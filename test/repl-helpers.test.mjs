@@ -4,55 +4,60 @@ import { textToRunCode, filterResponse } from '../src/repl.mjs';
 // ─── textToRunCode ──────────────────────────────────────────────────────────
 
 describe('textToRunCode', () => {
-  it('click generates getByText().click()', () => {
+  it('click generates getByText().click() with exact', () => {
     const result = textToRunCode('click', 'Submit', []);
     expect(result._[0]).toBe('run-code');
-    expect(result._[1]).toContain('page.getByText("Submit").click()');
+    expect(result._[1]).toContain("page.getByText('Submit', { exact: true }).click()");
   });
 
-  it('dblclick generates getByText().dblclick()', () => {
+  it('dblclick generates getByText().dblclick() with exact', () => {
     const result = textToRunCode('dblclick', 'Edit', []);
-    expect(result._[1]).toContain('page.getByText("Edit").dblclick()');
+    expect(result._[1]).toContain("page.getByText('Edit', { exact: true }).dblclick()");
   });
 
-  it('hover generates getByText().hover()', () => {
+  it('hover generates getByText().hover() with exact', () => {
     const result = textToRunCode('hover', 'Menu', []);
-    expect(result._[1]).toContain('page.getByText("Menu").hover()');
+    expect(result._[1]).toContain("page.getByText('Menu', { exact: true }).hover()");
   });
 
-  it('fill generates getByLabel().fill()', () => {
+  it('fill generates getByLabel with fallback chain', () => {
     const result = textToRunCode('fill', 'Email', ['test@example.com']);
-    expect(result._[1]).toContain('page.getByLabel("Email").fill("test@example.com")');
+    expect(result._[1]).toContain("page.getByLabel('Email')");
+    expect(result._[1]).toContain("page.getByPlaceholder('Email')");
+    expect(result._[1]).toContain("loc.fill('test@example.com')");
   });
 
-  it('select generates getByLabel().selectOption()', () => {
+  it('select generates getByLabel with fallback chain', () => {
     const result = textToRunCode('select', 'Country', ['US']);
-    expect(result._[1]).toContain('page.getByLabel("Country").selectOption("US")');
+    expect(result._[1]).toContain("page.getByLabel('Country')");
+    expect(result._[1]).toContain("loc.selectOption('US')");
   });
 
-  it('check generates getByLabel().check()', () => {
+  it('check generates listitem fallback then getByLabel', () => {
     const result = textToRunCode('check', 'Terms', []);
-    expect(result._[1]).toContain('page.getByLabel("Terms").check()');
+    expect(result._[1]).toContain("page.getByRole('listitem').filter({ hasText: 'Terms' })");
+    expect(result._[1]).toContain("page.getByLabel('Terms')");
   });
 
-  it('uncheck generates getByLabel().uncheck()', () => {
+  it('uncheck generates listitem fallback then getByLabel', () => {
     const result = textToRunCode('uncheck', 'Newsletter', []);
-    expect(result._[1]).toContain('page.getByLabel("Newsletter").uncheck()');
+    expect(result._[1]).toContain("page.getByRole('listitem').filter({ hasText: 'Newsletter' })");
+    expect(result._[1]).toContain("page.getByLabel('Newsletter')");
   });
 
-  it('escapes double quotes in text arg', () => {
-    const result = textToRunCode('click', 'Say "hello"', []);
-    expect(result._[1]).toContain('page.getByText("Say \\"hello\\"")');
+  it('escapes single quotes in text arg', () => {
+    const result = textToRunCode('click', "Say 'hello'", []);
+    expect(result._[1]).toContain("Say \\'hello\\'");
   });
 
   it('escapes backslashes in text arg', () => {
     const result = textToRunCode('click', 'path\\to\\file', []);
-    expect(result._[1]).toContain('page.getByText("path\\\\to\\\\file")');
+    expect(result._[1]).toContain("path\\\\to\\\\file");
   });
 
-  it('escapes quotes in fill value', () => {
-    const result = textToRunCode('fill', 'Name', ['O"Brien']);
-    expect(result._[1]).toContain('.fill("O\\"Brien")');
+  it('escapes single quotes in fill value', () => {
+    const result = textToRunCode('fill', 'Name', ["O'Brien"]);
+    expect(result._[1]).toContain("O\\'Brien");
   });
 
   it('returns null for unknown command', () => {
@@ -67,7 +72,7 @@ describe('textToRunCode', () => {
 
   it('fill with empty value', () => {
     const result = textToRunCode('fill', 'Name', []);
-    expect(result._[1]).toContain('.fill("")');
+    expect(result._[1]).toContain("loc.fill('')");
   });
 });
 

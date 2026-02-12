@@ -16,7 +16,14 @@ describe('findWorkspaceDir', () => {
   });
 
   it('returns undefined when no .playwright directory found', () => {
-    expect(findWorkspaceDir(tmpDir)).toBeUndefined();
+    // Create a deep nested dir so the 10-level walk limit expires
+    // before reaching any real .playwright dir above tmpDir
+    let deep = tmpDir;
+    for (let i = 0; i < 12; i++) {
+      deep = path.join(deep, `n${i}`);
+    }
+    fs.mkdirSync(deep, { recursive: true });
+    expect(findWorkspaceDir(deep)).toBeUndefined();
   });
 
   it('finds .playwright in the start directory', () => {

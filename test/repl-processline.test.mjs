@@ -323,7 +323,7 @@ describe('processLine', () => {
     await processLine(ctx, 'click "Submit"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByText("Submit").click()');
+    expect(call._[1]).toContain("getByText('Submit', { exact: true }).click()");
   });
 
   it('auto-resolves text to run-code for fill', async () => {
@@ -331,7 +331,8 @@ describe('processLine', () => {
     await processLine(ctx, 'fill "Email" test@x.com');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByLabel("Email").fill("test@x.com")');
+    expect(call._[1]).toContain("getByLabel('Email')");
+    expect(call._[1]).toContain("loc.fill('test@x.com')");
   });
 
   it('does NOT auto-resolve ref-style args (e5)', async () => {
@@ -500,7 +501,7 @@ describe('processLine', () => {
     await processLine(ctx, 'dblclick "Item"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByText("Item").dblclick()');
+    expect(call._[1]).toContain("getByText('Item', { exact: true }).dblclick()");
   });
 
   it('auto-resolves text for hover', async () => {
@@ -508,7 +509,7 @@ describe('processLine', () => {
     await processLine(ctx, 'hover "Menu"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByText("Menu").hover()');
+    expect(call._[1]).toContain("getByText('Menu', { exact: true }).hover()");
   });
 
   it('auto-resolves text for select (uses getByLabel)', async () => {
@@ -516,7 +517,8 @@ describe('processLine', () => {
     await processLine(ctx, 'select "Country" US');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByLabel("Country").selectOption("US")');
+    expect(call._[1]).toContain("getByLabel('Country')");
+    expect(call._[1]).toContain("loc.selectOption('US')");
   });
 
   it('auto-resolves text for check (uses getByLabel)', async () => {
@@ -524,7 +526,7 @@ describe('processLine', () => {
     await processLine(ctx, 'check "Agree"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByLabel("Agree").check()');
+    expect(call._[1]).toContain("getByLabel('Agree')");
   });
 
   it('auto-resolves text for uncheck (uses getByLabel)', async () => {
@@ -532,7 +534,7 @@ describe('processLine', () => {
     await processLine(ctx, 'uncheck "Agree"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain('getByLabel("Agree").uncheck()');
+    expect(call._[1]).toContain("getByLabel('Agree')");
   });
 
   it('does not record when session is paused', async () => {
