@@ -4,20 +4,27 @@ import { textToRunCode, filterResponse } from '../src/repl.mjs';
 // ─── textToRunCode ──────────────────────────────────────────────────────────
 
 describe('textToRunCode', () => {
-  it('click generates getByText().click() with exact', () => {
+  it('click generates fallback chain with getByText exact, role, then getByText', () => {
     const result = textToRunCode('click', 'Submit', []);
     expect(result._[0]).toBe('run-code');
-    expect(result._[1]).toContain("page.getByText('Submit', { exact: true }).click()");
+    expect(result._[1]).toContain("page.getByText('Submit', { exact: true })");
+    expect(result._[1]).toContain("page.getByRole('button', { name: 'Submit' })");
+    expect(result._[1]).toContain("page.getByRole('link', { name: 'Submit' })");
+    expect(result._[1]).toContain("loc.click()");
   });
 
-  it('dblclick generates getByText().dblclick() with exact', () => {
+  it('dblclick generates fallback chain with getByText exact, role, then getByText', () => {
     const result = textToRunCode('dblclick', 'Edit', []);
-    expect(result._[1]).toContain("page.getByText('Edit', { exact: true }).dblclick()");
+    expect(result._[1]).toContain("page.getByText('Edit', { exact: true })");
+    expect(result._[1]).toContain("page.getByRole('button', { name: 'Edit' })");
+    expect(result._[1]).toContain("loc.dblclick()");
   });
 
-  it('hover generates getByText().hover() with exact', () => {
+  it('hover generates fallback chain with getByText exact, role, then getByText', () => {
     const result = textToRunCode('hover', 'Menu', []);
-    expect(result._[1]).toContain("page.getByText('Menu', { exact: true }).hover()");
+    expect(result._[1]).toContain("page.getByText('Menu', { exact: true })");
+    expect(result._[1]).toContain("page.getByRole('button', { name: 'Menu' })");
+    expect(result._[1]).toContain("loc.hover()");
   });
 
   it('fill generates getByLabel with fallback chain', () => {
@@ -67,7 +74,7 @@ describe('textToRunCode', () => {
 
   it('wraps code in async function', () => {
     const result = textToRunCode('click', 'OK', []);
-    expect(result._[1]).toMatch(/^async \(page\) => \{.*\}$/);
+    expect(result._[1]).toMatch(/^async \(page\) => \{[\s\S]*\}$/);
   });
 
   it('fill with empty value', () => {

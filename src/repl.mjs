@@ -69,11 +69,29 @@ export function textToRunCode(cmdName, textArg, extraArgs) {
 
   switch (cmdName) {
     case 'click':
-      return { _: ['run-code', `async (page) => { await page.getByText('${text}', { exact: true }).click(); }`] };
+      return { _: ['run-code', `async (page) => {
+  let loc = page.getByText('${text}', { exact: true });
+  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByText('${text}');
+  await loc.click();
+}`] };
     case 'dblclick':
-      return { _: ['run-code', `async (page) => { await page.getByText('${text}', { exact: true }).dblclick(); }`] };
+      return { _: ['run-code', `async (page) => {
+  let loc = page.getByText('${text}', { exact: true });
+  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByText('${text}');
+  await loc.dblclick();
+}`] };
     case 'hover':
-      return { _: ['run-code', `async (page) => { await page.getByText('${text}', { exact: true }).hover(); }`] };
+      return { _: ['run-code', `async (page) => {
+  let loc = page.getByText('${text}', { exact: true });
+  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
+  if (await loc.count() === 0) loc = page.getByText('${text}');
+  await loc.hover();
+}`] };
     case 'fill': {
       const value = esc(extraArgs[0] || '');
       // Try getByLabel first, fall back to getByPlaceholder, then getByRole('textbox')
@@ -190,14 +208,18 @@ export async function handleKillAll(ctx) {
     if (process.platform === 'win32') {
       let result = '';
       try {
-        result = execSync('wmic process where "CommandLine like \'%run-mcp-server%\' and CommandLine like \'%--daemon-session%\'" get ProcessId /format:list', { encoding: 'utf-8' });
+        result = execSync(
+          'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*run-mcp-server*\' -and $_.CommandLine -like \'*--daemon-session*\' } | Select-Object -ExpandProperty ProcessId"',
+          { encoding: 'utf-8' }
+        );
       } catch (err) {
         result = err.stdout || '';
       }
-      const pids = result.match(/ProcessId=(\d+)/g) || [];
-      for (const match of pids) {
-        const pid = match.split('=')[1];
-        try { process.kill(parseInt(pid, 10)); killed++; } catch {}
+      for (const line of result.trim().split(/\r?\n/)) {
+        const pid = line.trim();
+        if (/^\d+$/.test(pid)) {
+          try { process.kill(parseInt(pid, 10)); killed++; } catch {}
+        }
       }
     } else {
       const result = execSync('ps aux', { encoding: 'utf-8' });

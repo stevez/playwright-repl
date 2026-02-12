@@ -323,7 +323,7 @@ describe('processLine', () => {
     await processLine(ctx, 'click "Submit"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Submit', { exact: true }).click()");
+    expect(call._[1]).toContain("getByText('Submit', { exact: true })");
   });
 
   it('auto-resolves text to run-code for fill', async () => {
@@ -501,7 +501,7 @@ describe('processLine', () => {
     await processLine(ctx, 'dblclick "Item"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Item', { exact: true }).dblclick()");
+    expect(call._[1]).toContain("getByText('Item', { exact: true })");
   });
 
   it('auto-resolves text for hover', async () => {
@@ -509,7 +509,7 @@ describe('processLine', () => {
     await processLine(ctx, 'hover "Menu"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Menu', { exact: true }).hover()");
+    expect(call._[1]).toContain("getByText('Menu', { exact: true })");
   });
 
   it('auto-resolves text for select (uses getByLabel)', async () => {
