@@ -2,7 +2,7 @@
 
 Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal.
 
-> Think of it as Robot Framework backed by Playwright instead of Selenium.
+Inspired by [playwright-cli](https://github.com/anthropics/playwright-cli), reusing its command vocabulary and Playwright MCP daemon. Where playwright-cli is designed for AI agents (one command per process), playwright-repl is designed for **humans** — a persistent session with recording, replay, and instant feedback.
 
 ## Why?
 
@@ -10,28 +10,37 @@ The `playwright-cli` tool spawns a new Node.js process **per command** — conne
 
 **playwright-repl** keeps a persistent socket connection open. Type a command, see the result instantly. Record your session, replay it later — no code, no tokens, no setup.
 
+Key features beyond playwright-cli:
+- **Text locators** — use `click "Submit"` or `fill "Email" "test@example.com"` instead of element refs. Auto-resolves via getByText, getByLabel, getByPlaceholder, and getByRole with fallback chains
+- **Element refs** — also supports ref-based commands (`click e5`, `fill e7 "hello"`) from `snapshot` output
+- **Assertions** — `verify-text`, `verify-element`, `verify-value`, `verify-list` for inline validation
+- **Record & replay** — capture sessions as `.pw` files and replay them headlessly or step-by-step
+
 ```
-pw> goto https://myapp.com/login
-pw> snapshot
-- textbox "Email" [ref=e3]
-- textbox "Password" [ref=e5]
-- button "Sign in" [ref=e7]
-
-pw> .record login-test
-⏺ Recording to login-test.pw
-
-pw> fill e3 user@test.com
-pw> fill e5 password123
-pw> click e7
-pw> verify-text "Welcome back"
-pw> .save
-✓ Saved 4 commands to login-test.pw
+pw> goto https://demo.playwright.dev/todomvc/
+pw> fill "What needs to be done?" "Buy groceries"
+pw> press Enter
+pw> fill "What needs to be done?" "Write tests"
+pw> press Enter
+pw> check "Buy groceries"
+pw> verify-text "1 item left"
 ```
 
-Then replay it any time:
+Record it, replay it later:
 
 ```bash
-playwright-repl --replay login-test.pw
+pw> .record smoke-test
+⏺ Recording to smoke-test.pw
+
+pw> goto https://demo.playwright.dev/todomvc/
+pw> fill "What needs to be done?" "Buy groceries"
+pw> press Enter
+pw> verify-text "1 item left"
+pw> .save
+✓ Saved 4 commands to smoke-test.pw
+
+# Replay any time
+$ playwright-repl --replay smoke-test.pw
 ```
 
 ## Install
@@ -44,7 +53,7 @@ npm install -g playwright@latest
 npm install -g playwright-repl
 
 # Or from source
-git clone https://github.com/anthropics/playwright-repl.git
+git clone https://github.com/stevez/playwright-repl.git
 cd playwright-repl && npm install && npm link
 ```
 
@@ -61,13 +70,23 @@ playwright-repl --headed
 playwright-repl --headed --browser firefox
 ```
 
-Once inside the REPL:
+Once inside the REPL, use either **text locators** or **element refs**:
 
 ```
-pw> goto https://example.com      # navigate
-pw> snapshot                       # see the page (accessibility tree)
-pw> click e3                       # click element ref e3
-pw> fill e5 "search query"         # type into a field
+pw> goto https://demo.playwright.dev/todomvc/
+
+# Text locators — no snapshot needed
+pw> fill "What needs to be done?" "Buy groceries"
+pw> press Enter
+pw> check "Buy groceries"
+pw> verify-text "0 items left"
+
+# Or use element refs from snapshot
+pw> snapshot
+- textbox "What needs to be done?" [ref=e8]
+- listitem "Buy groceries" [ref=e21]
+
+pw> click e21                      # click by ref
 pw> screenshot                     # take a screenshot
 pw> close                          # close browser
 ```
@@ -240,31 +259,30 @@ Record your browser interactions and replay them later — great for regression 
 
 ```bash
 # From CLI
-playwright-repl --record login-test.pw --headed
+playwright-repl --record my-test.pw --headed
 
 # Or inside the REPL
-pw> .record login-test
-⏺ Recording to login-test.pw
-pw> goto https://myapp.com/login
-pw> fill e3 user@test.com
-pw> fill e5 password123
-pw> click e7
-pw> verify-text "Dashboard"
+pw> .record my-test
+⏺ Recording to my-test.pw
+pw> goto https://demo.playwright.dev/todomvc/
+pw> fill "What needs to be done?" "Buy groceries"
+pw> press Enter
+pw> verify-text "1 item left"
 pw> .save
-✓ Saved 5 commands to login-test.pw
+✓ Saved 4 commands to my-test.pw
 ```
 
 ### Replay
 
 ```bash
 # Full speed
-playwright-repl --replay login-test.pw
+playwright-repl --replay my-test.pw
 
 # Step-through (press Enter between commands)
-playwright-repl --replay login-test.pw --step
+playwright-repl --replay my-test.pw --step --headed
 
 # Or inside the REPL
-pw> .replay login-test.pw
+pw> .replay my-test.pw
 ```
 
 ### File Format
@@ -272,14 +290,14 @@ pw> .replay login-test.pw
 `.pw` files are plain text — human-readable, diffable, version-controllable:
 
 ```
-# Playwright REPL session
-# recorded 2026-02-09T19:30:00Z
+# CI smoke test — quick add-and-verify
+# App: https://demo.playwright.dev/todomvc/
 
-goto https://myapp.com/login
-fill e3 user@test.com
-fill e5 password123
-click e7
-verify-text "Dashboard"
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+verify-text "Buy groceries"
+verify-text "1 item left"
 ```
 
 ### Recording Controls
@@ -293,29 +311,7 @@ verify-text "Dashboard"
 
 ## Examples
 
-Record a test flow and replay it — using the [TodoMVC demo](https://demo.playwright.dev/todomvc/):
-
-```
-$ playwright-repl --headed
-
-pw> .record todo-smoke-test
-⏺ Recording to todo-smoke-test.pw
-
-pw> goto https://demo.playwright.dev/todomvc/
-pw> fill e8 "Buy groceries"
-pw> press Enter
-pw> fill e8 "Write tests"
-pw> press Enter
-pw> check e21
-pw> verify-text "1 item left"
-pw> .save
-✓ Saved 7 commands to todo-smoke-test.pw
-
-# Replay later
-$ playwright-repl --replay todo-smoke-test.pw --headed
-```
-
-More examples in the [examples/](examples/) folder:
+All examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and can be run directly:
 
 | File | Description |
 |------|-------------|
@@ -329,7 +325,14 @@ More examples in the [examples/](examples/) folder:
 Try one:
 
 ```bash
+# Run an example with a visible browser
 playwright-repl --replay examples/01-add-todos.pw --headed
+
+# Step through an example interactively
+playwright-repl --replay examples/04-replay-session.pw --step --headed
+
+# Run as a CI smoke test (headless, silent)
+playwright-repl --replay examples/05-ci-pipe.pw --silent
 ```
 
 ## Architecture
