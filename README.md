@@ -46,13 +46,12 @@ $ playwright-repl --replay smoke-test.pw
 ## Install
 
 ```bash
-# Prerequisites: Node.js >= 18 and Playwright
-npm install -g playwright@latest
-
-# Install playwright-repl
 npm install -g playwright-repl
 
-# Or from source
+# If you don't have browser binaries yet
+npx playwright install
+
+# Or install from source
 git clone https://github.com/stevez/playwright-repl.git
 cd playwright-repl && npm install && npm link
 ```

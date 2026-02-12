@@ -77,8 +77,8 @@ describe('handleKillAll', () => {
   });
 
   if (process.platform === 'win32') {
-    it('parses wmic output for PIDs on windows', async () => {
-      vi.mocked(execSync).mockReturnValue('ProcessId=12345\r\nProcessId=67890\r\n');
+    it('parses powershell output for PIDs on windows', async () => {
+      vi.mocked(execSync).mockReturnValue('12345\r\n67890\r\n');
       const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
       const ctx = makeCtx();
       await handleKillAll(ctx);
@@ -89,8 +89,8 @@ describe('handleKillAll', () => {
       killSpy.mockRestore();
     });
 
-    it('handles wmic failure gracefully', async () => {
-      const err = new Error('wmic failed');
+    it('handles powershell failure gracefully', async () => {
+      const err = new Error('powershell failed');
       err.stdout = '';
       vi.mocked(execSync).mockImplementation(() => { throw err; });
       const ctx = makeCtx();

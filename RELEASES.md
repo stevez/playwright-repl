@@ -1,5 +1,20 @@
 # Releases
 
+## v0.1.1 — Bug Fixes
+
+**2026-02-12**
+
+### Fixes
+
+- **`kill-all` on Windows 11**: Replace deprecated `wmic` with PowerShell `Get-CimInstance` — fixes `'wmic' is not recognized` error on modern Windows
+- **Text locator case sensitivity**: `click`, `dblclick`, and `hover` now use a fallback chain (exact text → button role → link role → substring match) so `click "GET STARTED"` works even when the DOM text is "Get Started"
+
+### Tests
+
+- Updated tests for new text locator fallback chain and PowerShell kill-all
+
+---
+
 ## v0.1.0 — Initial Release
 
 **2026-02-09**
