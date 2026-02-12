@@ -1,0 +1,21 @@
+# Complete a todo and use filters
+# App: https://demo.playwright.dev/todomvc/
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+fill "What needs to be done?" "Write tests"
+press Enter
+fill "What needs to be done?" "Deploy to production"
+press Enter
+check "Buy groceries"
+verify-text "2 items left"
+click "Active"
+verify-text "Write tests"
+verify-text "Deploy to production"
+click "Completed"
+verify-text "Buy groceries"
+click "All"
+click "Clear completed"
+verify-text "Write tests"
+verify-text "Deploy to production"

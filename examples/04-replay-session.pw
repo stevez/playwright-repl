@@ -1,0 +1,17 @@
+# Replay demo — add todos, complete them, verify count
+# App: https://demo.playwright.dev/todomvc/
+# Full speed: playwright-repl --replay examples/04-replay-session.pw
+# Step-through: playwright-repl --replay examples/04-replay-session.pw --step --headed
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+fill "What needs to be done?" "Write tests"
+press Enter
+fill "What needs to be done?" "Deploy to production"
+press Enter
+verify-text "3 items left"
+check "Buy groceries"
+verify-text "2 items left"
+check "Write tests"
+verify-text "1 item left"

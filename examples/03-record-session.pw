@@ -1,0 +1,13 @@
+# Record and save a smoke test
+# App: https://demo.playwright.dev/todomvc/
+# Usage: playwright-repl --replay examples/03-record-session.pw --headed
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+fill "What needs to be done?" "Write tests"
+press Enter
+check "Buy groceries"
+verify-text "1 item left"
+click "Clear completed"
+verify-text "Write tests"

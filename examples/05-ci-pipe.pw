@@ -1,0 +1,14 @@
+# CI smoke test — quick add-and-verify
+# App: https://demo.playwright.dev/todomvc/
+# Usage: playwright-repl --replay examples/05-ci-pipe.pw --silent
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+verify-text "Buy groceries"
+verify-text "1 item left"
+fill "What needs to be done?" "Write tests"
+press Enter
+verify-text "2 items left"
+check "Buy groceries"
+verify-text "1 item left"

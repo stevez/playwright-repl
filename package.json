@@ -1,0 +1,40 @@
+{
+  "name": "playwright-repl",
+  "version": "0.1.0",
+  "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
+  "type": "module",
+  "bin": {
+    "playwright-repl": "./bin/playwright-repl.mjs"
+  },
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "scripts": {
+    "start": "node bin/playwright-repl.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "playwright",
+    "repl",
+    "browser",
+    "automation",
+    "testing",
+    "mcp",
+    "keyword-driven"
+  ],
+  "author": "Steve Higa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "playwright": ">=1.59.0-alpha-2026-02-01"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
+    "vitest": "^4.0.18"
+  }
+}

@@ -1,0 +1,11 @@
+# Double-click to edit a todo
+# App: https://demo.playwright.dev/todomvc/
+
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+dblclick "Buy groceries"
+press Control+a
+type "Buy organic groceries"
+press Enter
+verify-text "Buy organic groceries"
