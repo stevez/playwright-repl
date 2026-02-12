@@ -24,7 +24,7 @@
     "mcp",
     "keyword-driven"
   ],
-  "author": "Steve Higa",
+  "author": "Steve Zhang",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
