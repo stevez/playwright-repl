@@ -26,6 +26,18 @@
   ],
   "author": "Steve Zhang",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevez/playwright-repl.git"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "examples/",
+    "LICENSE",
+    "README.md",
+    "RELEASES.md"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },
