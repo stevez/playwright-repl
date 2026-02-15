@@ -1,5 +1,7 @@
 # playwright-repl
 
+![playwright-repl](cover-image.png)
+
 Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal.
 
 Inspired by [playwright-cli](https://github.com/anthropics/playwright-cli), reusing its command vocabulary and Playwright MCP daemon. Where playwright-cli is designed for AI agents (one command per process), playwright-repl is designed for **humans** — a persistent session with recording, replay, and instant feedback.
@@ -336,13 +338,7 @@ playwright-repl --replay examples/05-ci-pipe.pw --silent
 
 ## Architecture
 
-```
-┌──────────────┐     Unix Socket      ┌──────────────────┐     CDP      ┌─────────┐
-│ playwright-  │◄──── JSON/newline ───►│  Daemon Process  │◄────────────►│ Browser │
-│ repl         │                       │  (Playwright     │              │(Chrome/ │
-│              │                       │   MCP backend)   │              │ FF/WK)  │
-└──────────────┘                       └──────────────────┘              └─────────┘
-```
+![Architecture](architecture-diagram.png)
 
 The REPL replaces only the **client half** of playwright-cli. The daemon, browser, and all tool handlers are unchanged — both CLI and REPL produce identical wire messages.
 
