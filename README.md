@@ -114,6 +114,49 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 playwright-repl --session checkout-flow --headed
 ```
 
+## Use as an MCP Server
+
+`playwright-repl` also ships a thin stdio MCP server wrapper:
+
+```bash
+playwright-mcp-server
+```
+
+It exposes a focused tool set and forwards calls to the same Playwright daemon used by the REPL.
+
+### MCP Server Options
+
+| Option | Description |
+|--------|-------------|
+| `-s, --session <name>` | Daemon session name (default: `"default"`) |
+| `--auto-start-daemon` | Auto-start daemon when not running (default: `true`) |
+| `--tool-timeout-ms <ms>` | Timeout per tool call (default: `30000`) |
+| `--headed` | Start daemon/browser in headed mode when auto-starting |
+| `--browser <type>` | Browser for daemon startup: `chrome`, `firefox`, `webkit`, `msedge` |
+| `--persistent` | Use persistent browser profile when auto-starting |
+| `--profile <dir>` | Persistent profile directory |
+| `--config <file>` | Path to Playwright daemon config file |
+| `--silent` | Suppress daemon startup output (default: `true`) |
+| `--allow-tool <name[,name...]>` | Restrict exposed tools to an allowlist |
+
+### Exposed MCP Tools (MVP)
+
+- `open`
+- `goto`
+- `click`
+- `fill`
+- `press`
+- `snapshot`
+- `screenshot`
+- `verify-text`
+- `verify-element`
+- `verify-value`
+- `verify-list`
+
+Behavior notes:
+- `click` / `fill` support both aria refs (`e5`) and text targets, matching REPL behavior.
+- `verify-*` commands are translated to `run-code` internally because daemon CLI keywords for verify are not natively mapped.
+
 ### CLI Options
 
 | Option | Description |

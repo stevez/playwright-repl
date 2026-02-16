@@ -4,7 +4,8 @@
   "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
   "type": "module",
   "bin": {
-    "playwright-repl": "./bin/playwright-repl.mjs"
+    "playwright-repl": "./bin/playwright-repl.mjs",
+    "playwright-mcp-server": "./bin/playwright-mcp-server.mjs"
   },
   "main": "./src/index.mjs",
   "exports": {
@@ -12,6 +13,7 @@
   },
   "scripts": {
     "start": "node bin/playwright-repl.mjs",
+    "start:mcp": "node bin/playwright-mcp-server.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
