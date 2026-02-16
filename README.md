@@ -130,6 +130,52 @@ playwright-repl --session checkout-flow --headed
 | `-q, --silent` | Suppress banner and status messages |
 | `-h, --help` | Show help |
 
+## MCP Server
+
+`playwright-repl` also ships an MCP server that exposes Playwright's full browser automation toolkit to AI agents (Claude, Cursor, etc.) over stdio.
+
+```bash
+# Run directly
+npx -p playwright-repl playwright-mcp-server
+
+# With visible browser
+npx -p playwright-repl playwright-mcp-server --headed
+```
+
+### VS Code / Cursor Configuration
+
+Add to `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-p", "playwright-repl", "playwright-mcp-server"]
+    }
+  }
+}
+```
+
+Or with a visible browser:
+
+```json
+{
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-p", "playwright-repl", "playwright-mcp-server", "--headed"]
+    }
+  }
+}
+```
+
+### MCP Server Options
+
+| Option | Description |
+|--------|-------------|
+| `--headed` | Run browser in headed (visible) mode |
+
 ## Commands
 
 ### Navigation

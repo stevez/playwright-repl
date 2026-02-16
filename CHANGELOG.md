@@ -1,4 +1,30 @@
-# Releases
+# Changelog
+
+## v0.2.0 — MCP Server
+
+**2026-02-16**
+
+### Features
+
+- **MCP Server**: Ships a stdio MCP server (`playwright-mcp-server`) that exposes Playwright's full browser automation toolkit to AI agents (Claude, Cursor, etc.)
+- Supports `--headed` flag for visible browser mode
+
+### Configuration
+
+VS Code / Cursor — add to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-p", "playwright-repl", "playwright-mcp-server", "--headed"]
+    }
+  }
+}
+```
+
+---
 
 ## v0.1.1 — Bug Fixes
 

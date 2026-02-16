@@ -1,10 +1,11 @@
 {
   "name": "playwright-repl",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
   "type": "module",
   "bin": {
-    "playwright-repl": "./bin/playwright-repl.mjs"
+    "playwright-repl": "./bin/playwright-repl.mjs",
+    "playwright-mcp-server": "./bin/mcp-server.cjs"
   },
   "main": "./src/index.mjs",
   "exports": {
@@ -36,7 +37,7 @@
     "examples/",
     "LICENSE",
     "README.md",
-    "RELEASES.md"
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18.0.0"
