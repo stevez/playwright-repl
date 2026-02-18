@@ -7,7 +7,6 @@ import {
   showAliases,
   showStatus,
   promptStr,
-  completer,
 } from '../src/repl.mjs';
 
 // ─── Mock ctx factory ───────────────────────────────────────────────────────
@@ -58,44 +57,6 @@ describe('promptStr', () => {
     ctx.session.togglePause();
     const prompt = promptStr(ctx);
     expect(prompt).toContain('⏸');
-  });
-});
-
-// ─── completer ──────────────────────────────────────────────────────────────
-
-describe('completer', () => {
-  it('completes command names', () => {
-    const [hits, prefix] = completer('sn');
-    expect(prefix).toBe('sn');
-    expect(hits).toContain('snapshot');
-  });
-
-  it('completes meta-commands', () => {
-    const [hits, prefix] = completer('.he');
-    expect(prefix).toBe('.he');
-    expect(hits).toContain('.help');
-  });
-
-  it('completes aliases', () => {
-    const [hits, prefix] = completer('sna');
-    expect(hits).toContain('snap');
-  });
-
-  it('returns all commands when no match', () => {
-    const [hits, prefix] = completer('');
-    expect(hits.length).toBeGreaterThan(10);
-  });
-
-  it('completes options after command', () => {
-    const [hits, lastPart] = completer('screenshot --fu');
-    expect(lastPart).toBe('--fu');
-    // screenshot has --fullPage and --filename options
-    expect(hits).toContain('--fullPage');
-  });
-
-  it('returns empty for non-option second args', () => {
-    const [hits] = completer('click e5');
-    expect(hits).toEqual([]);
   });
 });
 

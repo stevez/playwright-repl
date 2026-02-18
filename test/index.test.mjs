@@ -49,4 +49,8 @@ describe('index.mjs exports', () => {
   it('exports startRepl', () => {
     expect(typeof api.startRepl).toBe('function');
   });
+
+  it('exports buildCompletionItems', () => {
+    expect(typeof api.buildCompletionItems).toBe('function');
+  });
 });

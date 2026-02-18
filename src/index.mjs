@@ -13,3 +13,4 @@ export { parseInput, ALIASES, ALL_COMMANDS } from './parser.mjs';
 export { SessionRecorder, SessionPlayer } from './recorder.mjs';
 export { socketPath, isDaemonRunning, startDaemon, findWorkspaceDir } from './workspace.mjs';
 export { startRepl } from './repl.mjs';
+export { buildCompletionItems } from './completion-data.mjs';

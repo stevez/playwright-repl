@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.2.1 — Ghost Completion
+
+**2026-02-17**
+
+### Features
+
+- **Ghost completion**: Fish-shell style inline suggestions — type a prefix and see dimmed suggestion text after the cursor
+  - **Tab** cycles through matches (e.g., `go` → goto, go-back, go-forward)
+  - **Right Arrow** accepts the current suggestion
+  - **Tab on empty line** cycles through all commands
+- Aliases excluded from ghost suggestions (still work when typed)
+
+### Removed
+
+- Removed readline's built-in Tab completer (replaced entirely by ghost completion)
+
+---
+
 ## v0.2.0 — MCP Server
 
 **2026-02-16**

@@ -9,11 +9,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 
-import { replVersion, COMMANDS } from './resolve.mjs';
+import { replVersion } from './resolve.mjs';
 import { DaemonConnection } from './connection.mjs';
 import { socketPath, daemonProfilesDir, isDaemonRunning, startDaemon } from './workspace.mjs';
 import { parseInput, ALIASES, ALL_COMMANDS } from './parser.mjs';
 import { SessionManager } from './recorder.mjs';
+import { buildCompletionItems } from './completion-data.mjs';
 import { c } from './colors.mjs';
 
 // ─── Verify commands → run-code translation ─────────────────────────────────
@@ -518,26 +519,98 @@ export function promptStr(ctx) {
   return `${prefix}${c.cyan}pw>${c.reset} `;
 }
 
-// ─── Tab completer ──────────────────────────────────────────────────────────
+// ─── Ghost completion (inline suggestion) ───────────────────────────────────
 
-export function completer(line) {
-  const parts = line.split(/\s+/);
-  if (parts.length <= 1) {
-    const prefix = parts[0] || '';
-    const allNames = [...ALL_COMMANDS, ...Object.keys(ALIASES)];
-    const metas = ['.help', '.aliases', '.status', '.reconnect', '.exit',
-                   '.record', '.save', '.replay', '.pause', '.discard'];
-    const hits = [...allNames, ...metas].filter(n => n.startsWith(prefix));
-    return [hits.length ? hits : allNames, prefix];
+/**
+ * Attaches ghost-text completion to a readline interface.
+ * Shows dimmed inline suggestion after the cursor; Tab or Right Arrow accepts it.
+ *
+ * Uses _ttyWrite wrapper instead of _writeToOutput because Node 22+ optimizes
+ * single-character appends and doesn't always trigger a full line refresh.
+ *
+ * @param {readline.Interface} rl
+ * @param {Array<{cmd: string, desc: string}>} items - from buildCompletionItems()
+ */
+function attachGhostCompletion(rl, items) {
+  if (!process.stdin.isTTY) return;  // no ghost text for piped input
+
+  const cmds = items.filter(i => !i.desc.startsWith('→')).map(i => i.cmd);
+  let ghost = '';
+  let matches = [];   // all matching commands for current input
+  let matchIdx = 0;   // which match is currently shown
+
+  function getMatches(input) {
+    if (input.length > 0 && !input.includes(' ')) {
+      return cmds.filter(cmd => cmd.startsWith(input) && cmd !== input);
+    }
+    return [];
   }
-  const cmd = ALIASES[parts[0]] || parts[0];
-  const helpText = COMMANDS[cmd]?.options || [];
-  const lastPart = parts[parts.length - 1];
-  if (lastPart.startsWith('--')) {
-    const hits = helpText.filter(o => o.startsWith(lastPart));
-    return [hits, lastPart];
+
+  function renderGhost(suffix) {
+    ghost = suffix;
+    rl.output.write(`\x1b[2m${ghost}\x1b[0m\x1b[${ghost.length}D`);
   }
-  return [[], line];
+
+  const origTtyWrite = rl._ttyWrite.bind(rl);
+  rl._ttyWrite = function (s, key) {
+    if (ghost && key) {
+      // Right-arrow-at-end accepts ghost suggestion
+      if (key.name === 'right' && rl.cursor === rl.line.length) {
+        const text = ghost;
+        rl.output.write('\x1b[K');
+        ghost = '';
+        matches = [];
+        rl._insertString(text);
+        return;
+      }
+
+      // Tab cycles through matches
+      if (key.name === 'tab' && matches.length > 1) {
+        rl.output.write('\x1b[K');
+        matchIdx = (matchIdx + 1) % matches.length;
+        const input = rl.line || '';
+        renderGhost(matches[matchIdx].slice(input.length));
+        return;
+      }
+
+      // Tab with single match accepts it
+      if (key.name === 'tab' && matches.length === 1) {
+        const text = ghost;
+        rl.output.write('\x1b[K');
+        ghost = '';
+        matches = [];
+        rl._insertString(text);
+        return;
+      }
+    }
+
+    // Tab on empty input — show all commands as ghost suggestions
+    if (key && key.name === 'tab') {
+      if ((rl.line || '') === '') {
+        matches = cmds;
+        matchIdx = 0;
+        renderGhost(matches[0]);
+      }
+      return;
+    }
+
+    // Clear existing ghost text before readline processes the key
+    if (ghost) {
+      rl.output.write('\x1b[K');
+      ghost = '';
+    }
+
+    // Let readline handle the key normally
+    origTtyWrite(s, key);
+
+    // Render new ghost text if cursor is at end of line
+    const input = rl.line || '';
+    matches = getMatches(input);
+    matchIdx = 0;
+    if (matches.length > 0 && rl.cursor === rl.line.length) {
+      renderGhost(matches[0].slice(input.length));
+    }
+  };
 }
 
 // ─── REPL ────────────────────────────────────────────────────────────────────
@@ -585,7 +658,6 @@ export async function startRepl(opts = {}) {
     output: process.stdout,
     prompt: promptStr(ctx),
     historySize: 500,
-    completer,
   });
   ctx.rl = rl;
 
@@ -593,6 +665,8 @@ export async function startRepl(opts = {}) {
     const hist = fs.readFileSync(historyFile, 'utf-8').split('\n').filter(Boolean).reverse();
     for (const line of hist) rl.history.push(line);
   } catch {}
+
+  attachGhostCompletion(rl, buildCompletionItems());
 
   // ─── Start ───────────────────────────────────────────────────────
 
