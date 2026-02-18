@@ -15,123 +15,11 @@ import { socketPath, daemonProfilesDir, isDaemonRunning, startDaemon } from './w
 import { parseInput, ALIASES, ALL_COMMANDS } from './parser.mjs';
 import { SessionManager } from './recorder.mjs';
 import { buildCompletionItems } from './completion-data.mjs';
+import {
+  buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  actionByText, fillByText, selectByText, checkByText, uncheckByText,
+} from './page-scripts.mjs';
 import { c } from './colors.mjs';
-
-// ─── Verify commands → run-code translation ─────────────────────────────────
-
-/**
- * The daemon has browser_verify_* tools but no CLI keyword mappings.
- * We intercept verify-* commands here and translate them to run-code calls
- * that use the equivalent Playwright API.
- */
-export function verifyToRunCode(cmdName, positionalArgs) {
-  const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-  switch (cmdName) {
-    case 'verify-text': {
-      const text = positionalArgs.join(' ');
-      if (!text) return null;
-      return { _: ['run-code', `async (page) => { if (await page.getByText('${esc(text)}').filter({ visible: true }).count() === 0) throw new Error('Text not found: ${esc(text)}'); }`] };
-    }
-    case 'verify-element': {
-      const [role, ...nameParts] = positionalArgs;
-      const name = nameParts.join(' ');
-      if (!role || !name) return null;
-      return { _: ['run-code', `async (page) => { if (await page.getByRole('${esc(role)}', { name: '${esc(name)}' }).count() === 0) throw new Error('Element not found: ${esc(role)} "${esc(name)}"'); }`] };
-    }
-    case 'verify-value': {
-      const [ref, ...valueParts] = positionalArgs;
-      const value = valueParts.join(' ');
-      if (!ref || !value) return null;
-      return { _: ['run-code', `async (page) => { const el = page.locator('[aria-ref="${esc(ref)}"]'); const v = await el.inputValue(); if (v !== '${esc(value)}') throw new Error('Expected "${esc(value)}", got "' + v + '"'); }`] };
-    }
-    case 'verify-list': {
-      const [ref, ...items] = positionalArgs;
-      if (!ref || items.length === 0) return null;
-      const checks = items.map(item => `if (await loc.getByText('${esc(item)}').count() === 0) throw new Error('Item not found: ${esc(item)}');`).join(' ');
-      return { _: ['run-code', `async (page) => { const loc = page.locator('[aria-ref="${esc(ref)}"]'); ${checks} }`] };
-    }
-    default:
-      return null;
-  }
-}
-
-// ─── Text-to-action via Playwright native locators ──────────────────────────
-
-/**
- * Build a run-code args object that uses Playwright's native text locators.
- * e.g. click "Active"       → page.getByText("Active").click()
- *      fill "Email" "test"  → page.getByLabel("Email").fill("test")
- *      check "Buy groceries" → listitem with text → checkbox.check()
- */
-export function textToRunCode(cmdName, textArg, extraArgs) {
-  const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const text = esc(textArg);
-
-  switch (cmdName) {
-    case 'click':
-      return { _: ['run-code', `async (page) => {
-  let loc = page.getByText('${text}', { exact: true });
-  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByText('${text}');
-  await loc.click();
-}`] };
-    case 'dblclick':
-      return { _: ['run-code', `async (page) => {
-  let loc = page.getByText('${text}', { exact: true });
-  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByText('${text}');
-  await loc.dblclick();
-}`] };
-    case 'hover':
-      return { _: ['run-code', `async (page) => {
-  let loc = page.getByText('${text}', { exact: true });
-  if (await loc.count() === 0) loc = page.getByRole('button', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByRole('link', { name: '${text}' });
-  if (await loc.count() === 0) loc = page.getByText('${text}');
-  await loc.hover();
-}`] };
-    case 'fill': {
-      const value = esc(extraArgs[0] || '');
-      // Try getByLabel first, fall back to getByPlaceholder, then getByRole('textbox')
-      return { _: ['run-code', `async (page) => {
-  let loc = page.getByLabel('${text}');
-  if (await loc.count() === 0) loc = page.getByPlaceholder('${text}');
-  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: '${text}' });
-  await loc.fill('${value}');
-}`] };
-    }
-    case 'select': {
-      const value = esc(extraArgs[0] || '');
-      return { _: ['run-code', `async (page) => {
-  let loc = page.getByLabel('${text}');
-  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: '${text}' });
-  await loc.selectOption('${value}');
-}`] };
-    }
-    case 'check':
-      // Scope to listitem/group with matching text, then find checkbox inside
-      return { _: ['run-code', `async (page) => {
-  const item = page.getByRole('listitem').filter({ hasText: '${text}' });
-  if (await item.count() > 0) { await item.getByRole('checkbox').check(); return; }
-  let loc = page.getByLabel('${text}');
-  if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: '${text}' });
-  await loc.check();
-}`] };
-    case 'uncheck':
-      return { _: ['run-code', `async (page) => {
-  const item = page.getByRole('listitem').filter({ hasText: '${text}' });
-  if (await item.count() > 0) { await item.getByRole('checkbox').uncheck(); return; }
-  let loc = page.getByLabel('${text}');
-  if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: '${text}' });
-  await loc.uncheck();
-}`] };
-    default:
-      return null;
-  }
-}
 
 // ─── Response filtering ─────────────────────────────────────────────────────
 
@@ -143,7 +31,9 @@ export function filterResponse(text) {
     if (newline === -1) continue;
     const title = section.substring(0, newline).trim();
     const content = section.substring(newline + 1).trim();
-    if (title === 'Result' || title === 'Error' || title === 'Modal state')
+    if (title === 'Error')
+      kept.push(`${c.red}${content}${c.reset}`);
+    else if (title === 'Result' || title === 'Modal state')
       kept.push(content);
   }
   return kept.length > 0 ? kept.join('\n') : null;
@@ -374,9 +264,23 @@ export async function processLine(ctx, line) {
   if (cmdName === 'close' || cmdName === 'close-all') return handleClose(ctx);
 
   // ── Verify commands → run-code translation ──────────────────
-  const verifyCommands = ['verify-text', 'verify-element', 'verify-value', 'verify-list'];
-  if (verifyCommands.includes(cmdName)) {
-    const translated = verifyToRunCode(cmdName, args._.slice(1));
+  const verifyFns = {
+    'verify-text': verifyText,
+    'verify-element': verifyElement,
+    'verify-value': verifyValue,
+    'verify-list': verifyList,
+  };
+  if (verifyFns[cmdName]) {
+    const pos = args._.slice(1);
+    const fn = verifyFns[cmdName];
+    let translated = null;
+    if (cmdName === 'verify-text') {
+      const text = pos.join(' ');
+      if (text) translated = buildRunCode(fn, text);
+    } else if (pos[0] && pos.length >= 2) {
+      const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
+      translated = buildRunCode(fn, pos[0], rest);
+    }
     if (translated) {
       args = translated;
     } else {
@@ -386,15 +290,31 @@ export async function processLine(ctx, line) {
   }
 
   // ── Auto-resolve text to native Playwright locator ─────────
-  const refCommands = ['click', 'dblclick', 'hover', 'fill', 'select', 'check', 'uncheck'];
-  if (refCommands.includes(cmdName) && args._[1] && !/^e\d+$/.test(args._[1])) {
+  const textFns = {
+    click: actionByText, dblclick: actionByText, hover: actionByText,
+    fill: fillByText, select: selectByText, check: checkByText, uncheck: uncheckByText,
+  };
+  if (textFns[cmdName] && args._[1] && !/^e\d+$/.test(args._[1])) {
     const textArg = args._[1];
     const extraArgs = args._.slice(2);
-    const runCodeArgs = textToRunCode(cmdName, textArg, extraArgs);
-    if (runCodeArgs) {
-      ctx.log(`${c.dim}→ ${runCodeArgs._[1]}${c.reset}`);
-      args = runCodeArgs;
-    }
+    const fn = textFns[cmdName];
+    let runCodeArgs;
+    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName);
+    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '');
+    else runCodeArgs = buildRunCode(fn, textArg);
+    const argsHint = extraArgs.length > 0 ? ` ${extraArgs.join(' ')}` : '';
+    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint} (via run-code)${c.reset}`);
+    args = runCodeArgs;
+  }
+
+  // ── Auto-wrap run-code body with async (page) => { ... } ──
+  if (cmdName === 'run-code' && args._[1] && !args._[1].startsWith('async')) {
+    const STMT = /^(await|return|const|let|var|for|if|while|throw|try)\b/;
+    const body = !args._[1].includes(';') && !STMT.test(args._[1])
+      ? `return await ${args._[1]}`
+      : args._[1];
+    args = { _: ['run-code', `async (page) => { ${body} }`] };
+    ctx.log(`${c.dim}→ ${args._[1]}${c.reset}`);
   }
 
   const startTime = performance.now();
@@ -531,20 +451,27 @@ export function promptStr(ctx) {
  * @param {readline.Interface} rl
  * @param {Array<{cmd: string, desc: string}>} items - from buildCompletionItems()
  */
+/**
+ * Returns matching commands for ghost completion.
+ * When the input exactly matches a command AND there are longer matches,
+ * the exact match is included so the user can cycle through all options.
+ */
+export function getGhostMatches(cmds, input) {
+  if (input.length > 0 && !input.includes(' ')) {
+    const longer = cmds.filter(cmd => cmd.startsWith(input) && cmd !== input);
+    if (longer.length > 0 && cmds.includes(input)) longer.push(input);
+    return longer;
+  }
+  return [];
+}
+
 function attachGhostCompletion(rl, items) {
   if (!process.stdin.isTTY) return;  // no ghost text for piped input
 
-  const cmds = items.filter(i => !i.desc.startsWith('→')).map(i => i.cmd);
+  const cmds = items.map(i => i.cmd);
   let ghost = '';
   let matches = [];   // all matching commands for current input
   let matchIdx = 0;   // which match is currently shown
-
-  function getMatches(input) {
-    if (input.length > 0 && !input.includes(' ')) {
-      return cmds.filter(cmd => cmd.startsWith(input) && cmd !== input);
-    }
-    return [];
-  }
 
   function renderGhost(suffix) {
     ghost = suffix;
@@ -553,6 +480,30 @@ function attachGhostCompletion(rl, items) {
 
   const origTtyWrite = rl._ttyWrite.bind(rl);
   rl._ttyWrite = function (s, key) {
+    // Tab handling — based on matches, not ghost text
+    if (key && key.name === 'tab') {
+      // Cycle through multiple matches
+      if (matches.length > 1) {
+        rl.output.write('\x1b[K');
+        ghost = '';
+        matchIdx = (matchIdx + 1) % matches.length;
+        const input = rl.line || '';
+        const suffix = matches[matchIdx].slice(input.length);
+        if (suffix) renderGhost(suffix);
+        return;
+      }
+      // Single match — accept it
+      if (ghost && matches.length === 1) {
+        const text = ghost;
+        rl.output.write('\x1b[K');
+        ghost = '';
+        matches = [];
+        rl._insertString(text);
+        return;
+      }
+      return;
+    }
+
     if (ghost && key) {
       // Right-arrow-at-end accepts ghost suggestion
       if (key.name === 'right' && rl.cursor === rl.line.length) {
@@ -563,35 +514,6 @@ function attachGhostCompletion(rl, items) {
         rl._insertString(text);
         return;
       }
-
-      // Tab cycles through matches
-      if (key.name === 'tab' && matches.length > 1) {
-        rl.output.write('\x1b[K');
-        matchIdx = (matchIdx + 1) % matches.length;
-        const input = rl.line || '';
-        renderGhost(matches[matchIdx].slice(input.length));
-        return;
-      }
-
-      // Tab with single match accepts it
-      if (key.name === 'tab' && matches.length === 1) {
-        const text = ghost;
-        rl.output.write('\x1b[K');
-        ghost = '';
-        matches = [];
-        rl._insertString(text);
-        return;
-      }
-    }
-
-    // Tab on empty input — show all commands as ghost suggestions
-    if (key && key.name === 'tab') {
-      if ((rl.line || '') === '') {
-        matches = cmds;
-        matchIdx = 0;
-        renderGhost(matches[0]);
-      }
-      return;
     }
 
     // Clear existing ghost text before readline processes the key
@@ -605,7 +527,7 @@ function attachGhostCompletion(rl, items) {
 
     // Render new ghost text if cursor is at end of line
     const input = rl.line || '';
-    matches = getMatches(input);
+    matches = getGhostMatches(cmds, input);
     matchIdx = 0;
     if (matches.length > 0 && rl.cursor === rl.line.length) {
       renderGhost(matches[0].slice(input.length));

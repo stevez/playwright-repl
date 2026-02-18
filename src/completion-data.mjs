@@ -1,12 +1,10 @@
 /**
- * Completion data — builds the list of items for dropdown autocomplete.
+ * Completion data — builds the list of items for ghost completion.
  *
- * Sources: COMMANDS from resolve.mjs, ALIASES from parser.mjs,
- * plus REPL meta-commands (.help, .exit, etc.).
+ * Sources: COMMANDS from resolve.mjs plus REPL meta-commands (.help, .exit, etc.).
  */
 
 import { COMMANDS } from './resolve.mjs';
-import { ALIASES } from './parser.mjs';
 
 // ─── Meta-commands ───────────────────────────────────────────────────────────
 
@@ -23,11 +21,18 @@ const META_COMMANDS = [
   { cmd: '.exit',      desc: 'Exit REPL' },
 ];
 
+const EXTRA_COMMANDS = [
+  { cmd: 'verify-text',    desc: 'Assert text is visible on page' },
+  { cmd: 'verify-element', desc: 'Assert element exists by role and name' },
+  { cmd: 'verify-value',   desc: 'Assert input/select/checkbox value' },
+  { cmd: 'verify-list',    desc: 'Assert list contains expected items' },
+];
+
 // ─── Build completion items ──────────────────────────────────────────────────
 
 /**
  * Returns a sorted array of `{ cmd, desc }` for all completable items:
- * commands, aliases (with "→ target" description), and meta-commands.
+ * commands and meta-commands.
  */
 export function buildCompletionItems() {
   const items = [];
@@ -37,10 +42,8 @@ export function buildCompletionItems() {
     items.push({ cmd: name, desc: info.desc });
   }
 
-  // Aliases — show "→ target" as description
-  for (const [alias, target] of Object.entries(ALIASES)) {
-    items.push({ cmd: alias, desc: `→ ${target}` });
-  }
+  // Extra commands (not in COMMANDS but handled by REPL)
+  items.push(...EXTRA_COMMANDS);
 
   // Meta-commands
   items.push(...META_COMMANDS);

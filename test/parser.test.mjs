@@ -73,6 +73,31 @@ describe('parseInput', () => {
     const args = parseInput('snapshot');
     expect(args._).toEqual(['snapshot']);
   });
+
+  it('preserves run-code body as single raw string', () => {
+    const args = parseInput('run-code async (page) => await page.url()');
+    expect(args._).toEqual(['run-code', 'async (page) => await page.url()']);
+  });
+
+  it('preserves eval expression as single raw string', () => {
+    const args = parseInput('eval document.querySelectorAll("a").length');
+    expect(args._).toEqual(['eval', 'document.querySelectorAll("a").length']);
+  });
+
+  it('resolves eval alias and preserves raw expression', () => {
+    const args = parseInput('e document.title');
+    expect(args._).toEqual(['eval', 'document.title']);
+  });
+
+  it('handles run-code with no body', () => {
+    const args = parseInput('run-code');
+    expect(args._).toEqual(['run-code']);
+  });
+
+  it('preserves braces and special chars in run-code', () => {
+    const args = parseInput('run-code async (page) => { const t = await page.title(); return t; }');
+    expect(args._[1]).toContain('{ const t = await page.title()');
+  });
 });
 
 describe('ALIASES', () => {

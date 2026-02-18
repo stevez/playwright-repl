@@ -284,7 +284,8 @@ describe('processLine', () => {
     await processLine(ctx, 'click "Submit"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Submit', { exact: true })");
+    expect(call._[1]).toContain('getByText(text, { exact: true })');
+    expect(call._[1]).toContain('(page, "Submit", "click")');
   });
 
   it('auto-resolves text to run-code for fill', async () => {
@@ -292,8 +293,9 @@ describe('processLine', () => {
     await processLine(ctx, 'fill "Email" test@x.com');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByLabel('Email')");
-    expect(call._[1]).toContain("loc.fill('test@x.com')");
+    expect(call._[1]).toContain('getByLabel(text)');
+    expect(call._[1]).toContain('loc.fill(value)');
+    expect(call._[1]).toContain('(page, "Email", "test@x.com")');
   });
 
   it('does NOT auto-resolve ref-style args (e5)', async () => {
@@ -462,7 +464,8 @@ describe('processLine', () => {
     await processLine(ctx, 'dblclick "Item"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Item', { exact: true })");
+    expect(call._[1]).toContain('getByText(text, { exact: true })');
+    expect(call._[1]).toContain('(page, "Item", "dblclick")');
   });
 
   it('auto-resolves text for hover', async () => {
@@ -470,7 +473,8 @@ describe('processLine', () => {
     await processLine(ctx, 'hover "Menu"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByText('Menu', { exact: true })");
+    expect(call._[1]).toContain('getByText(text, { exact: true })');
+    expect(call._[1]).toContain('(page, "Menu", "hover")');
   });
 
   it('auto-resolves text for select (uses getByLabel)', async () => {
@@ -478,8 +482,9 @@ describe('processLine', () => {
     await processLine(ctx, 'select "Country" US');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByLabel('Country')");
-    expect(call._[1]).toContain("loc.selectOption('US')");
+    expect(call._[1]).toContain('getByLabel(text)');
+    expect(call._[1]).toContain('loc.selectOption(value)');
+    expect(call._[1]).toContain('(page, "Country", "US")');
   });
 
   it('auto-resolves text for check (uses getByLabel)', async () => {
@@ -487,7 +492,8 @@ describe('processLine', () => {
     await processLine(ctx, 'check "Agree"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByLabel('Agree')");
+    expect(call._[1]).toContain('getByLabel(text)');
+    expect(call._[1]).toContain('(page, "Agree")');
   });
 
   it('auto-resolves text for uncheck (uses getByLabel)', async () => {
@@ -495,7 +501,8 @@ describe('processLine', () => {
     await processLine(ctx, 'uncheck "Agree"');
     const call = ctx.conn.run.mock.calls[0][0];
     expect(call._[0]).toBe('run-code');
-    expect(call._[1]).toContain("getByLabel('Agree')");
+    expect(call._[1]).toContain('getByLabel(text)');
+    expect(call._[1]).toContain('(page, "Agree")');
   });
 
   it('does not record when session is paused', async () => {
@@ -535,5 +542,41 @@ describe('processLine', () => {
     const ctx = makeCtx();
     await processLine(ctx, '.record');
     expect(ctx.session.mode).toBe('recording');
+  });
+
+  it('auto-adds return await for simple expression', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'run-code page.url()');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toBe('async (page) => { return await page.url() }');
+  });
+
+  it('does not auto-add return for statement keywords', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'run-code await page.click("a")');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[1]).toBe('async (page) => { await page.click("a") }');
+  });
+
+  it('does not auto-add return when return is explicit', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'run-code return await page.url()');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[1]).toBe('async (page) => { return await page.url() }');
+  });
+
+  it('does not wrap run-code when body starts with async', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'run-code async (page) => await page.url()');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[1]).toBe('async (page) => await page.url()');
+  });
+
+  it('wraps run-code with multiple statements', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'run-code const t = await page.title(); return t');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[1]).toBe('async (page) => { const t = await page.title(); return t }');
   });
 });

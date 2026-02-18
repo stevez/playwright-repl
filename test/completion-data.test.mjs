@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildCompletionItems } from '../src/completion-data.mjs';
 import { COMMANDS } from '../src/resolve.mjs';
-import { ALIASES } from '../src/parser.mjs';
 
 describe('buildCompletionItems', () => {
   const items = buildCompletionItems();
@@ -23,14 +22,6 @@ describe('buildCompletionItems', () => {
     }
   });
 
-  it('includes all aliases with → description', () => {
-    for (const [alias, target] of Object.entries(ALIASES)) {
-      const item = items.find(i => i.cmd === alias);
-      expect(item).toBeDefined();
-      expect(item.desc).toBe(`→ ${target}`);
-    }
-  });
-
   it('includes meta-commands', () => {
     const cmds = new Set(items.map(i => i.cmd));
     expect(cmds.has('.help')).toBe(true);
@@ -39,14 +30,21 @@ describe('buildCompletionItems', () => {
     expect(cmds.has('.save')).toBe(true);
   });
 
+  it('does not include aliases', () => {
+    const cmds = new Set(items.map(i => i.cmd));
+    expect(cmds.has('g')).toBe(false);
+    expect(cmds.has('f')).toBe(false);
+    expect(cmds.has('snap')).toBe(false);
+  });
+
   it('is sorted alphabetically by cmd', () => {
     for (let i = 1; i < items.length; i++) {
       expect(items[i - 1].cmd.localeCompare(items[i].cmd)).toBeLessThanOrEqual(0);
     }
   });
 
-  it('has correct count (commands + aliases + meta-commands)', () => {
-    const expected = Object.keys(COMMANDS).length + Object.keys(ALIASES).length + 10;
+  it('has correct count (commands + extra + meta-commands)', () => {
+    const expected = Object.keys(COMMANDS).length + 4 + 10;
     expect(items.length).toBe(expected);
   });
 });

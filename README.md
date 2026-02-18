@@ -210,10 +210,10 @@ Or with a visible browser:
 |---------|-------|-------------|
 | `snapshot` | `s` | Accessibility tree with element refs |
 | `screenshot` | `ss` | Take a screenshot |
-| `eval <expr>` | `e` | Evaluate JavaScript |
+| `eval <expr>` | `e` | Evaluate JavaScript in browser context |
 | `console` | `con` | Browser console messages |
 | `network` | `net` | Network requests log |
-| `run-code <code>` | — | Run Playwright code directly |
+| `run-code <code>` | — | Run Playwright code with `page` object |
 
 ### Assertions
 
@@ -380,6 +380,54 @@ playwright-repl --replay examples/04-replay-session.pw --step --headed
 
 # Run as a CI smoke test (headless, silent)
 playwright-repl --replay examples/05-ci-pipe.pw --silent
+```
+
+## eval & run-code
+
+Two ways to run custom code from the REPL:
+
+### eval — Browser Context
+
+Runs JavaScript inside the browser page (via `page.evaluate`). Use browser globals like `document`, `window`, `location`:
+
+```
+pw> eval document.title
+"Installation | Playwright"
+
+pw> eval window.location.href
+"https://playwright.dev/docs/intro"
+
+pw> eval document.querySelectorAll('a').length
+42
+```
+
+### run-code — Playwright API
+
+Runs code with full access to the Playwright `page` object. The REPL auto-wraps your code — just write the body:
+
+```
+pw> run-code page.url()
+→ async (page) => { return await page.url() }
+"https://playwright.dev/docs/intro"
+
+pw> run-code page.locator('h1').textContent()
+→ async (page) => { return await page.locator('h1').textContent() }
+"Installation"
+
+pw> run-code await page.locator('.nav a').allTextContents()
+→ async (page) => { await page.locator('.nav a').allTextContents() }
+```
+
+For multiple statements, use semicolons:
+
+```
+pw> run-code const u = await page.url(); const t = await page.title(); return {u, t}
+```
+
+Full function expressions also work:
+
+```
+pw> run-code async (page) => { await page.waitForSelector('.loaded'); return await page.title(); }
 ```
 
 ## Architecture

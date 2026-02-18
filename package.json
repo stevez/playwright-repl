@@ -1,6 +1,6 @@
 {
   "name": "playwright-repl",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
   "type": "module",
   "bin": {

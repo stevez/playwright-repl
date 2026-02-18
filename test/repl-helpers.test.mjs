@@ -1,85 +1,82 @@
 import { describe, it, expect } from 'vitest';
-import { textToRunCode, filterResponse } from '../src/repl.mjs';
+import { filterResponse, getGhostMatches } from '../src/repl.mjs';
+import { c } from '../src/colors.mjs';
+import {
+  buildRunCode, actionByText,
+  fillByText, selectByText, checkByText, uncheckByText,
+} from '../src/page-scripts.mjs';
 
-// ─── textToRunCode ──────────────────────────────────────────────────────────
+// ─── buildRunCode for text locator actions ──────────────────────────────────
 
-describe('textToRunCode', () => {
-  it('click generates fallback chain with getByText exact, role, then getByText', () => {
-    const result = textToRunCode('click', 'Submit', []);
+describe('text locator buildRunCode output', () => {
+  it('click includes findByText fallback chain', () => {
+    const result = buildRunCode(actionByText, 'Submit', 'click');
     expect(result._[0]).toBe('run-code');
-    expect(result._[1]).toContain("page.getByText('Submit', { exact: true })");
-    expect(result._[1]).toContain("page.getByRole('button', { name: 'Submit' })");
-    expect(result._[1]).toContain("page.getByRole('link', { name: 'Submit' })");
-    expect(result._[1]).toContain("loc.click()");
+    expect(result._[1]).toContain('getByText(text, { exact: true })');
+    expect(result._[1]).toContain("getByRole('button'");
+    expect(result._[1]).toContain("getByRole('link'");
+    expect(result._[1]).toContain('loc[action]()');
   });
 
-  it('dblclick generates fallback chain with getByText exact, role, then getByText', () => {
-    const result = textToRunCode('dblclick', 'Edit', []);
-    expect(result._[1]).toContain("page.getByText('Edit', { exact: true })");
-    expect(result._[1]).toContain("page.getByRole('button', { name: 'Edit' })");
-    expect(result._[1]).toContain("loc.dblclick()");
+  it('dblclick includes findByText fallback chain', () => {
+    const result = buildRunCode(actionByText, 'Edit', 'dblclick');
+    expect(result._[1]).toContain('getByText(text, { exact: true })');
+    expect(result._[1]).toContain('loc[action]()');
   });
 
-  it('hover generates fallback chain with getByText exact, role, then getByText', () => {
-    const result = textToRunCode('hover', 'Menu', []);
-    expect(result._[1]).toContain("page.getByText('Menu', { exact: true })");
-    expect(result._[1]).toContain("page.getByRole('button', { name: 'Menu' })");
-    expect(result._[1]).toContain("loc.hover()");
+  it('hover includes findByText fallback chain', () => {
+    const result = buildRunCode(actionByText, 'Menu', 'hover');
+    expect(result._[1]).toContain('getByText(text, { exact: true })');
+    expect(result._[1]).toContain('loc[action]()');
   });
 
-  it('fill generates getByLabel with fallback chain', () => {
-    const result = textToRunCode('fill', 'Email', ['test@example.com']);
-    expect(result._[1]).toContain("page.getByLabel('Email')");
-    expect(result._[1]).toContain("page.getByPlaceholder('Email')");
-    expect(result._[1]).toContain("loc.fill('test@example.com')");
+  it('fill includes getByLabel with fallback chain', () => {
+    const result = buildRunCode(fillByText, 'Email', 'test@example.com');
+    expect(result._[1]).toContain('getByLabel(text)');
+    expect(result._[1]).toContain('getByPlaceholder(text)');
+    expect(result._[1]).toContain('loc.fill(value)');
   });
 
-  it('select generates getByLabel with fallback chain', () => {
-    const result = textToRunCode('select', 'Country', ['US']);
-    expect(result._[1]).toContain("page.getByLabel('Country')");
-    expect(result._[1]).toContain("loc.selectOption('US')");
+  it('select includes getByLabel with fallback chain', () => {
+    const result = buildRunCode(selectByText, 'Country', 'US');
+    expect(result._[1]).toContain('getByLabel(text)');
+    expect(result._[1]).toContain("getByRole('combobox'");
+    expect(result._[1]).toContain('loc.selectOption(value)');
   });
 
-  it('check generates listitem fallback then getByLabel', () => {
-    const result = textToRunCode('check', 'Terms', []);
-    expect(result._[1]).toContain("page.getByRole('listitem').filter({ hasText: 'Terms' })");
-    expect(result._[1]).toContain("page.getByLabel('Terms')");
+  it('check includes listitem fallback then getByLabel', () => {
+    const result = buildRunCode(checkByText, 'Terms');
+    expect(result._[1]).toContain("getByRole('listitem')");
+    expect(result._[1]).toContain('getByLabel(text)');
+    expect(result._[1]).toContain('loc.check()');
   });
 
-  it('uncheck generates listitem fallback then getByLabel', () => {
-    const result = textToRunCode('uncheck', 'Newsletter', []);
-    expect(result._[1]).toContain("page.getByRole('listitem').filter({ hasText: 'Newsletter' })");
-    expect(result._[1]).toContain("page.getByLabel('Newsletter')");
+  it('uncheck includes listitem fallback then getByLabel', () => {
+    const result = buildRunCode(uncheckByText, 'Newsletter');
+    expect(result._[1]).toContain("getByRole('listitem')");
+    expect(result._[1]).toContain('getByLabel(text)');
+    expect(result._[1]).toContain('loc.uncheck()');
   });
 
-  it('escapes single quotes in text arg', () => {
-    const result = textToRunCode('click', "Say 'hello'", []);
-    expect(result._[1]).toContain("Say \\'hello\\'");
+  it('escapes special characters via JSON.stringify', () => {
+    const result = buildRunCode(actionByText, "Say 'hello'", 'click');
+    expect(result._[1]).toContain("Say 'hello'");
   });
 
-  it('escapes backslashes in text arg', () => {
-    const result = textToRunCode('click', 'path\\to\\file', []);
-    expect(result._[1]).toContain("path\\\\to\\\\file");
+  it('escapes backslashes via JSON.stringify', () => {
+    const result = buildRunCode(actionByText, 'path\\to\\file', 'click');
+    expect(result._[1]).toContain('path\\\\to\\\\file');
   });
 
-  it('escapes single quotes in fill value', () => {
-    const result = textToRunCode('fill', 'Name', ["O'Brien"]);
-    expect(result._[1]).toContain("O\\'Brien");
+  it('escapes quotes in fill value via JSON.stringify', () => {
+    const result = buildRunCode(fillByText, 'Name', "O'Brien");
+    expect(result._[1]).toContain("O'Brien");
   });
 
-  it('returns null for unknown command', () => {
-    expect(textToRunCode('snapshot', 'test', [])).toBeNull();
-    expect(textToRunCode('press', 'Enter', [])).toBeNull();
-  });
-
-  it('wraps code in async function', () => {
-    const result = textToRunCode('click', 'OK', []);
-    expect(result._[1]).toMatch(/^async \(page\) => \{[\s\S]*\}$/);
-  });
-
-  it('fill with empty value', () => {
-    const result = textToRunCode('fill', 'Name', []);
-    expect(result._[1]).toContain("loc.fill('')");
+  it('wraps code as arrow function for daemon', () => {
+    const result = buildRunCode(actionByText, 'OK', 'click');
+    expect(result._[1]).toMatch(/^async \(page\) =>/);
+    expect(result._[1]).toContain('(page, "OK", "click")');
   });
 });
 
@@ -91,9 +88,9 @@ describe('filterResponse', () => {
     expect(filterResponse(text)).toBe('Clicked element');
   });
 
-  it('extracts Error section', () => {
+  it('extracts Error section in red', () => {
     const text = '### Page\nhttp://example.com\n### Error\nElement not found';
-    expect(filterResponse(text)).toBe('Element not found');
+    expect(filterResponse(text)).toBe(`${c.red}Element not found${c.reset}`);
   });
 
   it('extracts Modal state section', () => {
@@ -128,5 +125,37 @@ describe('filterResponse', () => {
   it('strips Ran Playwright code section', () => {
     const text = '### Ran Playwright code\nasync (page) => {...}\n### Result\nOK';
     expect(filterResponse(text)).toBe('OK');
+  });
+});
+
+// ─── getGhostMatches ─────────────────────────────────────────────────────────
+
+describe('getGhostMatches', () => {
+  const cmds = ['close', 'close-all', 'click', 'check', 'config-print'];
+
+  it('returns longer matches for partial input', () => {
+    expect(getGhostMatches(cmds, 'cl')).toEqual(['close', 'close-all', 'click']);
+  });
+
+  it('includes exact match when longer matches exist', () => {
+    const matches = getGhostMatches(cmds, 'close');
+    expect(matches).toContain('close-all');
+    expect(matches).toContain('close');
+  });
+
+  it('returns empty when input is an exact match with no longer variants', () => {
+    expect(getGhostMatches(cmds, 'click')).toEqual([]);
+  });
+
+  it('returns empty for empty input', () => {
+    expect(getGhostMatches(cmds, '')).toEqual([]);
+  });
+
+  it('returns empty when input contains a space', () => {
+    expect(getGhostMatches(cmds, 'close ')).toEqual([]);
+  });
+
+  it('returns empty when no commands match', () => {
+    expect(getGhostMatches(cmds, 'xyz')).toEqual([]);
   });
 });

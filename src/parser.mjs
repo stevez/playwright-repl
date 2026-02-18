@@ -107,6 +107,9 @@ function tokenize(line) {
  * Parse a REPL input line into a minimist args object ready for the daemon.
  * Returns null if the line is empty.
  */
+// Commands where everything after the keyword is a single raw argument
+const RAW_COMMANDS = new Set(['run-code', 'eval']);
+
 export function parseInput(line) {
   const tokens = tokenize(line);
   if (tokens.length === 0) return null;
@@ -114,6 +117,13 @@ export function parseInput(line) {
   // Resolve alias
   const cmd = tokens[0].toLowerCase();
   if (ALIASES[cmd]) tokens[0] = ALIASES[cmd];
+
+  // For run-code / eval, preserve the rest of the line as a single raw string
+  if (RAW_COMMANDS.has(tokens[0])) {
+    const cmdLen = line.match(/^\s*\S+/)[0].length;
+    const rest = line.slice(cmdLen).trim();
+    return rest ? { _: [tokens[0], rest] } : { _: [tokens[0]] };
+  }
 
   // Parse with minimist (same lib and boolean set as playwright-cli)
   const args = minimist(tokens, { boolean: [...booleanOptions] });

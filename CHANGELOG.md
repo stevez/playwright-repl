@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.3.0 — Page Scripts & run-code
+
+**2026-02-17**
+
+### Features
+
+- **`run-code` auto-wrap**: Type Playwright code directly — no boilerplate needed
+  - `run-code page.title()` → auto-wraps as `async (page) => { return await page.title() }`
+  - `run-code await page.click('a')` → wraps without `return` for statement keywords
+  - `run-code async (page) => ...` → pass-through for full function expressions
+- **Raw parsing for `run-code` / `eval`**: Expressions are preserved as a single raw string — parentheses, braces, quotes, and operators no longer get split by the tokenizer
+- **Red error messages**: Daemon errors (`### Error` sections) now display in red
+- **Verify commands**: `verify-text`, `verify-element`, `verify-value`, `verify-list` now use real functions via `buildRunCode` instead of template strings
+
+### Refactored
+
+- **Page scripts module** (`src/page-scripts.mjs`): Extracted all run-code templates into real async functions (`verifyText`, `actionByText`, `fillByText`, etc.) — testable, readable, no manual escaping
+- **`buildRunCode` helper**: Converts real functions to daemon-compatible code strings using `fn.toString()` + `JSON.stringify()`
+- **Consolidated `actionByText`**: Merged `clickByText`, `dblclickByText`, `hoverByText` into a single function with dynamic dispatch via `loc[action]()`
+- **Removed `esc()` helper and ~150 lines of template strings** from `repl.mjs`
+
+### Fixed
+
+- **Ghost completion for prefix commands**: Typing "close" now correctly cycles to both "close" and "close-all" (previously only showed "close-all")
+- **Removed Tab-on-empty-line**: No longer shows all commands when pressing Tab on empty input
+
+### Tests
+
+- 100 new tests (154 → 254 total across 13 test files)
+- New `test/page-scripts.test.mjs` — 21 tests for page-script functions and `buildRunCode`
+- Daemon-compatibility test: verifies generated code is a valid function expression
+
+---
+
 ## v0.2.1 — Ghost Completion
 
 **2026-02-17**
@@ -9,7 +43,6 @@
 - **Ghost completion**: Fish-shell style inline suggestions — type a prefix and see dimmed suggestion text after the cursor
   - **Tab** cycles through matches (e.g., `go` → goto, go-back, go-forward)
   - **Right Arrow** accepts the current suggestion
-  - **Tab on empty line** cycles through all commands
 - Aliases excluded from ghost suggestions (still work when typed)
 
 ### Removed
@@ -118,7 +151,7 @@ First public release of playwright-repl — an interactive REPL for Playwright b
 - Connects to Playwright's MCP terminal daemon over Unix socket / named pipe
 - Wire-compatible with `playwright-cli` — produces identical JSON messages
 - Requires `playwright >= 1.59.0-alpha` (daemon code in `lib/mcp/terminal/`)
-- 218 tests, 96% statement coverage
+- 218 tests at initial release
 
 ### Known Limitations
 
