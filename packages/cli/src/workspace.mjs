@@ -12,7 +12,10 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { packageLocation } from './resolve.mjs';
+
+// packageLocation must point to CLI's package.json (not core's) — it's used
+// for socket hash computation and must match what daemon-launcher.cjs computes.
+const packageLocation = fileURLToPath(new URL('../../package.json', import.meta.url));
 
 // ─── Workspace detection ─────────────────────────────────────────────────────
 

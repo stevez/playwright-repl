@@ -1,0 +1,19 @@
+{
+  "name": "@playwright-repl/core",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}

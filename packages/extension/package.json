@@ -1,0 +1,6 @@
+{
+  "name": "@playwright-repl/extension",
+  "version": "0.9.3",
+  "private": true,
+  "description": "Chrome DevTools panel extension for Playwright REPL"
+}

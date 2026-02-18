@@ -10,7 +10,7 @@
  *   playwright-repl --record my-test.pw
  */
 
-import { minimist } from '../src/resolve.mjs';
+import { minimist } from '@playwright-repl/core';
 import { startRepl } from '../src/repl.mjs';
 
 const args = minimist(process.argv.slice(2), {

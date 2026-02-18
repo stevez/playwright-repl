@@ -8,9 +8,11 @@
  *   import { DaemonConnection, parseInput, SessionRecorder } from 'playwright-repl';
  */
 
+// Re-export core
+export { parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems } from '@playwright-repl/core';
+
+// CLI-specific
 export { DaemonConnection } from './connection.mjs';
-export { parseInput, ALIASES, ALL_COMMANDS } from './parser.mjs';
 export { SessionRecorder, SessionPlayer } from './recorder.mjs';
 export { socketPath, isDaemonRunning, startDaemon, findWorkspaceDir } from './workspace.mjs';
 export { startRepl } from './repl.mjs';
-export { buildCompletionItems } from './completion-data.mjs';

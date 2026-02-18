@@ -9,17 +9,14 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 
-import { replVersion } from './resolve.mjs';
-import { DaemonConnection } from './connection.mjs';
-import { socketPath, daemonProfilesDir, isDaemonRunning, startDaemon } from './workspace.mjs';
-import { parseInput, ALIASES, ALL_COMMANDS } from './parser.mjs';
-import { SessionManager } from './recorder.mjs';
-import { buildCompletionItems } from './completion-data.mjs';
 import {
+  replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c,
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-} from './page-scripts.mjs';
-import { c } from './colors.mjs';
+} from '@playwright-repl/core';
+import { DaemonConnection } from './connection.mjs';
+import { socketPath, daemonProfilesDir, isDaemonRunning, startDaemon } from './workspace.mjs';
+import { SessionManager } from './recorder.mjs';
 
 // ─── Response filtering ─────────────────────────────────────────────────────
 

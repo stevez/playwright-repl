@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { filterResponse, getGhostMatches } from '../src/repl.mjs';
-import { c } from '../src/colors.mjs';
 import {
-  buildRunCode, actionByText,
+  c, buildRunCode, actionByText,
   fillByText, selectByText, checkByText, uncheckByText,
-} from '../src/page-scripts.mjs';
+} from '@playwright-repl/core';
 
 // ─── buildRunCode for text locator actions ──────────────────────────────────
 
