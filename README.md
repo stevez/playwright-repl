@@ -387,6 +387,14 @@ pw> run-code async (page) => { await page.waitForSelector('.loaded'); return awa
 
 The REPL runs Playwright's `BrowserServerBackend` in-process via an `Engine` class. No daemon, no socket — commands execute directly.
 
+![Architecture](architecture-diagram.png)
+
+### How It Works
+
+![Command Flow](flow-diagram.png)
+
+### Monorepo Structure
+
 ```
 packages/
 ├── core/         # Engine + shared utilities
@@ -400,14 +408,6 @@ packages/
         ├── repl.mjs            # Interactive readline loop
         └── recorder.mjs        # Session recording/replay
 ```
-
-### How It Works
-
-1. **Startup**: The Engine creates a `BrowserServerBackend` with a browser context
-2. **Input**: User types a command like `click e5`
-3. **Parse**: Alias resolution (`c` → `click`) + minimist parsing → `{ _: ["click", "e5"] }`
-4. **Execute**: Engine maps the command to a Playwright tool call and executes it in-process
-5. **Result**: Response rendered in the terminal
 
 ### Connect Mode
 

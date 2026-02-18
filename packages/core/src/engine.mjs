@@ -11,6 +11,7 @@
  */
 
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import url from 'node:url';
 
 // ─── Lazy-loaded Playwright dependencies ────────────────────────────────────
@@ -20,12 +21,15 @@ let _deps;
 function loadDeps() {
   if (_deps) return _deps;
   const require = createRequire(import.meta.url);
+  // Resolve absolute paths to bypass Playwright's exports map.
+  const pwDir = path.dirname(require.resolve('playwright/package.json'));
+  const pwReq = (sub) => require(path.join(pwDir, sub));
   _deps = {
-    BrowserServerBackend: require('playwright/lib/mcp/browser/browserServerBackend').BrowserServerBackend,
-    contextFactory:       require('playwright/lib/mcp/browser/browserContextFactory').contextFactory,
-    resolveConfig:        require('playwright/lib/mcp/browser/config').resolveConfig,
-    commands:             require('playwright/lib/mcp/terminal/commands').commands,
-    parseCommand:         require('playwright/lib/mcp/terminal/command').parseCommand,
+    BrowserServerBackend: pwReq('lib/mcp/browser/browserServerBackend.js').BrowserServerBackend,
+    contextFactory:       pwReq('lib/mcp/browser/browserContextFactory.js').contextFactory,
+    resolveConfig:        pwReq('lib/mcp/browser/config.js').resolveConfig,
+    commands:             pwReq('lib/mcp/terminal/commands.js').commands,
+    parseCommand:         pwReq('lib/mcp/terminal/command.js').parseCommand,
   };
   return _deps;
 }
