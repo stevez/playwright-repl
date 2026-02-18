@@ -10,3 +10,4 @@ export {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
 } from './page-scripts.mjs';
+export { Engine } from './engine.mjs';
