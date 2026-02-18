@@ -36,7 +36,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@playwright-repl/core": "*",
+    "@playwright-repl/core": "file:../core",
     "playwright": ">=1.59.0-alpha-2026-02-01"
   },
   "devDependencies": {
