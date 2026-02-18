@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.4.0 — In-Process Engine & Monorepo
+
+**2026-02-18**
+
+### Breaking Changes
+
+- **No more daemon**: The Playwright MCP daemon is replaced by an in-process `Engine` class. No socket, no background process — commands execute directly via `BrowserServerBackend`.
+- **Removed `playwright-mcp-server` binary**: The MCP server is no longer bundled. Use Playwright's own MCP server instead.
+- **Removed session commands**: `list`, `close-all`, `kill-all` are no longer needed (no daemon to manage).
+
+### Features
+
+- **In-process Engine** (`packages/core/src/engine.mjs`): Wraps Playwright's `BrowserServerBackend` directly — faster startup, simpler architecture, no IPC overhead.
+- **Connect mode** (`--connect [port]`): Attach to an existing Chrome instance via CDP. Start Chrome with `--remote-debugging-port=9222`, then `playwright-repl --connect`.
+- **Monorepo structure**: Restructured into `packages/core` (engine + utilities) and `packages/cli` (REPL + recorder) using npm workspaces.
+
+### Removed
+
+- `src/connection.mjs` — DaemonConnection (Unix socket client)
+- `src/workspace.mjs` — daemon startup, socket paths
+- `bin/daemon-launcher.cjs` — daemon launcher
+- `bin/mcp-server.cjs` — MCP server binary
+
+### Technical Details
+
+- Engine uses dependency injection for testability — Playwright internals loaded lazily via absolute path resolution to bypass the `exports` map
+- 214 tests (147 cli + 67 core) across 10 test files
+- Pure ESM JavaScript, no build step
+
+---
+
 ## v0.3.0 — Page Scripts & run-code
 
 **2026-02-17**
