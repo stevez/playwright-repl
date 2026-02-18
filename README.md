@@ -4,19 +4,18 @@
 
 Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal.
 
-Inspired by [playwright-cli](https://github.com/anthropics/playwright-cli), reusing its command vocabulary and Playwright MCP daemon. Where playwright-cli is designed for AI agents (one command per process), playwright-repl is designed for **humans** — a persistent session with recording, replay, and instant feedback.
+Inspired by [playwright-cli](https://github.com/anthropics/playwright-cli), reusing its command vocabulary and Playwright's browser tools. Where playwright-cli is designed for AI agents (one command per process), playwright-repl is designed for **humans** — a persistent session with recording, replay, and instant feedback.
 
 ## Why?
 
-The `playwright-cli` tool spawns a new Node.js process **per command** — connecting to the daemon, sending one message, and exiting. That's ~50–100ms overhead each time.
+**playwright-repl** runs Playwright's browser tools in-process. Type a command, see the result instantly. Record your session, replay it later — no code, no tokens, no setup.
 
-**playwright-repl** keeps a persistent socket connection open. Type a command, see the result instantly. Record your session, replay it later — no code, no tokens, no setup.
-
-Key features beyond playwright-cli:
+Key features:
 - **Text locators** — use `click "Submit"` or `fill "Email" "test@example.com"` instead of element refs. Auto-resolves via getByText, getByLabel, getByPlaceholder, and getByRole with fallback chains
 - **Element refs** — also supports ref-based commands (`click e5`, `fill e7 "hello"`) from `snapshot` output
 - **Assertions** — `verify-text`, `verify-element`, `verify-value`, `verify-list` for inline validation
 - **Record & replay** — capture sessions as `.pw` files and replay them headlessly or step-by-step
+- **Connect mode** — attach to an existing Chrome instance via `--connect [port]`
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
@@ -69,6 +68,9 @@ playwright-repl --headed
 
 # With a specific browser
 playwright-repl --headed --browser firefox
+
+# Connect to existing Chrome (must be launched with --remote-debugging-port)
+playwright-repl --connect 9222
 ```
 
 Once inside the REPL, use either **text locators** or **element refs**:
@@ -110,71 +112,26 @@ playwright-repl --record my-test.pw
 # Pipe commands
 echo -e "goto https://example.com\nsnapshot" | playwright-repl
 
-# Named sessions
-playwright-repl --session checkout-flow --headed
+# Connect to existing Chrome via CDP
+playwright-repl --connect         # default port 9222
+playwright-repl --connect 9333    # custom port
 ```
 
 ### CLI Options
 
 | Option | Description |
 |--------|-------------|
-| `-s, --session <name>` | Session name (default: `"default"`) |
 | `-b, --browser <type>` | Browser: `chrome`, `firefox`, `webkit`, `msedge` |
 | `--headed` | Run browser in headed (visible) mode |
 | `--persistent` | Use persistent browser profile |
 | `--profile <dir>` | Persistent profile directory |
+| `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
 | `--config <file>` | Path to config file |
 | `--replay <file>` | Replay a `.pw` session file |
 | `--record <file>` | Start REPL with recording to file |
 | `--step` | Pause between commands during replay |
 | `-q, --silent` | Suppress banner and status messages |
 | `-h, --help` | Show help |
-
-## MCP Server
-
-`playwright-repl` also ships an MCP server that exposes Playwright's full browser automation toolkit to AI agents (Claude, Cursor, etc.) over stdio.
-
-```bash
-# Run directly
-npx -p playwright-repl playwright-mcp-server
-
-# With visible browser
-npx -p playwright-repl playwright-mcp-server --headed
-```
-
-### VS Code / Cursor Configuration
-
-Add to `.vscode/mcp.json` in your project:
-
-```json
-{
-  "servers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["-p", "playwright-repl", "playwright-mcp-server"]
-    }
-  }
-}
-```
-
-Or with a visible browser:
-
-```json
-{
-  "servers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["-p", "playwright-repl", "playwright-mcp-server", "--headed"]
-    }
-  }
-}
-```
-
-### MCP Server Options
-
-| Option | Description |
-|--------|-------------|
-| `--headed` | Run browser in headed (visible) mode |
 
 ## Commands
 
@@ -272,16 +229,12 @@ Or with a visible browser:
 | `resize <w> <h>` | Resize browser window |
 | `pdf` | Save page as PDF |
 
-### Session Management
+### Browser Control
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `list` | `ls` | List active sessions |
 | `close` | `q` | Close the browser |
-| `close-all` | — | Close all sessions |
-| `kill-all` | — | Kill all daemon processes |
-| `config-print` | — | Print daemon config |
-| `install-browser` | — | Install browser binaries |
+| `config-print` | — | Print browser config |
 
 ### REPL Meta-Commands
 
@@ -290,7 +243,7 @@ Or with a visible browser:
 | `.help` | Show available commands |
 | `.aliases` | Show all command aliases |
 | `.status` | Show connection status |
-| `.reconnect` | Reconnect to daemon |
+| `.reconnect` | Restart browser |
 | `.record [file]` | Start recording commands |
 | `.save` | Stop recording and save to file |
 | `.pause` | Pause/resume recording |
@@ -362,24 +315,24 @@ All examples use the [TodoMVC demo](https://demo.playwright.dev/todomvc/) and ca
 
 | File | Description |
 |------|-------------|
-| [01-add-todos.pw](examples/01-add-todos.pw) | Add todos and verify with assertions |
-| [02-complete-and-filter.pw](examples/02-complete-and-filter.pw) | Complete todos, use filters |
-| [03-record-session.pw](examples/03-record-session.pw) | Record a test session |
-| [04-replay-session.pw](examples/04-replay-session.pw) | Replay with step-through |
-| [05-ci-pipe.pw](examples/05-ci-pipe.pw) | CI smoke test |
-| [06-edit-todo.pw](examples/06-edit-todo.pw) | Double-click to edit a todo |
+| [01-add-todos.pw](packages/cli/examples/01-add-todos.pw) | Add todos and verify with assertions |
+| [02-complete-and-filter.pw](packages/cli/examples/02-complete-and-filter.pw) | Complete todos, use filters |
+| [03-record-session.pw](packages/cli/examples/03-record-session.pw) | Record a test session |
+| [04-replay-session.pw](packages/cli/examples/04-replay-session.pw) | Replay with step-through |
+| [05-ci-pipe.pw](packages/cli/examples/05-ci-pipe.pw) | CI smoke test |
+| [06-edit-todo.pw](packages/cli/examples/06-edit-todo.pw) | Double-click to edit a todo |
 
 Try one:
 
 ```bash
 # Run an example with a visible browser
-playwright-repl --replay examples/01-add-todos.pw --headed
+playwright-repl --replay packages/cli/examples/01-add-todos.pw --headed
 
 # Step through an example interactively
-playwright-repl --replay examples/04-replay-session.pw --step --headed
+playwright-repl --replay packages/cli/examples/04-replay-session.pw --step --headed
 
 # Run as a CI smoke test (headless, silent)
-playwright-repl --replay examples/05-ci-pipe.pw --silent
+playwright-repl --replay packages/cli/examples/05-ci-pipe.pw --silent
 ```
 
 ## eval & run-code
@@ -432,34 +385,46 @@ pw> run-code async (page) => { await page.waitForSelector('.loaded'); return awa
 
 ## Architecture
 
-![Architecture](architecture-diagram.png)
+The REPL runs Playwright's `BrowserServerBackend` in-process via an `Engine` class. No daemon, no socket — commands execute directly.
 
-The REPL replaces only the **client half** of playwright-cli. The daemon, browser, and all tool handlers are unchanged — both CLI and REPL produce identical wire messages.
+```
+packages/
+├── core/         # Engine + shared utilities
+│   └── src/
+│       ├── engine.mjs          # Wraps BrowserServerBackend in-process
+│       ├── parser.mjs          # Command parsing and alias resolution
+│       ├── page-scripts.mjs    # Text locator and assertion helpers
+│       └── ...
+└── cli/          # Terminal REPL
+    └── src/
+        ├── repl.mjs            # Interactive readline loop
+        └── recorder.mjs        # Session recording/replay
+```
 
 ### How It Works
 
-1. **Startup**: The REPL starts the Playwright daemon (if not already running) and connects via Unix socket / Windows named pipe
+1. **Startup**: The Engine creates a `BrowserServerBackend` with a browser context
 2. **Input**: User types a command like `click e5`
 3. **Parse**: Alias resolution (`c` → `click`) + minimist parsing → `{ _: ["click", "e5"] }`
-4. **Send**: JSON message over socket to the daemon
-5. **Execute**: Daemon maps the command to a Playwright API call and executes it
-6. **Result**: Response rendered in the terminal
+4. **Execute**: Engine maps the command to a Playwright tool call and executes it in-process
+5. **Result**: Response rendered in the terminal
 
-### Socket Path
+### Connect Mode
 
-The daemon socket includes a hash of the workspace directory:
+To control an existing Chrome instance:
 
+```bash
+# Start Chrome with debugging port
+chrome --remote-debugging-port=9222
+
+# Connect the REPL
+playwright-repl --connect 9222
 ```
-Linux/macOS:  /tmp/playwright-cli/{hash}/{session}.sock
-Windows:      \\.\pipe\{hash}-{session}.sock
-```
-
-Both REPL and daemon hash the same `package.json` path, so they always find each other.
 
 ## Requirements
 
 - **Node.js** >= 18
-- **playwright** >= 1.59.0-alpha (includes `lib/mcp/terminal/` daemon)
+- **playwright** >= 1.59.0-alpha (includes `lib/mcp/browser/` engine)
 
 ## License
 

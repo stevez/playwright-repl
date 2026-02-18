@@ -5,9 +5,9 @@ import { describe, it, expect } from 'vitest';
 import * as api from '../src/index.mjs';
 
 describe('index.mjs exports', () => {
-  it('exports DaemonConnection', () => {
-    expect(api.DaemonConnection).toBeDefined();
-    expect(typeof api.DaemonConnection).toBe('function');
+  it('exports Engine', () => {
+    expect(api.Engine).toBeDefined();
+    expect(typeof api.Engine).toBe('function');
   });
 
   it('exports parseInput', () => {
@@ -28,22 +28,6 @@ describe('index.mjs exports', () => {
 
   it('exports SessionPlayer', () => {
     expect(typeof api.SessionPlayer).toBe('function');
-  });
-
-  it('exports socketPath', () => {
-    expect(typeof api.socketPath).toBe('function');
-  });
-
-  it('exports isDaemonRunning', () => {
-    expect(typeof api.isDaemonRunning).toBe('function');
-  });
-
-  it('exports startDaemon', () => {
-    expect(typeof api.startDaemon).toBe('function');
-  });
-
-  it('exports findWorkspaceDir', () => {
-    expect(typeof api.findWorkspaceDir).toBe('function');
   });
 
   it('exports startRepl', () => {
