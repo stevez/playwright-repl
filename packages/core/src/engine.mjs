@@ -101,8 +101,7 @@ export class Engine {
     if (!toolName)
       return { text: `Command "${args._[0]}" is not supported in engine mode.` };
 
-    if (args.cwd)
-      toolParams._meta = { cwd: args.cwd };
+    toolParams._meta = { cwd: args.cwd || process.cwd() };
 
     const response = await this._backend.callTool(toolName, toolParams);
     return formatResult(response);

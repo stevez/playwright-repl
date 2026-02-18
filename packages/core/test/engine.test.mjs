@@ -177,7 +177,7 @@ describe('Engine', () => {
       });
 
       const result = await engine.run({ _: ['snapshot'] });
-      expect(mocks.callTool).toHaveBeenCalledWith('browser_snapshot', {});
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_snapshot', expect.objectContaining({ _meta: expect.any(Object) }));
       expect(result.text).toBe('### Snapshot\n...');
       expect(result.isError).toBe(false);
     });
@@ -189,7 +189,7 @@ describe('Engine', () => {
       });
 
       await engine.run({ _: ['click', 'e5'] });
-      expect(mocks.callTool).toHaveBeenCalledWith('browser_click', { ref: 'e5' });
+      expect(mocks.callTool).toHaveBeenCalledWith('browser_click', expect.objectContaining({ ref: 'e5' }));
     });
 
     it('returns error for unknown command', async () => {

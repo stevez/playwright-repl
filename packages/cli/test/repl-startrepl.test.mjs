@@ -1,35 +1,27 @@
 /**
  * Tests for startRepl() — the main orchestrator.
- * Mocks workspace, connection, and readline modules.
+ * Mocks Engine (from core) and readline.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('node:child_process', () => ({
-  execSync: vi.fn(() => ''),
-}));
+const mockStart = vi.fn().mockResolvedValue(undefined);
+const mockClose = vi.fn();
+const mockRun = vi.fn().mockResolvedValue({ text: '### Result\nOK' });
 
-vi.mock('../src/workspace.mjs', () => ({
-  socketPath: vi.fn(() => '/tmp/test.sock'),
-  daemonProfilesDir: '/tmp/pw-profiles',
-  isDaemonRunning: vi.fn(),
-  startDaemon: vi.fn(),
-  findWorkspaceDir: vi.fn(() => '/tmp'),
-}));
-
-let lastMockConn;
-vi.mock('../src/connection.mjs', () => {
-  const MockConn = vi.fn(function () {
-    this.connect = vi.fn().mockResolvedValue(true);
-    this.close = vi.fn();
-    this.send = vi.fn().mockResolvedValue({});
-    this.run = vi.fn().mockResolvedValue({ text: '### Result\nOK' });
-    this.connected = true;
-    lastMockConn = this;
-  });
-  return { DaemonConnection: MockConn };
+vi.mock('@playwright-repl/core', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    Engine: vi.fn(function () {
+      this.start = mockStart;
+      this.close = mockClose;
+      this.run = mockRun;
+      this.connected = true;
+    }),
+  };
 });
 
 vi.mock('node:readline', () => ({
@@ -45,8 +37,7 @@ vi.mock('node:readline', () => ({
   },
 }));
 
-import { isDaemonRunning, startDaemon } from '../src/workspace.mjs';
-import { DaemonConnection } from '../src/connection.mjs';
+import { Engine } from '@playwright-repl/core';
 import { startRepl } from '../src/repl.mjs';
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -58,16 +49,10 @@ describe('startRepl', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
-    vi.mocked(isDaemonRunning).mockResolvedValue(true);
-    // Reset DaemonConnection to default constructor
-    DaemonConnection.mockImplementation(function () {
-      this.connect = vi.fn().mockResolvedValue(true);
-      this.close = vi.fn();
-      this.send = vi.fn().mockResolvedValue({});
-      this.run = vi.fn().mockResolvedValue({ text: '### Result\nOK' });
-      this.connected = true;
-      lastMockConn = this;
-    });
+    // Reset Engine mock to default
+    mockStart.mockReset().mockResolvedValue(undefined);
+    mockClose.mockReset();
+    mockRun.mockReset().mockResolvedValue({ text: '### Result\nOK' });
   });
 
   afterEach(() => {
@@ -77,32 +62,21 @@ describe('startRepl', () => {
     vi.restoreAllMocks();
   });
 
-  it('connects to existing daemon without starting a new one', async () => {
-    vi.mocked(isDaemonRunning).mockResolvedValue(true);
-    await startRepl({ session: 'test-session', silent: true });
-    expect(startDaemon).not.toHaveBeenCalled();
-    expect(DaemonConnection).toHaveBeenCalled();
-  });
-
-  it('starts daemon when not running', async () => {
-    vi.mocked(isDaemonRunning).mockResolvedValue(false);
-    await startRepl({ session: 'test-session', silent: true });
-    expect(startDaemon).toHaveBeenCalledWith('test-session', expect.any(Object));
-  });
-
-  it('uses default session name when not specified', async () => {
+  it('creates Engine and calls start', async () => {
     await startRepl({ silent: true });
-    expect(isDaemonRunning).toHaveBeenCalledWith('default');
+    expect(Engine).toHaveBeenCalled();
+    expect(mockStart).toHaveBeenCalled();
   });
 
-  it('exits with 1 when connection fails', async () => {
-    DaemonConnection.mockImplementation(function () {
-      this.connect = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
-      this.close = vi.fn();
-      this.connected = false;
-      lastMockConn = this;
-    });
+  it('passes opts to engine.start', async () => {
+    await startRepl({ silent: true, headed: true, browser: 'firefox' });
+    expect(mockStart).toHaveBeenCalledWith(
+      expect.objectContaining({ headed: true, browser: 'firefox' }),
+    );
+  });
 
+  it('exits with 1 when engine start fails', async () => {
+    mockStart.mockRejectedValue(new Error('Browser launch failed'));
     await startRepl({ silent: true });
     expect(errorSpy).toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -120,10 +94,15 @@ describe('startRepl', () => {
     expect(output).not.toContain('Playwright REPL');
   });
 
+  it('shows ready message on successful start', async () => {
+    await startRepl({});
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('Browser ready');
+  });
+
   it('auto-starts recording when --record is passed', async () => {
     await startRepl({ silent: true, record: '/tmp/my-session.pw' });
     // The session should have started recording (no error thrown)
-    // We can't easily inspect the ctx, but we verify no error
     expect(errorSpy).not.toHaveBeenCalled();
   });
 });

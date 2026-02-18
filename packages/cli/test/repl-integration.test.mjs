@@ -9,12 +9,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { SessionManager } from '../src/recorder.mjs';
 
-// Mock child_process — used by handleKillAll
-vi.mock('node:child_process', () => ({
-  execSync: vi.fn(() => ''),
-}));
-
-import { execSync } from 'node:child_process';
 import {
   handleKillAll,
   handleClose,
@@ -29,13 +23,12 @@ function makeCtx(overrides = {}) {
     conn: {
       connected: true,
       close: vi.fn(),
-      connect: vi.fn().mockResolvedValue(true),
-      send: vi.fn().mockResolvedValue({}),
+      start: vi.fn().mockResolvedValue(undefined),
       run: vi.fn().mockResolvedValue({ text: '### Result\nOK' }),
     },
     session: new SessionManager(),
     rl: null,
-    sessionName: 'test',
+    opts: {},
     log: vi.fn(),
     historyFile: path.join(os.tmpdir(), 'pw-test-history-' + Date.now()),
     commandCount: 0,
@@ -59,7 +52,6 @@ describe('handleKillAll', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(execSync).mockReset();
   });
 
   afterEach(() => {
@@ -67,69 +59,19 @@ describe('handleKillAll', () => {
     errorSpy.mockRestore();
   });
 
-  it('reports no daemons found when none running', async () => {
-    vi.mocked(execSync).mockReturnValue('');
+  it('closes the engine', async () => {
     const ctx = makeCtx();
     await handleKillAll(ctx);
-    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-    expect(output).toContain('No daemon processes found');
     expect(ctx.conn.close).toHaveBeenCalled();
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('Browser closed');
   });
 
-  if (process.platform === 'win32') {
-    it('parses powershell output for PIDs on windows', async () => {
-      vi.mocked(execSync).mockReturnValue('12345\r\n67890\r\n');
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
-      const ctx = makeCtx();
-      await handleKillAll(ctx);
-      expect(killSpy).toHaveBeenCalledWith(12345);
-      expect(killSpy).toHaveBeenCalledWith(67890);
-      const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-      expect(output).toContain('Killed 2');
-      killSpy.mockRestore();
-    });
-
-    it('handles powershell failure gracefully', async () => {
-      const err = new Error('powershell failed');
-      err.stdout = '';
-      vi.mocked(execSync).mockImplementation(() => { throw err; });
-      const ctx = makeCtx();
-      await handleKillAll(ctx);
-      // Should not crash
-      expect(ctx.conn.close).toHaveBeenCalled();
-    });
-  } else {
-    it('parses ps aux output for PIDs on unix', async () => {
-      vi.mocked(execSync).mockReturnValue(
-        'user  1234 0.0 node run-mcp-server --daemon-session=config.json\n' +
-        'user  5678 0.0 node run-mcp-server --daemon-session=other.json\n' +
-        'user  9999 0.0 node some-other-process\n'
-      );
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
-      const ctx = makeCtx();
-      await handleKillAll(ctx);
-      expect(killSpy).toHaveBeenCalledWith(1234, 'SIGKILL');
-      expect(killSpy).toHaveBeenCalledWith(5678, 'SIGKILL');
-      expect(killSpy).not.toHaveBeenCalledWith(9999, expect.anything());
-      const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-      expect(output).toContain('Killed 2');
-      killSpy.mockRestore();
-    });
-  }
-
-  it('handles execSync error gracefully', async () => {
-    vi.mocked(execSync).mockImplementation(() => { throw new Error('exec failed'); });
+  it('handles close error gracefully', async () => {
     const ctx = makeCtx();
+    ctx.conn.close = vi.fn().mockRejectedValue(new Error('close failed'));
     await handleKillAll(ctx);
-    // Should not throw — catches internally
-    if (process.platform === 'win32') {
-      // On Windows the inner try/catch handles the error; code falls through to "No daemon processes found"
-      const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-      expect(output).toContain('No daemon processes found');
-    } else {
-      // On Unix the outer catch fires
-      expect(errorSpy).toHaveBeenCalled();
-    }
+    expect(errorSpy).toHaveBeenCalled();
   });
 });
 
@@ -148,18 +90,17 @@ describe('handleClose', () => {
     errorSpy.mockRestore();
   });
 
-  it('sends stop and closes connection', async () => {
+  it('closes the engine and reports success', async () => {
     const ctx = makeCtx();
     await handleClose(ctx);
-    expect(ctx.conn.send).toHaveBeenCalledWith('stop', {});
     expect(ctx.conn.close).toHaveBeenCalled();
     const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-    expect(output).toContain('Daemon stopped');
+    expect(output).toContain('Browser closed');
   });
 
-  it('handles send error gracefully', async () => {
+  it('handles close error gracefully', async () => {
     const ctx = makeCtx();
-    ctx.conn.send = vi.fn().mockRejectedValue(new Error('not connected'));
+    ctx.conn.close = vi.fn().mockRejectedValue(new Error('close failed'));
     await handleClose(ctx);
     expect(errorSpy).toHaveBeenCalled();
   });

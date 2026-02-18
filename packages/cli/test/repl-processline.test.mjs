@@ -16,8 +16,7 @@ function makeCtx(overrides = {}) {
     conn: {
       connected: true,
       close: vi.fn(),
-      connect: vi.fn().mockResolvedValue(true),
-      send: vi.fn().mockResolvedValue({}),
+      start: vi.fn().mockResolvedValue(undefined),
       run: vi.fn().mockResolvedValue({ text: '### Result\nOK' }),
     },
     session: new SessionManager(),
@@ -25,7 +24,7 @@ function makeCtx(overrides = {}) {
       setPrompt: vi.fn(),
       prompt: vi.fn(),
     },
-    sessionName: 'test-session',
+    opts: {},
     log: vi.fn(),
     historyFile: '/tmp/test-history',
     commandCount: 0,
@@ -106,7 +105,6 @@ describe('showStatus', () => {
     showStatus(ctx);
     const text = output.join('\n');
     expect(text).toContain('yes');
-    expect(text).toContain('test-session');
     expect(text).toContain('Mode: idle');
     spy.mockRestore();
   });
@@ -240,19 +238,19 @@ describe('processLine', () => {
     const ctx = makeCtx();
     await processLine(ctx, '.status');
     const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-    expect(output).toContain('test-session');
+    expect(output).toContain('Commands sent');
   });
 
-  it('.reconnect closes and reconnects', async () => {
+  it('.reconnect closes and restarts', async () => {
     const ctx = makeCtx();
     await processLine(ctx, '.reconnect');
     expect(ctx.conn.close).toHaveBeenCalled();
-    expect(ctx.conn.connect).toHaveBeenCalled();
+    expect(ctx.conn.start).toHaveBeenCalledWith(ctx.opts);
   });
 
   it('.reconnect handles failure', async () => {
     const ctx = makeCtx();
-    ctx.conn.connect = vi.fn().mockRejectedValue(new Error('refused'));
+    ctx.conn.start = vi.fn().mockRejectedValue(new Error('launch failed'));
     await processLine(ctx, '.reconnect');
     expect(errorSpy).toHaveBeenCalled();
   });
@@ -313,13 +311,13 @@ describe('processLine', () => {
     expect(ctx.session.recordedCount).toBe(1);
   });
 
-  it('handles daemon error and attempts reconnect', async () => {
+  it('handles error and attempts restart when disconnected', async () => {
     const ctx = makeCtx();
     ctx.conn.run = vi.fn().mockRejectedValue(new Error('timeout'));
     ctx.conn.connected = false;
     await processLine(ctx, 'snapshot');
     expect(errorSpy).toHaveBeenCalled();
-    expect(ctx.conn.connect).toHaveBeenCalled();
+    expect(ctx.conn.start).toHaveBeenCalledWith(ctx.opts);
   });
 
   it('handles .record/.save via session command flow', async () => {
@@ -338,10 +336,10 @@ describe('processLine', () => {
     expect(output).toContain('Not recording');
   });
 
-  it('close sends stop to daemon', async () => {
+  it('close shuts down the browser', async () => {
     const ctx = makeCtx();
     await processLine(ctx, 'close');
-    expect(ctx.conn.send).toHaveBeenCalledWith('stop', {});
+    expect(ctx.conn.close).toHaveBeenCalled();
   });
 
   it('.exit closes connection and exits', async () => {
@@ -406,18 +404,18 @@ describe('processLine', () => {
     expect(logCalls).toMatch(/\d+ms/);
   });
 
-  it('shows reconnect failure message when both run and reconnect fail', async () => {
+  it('shows restart failure message when both run and restart fail', async () => {
     const ctx = makeCtx();
     ctx.conn.run = vi.fn().mockRejectedValue(new Error('timeout'));
     ctx.conn.connected = false;
-    ctx.conn.connect = vi.fn().mockRejectedValue(new Error('refused'));
+    ctx.conn.start = vi.fn().mockRejectedValue(new Error('launch failed'));
     await processLine(ctx, 'snapshot');
     expect(errorSpy).toHaveBeenCalled();
     const allOutput = [
       ...errorSpy.mock.calls.map(c => c.join(' ')),
       ...logSpy.mock.calls.map(c => c.join(' ')),
     ].join('\n');
-    expect(allOutput).toContain('Could not reconnect');
+    expect(allOutput).toContain('Could not restart');
   });
 
   it('kill-all dispatches to handleKillAll', async () => {
@@ -427,10 +425,10 @@ describe('processLine', () => {
     expect(ctx.conn.close).toHaveBeenCalled();
   });
 
-  it('close-all dispatches to handleClose', async () => {
+  it('close-all shuts down the browser', async () => {
     const ctx = makeCtx();
     await processLine(ctx, 'close-all');
-    expect(ctx.conn.send).toHaveBeenCalledWith('stop', {});
+    expect(ctx.conn.close).toHaveBeenCalled();
   });
 
   it('handles null result from daemon gracefully', async () => {
@@ -513,13 +511,13 @@ describe('processLine', () => {
     expect(ctx.session.recordedCount).toBe(0);
   });
 
-  it('daemon error without disconnect does not attempt reconnect', async () => {
+  it('error while still connected does not attempt restart', async () => {
     const ctx = makeCtx();
     ctx.conn.run = vi.fn().mockRejectedValue(new Error('bad args'));
     // conn.connected stays true
     await processLine(ctx, 'snapshot');
     expect(errorSpy).toHaveBeenCalled();
-    expect(ctx.conn.connect).not.toHaveBeenCalled();
+    expect(ctx.conn.start).not.toHaveBeenCalled();
   });
 
   it('.discard via processLine shows message', async () => {

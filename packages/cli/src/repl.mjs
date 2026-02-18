@@ -7,15 +7,13 @@
 import readline from 'node:readline';
 import path from 'node:path';
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
-
+import os from 'node:os';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c,
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
+  Engine,
 } from '@playwright-repl/core';
-import { DaemonConnection } from './connection.mjs';
-import { socketPath, daemonProfilesDir, isDaemonRunning, startDaemon } from './workspace.mjs';
 import { SessionManager } from './recorder.mjs';
 
 // ─── Response filtering ─────────────────────────────────────────────────────
@@ -54,7 +52,7 @@ export function showHelp() {
   console.log(`\n${c.bold}REPL meta-commands:${c.reset}`);
   console.log(`  .aliases              Show command aliases`);
   console.log(`  .status               Show connection status`);
-  console.log(`  .reconnect            Reconnect to daemon`);
+  console.log(`  .reconnect            Restart browser`);
   console.log(`  .record [filename]    Start recording commands`);
   console.log(`  .save                 Stop recording and save`);
   console.log(`  .pause                Pause/resume recording`);
@@ -77,10 +75,8 @@ export function showAliases() {
 }
 
 export function showStatus(ctx) {
-  const { conn, sessionName, session } = ctx;
+  const { conn, session } = ctx;
   console.log(`Connected: ${conn.connected ? `${c.green}yes${c.reset}` : `${c.red}no${c.reset}`}`);
-  console.log(`Session: ${sessionName}`);
-  console.log(`Socket: ${socketPath(sessionName)}`);
   console.log(`Commands sent: ${ctx.commandCount}`);
   console.log(`Mode: ${session.mode}`);
   if (session.mode === 'recording' || session.mode === 'paused') {
@@ -92,38 +88,8 @@ export function showStatus(ctx) {
 
 export async function handleKillAll(ctx) {
   try {
-    let killed = 0;
-    if (process.platform === 'win32') {
-      let result = '';
-      try {
-        result = execSync(
-          'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*run-mcp-server*\' -and $_.CommandLine -like \'*--daemon-session*\' } | Select-Object -ExpandProperty ProcessId"',
-          { encoding: 'utf-8' }
-        );
-      } catch (err) {
-        result = err.stdout || '';
-      }
-      for (const line of result.trim().split(/\r?\n/)) {
-        const pid = line.trim();
-        if (/^\d+$/.test(pid)) {
-          try { process.kill(parseInt(pid, 10)); killed++; } catch {}
-        }
-      }
-    } else {
-      const result = execSync('ps aux', { encoding: 'utf-8' });
-      for (const ln of result.split('\n')) {
-        if (ln.includes('run-mcp-server') && ln.includes('--daemon-session')) {
-          const pid = ln.trim().split(/\s+/)[1];
-          if (pid && /^\d+$/.test(pid)) {
-            try { process.kill(parseInt(pid, 10), 'SIGKILL'); killed++; } catch {}
-          }
-        }
-      }
-    }
-    console.log(killed > 0
-      ? `${c.green}✓${c.reset} Killed ${killed} daemon process${killed === 1 ? '' : 'es'}`
-      : `${c.dim}No daemon processes found${c.reset}`);
-    ctx.conn.close();
+    await ctx.conn.close();
+    console.log(`${c.green}✓${c.reset} Browser closed`);
   } catch (err) {
     console.error(`${c.red}Error:${c.reset} ${err.message}`);
   }
@@ -131,9 +97,8 @@ export async function handleKillAll(ctx) {
 
 export async function handleClose(ctx) {
   try {
-    await ctx.conn.send('stop', {});
-    console.log(`${c.green}✓${c.reset} Daemon stopped`);
-    ctx.conn.close();
+    await ctx.conn.close();
+    console.log(`${c.green}✓${c.reset} Browser closed`);
   } catch (err) {
     console.error(`${c.red}Error:${c.reset} ${err.message}`);
   }
@@ -193,9 +158,9 @@ export async function processLine(ctx, line) {
   }
 
   if (line === '.reconnect') {
-    ctx.conn.close();
+    await ctx.conn.close();
     try {
-      await ctx.conn.connect();
+      await ctx.conn.start(ctx.opts);
       console.log(`${c.green}✓${c.reset} Reconnected`);
     } catch (err) {
       console.error(`${c.red}✗${c.reset} ${err.message}`);
@@ -331,12 +296,12 @@ export async function processLine(ctx, line) {
   } catch (err) {
     console.error(`${c.red}Error:${c.reset} ${err.message}`);
     if (!ctx.conn.connected) {
-      console.log(`${c.yellow}Connection lost. Trying to reconnect...${c.reset}`);
+      console.log(`${c.yellow}Browser disconnected. Trying to restart...${c.reset}`);
       try {
-        await ctx.conn.connect();
-        console.log(`${c.green}✓${c.reset} Reconnected. Try your command again.`);
+        await ctx.conn.start(ctx.opts);
+        console.log(`${c.green}✓${c.reset} Restarted. Try your command again.`);
       } catch {
-        console.error(`${c.red}✗${c.reset} Could not reconnect. Use .reconnect or restart.`);
+        console.error(`${c.red}✗${c.reset} Could not restart. Use .reconnect or restart the REPL.`);
       }
     }
   }
@@ -408,7 +373,7 @@ export function startCommandLoop(ctx) {
     while (processing || commandQueue.length > 0) {
       await new Promise(r => setTimeout(r, 50));
     }
-    ctx.log(`\n${c.dim}Disconnecting... (daemon stays running)${c.reset}`);
+    ctx.log(`\n${c.dim}Closing browser...${c.reset}`);
     ctx.conn.close();
     process.exit(0);
   });
@@ -535,36 +500,29 @@ function attachGhostCompletion(rl, items) {
 // ─── REPL ────────────────────────────────────────────────────────────────────
 
 export async function startRepl(opts = {}) {
-  const sessionName = opts.session || 'default';
   const silent = opts.silent || false;
   const log = (...args) => { if (!silent) console.log(...args); };
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
-  log(`${c.dim}Session: ${sessionName} | Type .help for commands${c.reset}\n`);
+  log(`${c.dim}Type .help for commands${c.reset}\n`);
 
-  // ─── Connect to daemon ───────────────────────────────────────────
+  // ─── Start engine ────────────────────────────────────────────────
 
-  const running = await isDaemonRunning(sessionName);
-  if (!running) {
-    await startDaemon(sessionName, opts);
-    await new Promise(r => setTimeout(r, 500));
-  }
-
-  const conn = new DaemonConnection(socketPath(sessionName), replVersion);
+  const conn = new Engine();
   try {
-    await conn.connect();
-    log(`${c.green}✓${c.reset} Connected to daemon${running ? '' : ' (newly started)'}\n`);
+    await conn.start(opts);
+    log(`${c.green}✓${c.reset} Browser ready\n`);
   } catch (err) {
-    console.error(`${c.red}✗${c.reset} Failed to connect: ${err.message}`);
-    console.error(`  Try: playwright-cli open`);
+    console.error(`${c.red}✗${c.reset} Failed to start: ${err.message}`);
     process.exit(1);
   }
 
   // ─── Session + readline ──────────────────────────────────────────
 
   const session = new SessionManager();
-  const historyFile = path.join(daemonProfilesDir, '.repl-history');
-  const ctx = { conn, session, rl: null, sessionName, log, historyFile, commandCount: 0 };
+  const historyDir = path.join(os.homedir(), '.playwright-repl');
+  const historyFile = path.join(historyDir, '.repl-history');
+  const ctx = { conn, session, rl: null, opts, log, historyFile, commandCount: 0 };
 
   // Auto-start recording if --record was passed
   if (opts.record) {
