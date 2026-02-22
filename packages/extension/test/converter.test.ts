@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tokenize, pwToPlaywright } from "../lib/converter.js";
+import { tokenize, pwToPlaywright } from "../src/lib/converter.js";
 
 describe("tokenize", () => {
   it("tokenizes simple words", () => {

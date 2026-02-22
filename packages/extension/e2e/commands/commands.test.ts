@@ -5,7 +5,7 @@
  * Each test sends commands via HTTP POST /run and asserts on actual results.
  */
 
-import { test, expect } from './fixtures.mjs';
+import { test, expect } from './fixtures.js';
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ import { test, expect } from './fixtures.mjs';
  *   - textbox "Name" [ref=e2]          → label before ref
  *   - combobox [ref=e2]:               → type before ref (no label)
  */
-function findRef(snapshotText, labelPattern) {
+function findRef(snapshotText: string, labelPattern: string): string {
   // Try: label appears before [ref=eN] on same line
   const re1 = new RegExp(`${labelPattern}.*\\[ref=(e\\d+)\\]`, 'i');
   const m1 = snapshotText.match(re1);
@@ -235,7 +235,7 @@ test('alias c for click', async ({ run }) => {
  * Count tab entries in tab-list output.
  * Format: "- N: [Title](URL)" or "- N: (current) [Title](URL)"
  */
-function countTabs(tabListText) {
+function countTabs(tabListText: string): number {
   return tabListText.split('\n').filter(l => /^- \d+:/.test(l)).length;
 }
 

@@ -25,7 +25,8 @@
     "default_path": "panel/panel.html"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "icons": {
     "16": "icons/icon16.png",

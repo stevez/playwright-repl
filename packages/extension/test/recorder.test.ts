@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("recorder.js", () => {
-  let sendMessageSpy;
+  let sendMessageSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -14,7 +14,7 @@ describe("recorder.js", () => {
 
     // Mock chrome.runtime.sendMessage
     sendMessageSpy = vi.fn();
-    globalThis.chrome = {
+    (globalThis as any).chrome = {
       runtime: { sendMessage: sendMessageSpy },
     };
   });
@@ -28,7 +28,8 @@ describe("recorder.js", () => {
   });
 
   async function loadRecorder() {
-    await import("../content/recorder.js");
+    // @ts-expect-error recorder.ts is an IIFE script with no exports; vitest can still execute it
+    await import("../src/content/recorder.ts");
   }
 
   // ─── Initialization ─────────────────────────────────────────────────────
@@ -46,7 +47,8 @@ describe("recorder.js", () => {
   it("is idempotent — does not run twice", async () => {
     await loadRecorder();
     const firstCleanup = window.__pwRecorderCleanup;
-    await import("../content/recorder.js");
+    // @ts-expect-error recorder.ts is an IIFE with no exports
+    await import("../src/content/recorder.ts");
     expect(window.__pwRecorderCleanup).toBe(firstCleanup);
   });
 
@@ -55,7 +57,7 @@ describe("recorder.js", () => {
   it("records click on a button", async () => {
     document.body.innerHTML = '<button>Submit</button>';
     await loadRecorder();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -66,7 +68,7 @@ describe("recorder.js", () => {
   it("records click on a link", async () => {
     document.body.innerHTML = '<a href="#">Learn more</a>';
     await loadRecorder();
-    document.querySelector("a").click();
+    document.querySelector("a")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -77,7 +79,7 @@ describe("recorder.js", () => {
   it("skips clicks on non-interactive containers (div, section)", async () => {
     document.body.innerHTML = '<div id="container">content</div>';
     await loadRecorder();
-    document.querySelector("#container").click();
+    (document.querySelector("#container") as HTMLElement).click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -85,7 +87,7 @@ describe("recorder.js", () => {
   it("uses aria-label for locator when available", async () => {
     document.body.innerHTML = '<button aria-label="Close dialog">X</button>';
     await loadRecorder();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -96,7 +98,7 @@ describe("recorder.js", () => {
   it("uses label[for] for locator", async () => {
     document.body.innerHTML = '<label for="name">Full Name</label><input id="name" type="checkbox">';
     await loadRecorder();
-    document.querySelector("input").click();
+    document.querySelector("input")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pw-recorded-command" }),
@@ -107,7 +109,7 @@ describe("recorder.js", () => {
     document.body.innerHTML = '<button placeholder="Search...">Search...</button>';
     await loadRecorder();
     // placeholder is not standard on buttons, so textContent takes priority
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -118,7 +120,7 @@ describe("recorder.js", () => {
   it("uses title as fallback locator", async () => {
     document.body.innerHTML = '<span title="Info tooltip" role="button"></span>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -129,7 +131,7 @@ describe("recorder.js", () => {
   it("falls back to tagName locator", async () => {
     document.body.innerHTML = '<span role="button"></span>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -140,7 +142,7 @@ describe("recorder.js", () => {
   it("skips click on text input (handled by fill)", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Name">';
     await loadRecorder();
-    document.querySelector("input").click();
+    document.querySelector("input")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -148,7 +150,7 @@ describe("recorder.js", () => {
   it("skips click on textarea (handled by fill)", async () => {
     document.body.innerHTML = '<textarea placeholder="Notes"></textarea>';
     await loadRecorder();
-    document.querySelector("textarea").click();
+    document.querySelector("textarea")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -156,7 +158,7 @@ describe("recorder.js", () => {
   it("records click on div with role attribute", async () => {
     document.body.innerHTML = '<div role="button">Custom Button</div>';
     await loadRecorder();
-    document.querySelector("div").click();
+    document.querySelector("div")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -167,7 +169,7 @@ describe("recorder.js", () => {
   it("escapes quotes in locator text", async () => {
     document.body.innerHTML = '<button>Say "Hello"</button>';
     await loadRecorder();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -179,7 +181,7 @@ describe("recorder.js", () => {
     const longText = "A".repeat(100);
     document.body.innerHTML = `<span role="button" title="Short title">${longText}</span>`;
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -190,7 +192,7 @@ describe("recorder.js", () => {
   it("uses parent label text for locator", async () => {
     document.body.innerHTML = '<label>Username <span role="button">icon</span></label>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -203,7 +205,7 @@ describe("recorder.js", () => {
   it("skips clicks on plain span without role", async () => {
     document.body.innerHTML = '<span>just text</span>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -211,7 +213,7 @@ describe("recorder.js", () => {
   it("skips clicks on paragraph text", async () => {
     document.body.innerHTML = '<p>paragraph content</p>';
     await loadRecorder();
-    document.querySelector("p").click();
+    document.querySelector("p")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -219,7 +221,7 @@ describe("recorder.js", () => {
   it("skips clicks on heading text", async () => {
     document.body.innerHTML = '<h2>Section Title</h2>';
     await loadRecorder();
-    document.querySelector("h2").click();
+    document.querySelector("h2")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -227,7 +229,7 @@ describe("recorder.js", () => {
   it("records click on child of a link", async () => {
     document.body.innerHTML = '<a href="#"><span>inner text</span></a>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pw-recorded-command" }),
@@ -237,7 +239,7 @@ describe("recorder.js", () => {
   it("records click on child of a button", async () => {
     document.body.innerHTML = '<button><span>icon</span></button>';
     await loadRecorder();
-    document.querySelector("span").click();
+    document.querySelector("span")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pw-recorded-command" }),
@@ -247,7 +249,7 @@ describe("recorder.js", () => {
   it("records click on element with onclick attribute", async () => {
     document.body.innerHTML = '<div onclick="void(0)">clickable div</div>';
     await loadRecorder();
-    document.querySelector("div").click();
+    document.querySelector("div")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pw-recorded-command" }),
@@ -282,7 +284,7 @@ describe("recorder.js", () => {
   it("does not append --nth when text is unique", async () => {
     document.body.innerHTML = '<button>Submit</button><button>Cancel</button>';
     await loadRecorder();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -306,7 +308,7 @@ describe("recorder.js", () => {
   it("records check command on checkbox", async () => {
     document.body.innerHTML = '<input type="checkbox" aria-label="Accept terms">';
     await loadRecorder();
-    const cb = document.querySelector("input");
+    const cb = document.querySelector("input")!;
     // click() toggles unchecked → checked, handler reads checked=true
     cb.click();
     vi.advanceTimersByTime(300);
@@ -319,7 +321,7 @@ describe("recorder.js", () => {
   it("records uncheck command on checkbox", async () => {
     document.body.innerHTML = '<input type="checkbox" aria-label="Accept terms" checked>';
     await loadRecorder();
-    const cb = document.querySelector("input");
+    const cb = document.querySelector("input")!;
     // click() toggles checked → unchecked, handler reads checked=false
     cb.click();
     vi.advanceTimersByTime(300);
@@ -332,9 +334,9 @@ describe("recorder.js", () => {
   it("detects checkbox via parent label", async () => {
     document.body.innerHTML = '<label>Remember me <input type="checkbox"></label>';
     await loadRecorder();
-    const cb = document.querySelector("input");
+    const cb = document.querySelector("input")!;
     cb.checked = true;
-    document.querySelector("label").click();
+    document.querySelector("label")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -349,7 +351,7 @@ describe("recorder.js", () => {
   it("records debounced fill command on input", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Username">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = "alice";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     // Should not fire immediately
@@ -365,11 +367,11 @@ describe("recorder.js", () => {
   it("click flushes pending fill immediately", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Email"><button>Submit</button>';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = "test@example.com";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     // Click before debounce timeout
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     const calls = sendMessageSpy.mock.calls.map((c) => c[0]);
     const fillCall = calls.find((c) => c.command && c.command.startsWith("fill"));
@@ -381,7 +383,7 @@ describe("recorder.js", () => {
   it("records fill on textarea", async () => {
     document.body.innerHTML = '<textarea aria-label="Comments"></textarea>';
     await loadRecorder();
-    const el = document.querySelector("textarea");
+    const el = document.querySelector("textarea")!;
     el.value = "Great product!";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     vi.advanceTimersByTime(1500);
@@ -394,7 +396,7 @@ describe("recorder.js", () => {
   it("resets debounce timer on continued typing", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Search">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = "hel";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     vi.advanceTimersByTime(1000);
@@ -416,7 +418,7 @@ describe("recorder.js", () => {
   it("escapes quotes in fill value", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Name">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = 'John "Doe"';
     el.dispatchEvent(new Event("input", { bubbles: true }));
     vi.advanceTimersByTime(1500);
@@ -429,7 +431,7 @@ describe("recorder.js", () => {
   it("does not record fill for radio inputs", async () => {
     document.body.innerHTML = '<input type="radio" name="opt">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     vi.advanceTimersByTime(1500);
     const fillCalls = sendMessageSpy.mock.calls.filter(
@@ -441,7 +443,7 @@ describe("recorder.js", () => {
   it("does not record fill for checkbox inputs", async () => {
     document.body.innerHTML = '<input type="checkbox" aria-label="Toggle">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     vi.advanceTimersByTime(1500);
     const fillCalls = sendMessageSpy.mock.calls.filter(
@@ -459,7 +461,7 @@ describe("recorder.js", () => {
         <option value="b">Blue</option>
       </select>`;
     await loadRecorder();
-    const sel = document.querySelector("select");
+    const sel = document.querySelector("select")!;
     sel.selectedIndex = 1;
     sel.dispatchEvent(new Event("change", { bubbles: true }));
     expect(sendMessageSpy).toHaveBeenCalledWith({
@@ -507,7 +509,7 @@ describe("recorder.js", () => {
   it("keydown flushes pending fill", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Search">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = "hello";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -521,7 +523,7 @@ describe("recorder.js", () => {
   it("records dblclick and suppresses single click", async () => {
     document.body.innerHTML = '<span role="button">Edit</span>';
     await loadRecorder();
-    const el = document.querySelector("span");
+    const el = document.querySelector("span")!;
     // Simulate browser's click → dblclick sequence
     el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
@@ -536,7 +538,7 @@ describe("recorder.js", () => {
   it("records right-click as click --button right", async () => {
     document.body.innerHTML = '<span role="button">Item</span>';
     await loadRecorder();
-    const el = document.querySelector("span");
+    const el = document.querySelector("span")!;
     el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -552,7 +554,7 @@ describe("recorder.js", () => {
         <li><span>Buy milk</span><button aria-label="delete">X</button></li>
       </ul>`;
     await loadRecorder();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: "pw-recorded-command",
@@ -574,7 +576,7 @@ describe("recorder.js", () => {
 
     // Events should no longer be captured
     sendMessageSpy.mockClear();
-    document.querySelector("button").click();
+    document.querySelector("button")!.click();
     vi.advanceTimersByTime(300);
     expect(sendMessageSpy).not.toHaveBeenCalled();
   });
@@ -582,7 +584,7 @@ describe("recorder.js", () => {
   it("cleanup flushes pending fill", async () => {
     document.body.innerHTML = '<input type="text" placeholder="Name">';
     await loadRecorder();
-    const el = document.querySelector("input");
+    const el = document.querySelector("input")!;
     el.value = "Bob";
     el.dispatchEvent(new Event("input", { bubbles: true }));
     // Cleanup before debounce

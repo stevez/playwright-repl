@@ -5,52 +5,51 @@
  *   recorder.js (content script) → chrome.runtime.sendMessage → panel.js
  *
  * Key challenge: In E2E tests the panel runs as a regular tab
- * (not a real side panel), so we trigger recording via the service worker
- * directly rather than clicking the Record button (which queries the active tab).
+ * (not a real side panel), so we trigger recording via chrome.runtime.sendMessage
+ * from the panel page (an extension page that can message the service worker).
  */
 
-import { test, expect } from './fixtures.mjs';
+import { test, expect } from './fixtures.js';
+import type { Page } from '@playwright/test';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Start recording on the target page by calling startRecording()
- * directly in the service worker context.
+ * Start recording on the target page via chrome.runtime.sendMessage
+ * sent from the panel page (an extension page), the same way the
+ * panel triggers recording in production.
  */
-async function startRecordingOn(sw, targetPage) {
+async function startRecordingOn(panelPage: Page, targetPage: Page): Promise<{ ok: boolean; error?: string }> {
   const targetUrl = targetPage.url();
-  const result = await sw.evaluate(async (url) => {
-    // Find the target tab by URL
-    const tabs = await chrome.tabs.query({});
-    const tab = tabs.find(t => t.url && t.url.startsWith(url));
+  return await panelPage.evaluate(async (url: string) => {
+    const tabs: any[] = await (chrome.tabs.query as any)({});
+    const tab = tabs.find((t: any) => t.url && t.url.startsWith(url));
     if (!tab) return { ok: false, error: 'Target tab not found for ' + url };
-    // Call startRecording directly (defined in background.js scope)
-    return await startRecording(tab.id);
+    return await (chrome.runtime.sendMessage as any)({ type: 'pw-record-start', tabId: tab.id });
   }, targetUrl);
-  return result;
 }
 
 /**
  * Stop recording on the target page.
  */
-async function stopRecordingOn(sw, targetPage) {
+async function stopRecordingOn(panelPage: Page, targetPage: Page): Promise<{ ok: boolean }> {
   const targetUrl = targetPage.url();
-  return await sw.evaluate(async (url) => {
-    const tabs = await chrome.tabs.query({});
-    const tab = tabs.find(t => t.url && t.url.startsWith(url));
+  return await panelPage.evaluate(async (url: string) => {
+    const tabs: any[] = await (chrome.tabs.query as any)({});
+    const tab = tabs.find((t: any) => t.url && t.url.startsWith(url));
     if (!tab) return { ok: true };
-    return await stopRecording(tab.id);
+    return await (chrome.runtime.sendMessage as any)({ type: 'pw-record-stop', tabId: tab.id });
   }, targetUrl);
 }
 
 /**
  * Wait for a command matching a pattern to appear in the panel's console output.
  */
-async function waitForConsoleCommand(panelPage, pattern, timeoutMs = 10000) {
+async function waitForConsoleCommand(panelPage: Page, pattern: string, timeoutMs: number = 10000): Promise<void> {
   await panelPage.waitForFunction(
     ([pat]) => {
       const cmds = document.querySelectorAll('.line-command');
-      return [...cmds].some(el => new RegExp(pat).test(el.textContent));
+      return [...cmds].some(el => new RegExp(pat).test(el.textContent!));
     },
     [pattern],
     { timeout: timeoutMs },
@@ -60,10 +59,10 @@ async function waitForConsoleCommand(panelPage, pattern, timeoutMs = 10000) {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 test('recorder injects and captures a click on a link', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
   // Start recording on the target page
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Bring target page to front and click the link
@@ -78,17 +77,17 @@ test('recorder injects and captures a click on a link', async ({ recordingPages 
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).toContain('click');
 
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });
 
 test('recorder appends --nth for ambiguous locators', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
   // Navigate to a page with multiple duplicate tab buttons (npm/yarn tabs)
   await targetPage.goto('https://playwright.dev/docs/intro');
   await targetPage.waitForLoadState('domcontentloaded');
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Click the second "npm" tab — multiple tab buttons share the same "npm" text.
@@ -105,16 +104,16 @@ test('recorder appends --nth for ambiguous locators', async ({ recordingPages })
 
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).toContain('--nth 1');
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });
 
 test('recorder ignores clicks on non-interactive elements', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
   await targetPage.goto('https://playwright.dev/docs/intro');
   await targetPage.waitForLoadState('domcontentloaded');
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Click a heading — non-interactive, recorder should ignore it
@@ -127,17 +126,17 @@ test('recorder ignores clicks on non-interactive elements', async ({ recordingPa
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).not.toContain('click');
 
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });
 
 test('recorder captures input/fill events', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
   // Navigate to a page with an input field
   await targetPage.goto('https://demo.playwright.dev/todomvc/');
   await targetPage.waitForLoadState('domcontentloaded');
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Type into the input field — recorder debounces fill after 1500ms
@@ -155,17 +154,17 @@ test('recorder captures input/fill events', async ({ recordingPages }) => {
   expect(editorValue).toContain('fill');
   expect(editorValue).toContain('Buy groceries');
 
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });
 
 test('recorder captures keyboard press events', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
   // Navigate to a page with an input
   await targetPage.goto('https://demo.playwright.dev/todomvc/');
   await targetPage.waitForLoadState('domcontentloaded');
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Type and press Enter
@@ -180,13 +179,13 @@ test('recorder captures keyboard press events', async ({ recordingPages }) => {
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).toContain('press Enter');
 
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });
 
 test('stop recording cleans up — no more commands captured', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Click while recording — should be captured
@@ -196,11 +195,11 @@ test('stop recording cleans up — no more commands captured', async ({ recordin
   await waitForConsoleCommand(panelPage, 'click');
 
   // Stop recording
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 
   // Clear editor to check for new commands
   await panelPage.evaluate(() => {
-    document.getElementById('editor').value = '';
+    (document.getElementById('editor') as HTMLTextAreaElement).value = '';
   });
 
   // Navigate back and click again — should NOT be captured
@@ -217,9 +216,9 @@ test('stop recording cleans up — no more commands captured', async ({ recordin
 });
 
 test('recorder re-injects after page navigation', async ({ recordingPages }) => {
-  const { panelPage, targetPage, sw } = recordingPages;
+  const { panelPage, targetPage } = recordingPages;
 
-  const result = await startRecordingOn(sw, targetPage);
+  const result = await startRecordingOn(panelPage, targetPage);
   expect(result.ok).toBe(true);
 
   // Click a link that navigates to a new page
@@ -233,7 +232,7 @@ test('recorder re-injects after page navigation', async ({ recordingPages }) => 
   // Clear the editor to isolate new commands
   await panelPage.bringToFront();
   await panelPage.evaluate(() => {
-    document.getElementById('editor').value = '';
+    (document.getElementById('editor') as HTMLTextAreaElement).value = '';
   });
 
   // Now interact with the new page — recorder should still work
@@ -245,5 +244,5 @@ test('recorder re-injects after page navigation', async ({ recordingPages }) => 
   await panelPage.bringToFront();
   await waitForConsoleCommand(panelPage, 'press Tab');
 
-  await stopRecordingOn(sw, targetPage);
+  await stopRecordingOn(panelPage, targetPage);
 });

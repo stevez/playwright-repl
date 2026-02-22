@@ -1,37 +1,61 @@
 import { pwToPlaywright } from "../lib/converter.js";
 
+// --- Interfaces ---
+
+interface RunResult {
+  text: string;
+  isError: boolean;
+  image?: string;
+}
+
+interface ResponseEntry {
+  command: string;
+  text: string;
+  timestamp: number;
+}
+
+// --- Chrome MV3 promise-based API helpers ---
+// @types/chrome only declares callback overloads; MV3 supports promises at runtime.
+// These are functions (not captured references) so E2E tests can mock chrome.tabs/runtime.
+function tabsQuery(q: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> {
+  return (chrome.tabs.query as any)(q);
+}
+function rtSendMessage(message: unknown): Promise<unknown> {
+  return (chrome.runtime.sendMessage as any)(message);
+}
+
 // --- DOM references ---
 
-const output = document.getElementById("output");
-const input = document.getElementById("command-input");
-const editor = document.getElementById("editor");
-const lineNumbers = document.getElementById("line-numbers");
-const editorPane = document.getElementById("editor-pane");
-const splitter = document.getElementById("splitter");
-const consoleStats = document.getElementById("console-stats");
-const fileInfo = document.getElementById("file-info");
-const runBtn = document.getElementById("run-btn");
-const openBtn = document.getElementById("open-btn");
-const saveBtn = document.getElementById("save-btn");
-const exportBtn = document.getElementById("export-btn");
-const recordBtn = document.getElementById("record-btn");
-const copyBtn = document.getElementById("copy-btn");
-const stepBtn = document.getElementById("step-btn");
-const consoleClearBtn = document.getElementById("console-clear-btn");
-const lineHighlight = document.getElementById("line-highlight");
-const lightbox = document.getElementById("lightbox");
-const lightboxImg = document.getElementById("lightbox-img");
-const lightboxSaveBtn = document.getElementById("lightbox-save-btn");
-const lightboxCloseBtn = document.getElementById("lightbox-close-btn");
-const ghostText = document.getElementById("ghost-text");
-const dropdown = document.getElementById("autocomplete-dropdown");
+const output = document.getElementById("output") as HTMLDivElement;
+const input = document.getElementById("command-input") as HTMLInputElement;
+const editor = document.getElementById("editor") as HTMLTextAreaElement;
+const lineNumbers = document.getElementById("line-numbers") as HTMLDivElement;
+const editorPane = document.getElementById("editor-pane") as HTMLDivElement;
+const splitter = document.getElementById("splitter") as HTMLDivElement;
+const consoleStats = document.getElementById("console-stats") as HTMLSpanElement;
+const fileInfo = document.getElementById("file-info") as HTMLSpanElement;
+const runBtn = document.getElementById("run-btn") as HTMLButtonElement;
+const openBtn = document.getElementById("open-btn") as HTMLButtonElement;
+const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+const exportBtn = document.getElementById("export-btn") as HTMLButtonElement;
+const recordBtn = document.getElementById("record-btn") as HTMLButtonElement;
+const copyBtn = document.getElementById("copy-btn") as HTMLButtonElement;
+const stepBtn = document.getElementById("step-btn") as HTMLButtonElement;
+const consoleClearBtn = document.getElementById("console-clear-btn") as HTMLButtonElement;
+const lineHighlight = document.getElementById("line-highlight") as HTMLDivElement;
+const lightbox = document.getElementById("lightbox") as HTMLDivElement;
+const lightboxImg = document.getElementById("lightbox-img") as HTMLImageElement;
+const lightboxSaveBtn = document.getElementById("lightbox-save-btn") as HTMLButtonElement;
+const lightboxCloseBtn = document.getElementById("lightbox-close-btn") as HTMLButtonElement;
+const ghostText = document.getElementById("ghost-text") as HTMLSpanElement;
+const dropdown = document.getElementById("autocomplete-dropdown") as HTMLDivElement;
 
 // --- Server config ---
 const SERVER_PORT = 6781;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
 // --- Response history (full responses stored for reference) ---
-const responseHistory = [];
+const responseHistory: ResponseEntry[] = [];
 
 /**
  * Filter verbose response for panel display.
@@ -47,7 +71,7 @@ const responseHistory = [];
  *   - For "snapshot": show the ### Snapshot section (that's the whole point)
  *   - For everything else: show only the result text (before the first ### header)
  */
-function filterResponse(command, text) {
+function filterResponse(command: string, text: string): string {
   responseHistory.push({ command, text, timestamp: Date.now() });
 
   const cmdName = command.trim().split(/\s+/)[0];
@@ -61,7 +85,7 @@ function filterResponse(command, text) {
 
   // Extract content from useful ### sections (Result, Error, Snapshot)
   const sections = text.split(/^### /m).slice(1);
-  const kept = [];
+  const kept: string[] = [];
   for (const section of sections) {
     const nl = section.indexOf('\n');
     if (nl === -1) continue;
@@ -83,21 +107,21 @@ if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
 // --- State ---
 
 // Command history (for REPL input up/down)
-const history = [];
-let historyIndex = -1;
+const history: string[] = [];
+let historyIndex: number = -1;
 
 // Run state
-let isRunning = false;
-let currentRunLine = -1;
-let runPassCount = 0;
-let runFailCount = 0;
-let lineResults = []; // "pass" | "fail" | null per line
+let isRunning: boolean = false;
+let currentRunLine: number = -1;
+let runPassCount: number = 0;
+let runFailCount: number = 0;
+let lineResults: (string | null)[] = []; // "pass" | "fail" | null per line
 
 // Step state
-let stepLine = -1; // Next line to execute when stepping, -1 = not stepping
+let stepLine: number = -1; // Next line to execute when stepping, -1 = not stepping
 
 // File state
-let currentFilename = "";
+let currentFilename: string = "";
 
 // Commands handled locally (not added to history, not sent to background)
 const LOCAL_COMMANDS = new Set(["history", "clear", "reset"]);
@@ -114,7 +138,7 @@ const COMMANDS = [
 
 // --- Autocomplete ---
 
-function updateGhostText() {
+function updateGhostText(): void {
   const val = input.value.toLowerCase();
   if (!val || val.includes(" ")) {
     ghostText.textContent = "";
@@ -129,14 +153,14 @@ function updateGhostText() {
   }
 }
 
-function clearGhostText() {
+function clearGhostText(): void {
   ghostText.textContent = "";
 }
 
-let dropdownItems = [];
-let dropdownIndex = -1;
+let dropdownItems: string[] = [];
+let dropdownIndex: number = -1;
 
-function showDropdown(matches) {
+function showDropdown(matches: string[]): void {
   dropdown.innerHTML = "";
   dropdownItems = matches;
   dropdownIndex = -1;
@@ -144,7 +168,7 @@ function showDropdown(matches) {
     const div = document.createElement("div");
     div.className = "autocomplete-item";
     div.textContent = matches[i];
-    div.addEventListener("mousedown", (e) => {
+    div.addEventListener("mousedown", (e: MouseEvent) => {
       e.preventDefault();
       input.value = matches[i] + " ";
       hideDropdown();
@@ -156,14 +180,14 @@ function showDropdown(matches) {
   dropdown.hidden = false;
 }
 
-function hideDropdown() {
+function hideDropdown(): void {
   dropdown.hidden = true;
   dropdown.innerHTML = "";
   dropdownItems = [];
   dropdownIndex = -1;
 }
 
-function updateDropdownHighlight() {
+function updateDropdownHighlight(): void {
   const items = dropdown.querySelectorAll(".autocomplete-item");
   items.forEach((el, i) => {
     el.classList.toggle("active", i === dropdownIndex);
@@ -172,7 +196,7 @@ function updateDropdownHighlight() {
 
 // --- Output helpers ---
 
-function addLine(text, className) {
+function addLine(text: string, className: string): void {
   const div = document.createElement("div");
   div.className = `line ${className}`;
   div.textContent = text;
@@ -180,27 +204,27 @@ function addLine(text, className) {
   output.scrollTop = output.scrollHeight;
 }
 
-function addCommand(text) {
+function addCommand(text: string): void {
   addLine(text, "line-command");
 }
 
-function addSuccess(text) {
+function addSuccess(text: string): void {
   addLine(text, "line-success");
 }
 
-function addError(text) {
+function addError(text: string): void {
   addLine(text, "line-error");
 }
 
-function addInfo(text) {
+function addInfo(text: string): void {
   addLine(text, "line-info");
 }
 
-function addSnapshot(text) {
+function addSnapshot(text: string): void {
   addLine(text, "line-snapshot");
 }
 
-function addScreenshot(base64) {
+function addScreenshot(base64: string): void {
   const dataUrl = "data:image/png;base64," + base64;
 
   const wrapper = document.createElement("div");
@@ -248,11 +272,11 @@ function addScreenshot(base64) {
   output.scrollTop = output.scrollHeight;
 }
 
-function addComment(text) {
+function addComment(text: string): void {
   addLine(text, "line-comment");
 }
 
-function addCodeBlock(code) {
+function addCodeBlock(code: string): void {
   const wrapper = document.createElement("div");
   wrapper.className = "code-block";
 
@@ -278,7 +302,7 @@ function addCodeBlock(code) {
 
 // --- Clipboard helper (navigator.clipboard blocked in DevTools panels) ---
 
-function copyToClipboard(text) {
+function copyToClipboard(text: string): boolean {
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.style.position = "fixed";
@@ -288,7 +312,7 @@ function copyToClipboard(text) {
   try {
     document.execCommand("copy");
     return true;
-  } catch (e) {
+  } catch (_e) {
     return false;
   } finally {
     document.body.removeChild(textarea);
@@ -297,7 +321,7 @@ function copyToClipboard(text) {
 
 // --- Editor helpers ---
 
-function updateLineNumbers() {
+function updateLineNumbers(): void {
   const lines = editor.value.split("\n");
   let html = "";
   for (let i = 0; i < lines.length; i++) {
@@ -315,7 +339,7 @@ function updateLineNumbers() {
   updateLineHighlight();
 }
 
-function updateLineHighlight() {
+function updateLineHighlight(): void {
   if (currentRunLine >= 0) {
     // 8px padding + line index * 18px line-height, offset by scroll
     lineHighlight.style.top = (8 + currentRunLine * 18 - editor.scrollTop) + "px";
@@ -325,26 +349,26 @@ function updateLineHighlight() {
   }
 }
 
-function syncScroll() {
+function syncScroll(): void {
   lineNumbers.scrollTop = editor.scrollTop;
   updateLineHighlight();
 }
 
-function updateFileInfo() {
+function updateFileInfo(): void {
   const lines = editor.value.split("\n");
   const count = lines.length;
   const name = currentFilename || "untitled.pw";
   fileInfo.textContent = `${name} \u2014 ${count} line${count !== 1 ? "s" : ""}`;
 }
 
-function updateButtonStates() {
+function updateButtonStates(): void {
   const hasContent = editor.value.trim().length > 0;
   copyBtn.disabled = !hasContent;
   saveBtn.disabled = !hasContent;
   exportBtn.disabled = !hasContent;
 }
 
-function appendToEditor(text) {
+function appendToEditor(text: string): void {
   const current = editor.value;
   if (current && !current.endsWith("\n")) {
     editor.value += "\n";
@@ -356,14 +380,14 @@ function appendToEditor(text) {
   editor.scrollTop = editor.scrollHeight;
 }
 
-function clearConsole() {
+function clearConsole(): void {
   output.innerHTML = "";
   runPassCount = 0;
   runFailCount = 0;
   updateConsoleStats();
 }
 
-function findNextExecutableLine(startFrom, lines) {
+function findNextExecutableLine(startFrom: number, lines: string[]): number {
   for (let i = startFrom; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed && !trimmed.startsWith("#")) return i;
@@ -371,7 +395,7 @@ function findNextExecutableLine(startFrom, lines) {
   return -1;
 }
 
-function updateConsoleStats() {
+function updateConsoleStats(): void {
   if (runPassCount === 0 && runFailCount === 0) {
     consoleStats.textContent = "";
     return;
@@ -395,7 +419,7 @@ editor.addEventListener("scroll", syncScroll);
 
 // --- Export helper ---
 
-function exportFromLines(cmds) {
+function exportFromLines(cmds: string[]): void {
   const lines = [
     `import { test, expect } from '@playwright/test';`,
     ``,
@@ -419,17 +443,18 @@ function exportFromLines(cmds) {
 
 // --- Active tab detection ---
 
-async function getActiveTabUrl() {
+async function getActiveTabUrl(): Promise<string | null> {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = tabs[0];
     console.log('[panel] activeTab:', tab?.id, tab?.url);
     return tab?.url || null;
-  } catch (e) { console.error('[panel] tabs.query failed:', e); return null; }
+  } catch (_e) { console.error('[panel] tabs.query failed:', _e); return null; }
 }
 
 // --- Command execution (REPL ad-hoc) ---
 
-async function executeCommand(raw) {
+async function executeCommand(raw: string): Promise<void> {
   const trimmed = raw.trim();
   if (!trimmed) return;
 
@@ -495,7 +520,7 @@ async function executeCommand(raw) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ raw: trimmed, activeTabUrl }),
     });
-    const result = await res.json();
+    const result: RunResult = await res.json();
 
     if (result.isError) {
       addError(result.text);
@@ -512,14 +537,14 @@ async function executeCommand(raw) {
         addSuccess(text);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     addError("Not connected to server. Run: playwright-repl --extension");
   }
 }
 
 // --- Command execution for Run (with pass/fail tracking) ---
 
-async function executeCommandForRun(raw) {
+async function executeCommandForRun(raw: string): Promise<void> {
   const trimmed = raw.trim();
   if (!trimmed) return;
 
@@ -538,7 +563,7 @@ async function executeCommandForRun(raw) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ raw: trimmed, activeTabUrl }),
     });
-    const result = await res.json();
+    const result: RunResult = await res.json();
 
     if (result.isError) {
       addError(result.text);
@@ -559,7 +584,7 @@ async function executeCommandForRun(raw) {
       lineResults[currentRunLine] = "pass";
       runPassCount++;
     }
-  } catch (e) {
+  } catch (_e) {
     addError("Not connected to server. Run: playwright-repl --extension");
     lineResults[currentRunLine] = "fail";
     runFailCount++;
@@ -570,13 +595,13 @@ async function executeCommandForRun(raw) {
 
 // --- REPL input handling ---
 
-function selectDropdownItem(cmd) {
+function selectDropdownItem(cmd: string): void {
   input.value = cmd + " ";
   hideDropdown();
   clearGhostText();
 }
 
-input.addEventListener("keydown", (e) => {
+input.addEventListener("keydown", (e: KeyboardEvent) => {
   // When dropdown is visible, arrow keys navigate it
   if (!dropdown.hidden && dropdownItems.length > 0) {
     if (e.key === "ArrowDown") {
@@ -692,7 +717,7 @@ input.addEventListener("input", () => {
 
 // --- Editor keyboard shortcut ---
 
-editor.addEventListener("keydown", (e) => {
+editor.addEventListener("keydown", (e: KeyboardEvent) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault();
     runBtn.click();
@@ -746,7 +771,7 @@ runBtn.addEventListener("click", async () => {
 
     await executeCommandForRun(line);
 
-    if (isRunning) await new Promise((r) => setTimeout(r, 300));
+    if (isRunning) await new Promise<void>((r) => setTimeout(r, 300));
   }
 
   isRunning = false;
@@ -819,11 +844,11 @@ openBtn.addEventListener("click", () => {
   fileInput.type = "file";
   fileInput.accept = ".pw,.txt";
   fileInput.addEventListener("change", () => {
-    const file = fileInput.files[0];
+    const file = fileInput.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      editor.value = reader.result;
+      editor.value = reader.result as string;
       currentFilename = file.name;
       lineResults = [];
       updateLineNumbers();
@@ -895,12 +920,13 @@ consoleClearBtn.addEventListener("click", clearConsole);
 
 // --- Record button ---
 
-let isRecording = false;
+let isRecording: boolean = false;
 
 recordBtn.addEventListener("click", async () => {
   if (isRecording) {
     // Stop recording
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = tabs[0];
     if (tab) {
       chrome.runtime.sendMessage({ type: "pw-record-stop", tabId: tab.id });
     }
@@ -911,12 +937,13 @@ recordBtn.addEventListener("click", async () => {
     addInfo("Recording stopped");
   } else {
     // Start recording
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = tabs[0];
     if (!tab) {
       addError("No active tab found");
       return;
     }
-    const result = await chrome.runtime.sendMessage({ type: "pw-record-start", tabId: tab.id });
+    const result = await rtSendMessage({ type: "pw-record-start", tabId: tab.id }) as { ok?: boolean; error?: string } | undefined;
     if (result && !result.ok) {
       addError("Recording failed: " + (result.error || "unknown error"));
       return;
@@ -940,11 +967,11 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // --- Draggable splitter ---
 
-let isDragging = false;
-let dragStartY = 0;
-let dragStartHeight = 0;
+let isDragging: boolean = false;
+let dragStartY: number = 0;
+let dragStartHeight: number = 0;
 
-splitter.addEventListener("mousedown", (e) => {
+splitter.addEventListener("mousedown", (e: MouseEvent) => {
   isDragging = true;
   dragStartY = e.clientY;
   dragStartHeight = editorPane.offsetHeight;
@@ -953,17 +980,17 @@ splitter.addEventListener("mousedown", (e) => {
   e.preventDefault();
 });
 
-document.addEventListener("mousemove", (e) => {
+document.addEventListener("mousemove", (e: MouseEvent) => {
   if (!isDragging) return;
   const delta = e.clientY - dragStartY;
   const newHeight = dragStartY === 0 ? dragStartHeight : dragStartHeight + delta;
   const minEditor = 80;
   const bodyHeight = document.body.offsetHeight;
   const fixedHeight =
-    document.getElementById("toolbar").offsetHeight +
+    (document.getElementById("toolbar") as HTMLDivElement).offsetHeight +
     splitter.offsetHeight +
-    document.getElementById("console-header").offsetHeight +
-    document.getElementById("input-bar").offsetHeight;
+    (document.getElementById("console-header") as HTMLDivElement).offsetHeight +
+    (document.getElementById("input-bar") as HTMLDivElement).offsetHeight;
   const maxEditor = bodyHeight - fixedHeight - 80;
   editorPane.style.flex = `0 0 ${Math.max(minEditor, Math.min(maxEditor, newHeight))}px`;
 });
@@ -977,7 +1004,7 @@ document.addEventListener("mouseup", () => {
 
 // --- Lightbox ---
 
-lightbox.addEventListener("click", (e) => {
+lightbox.addEventListener("click", (e: MouseEvent) => {
   // Only close when clicking the backdrop, not the image or save button
   if (e.target === lightbox) {
     lightbox.hidden = true;
@@ -1006,7 +1033,7 @@ lightboxSaveBtn.addEventListener("click", async () => {
   }
 });
 
-document.addEventListener("keydown", (e) => {
+document.addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "Escape" && !lightbox.hidden) {
     e.stopPropagation();
     e.preventDefault();

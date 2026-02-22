@@ -3,12 +3,15 @@
  * sets up page.route() mocking, and provides fixtures to tests.
  */
 
-import { test as base, chromium } from '@playwright/test';
+import { test as base, chromium, type BrowserContext, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXTENSION_PATH = path.resolve(__dirname, '../..');
+const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
+
+type ExtensionContext = { context: BrowserContext; extensionId: string };
+type MockResponse = (response: { text: string; isError: boolean }) => void;
 
 /**
  * Custom test fixtures for the extension panel.
@@ -16,7 +19,10 @@ const EXTENSION_PATH = path.resolve(__dirname, '../..');
  * Worker-scoped: browser context is shared across all tests in a worker.
  * Test-scoped: panelPage and mockResponse reset per test.
  */
-export const test = base.extend({
+export const test = base.extend<
+  { panelPage: Page; mockResponse: MockResponse },
+  { extensionContext: ExtensionContext }
+>({
   // Worker-scoped: launch browser once, reuse across tests
   extensionContext: [async ({}, use) => {
     const headlessArgs = process.env.HEADED ? [] : ['--headless=new'];
@@ -54,12 +60,12 @@ export const test = base.extend({
     const { context, extensionId } = extensionContext;
     const page = await context.newPage();
 
-    page._runResponse = { text: 'OK', isError: false };
+    (page as any)._runResponse = { text: 'OK', isError: false };
 
     await page.route('**/run', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify(page._runResponse),
+        body: JSON.stringify((page as any)._runResponse),
       });
     });
 
@@ -71,7 +77,9 @@ export const test = base.extend({
   },
 
   mockResponse: async ({ panelPage }, use) => {
-    await use((response) => { panelPage._runResponse = response; });
+    await use((response: { text: string; isError: boolean }) => {
+      (panelPage as any)._runResponse = response;
+    });
   },
 });
 

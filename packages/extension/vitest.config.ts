@@ -2,12 +2,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    setupFiles: "./test/setup.js",
+    setupFiles: "./test/setup.ts",
     environment: "happy-dom",
-    exclude: ["e2e/**", "node_modules/**"],
+    exclude: ["e2e/**", "node_modules/**", "dist/**"],
     coverage: {
       provider: "v8",
-      include: ["lib/**/*.js", "panel/**/*.js", "content/**/*.js", "background.js"],
+      include: ["src/**/*.ts"],
       reporter: ["text", "html"],
     },
   },

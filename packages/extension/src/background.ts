@@ -3,29 +3,29 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // ─── Recording State ───────────────────────────────────────────────────────
 
-let recordingTabId = null;
-let tabUpdateListener = null;
-let navCommittedListener = null;
-let lastRecordedUrl = null;
-let urlStack = [];
-let stackIndex = -1;
+let recordingTabId: number | null = null;
+let tabUpdateListener: ((tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => void) | null = null;
+let navCommittedListener: ((details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => void) | null = null;
+let lastRecordedUrl: string | null = null;
+let urlStack: string[] = [];
+let stackIndex: number = -1;
 
 // ─── Message Handler ────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg: { type: string; tabId?: number }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
   if (msg.type === "pw-record-start") {
-    startRecording(msg.tabId).then(sendResponse);
+    startRecording(msg.tabId!).then(sendResponse);
     return true;
   }
   if (msg.type === "pw-record-stop") {
-    stopRecording(msg.tabId).then(sendResponse);
+    stopRecording(msg.tabId!).then(sendResponse);
     return true;
   }
 });
 
 // ─── Tab Activation (follow active tab) ─────────────────────────────────────
 
-chrome.tabs.onActivated.addListener((activeInfo) => {
+chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
   if (recordingTabId === null) return;
   recordingTabId = activeInfo.tabId;
   injectRecorder(activeInfo.tabId).catch(() => {});
@@ -41,19 +41,19 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 
 // ─── Recording Functions ────────────────────────────────────────────────────
 
-async function startRecording(tabId) {
+async function startRecording(tabId: number): Promise<{ ok: boolean; error?: string }> {
   try {
     await injectRecorder(tabId);
     recordingTabId = tabId;
 
     // Store the initial URL and initialize history stack
     const tab = await chrome.tabs.get(tabId);
-    lastRecordedUrl = tab.url;
-    urlStack = [tab.url];
+    lastRecordedUrl = tab.url ?? null;
+    urlStack = [tab.url ?? ""];
     stackIndex = 0;
 
     // Listen for navigation commits to detect back/forward vs typed URLs
-    navCommittedListener = (details) => {
+    navCommittedListener = (details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
       if (details.tabId !== recordingTabId) return;
       if (details.frameId !== 0) return; // main frame only
       if (details.url === lastRecordedUrl) return;
@@ -104,23 +104,23 @@ async function startRecording(tabId) {
     chrome.webNavigation.onCommitted.addListener(navCommittedListener);
 
     // Listen for page load completion to re-inject recorder
-    tabUpdateListener = (updatedTabId, changeInfo) => {
+    tabUpdateListener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
       if (updatedTabId !== recordingTabId) return;
       if (changeInfo.status === "complete") {
-        injectRecorder(updatedTabId).catch((err) => {
-          console.warn("[recorder] re-injection failed:", err.message);
+        injectRecorder(updatedTabId).catch((err: unknown) => {
+          console.warn("[recorder] re-injection failed:", (err as Error).message);
         });
       }
     };
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
 
     return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err.message };
+  } catch (err: unknown) {
+    return { ok: false, error: (err as Error).message };
   }
 }
 
-async function stopRecording(tabId) {
+async function stopRecording(tabId: number): Promise<{ ok: boolean }> {
   try {
     // Remove navigation listeners
     if (navCommittedListener) {
@@ -146,21 +146,18 @@ async function stopRecording(tabId) {
     });
 
     return { ok: true };
-  } catch (err) {
+  } catch (_err) {
     // Cleanup failure is non-fatal (tab may have closed)
     return { ok: true };
   }
 }
 
-async function injectRecorder(tabId) {
+async function injectRecorder(tabId: number): Promise<void> {
   await chrome.scripting.executeScript({
     target: { tabId },
     files: ["content/recorder.js"],
   });
 }
 
-// ─── Exports for Testing ────────────────────────────────────────────────────
+export { startRecording, stopRecording, injectRecorder };
 
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = { startRecording, stopRecording, injectRecorder };
-}

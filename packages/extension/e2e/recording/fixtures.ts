@@ -9,14 +9,20 @@
  * the real background.js + recorder.js + panel.js message flow.
  */
 
-import { test as base, chromium } from '@playwright/test';
+import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXTENSION_PATH = path.resolve(__dirname, '../..');
+const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
 
-export const test = base.extend({
+type ExtensionContext = { context: BrowserContext; extensionId: string; sw: Worker };
+type RecordingPages = { panelPage: Page; targetPage: Page; extensionId: string; sw: Worker; context: BrowserContext };
+
+export const test = base.extend<
+  { recordingPages: RecordingPages },
+  { extensionContext: ExtensionContext }
+>({
   // Worker-scoped: browser context with extension loaded
   extensionContext: [async ({}, use) => {
     const headlessArgs = process.env.HEADED ? [] : ['--headless=new'];

@@ -2,7 +2,7 @@
  * Tokenizes a raw .pw command string, respecting quoted arguments.
  * Returns an empty array for comments and empty lines.
  */
-export function tokenize(raw) {
+export function tokenize(raw: string): string[] {
   const trimmed = raw.trim();
   if (!trimmed || trimmed.startsWith("#")) return [];
   const tokens = [];
@@ -26,7 +26,7 @@ export function tokenize(raw) {
  * Converts a .pw REPL command to Playwright TypeScript code.
  * Returns a code string, or null if the command is invalid.
  */
-export function pwToPlaywright(cmd) {
+export function pwToPlaywright(cmd: string): string | null {
   const tokens = tokenize(cmd);
   if (!tokens.length) return null;
   const command = tokens[0].toLowerCase();
@@ -120,11 +120,11 @@ export function pwToPlaywright(cmd) {
     }
     case "verify-url": {
       if (!args[0]) return null;
-      return `await expect(page).toHaveURL(/${args[0].replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&')}/);`;
+      return `await expect(page).toHaveURL(/${args[0].replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/);`;
     }
     case "verify-title": {
       if (!args[0]) return null;
-      return `await expect(page).toHaveTitle(/${args[0].replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&')}/);`;
+      return `await expect(page).toHaveTitle(/${args[0].replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/);`;
     }
     default:
       return `// unknown command: ${cmd}`;

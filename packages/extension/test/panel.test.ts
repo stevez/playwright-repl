@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 describe("panel.js", () => {
+  let fetchMock: Mock;
+
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
@@ -55,10 +57,10 @@ describe("panel.js", () => {
     document.body.classList.remove("theme-dark");
 
     // Mock window.matchMedia for theme detection
-    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    (window as any).matchMedia = vi.fn().mockReturnValue({ matches: false });
 
     // Mock fetch — route-aware: /health returns version, /run returns command result
-    global.fetch = vi.fn((url) => {
+    fetchMock = vi.fn((url) => {
       if (url && url.includes("/health")) {
         return Promise.resolve({
           ok: true,
@@ -70,90 +72,95 @@ describe("panel.js", () => {
         json: () => Promise.resolve({ text: "OK", isError: false }),
       });
     });
+    (global as any).fetch = fetchMock;
   });
+
+  async function loadPanel() {
+    await import("../src/panel/panel.js");
+  }
 
   // --- Init ---
 
   it("renders welcome message on load", async () => {
-    await import("../panel/panel.js");
-    const output = document.getElementById("output");
+    await loadPanel();
+    const output = document.getElementById("output")!;
     expect(output.textContent).toContain("Playwright REPL v1.0.0");
   });
 
   it("performs health check on load", async () => {
-    await import("../panel/panel.js");
+    await loadPanel();
     await vi.waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining("/health")
       );
     });
   });
 
   it("shows connected message when health check succeeds", async () => {
-    await import("../panel/panel.js");
+    await loadPanel();
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Connected to server"
       );
     });
   });
 
   it("shows error when health check fails", async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
-    await import("../panel/panel.js");
+    fetchMock = (global as any).fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+    await loadPanel();
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Server not running"
       );
     });
   });
 
   it("focuses the editor on load", async () => {
-    const editor = document.getElementById("editor");
+    const editor = document.getElementById("editor")!;
     const focusSpy = vi.spyOn(editor, "focus");
-    await import("../panel/panel.js");
+    await loadPanel();
     expect(focusSpy).toHaveBeenCalled();
   });
 
   it("has disabled copy, save, and export buttons initially", async () => {
-    await import("../panel/panel.js");
-    expect(document.getElementById("copy-btn").disabled).toBe(true);
-    expect(document.getElementById("save-btn").disabled).toBe(true);
-    expect(document.getElementById("export-btn").disabled).toBe(true);
+    await loadPanel();
+    expect((document.getElementById("copy-btn") as HTMLButtonElement).disabled).toBe(true);
+    expect((document.getElementById("save-btn") as HTMLButtonElement).disabled).toBe(true);
+    expect((document.getElementById("export-btn") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("has enabled open button", async () => {
-    await import("../panel/panel.js");
-    expect(document.getElementById("open-btn").disabled).toBe(false);
+    await loadPanel();
+    expect((document.getElementById("open-btn") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("record button is enabled", async () => {
-    await import("../panel/panel.js");
-    expect(document.getElementById("record-btn").disabled).toBe(false);
+    await loadPanel();
+    expect((document.getElementById("record-btn") as HTMLButtonElement).disabled).toBe(false);
   });
 
   // --- Theme ---
 
   it("defaults to light theme", async () => {
-    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
-    await import("../panel/panel.js");
+    (window as any).matchMedia = vi.fn().mockReturnValue({ matches: false });
+    await loadPanel();
     expect(document.body.classList.contains("theme-dark")).toBe(false);
   });
 
   it("applies dark theme when prefers-color-scheme: dark", async () => {
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
-    await import("../panel/panel.js");
+    (window as any).matchMedia = vi.fn().mockReturnValue({ matches: true });
+    await loadPanel();
     expect(document.body.classList.contains("theme-dark")).toBe(true);
   });
 
   // --- Line numbers ---
 
   it("renders line numbers for editor content", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = "goto https://example.com\nclick \"OK\"\npress Enter";
     editor.dispatchEvent(new Event("input"));
-    const lineNums = document.getElementById("line-numbers");
+    const lineNums = document.getElementById("line-numbers")!;
     const divs = lineNums.querySelectorAll("div");
     expect(divs.length).toBe(3);
     expect(divs[0].textContent).toBe("1");
@@ -162,25 +169,25 @@ describe("panel.js", () => {
   });
 
   it("shows file info with line count", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = "goto https://example.com\nclick \"OK\"";
     editor.dispatchEvent(new Event("input"));
-    const fileInfo = document.getElementById("file-info");
+    const fileInfo = document.getElementById("file-info")!;
     expect(fileInfo.textContent).toContain("2 lines");
   });
 
   // --- REPL input ---
 
   it("sends command via fetch on Enter key", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "click e5";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining("/run"),
         expect.objectContaining({
           method: "POST",
@@ -191,8 +198,8 @@ describe("panel.js", () => {
   });
 
   it("clears input after Enter", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "snapshot";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
@@ -201,15 +208,15 @@ describe("panel.js", () => {
   });
 
   it("does not send empty commands", async () => {
-    await import("../panel/panel.js");
+    await loadPanel();
     // Clear the health check fetch call
-    global.fetch.mockClear();
-    const input = document.getElementById("command-input");
+    fetchMock.mockClear();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "   ";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
-    expect(global.fetch).not.toHaveBeenCalledWith(
+    expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("/run"),
       expect.anything()
     );
@@ -218,7 +225,7 @@ describe("panel.js", () => {
   // --- Response display ---
 
   it("displays success response in output", async () => {
-    global.fetch = vi.fn((url) => {
+    fetchMock = (global as any).fetch = vi.fn((url) => {
       if (url && url.includes("/health")) {
         return Promise.resolve({
           ok: true,
@@ -234,40 +241,40 @@ describe("panel.js", () => {
           }),
       });
     });
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "goto https://example.com";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Navigated"
       );
     });
   });
 
   it("displays error response in output", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    fetchMock = (global as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({ text: "Element not found", isError: true }),
     });
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = 'click "Missing"';
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Element not found"
       );
     });
   });
 
   it("displays snapshot lines in output", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    fetchMock = (global as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -275,22 +282,22 @@ describe("panel.js", () => {
           isError: false,
         }),
     });
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "snapshot";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "button"
       );
-      expect(document.getElementById("output").textContent).toContain("link");
+      expect(document.getElementById("output")!.textContent).toContain("link");
     });
   });
 
   it("displays screenshot as image in output", async () => {
-    global.fetch = vi.fn((url) => {
+    fetchMock = (global as any).fetch = vi.fn((url) => {
       if (url && url.includes("/health")) {
         return Promise.resolve({
           ok: true,
@@ -307,46 +314,46 @@ describe("panel.js", () => {
           }),
       });
     });
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "screenshot";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      const img = document.querySelector("img:not(#lightbox-img)");
+      const img = document.querySelector("img:not(#lightbox-img)") as HTMLImageElement;
       expect(img).not.toBeNull();
       expect(img.src).toContain("fakebase64");
     });
   });
 
   it("shows server not running on fetch failure", async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    fetchMock = (global as any).fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "snapshot";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Not connected to server"
       );
     });
   });
 
   it("displays comments without sending to server", async () => {
-    await import("../panel/panel.js");
-    global.fetch.mockClear();
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    fetchMock.mockClear();
+    const input = document.getElementById("command-input") as HTMLInputElement;
     input.value = "# this is a comment";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
-    expect(document.getElementById("output").textContent).toContain(
+    expect(document.getElementById("output")!.textContent).toContain(
       "# this is a comment"
     );
-    expect(global.fetch).not.toHaveBeenCalledWith(
+    expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("/run"),
       expect.anything()
     );
@@ -355,8 +362,8 @@ describe("panel.js", () => {
   // --- History ---
 
   it("navigates command history with ArrowUp/ArrowDown", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
 
     input.value = "help";
     input.dispatchEvent(
@@ -391,47 +398,47 @@ describe("panel.js", () => {
   // --- Copy/Save/Export ---
 
   it("enables copy, save, export when editor has content", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = "goto https://example.com";
     editor.dispatchEvent(new Event("input"));
 
-    expect(document.getElementById("copy-btn").disabled).toBe(false);
-    expect(document.getElementById("save-btn").disabled).toBe(false);
-    expect(document.getElementById("export-btn").disabled).toBe(false);
+    expect((document.getElementById("copy-btn") as HTMLButtonElement).disabled).toBe(false);
+    expect((document.getElementById("save-btn") as HTMLButtonElement).disabled).toBe(false);
+    expect((document.getElementById("export-btn") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("copy button copies editor content to clipboard", async () => {
-    document.execCommand = vi.fn().mockReturnValue(true);
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    (document as any).execCommand = vi.fn().mockReturnValue(true);
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = 'goto https://example.com\nclick "OK"';
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("copy-btn").click();
+    document.getElementById("copy-btn")!.click();
     expect(document.execCommand).toHaveBeenCalledWith("copy");
-    expect(document.getElementById("output").textContent).toContain("copied");
+    expect(document.getElementById("output")!.textContent).toContain("copied");
   });
 
   it("export button converts editor to Playwright code", async () => {
-    await import("../panel/panel.js");
-    document.execCommand = vi.fn().mockReturnValue(true);
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    (document as any).execCommand = vi.fn().mockReturnValue(true);
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = 'goto https://example.com\nclick "Submit"';
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("export-btn").click();
-    const output = document.getElementById("output");
+    document.getElementById("export-btn")!.click();
+    const output = document.getElementById("output")!;
     const codeBlock = output.querySelector(".code-block");
     expect(codeBlock).not.toBeNull();
-    expect(codeBlock.textContent).toContain("@playwright/test");
+    expect(codeBlock!.textContent).toContain("@playwright/test");
   });
 
   // --- Console commands (history, clear, reset) ---
 
   it("history command displays history in terminal", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
 
     input.value = "help";
     input.dispatchEvent(
@@ -444,7 +451,7 @@ describe("panel.js", () => {
 
     await vi.waitFor(() => {
       // Wait for the fetch calls to complete
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining("/run"),
         expect.anything()
       );
@@ -455,26 +462,26 @@ describe("panel.js", () => {
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
 
-    const output = document.getElementById("output");
+    const output = document.getElementById("output")!;
     expect(output.textContent).toContain("help");
     expect(output.textContent).toContain("snapshot");
   });
 
   it("clear command clears console output", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
 
     input.value = "clear";
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
 
-    expect(document.getElementById("output").innerHTML).toBe("");
+    expect(document.getElementById("output")!.innerHTML).toBe("");
   });
 
   it("reset command clears history and console", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
 
     input.value = "help";
     input.dispatchEvent(
@@ -486,7 +493,7 @@ describe("panel.js", () => {
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
     );
 
-    expect(document.getElementById("output").textContent).toContain(
+    expect(document.getElementById("output")!.textContent).toContain(
       "History and terminal cleared"
     );
 
@@ -499,17 +506,17 @@ describe("panel.js", () => {
   // --- Run button ---
 
   it("run button executes editor lines via fetch", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = 'goto https://example.com\nclick "OK"';
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("run-btn").click();
+    document.getElementById("run-btn")!.click();
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Running script..."
       );
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Run complete."
       );
     });
@@ -517,7 +524,7 @@ describe("panel.js", () => {
 
   it("run button shows pass/fail stats", async () => {
     let callCount = 0;
-    global.fetch = vi.fn().mockImplementation((url) => {
+    fetchMock = (global as any).fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/run")) {
         callCount++;
         if (callCount === 1) {
@@ -537,23 +544,23 @@ describe("panel.js", () => {
         json: () => Promise.resolve({ status: "ok" }),
       });
     });
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = 'goto https://example.com\nclick "Missing"';
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("run-btn").click();
+    document.getElementById("run-btn")!.click();
     await vi.waitFor(() => {
-      const stats = document.getElementById("console-stats");
+      const stats = document.getElementById("console-stats")!;
       expect(stats.textContent).toContain("1 passed");
       expect(stats.textContent).toContain("1 failed");
     });
   });
 
   it("run button shows message for empty editor", async () => {
-    await import("../panel/panel.js");
-    document.getElementById("run-btn").click();
-    expect(document.getElementById("output").textContent).toContain(
+    await loadPanel();
+    document.getElementById("run-btn")!.click();
+    expect(document.getElementById("output")!.textContent).toContain(
       "Editor is empty"
     );
   });
@@ -561,8 +568,8 @@ describe("panel.js", () => {
   // --- Ctrl+Enter ---
 
   it("Ctrl+Enter in editor triggers run", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = "goto https://example.com";
     editor.dispatchEvent(new Event("input"));
 
@@ -575,7 +582,7 @@ describe("panel.js", () => {
     );
 
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Running script..."
       );
     });
@@ -584,14 +591,14 @@ describe("panel.js", () => {
   // --- Step button ---
 
   it("step button executes the first executable line", async () => {
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = 'goto https://example.com\nclick "OK"';
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("step-btn").click();
+    document.getElementById("step-btn")!.click();
     await vi.waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining("/run"),
         expect.objectContaining({
           body: JSON.stringify({ raw: "goto https://example.com", activeTabUrl: null }),
@@ -601,9 +608,9 @@ describe("panel.js", () => {
   });
 
   it("step button shows message for empty editor", async () => {
-    await import("../panel/panel.js");
-    document.getElementById("step-btn").click();
-    expect(document.getElementById("output").textContent).toContain(
+    await loadPanel();
+    document.getElementById("step-btn")!.click();
+    expect(document.getElementById("output")!.textContent).toContain(
       "Editor is empty"
     );
   });
@@ -611,9 +618,9 @@ describe("panel.js", () => {
   // --- Autocomplete ---
 
   it("ghost text shows completion hint while typing", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
-    const ghost = document.getElementById("ghost-text");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
+    const ghost = document.getElementById("ghost-text")!;
 
     input.value = "go";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -621,8 +628,8 @@ describe("panel.js", () => {
   });
 
   it("Tab completes single matching command", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
 
     input.value = "scr";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -633,9 +640,9 @@ describe("panel.js", () => {
   });
 
   it("dropdown shows for multiple matches", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
-    const dd = document.getElementById("autocomplete-dropdown");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
+    const dd = document.getElementById("autocomplete-dropdown")!;
 
     input.value = "go";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -644,9 +651,9 @@ describe("panel.js", () => {
   });
 
   it("Escape closes dropdown", async () => {
-    await import("../panel/panel.js");
-    const input = document.getElementById("command-input");
-    const dd = document.getElementById("autocomplete-dropdown");
+    await loadPanel();
+    const input = document.getElementById("command-input") as HTMLInputElement;
+    const dd = document.getElementById("autocomplete-dropdown")!;
 
     input.value = "go";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -661,8 +668,8 @@ describe("panel.js", () => {
   // --- Lightbox ---
 
   it("lightbox closes when clicking backdrop", async () => {
-    await import("../panel/panel.js");
-    const lightbox = document.getElementById("lightbox");
+    await loadPanel();
+    const lightbox = document.getElementById("lightbox")!;
     lightbox.hidden = false;
 
     lightbox.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -670,17 +677,17 @@ describe("panel.js", () => {
   });
 
   it("lightbox close button works", async () => {
-    await import("../panel/panel.js");
-    const lightbox = document.getElementById("lightbox");
+    await loadPanel();
+    const lightbox = document.getElementById("lightbox")!;
     lightbox.hidden = false;
 
-    document.getElementById("lightbox-close-btn").click();
+    document.getElementById("lightbox-close-btn")!.click();
     expect(lightbox.hidden).toBe(true);
   });
 
   it("Escape key closes lightbox when visible", async () => {
-    await import("../panel/panel.js");
-    const lightbox = document.getElementById("lightbox");
+    await loadPanel();
+    const lightbox = document.getElementById("lightbox")!;
     lightbox.hidden = false;
 
     document.dispatchEvent(
@@ -692,8 +699,8 @@ describe("panel.js", () => {
   // --- Splitter ---
 
   it("splitter drag resizes editor pane", async () => {
-    await import("../panel/panel.js");
-    const splitter = document.getElementById("splitter");
+    await loadPanel();
+    const splitter = document.getElementById("splitter")!;
 
     splitter.dispatchEvent(
       new MouseEvent("mousedown", { clientY: 200, bubbles: true })
@@ -713,15 +720,15 @@ describe("panel.js", () => {
   it("save button saves editor content", async () => {
     const mockWritable = { write: vi.fn(), close: vi.fn() };
     const mockHandle = { name: "test.pw", createWritable: vi.fn().mockResolvedValue(mockWritable) };
-    window.showSaveFilePicker = vi.fn().mockResolvedValue(mockHandle);
-    await import("../panel/panel.js");
-    const editor = document.getElementById("editor");
+    (window as any).showSaveFilePicker = vi.fn().mockResolvedValue(mockHandle);
+    await loadPanel();
+    const editor = document.getElementById("editor") as HTMLTextAreaElement;
     editor.value = "goto https://example.com";
     editor.dispatchEvent(new Event("input"));
 
-    document.getElementById("save-btn").click();
+    document.getElementById("save-btn")!.click();
     await vi.waitFor(() => {
-      expect(document.getElementById("output").textContent).toContain(
+      expect(document.getElementById("output")!.textContent).toContain(
         "Saved as test.pw"
       );
     });
@@ -732,10 +739,10 @@ describe("panel.js", () => {
   // --- Open button ---
 
   it("open button loads file content into editor", async () => {
-    await import("../panel/panel.js");
+    await loadPanel();
 
     const realCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, "createElement").mockImplementation((tag) => {
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
       const el = realCreateElement(tag);
       if (tag === "input") {
         el.click = () => {
@@ -751,14 +758,14 @@ describe("panel.js", () => {
       return el;
     });
 
-    document.getElementById("open-btn").click();
+    document.getElementById("open-btn")!.click();
 
     await vi.waitFor(() => {
-      expect(document.getElementById("editor").value).toContain(
+      expect((document.getElementById("editor") as HTMLTextAreaElement).value).toContain(
         "goto https://example.com"
       );
     });
 
-    document.createElement.mockRestore();
+    (document.createElement as any).mockRestore();
   });
 });

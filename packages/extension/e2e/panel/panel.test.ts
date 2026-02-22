@@ -5,7 +5,7 @@
  * and uses page.route() to intercept HTTP calls to the CommandServer.
  */
 
-import { test, expect } from './fixtures.mjs';
+import { test, expect } from './fixtures.js';
 
 // ─── Initialization ────────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ test('executes all editor lines and shows Run complete', async ({ panelPage }) =
   await panelPage.locator('#run-btn').click();
 
   await panelPage.waitForFunction(
-    () => document.getElementById('output').textContent.includes('Run complete'),
+    () => document.getElementById('output')!.textContent!.includes('Run complete'),
     { timeout: 15000 },
   );
 });
@@ -187,7 +187,7 @@ test('shows fail stats when command errors', async ({ panelPage, mockResponse })
   await panelPage.locator('#run-btn').click();
 
   await panelPage.waitForFunction(
-    () => document.getElementById('output').textContent.includes('Run complete'),
+    () => document.getElementById('output')!.textContent!.includes('Run complete'),
     { timeout: 15000 },
   );
 
@@ -200,9 +200,9 @@ test('shows fail stats when command errors', async ({ panelPage, mockResponse })
 test('record button toggles to Stop when recording starts', async ({ panelPage }) => {
   // Mock chrome APIs so we don't need a real tab to inject into
   await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }];
+    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }] as chrome.tabs.Tab[];
     const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg) => {
+    chrome.runtime.sendMessage = async (msg: any) => {
       if (msg.type === 'pw-record-start' || msg.type === 'pw-record-stop') return { ok: true };
       return origSend(msg);
     };
@@ -220,16 +220,16 @@ test('record button toggles to Stop when recording starts', async ({ panelPage }
   await panelPage.waitForFunction(
     () => {
       const infos = document.querySelectorAll('.line-info');
-      return [...infos].some(el => el.textContent.includes('Recording on'));
+      return [...infos].some(el => el.textContent!.includes('Recording on'));
     },
   );
 });
 
 test('record button toggles back to Record when stopped', async ({ panelPage }) => {
   await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }];
+    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "https://example.com" }] as chrome.tabs.Tab[];
     const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg) => {
+    chrome.runtime.sendMessage = async (msg: any) => {
       if (msg.type === 'pw-record-start' || msg.type === 'pw-record-stop') return { ok: true };
       return origSend(msg);
     };
@@ -249,16 +249,16 @@ test('record button toggles back to Record when stopped', async ({ panelPage }) 
   await panelPage.waitForFunction(
     () => {
       const infos = document.querySelectorAll('.line-info');
-      return [...infos].some(el => el.textContent.includes('Recording stopped'));
+      return [...infos].some(el => el.textContent!.includes('Recording stopped'));
     },
   );
 });
 
 test('record button shows error when injection fails', async ({ panelPage }) => {
   await panelPage.evaluate(() => {
-    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "chrome://settings" }];
+    chrome.tabs.query = async () => [{ id: 999, title: "Test Page", url: "chrome://settings" }] as chrome.tabs.Tab[];
     const origSend = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = async (msg) => {
+    chrome.runtime.sendMessage = async (msg: any) => {
       if (msg.type === 'pw-record-start') return { ok: false, error: 'Cannot access chrome:// URLs' };
       return origSend(msg);
     };
