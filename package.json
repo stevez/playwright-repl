@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc --build packages/core packages/cli && npm run build -w packages/extension",
     "test": "npm test --workspaces --if-present",
     "test:core": "npm test -w packages/core",
     "test:cli": "npm test -w packages/cli"
