@@ -40,7 +40,7 @@ export interface ReplContext {
 
 // ─── Response filtering ─────────────────────────────────────────────────────
 
-export function filterResponse(text: string): string | null {
+export function filterResponse(text: string, cmdName?: string): string | null {
   const sections = text.split(/^### /m).slice(1);
   const kept: string[] = [];
   for (const section of sections) {
@@ -50,6 +50,8 @@ export function filterResponse(text: string): string | null {
     const content = section.substring(newline + 1).trim();
     if (title === 'Error')
       kept.push(`${c.red}${content}${c.reset}`);
+    else if (title === 'Snapshot' && cmdName !== 'snapshot')
+      continue;
     else if (title === 'Result' || title === 'Modal state' || title === 'Page' || title === 'Snapshot')
       kept.push(content);
   }
@@ -309,7 +311,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     const result = await ctx.conn.run(args);
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {
-      const filtered = filterResponse(result.text);
+      const filtered = filterResponse(result.text, cmdName);
       if (filtered !== null) console.log(filtered);
     }
     ctx.commandCount++;
