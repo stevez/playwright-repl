@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.5.0 — Extension Mode & TypeScript
+
+**2026-02-22**
+
+### Breaking Changes
+
+- **Requires Node.js >= 20** (was >= 18)
+- **TypeScript throughout** — all three packages now compiled from TypeScript
+
+### Features
+
+- **Extension mode** (`--extension`): Chrome side panel extension with REPL input, script editor, visual recorder, and export to Playwright tests. Uses direct CDP connection — Engine connects to Chrome via `--remote-debugging-port`.
+- **CommandServer**: HTTP server (`POST /run`, `GET /health`) relays commands from the extension panel to the Engine.
+- **Recording**: Extension-side recorder captures clicks, form input, selections, checkboxes, and key presses with automatic `--nth` disambiguation for ambiguous text locators.
+- **Suppress snapshot for non-snapshot commands**: `goto` now shows only URL and title instead of the full accessibility tree.
+- **Text locator `--nth` support**: `click "npm" --nth 1` to target a specific match when multiple elements share the same text.
+
+### Technical Details
+
+- **TypeScript migration**: `packages/core` and `packages/cli` compiled via `tsc --build` with project references; `packages/extension` compiled via Vite.
+- **`tsc --build`** handles dependency ordering (core before cli) automatically.
+- **Module resolution**: `NodeNext` (tracks latest Node.js module behavior).
+- **Testing**: 390+ unit tests (vitest) + 59 E2E tests (Playwright Test) across 3 packages.
+- **Extension E2E**: Launches Chrome with the extension loaded, tests panel rendering, command execution, recording, and theme switching.
+
+### Removed
+
+- Stale planning docs (PLAN-CRX.md, PLAN-RECORDING.md, PLAN-TYPESCRIPT.md, MIGRATION_PLAN.md)
+- Architecture diagram PNGs (outdated after extension mode redesign)
+- `packages/repl-ext/` (moved to separate `playwright-repl-crx` repo)
+
+---
+
 ## v0.4.0 — In-Process Engine & Monorepo
 
 **2026-02-18**
@@ -12,7 +45,7 @@
 
 ### Features
 
-- **In-process Engine** (`packages/core/src/engine.mjs`): Wraps Playwright's `BrowserServerBackend` directly — faster startup, simpler architecture, no IPC overhead.
+- **In-process Engine** (`packages/core/src/engine.ts`): Wraps Playwright's `BrowserServerBackend` directly — faster startup, simpler architecture, no IPC overhead.
 - **Connect mode** (`--connect [port]`): Attach to an existing Chrome instance via CDP. Start Chrome with `--remote-debugging-port=9222`, then `playwright-repl --connect`.
 - **Monorepo structure**: Restructured into `packages/core` (engine + utilities) and `packages/cli` (REPL + recorder) using npm workspaces.
 
@@ -27,7 +60,6 @@
 
 - Engine uses dependency injection for testability — Playwright internals loaded lazily via absolute path resolution to bypass the `exports` map
 - 214 tests (147 cli + 67 core) across 10 test files
-- Pure ESM JavaScript, no build step
 
 ---
 

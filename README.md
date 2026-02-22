@@ -2,7 +2,7 @@
 
 ![playwright-repl](cover-image.png)
 
-Interactive browser automation powered by Playwright — use it from your **terminal** or as a **Chrome DevTools panel**.
+Interactive browser automation powered by Playwright — use it from your **terminal** or as a **Chrome side panel**.
 
 Two frontends, one engine: the CLI gives you a terminal REPL with recording and replay; the Chrome extension gives you a DevTools panel with a script editor and visual recorder. Both run the same 35+ Playwright commands through a shared Engine — no command duplication.
 
@@ -23,9 +23,25 @@ Key features:
 
 ## Architecture
 
-![How It Works](architecture-diagram.png)
-
 Both CLI and Extension are frontends to the Engine. Neither directly accesses Chrome.
+
+```
+┌──────────────┐     ┌──────────────┐
+│   CLI (REPL) │     │  Extension   │
+│  packages/cli│     │  (Side Panel)│
+└──────┬───────┘     └──────┬───────┘
+       │                    │ fetch POST /run
+       │                    ▼
+       │              ┌─────────────┐
+       └──────────────►   Engine    │
+                      │ (in-process)│
+                      └──────┬──────┘
+                             │ CDP
+                             ▼
+                      ┌─────────────┐
+                      │   Chrome    │
+                      └─────────────┘
+```
 
 ### Three Connection Modes
 
@@ -33,13 +49,11 @@ Both CLI and Extension are frontends to the Engine. Neither directly accesses Ch
 |------|------|---------------|----------|
 | **Launch** | `--headed` (default) | Launches new Chromium via Playwright | General automation |
 | **Connect** | `--connect [port]` | Existing Chrome with `--remote-debugging-port` | Debug running app |
-| **Extension** | `--extension [--port N]` | User's normal Chrome via extension CDP relay | DevTools panel REPL |
+| **Extension** | `--extension` | Chrome launched with CDP port; side panel sends commands via HTTP | DevTools panel REPL |
 
-### Extension Mode Detail
+### Extension Mode
 
-![Extension Mode](extension-architecture.png)
-
-The extension is a thin CDP relay — it bridges `chrome.debugger` access from the user's browser to the Node.js server, which runs the full Engine with all 35+ Playwright commands.
+The extension is a Chrome side panel. The CLI starts Chrome with `--remote-debugging-port`, and the Engine connects directly via CDP. The panel sends commands to a local CommandServer (`POST /run`), which routes them through the Engine.
 
 ## Quick Start — CLI
 
@@ -71,18 +85,15 @@ pw> verify-text "1 item left"
 ## Quick Start — Extension
 
 ```bash
-# 1. Start the extension server
+# 1. Start in extension mode (launches Chrome with extension loaded)
 playwright-repl --extension
 
-# 2. Load the extension
-#    chrome://extensions → Enable Developer Mode → Load unpacked → packages/extension/
+# 2. Open any website → click the side panel icon → "Playwright REPL" panel
 
-# 3. Open any website → DevTools (F12) → "Playwright REPL" panel
-
-# 4. Type commands in the panel — same syntax as CLI
+# 3. Type commands in the panel — same syntax as CLI
 ```
 
-The extension panel includes a script editor, visual recorder, and export to Playwright tests.
+The extension side panel includes a REPL input, script editor, visual recorder, and export to Playwright tests.
 
 ## Install
 
@@ -119,9 +130,9 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 playwright-repl --connect         # default port 9222
 playwright-repl --connect 9333    # custom port
 
-# Extension mode
+# Extension mode (launches Chrome with side panel)
 playwright-repl --extension              # default port 3000
-playwright-repl --extension --port 4000  # custom port
+playwright-repl --extension --port 4000  # custom command server port
 ```
 
 ### CLI Options
@@ -133,8 +144,8 @@ playwright-repl --extension --port 4000  # custom port
 | `--persistent` | Use persistent browser profile |
 | `--profile <dir>` | Persistent profile directory |
 | `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
-| `--extension` | Start WebSocket server for Chrome extension |
-| `--port <number>` | Extension server port (default: `3000`) |
+| `--extension` | Launch Chrome with side panel extension and command server |
+| `--port <number>` | Command server port (default: `3000`) |
 | `--config <file>` | Path to config file |
 | `--replay <file>` | Replay a `.pw` session file |
 | `--record <file>` | Start REPL with recording to file |
@@ -363,9 +374,9 @@ pw> run-code const u = await page.url(); const t = await page.title(); return {u
 
 ## Extension Features
 
-### DevTools Panel
+### Side Panel
 
-The extension adds a "Playwright REPL" tab in Chrome DevTools with:
+The extension adds a "Playwright REPL" side panel in Chrome with:
 
 - **REPL input** — type commands at the bottom, results appear in the console pane
 - **Script editor** — write multi-line `.pw` scripts with line numbers, run all or step through
@@ -437,33 +448,39 @@ playwright-repl --replay packages/cli/examples/05-ci-pipe.pw --silent
 
 ```
 packages/
-├── core/           # Engine + shared utilities
+├── core/           # Engine + shared utilities (TypeScript, tsc)
 │   └── src/
-│       ├── engine.mjs            # Wraps BrowserServerBackend in-process
-│       ├── extension-server.mjs  # WebSocket server for extension CDP relay
-│       ├── parser.mjs            # Command parsing and alias resolution
-│       ├── page-scripts.mjs      # Text locator and assertion helpers
-│       └── ...
-├── cli/            # Terminal REPL
+│       ├── engine.ts             # Wraps BrowserServerBackend in-process
+│       ├── extension-server.ts   # HTTP server for extension commands
+│       ├── parser.ts             # Command parsing and alias resolution
+│       ├── page-scripts.ts       # Text locator and assertion helpers
+│       ├── completion-data.ts    # Ghost completion items
+│       ├── colors.ts             # ANSI color helpers
+│       └── resolve.ts            # COMMANDS map, minimist re-export
+├── cli/            # Terminal REPL (TypeScript, tsc)
 │   └── src/
-│       ├── repl.mjs              # Interactive readline loop
-│       └── recorder.mjs          # Session recording/replay
-└── extension/      # Chrome DevTools panel extension
-    ├── manifest.json             # Manifest V3 config
-    ├── background.js             # Thin CDP relay + command proxy
-    ├── panel/                    # DevTools panel UI
-    │   ├── panel.html
-    │   ├── panel.js
-    │   └── panel.css
-    ├── content/
-    │   └── recorder.js           # Event recorder injected into pages
-    └── lib/
-        └── converter.js          # .pw → Playwright test export
+│       ├── playwright-repl.ts    # CLI entry point
+│       ├── repl.ts               # Interactive readline loop
+│       ├── recorder.ts           # Session recording/replay
+│       └── index.ts              # Public API exports
+└── extension/      # Chrome side panel extension (TypeScript, Vite)
+    ├── src/
+    │   ├── background.ts         # Side panel behavior + recording handlers
+    │   ├── panel/                # Side panel UI
+    │   │   ├── panel.html
+    │   │   ├── panel.ts
+    │   │   └── panel.css
+    │   ├── content/
+    │   │   └── recorder.ts       # Event recorder injected into pages
+    │   └── lib/
+    │       └── converter.ts      # .pw → Playwright test export
+    └── public/
+        └── manifest.json         # Manifest V3 config
 ```
 
 ## Requirements
 
-- **Node.js** >= 18
+- **Node.js** >= 20
 - **playwright** >= 1.59.0-alpha (includes `lib/mcp/browser/` engine)
 
 ## License
