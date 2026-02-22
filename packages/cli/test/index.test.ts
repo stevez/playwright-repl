@@ -1,10 +1,11 @@
+// @ts-nocheck
 /**
- * Tests that index.mjs re-exports all public API.
+ * Tests that index.ts re-exports all public API.
  */
 import { describe, it, expect } from 'vitest';
 import * as api from '../src/index.js';
 
-describe('index.mjs exports', () => {
+describe('index.ts exports', () => {
   it('exports Engine', () => {
     expect(api.Engine).toBeDefined();
     expect(typeof api.Engine).toBe('function');

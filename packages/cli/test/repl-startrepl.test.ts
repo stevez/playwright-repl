@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Tests for startRepl() — the main orchestrator.
  * Mocks Engine (from core) and readline.

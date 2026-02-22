@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SessionManager } from '../src/recorder.js';
 import {

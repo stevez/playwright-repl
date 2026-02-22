@@ -1,5 +1,6 @@
+// @ts-nocheck
 /**
- * Integration-level tests for repl.mjs functions that need mocking
+ * Integration-level tests for repl.ts functions that need mocking
  * (execSync, process.exit, etc.)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

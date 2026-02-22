@@ -260,8 +260,8 @@ function addScreenshot(base64: string): void {
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-    } catch (e) {
-      if (e.name !== "AbortError") console.error("Save failed:", e);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name !== "AbortError") console.error("Save failed:", e);
     }
   });
   actions.appendChild(saveBtnEl);
@@ -882,8 +882,8 @@ saveBtn.addEventListener("click", async () => {
     currentFilename = handle.name;
     updateFileInfo();
     addSuccess("Saved as " + handle.name);
-  } catch (e) {
-    if (e.name !== "AbortError") addError("Save failed: " + e.message);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name !== "AbortError") addError("Save failed: " + e.message);
   }
 });
 
@@ -1028,8 +1028,8 @@ lightboxSaveBtn.addEventListener("click", async () => {
     const writable = await handle.createWritable();
     await writable.write(blob);
     await writable.close();
-  } catch (e) {
-    if (e.name !== "AbortError") console.error("Save failed:", e);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name !== "AbortError") console.error("Save failed:", e);
   }
 });
 

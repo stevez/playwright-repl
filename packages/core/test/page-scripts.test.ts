@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi } from 'vitest';
 import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,

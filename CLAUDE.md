@@ -13,7 +13,7 @@ playwright-repl/
 ├── package.json                    # Root workspace config (npm workspaces)
 ├── tsconfig.base.json              # Shared TypeScript compiler options
 ├── packages/
-│   ├── core/                       # Shared engine + utilities (TypeScript)
+│   ├── core/                       # Shared engine + utilities (TypeScript, tsc)
 │   │   ├── src/
 │   │   │   ├── engine.ts           # Wraps BrowserServerBackend in-process
 │   │   │   ├── parser.ts           # Command parsing + alias resolution
@@ -25,27 +25,32 @@ playwright-repl/
 │   │   ├── dist/                   # Compiled output (gitignored)
 │   │   └── test/
 │   │
-│   ├── cli/                        # Terminal REPL (published as "playwright-repl")
+│   ├── cli/                        # Terminal REPL (published as "playwright-repl", TypeScript, tsc)
+│   │   ├── src/
+│   │   │   ├── playwright-repl.ts  # CLI entry point (compiles to dist/)
+│   │   │   ├── repl.ts             # Interactive readline loop
+│   │   │   ├── recorder.ts         # Session recording/replay
+│   │   │   └── index.ts            # Public API exports
+│   │   ├── dist/                   # Compiled output (gitignored)
+│   │   ├── test/
+│   │   └── examples/               # .pw session files
+│   │
+│   └── extension/                  # Chrome side panel extension (TypeScript, Vite)
+│       ├── public/
+│       │   └── manifest.json       # Manifest V3 config (copied to dist/ by Vite)
 │       ├── src/
-│       │   ├── playwright-repl.ts  # CLI entry point (compiles to dist/)
-│       │   ├── repl.ts             # Interactive readline loop
-│       │   ├── recorder.ts         # Session recording/replay
-│       │   └── index.ts            # Public API exports
-│       ├── dist/                   # Compiled output (gitignored)
-│       ├── test/
-│       └── examples/               # .pw session files
-│
-│   └── extension/                  # Chrome DevTools panel extension
-│       ├── manifest.json           # Manifest V3 config
-│       ├── background.js           # Thin CDP relay + command proxy (~150 lines)
-│       ├── panel/                  # DevTools panel UI
-│       │   ├── panel.html
-│       │   ├── panel.js
-│       │   └── panel.css
-│       ├── content/
-│       │   └── recorder.js         # Event recorder injected into pages
-│       └── lib/
-│           └── converter.js        # .pw → Playwright test export
+│       │   ├── background.ts       # Side panel behavior + recording handlers
+│       │   ├── panel/              # Side panel UI
+│       │   │   ├── panel.html
+│       │   │   ├── panel.ts
+│       │   │   └── panel.css
+│       │   ├── content/
+│       │   │   └── recorder.ts     # Event recorder injected into pages
+│       │   └── lib/
+│       │       └── converter.ts    # .pw → Playwright test export
+│       ├── dist/                   # Vite build output (gitignored, loaded by Chrome)
+│       ├── vite.config.ts          # Vite build config (3 entry points)
+│       └── e2e/                    # Playwright E2E tests
 ```
 
 ## Architecture
@@ -105,7 +110,7 @@ await engine.close();
 Three connection modes via `start(opts)`:
 - **launch** (default): `contextFactory(config)` → new browser
 - **connect**: `opts.connect = 9222` → `cdpEndpoint` → `connectOverCDP()`
-- **extension**: `opts.extension = true` → starts `ExtensionServer`, Chrome extension relays CDP from user's browser
+- **extension**: `opts.extension = true` → starts `CommandServer`, Chrome launched with `--remote-debugging-port`, side panel sends commands via HTTP
 - Dependency injection: constructor accepts `deps` for testing
 
 Key Playwright internals used (via `createRequire`):
@@ -179,8 +184,8 @@ async function processQueue() {
 ## Tech Stack
 
 - **Runtime**: Node.js (ESM modules)
-- **Language**: TypeScript for `packages/core` and `packages/cli` (compiled to `dist/` via `tsc`); plain JS for `packages/extension`
-- **Build**: `tsc` with project references (`tsconfig.base.json` → per-package `tsconfig.json`). Run `npm run build` at root.
+- **Language**: TypeScript throughout — `packages/core` and `packages/cli` compiled via `tsc`; `packages/extension` compiled via Vite
+- **Build**: `tsc --build packages/core packages/cli` (project references) + Vite for extension. Run `npm run build` at root.
 - **Dependencies**: `minimist` (command parsing), `playwright@>=1.59.0-alpha` (browser engine)
 - **Monorepo**: npm workspaces (`packages/core`, `packages/cli`, `packages/extension`)
 - **Testing**: vitest (unit tests), Playwright Test (extension E2E)
@@ -190,6 +195,7 @@ async function processQueue() {
 ## Code Style
 
 - ESM imports (`import ... from`)
-- TypeScript with `"module": "Node16"` — relative imports use `.js` extensions (resolved to `.ts` at compile time)
+- TypeScript with `"module": "NodeNext"` — relative imports in core/cli use `.js` extensions (resolved to `.ts` at compile time)
+- Extension uses Vite — standard `.ts` imports (no `.js` extension needed)
 - Async/await throughout
 - Sections separated by `// ─── Section Name ───` comments

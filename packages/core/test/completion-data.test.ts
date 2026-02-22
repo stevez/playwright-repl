@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { buildCompletionItems } from '../src/completion-data.js';
 import { COMMANDS } from '../src/resolve.js';

@@ -5,8 +5,6 @@ node_modules/
 .claude/
 .playwright-cli/
 coverage/
-dist/
 .playwright-mcp/
-dist/
 packages/*/dist/
 *.tsbuildinfo

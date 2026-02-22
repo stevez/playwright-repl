@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { parseInput, ALIASES, ALL_COMMANDS, booleanOptions } from '../src/parser.js';
 
@@ -102,7 +103,7 @@ describe('parseInput', () => {
 
 describe('ALIASES', () => {
   it('maps most aliases to known commands', () => {
-    // verify-* aliases map to commands handled as knownExtras in repl.mjs,
+    // verify-* aliases map to commands handled as knownExtras in repl.ts,
     // not in the COMMANDS vocabulary — that's intentional.
     const extras = ['verify-text', 'verify-element', 'verify-value', 'verify-list'];
     for (const [alias, cmd] of Object.entries(ALIASES)) {

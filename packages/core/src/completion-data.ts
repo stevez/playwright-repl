@@ -1,7 +1,7 @@
 /**
  * Completion data — builds the list of items for ghost completion.
  *
- * Sources: COMMANDS from resolve.mjs plus REPL meta-commands (.help, .exit, etc.).
+ * Sources: COMMANDS from resolve.ts plus REPL meta-commands (.help, .exit, etc.).
  */
 
 import { COMMANDS } from './resolve.js';
