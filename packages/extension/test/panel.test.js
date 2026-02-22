@@ -711,16 +711,22 @@ describe("panel.js", () => {
   // --- Save button ---
 
   it("save button saves editor content", async () => {
-    window.prompt = vi.fn().mockReturnValue("test.pw");
+    const mockWritable = { write: vi.fn(), close: vi.fn() };
+    const mockHandle = { name: "test.pw", createWritable: vi.fn().mockResolvedValue(mockWritable) };
+    window.showSaveFilePicker = vi.fn().mockResolvedValue(mockHandle);
     await import("../panel/panel.js");
     const editor = document.getElementById("editor");
     editor.value = "goto https://example.com";
     editor.dispatchEvent(new Event("input"));
 
     document.getElementById("save-btn").click();
-    expect(document.getElementById("output").textContent).toContain(
-      "Saved as test.pw"
-    );
+    await vi.waitFor(() => {
+      expect(document.getElementById("output").textContent).toContain(
+        "Saved as test.pw"
+      );
+    });
+    expect(mockWritable.write).toHaveBeenCalledWith("goto https://example.com");
+    expect(mockWritable.close).toHaveBeenCalled();
   });
 
   // --- Open button ---

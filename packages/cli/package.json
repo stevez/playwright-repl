@@ -4,13 +4,15 @@
   "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
   "type": "module",
   "bin": {
-    "playwright-repl": "./bin/playwright-repl.mjs"
+    "playwright-repl": "./dist/playwright-repl.js"
   },
-  "main": "./src/index.mjs",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": "./dist/index.js"
   },
+  "types": "./dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
     "test": "vitest run"
   },
   "keywords": [
@@ -29,8 +31,7 @@
     "url": "git+https://github.com/stevez/playwright-repl.git"
   },
   "files": [
-    "bin/",
-    "src/"
+    "dist/"
   ],
   "engines": {
     "node": ">=20.0.0"

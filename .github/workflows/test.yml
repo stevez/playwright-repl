@@ -25,8 +25,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
+      - name: Type check
+        run: npx tsc --noEmit -p packages/core && npx tsc --noEmit -p packages/cli
+
       - name: Run tests
-        run: npm test
+        run: npm test --workspaces --if-present
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium

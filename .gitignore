@@ -6,3 +6,6 @@ node_modules/
 .playwright-cli/
 coverage/
 .playwright-mcp/
+dist/
+packages/*/dist/
+*.tsbuildinfo

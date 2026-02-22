@@ -11,25 +11,27 @@ Think of it as a **keyword-driven test runner** (like Robot Framework) backed by
 ```
 playwright-repl/
 ├── package.json                    # Root workspace config (npm workspaces)
+├── tsconfig.base.json              # Shared TypeScript compiler options
 ├── packages/
-│   ├── core/                       # Shared engine + utilities
+│   ├── core/                       # Shared engine + utilities (TypeScript)
 │   │   ├── src/
-│   │   │   ├── engine.mjs          # Wraps BrowserServerBackend in-process
-│   │   │   ├── parser.mjs          # Command parsing + alias resolution
-│   │   │   ├── page-scripts.mjs    # Text locators + assertion helpers
-│   │   │   ├── completion-data.mjs # Ghost completion items
-│   │   │   ├── extension-server.mjs # WebSocket server for extension CDP relay
-│   │   │   ├── colors.mjs          # ANSI color helpers
-│   │   │   └── resolve.mjs         # COMMANDS map, minimist re-export
+│   │   │   ├── engine.ts           # Wraps BrowserServerBackend in-process
+│   │   │   ├── parser.ts           # Command parsing + alias resolution
+│   │   │   ├── page-scripts.ts     # Text locators + assertion helpers
+│   │   │   ├── completion-data.ts  # Ghost completion items
+│   │   │   ├── extension-server.ts # HTTP server for extension commands
+│   │   │   ├── colors.ts           # ANSI color helpers
+│   │   │   └── resolve.ts          # COMMANDS map, minimist re-export
+│   │   ├── dist/                   # Compiled output (gitignored)
 │   │   └── test/
 │   │
 │   ├── cli/                        # Terminal REPL (published as "playwright-repl")
-│       ├── bin/
-│       │   └── playwright-repl.mjs # CLI entry point
 │       ├── src/
-│       │   ├── repl.mjs            # Interactive readline loop
-│       │   ├── recorder.mjs        # Session recording/replay
-│       │   └── index.mjs           # Public API exports
+│       │   ├── playwright-repl.ts  # CLI entry point (compiles to dist/)
+│       │   ├── repl.ts             # Interactive readline loop
+│       │   ├── recorder.ts         # Session recording/replay
+│       │   └── index.ts            # Public API exports
+│       ├── dist/                   # Compiled output (gitignored)
 │       ├── test/
 │       └── examples/               # .pw session files
 │
@@ -88,7 +90,7 @@ browser:     locator.click()
 Chrome:      actual DOM click event
 ```
 
-### Engine (packages/core/src/engine.mjs)
+### Engine (packages/core/src/engine.ts)
 
 The `Engine` class wraps Playwright's `BrowserServerBackend` in-process:
 
@@ -113,31 +115,30 @@ Key Playwright internals used (via `createRequire`):
 - `playwright/lib/mcp/terminal/commands` → `commands` map
 - `playwright/lib/mcp/terminal/command` → `parseCommand`
 
-### ExtensionServer (packages/core/src/extension-server.mjs)
+### CommandServer (packages/core/src/extension-server.ts)
 
-When `--extension` mode is used, `ExtensionServer` starts an HTTP + WebSocket server:
+When `--extension` mode is used, `CommandServer` starts an HTTP server:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Chrome Extension (DevTools Panel)                      │
-│  panel.js ──sendMessage──► background.js                │
-│     ▲                         │  ▲                      │
-│     │ port.postMessage        │  │ chrome.debugger      │
-└───────────────────────────────┼──┼──────────────────────┘
-                     WebSocket  │  │
-                                ▼  │
-┌───────────────────────────────────────────────────────────┐
-│  ExtensionServer                                          │
-│    ├── /extension WS  ← background.js connects here      │
-│    ├── HTTP /json/*   ← Playwright CDP discovery          │
-│    └── /devtools/*    ← Playwright CDP WebSocket          │
-│  Engine → connectOverCDP → local proxy → relay → ext      │
-└───────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  Chrome Extension (Side Panel)               │
+│  panel.js ─── fetch POST /run ───────────┐   │
+│     ▲                                    │   │
+│     │ JSON response                      │   │
+└─────┼────────────────────────────────────┼───┘
+      │                                    │
+      │                                    ▼
+┌─────────────────────────────────────────────────────┐
+│  CommandServer (HTTP :3000)                          │
+│    ├── POST /run   ← panel sends commands here      │
+│    └── GET /health ← panel checks server status     │
+│  Engine → connectOverCDP → CDP :3001 → Chrome       │
+└─────────────────────────────────────────────────────┘
 ```
 
-- **CDP relay**: background.js bridges `chrome.debugger` ↔ WebSocket so Playwright can control the user's browser
-- **Command channel**: panel sends commands via background.js → server → `Engine.run()` → results back
-- **Recording**: stays extension-side (inject recorder.js, listen for `__pw:` events)
+- **Direct CDP**: Engine connects to Chrome via `--remote-debugging-port` (no relay)
+- **Command channel**: panel sends commands via `fetch()` → CommandServer → `Engine.run()` → results back
+- **Recording**: extension-side (inject recorder.js via `chrome.scripting.executeScript`)
 
 ### Element Refs (e1, e5, etc.)
 
@@ -177,17 +178,18 @@ async function processQueue() {
 
 ## Tech Stack
 
-- **Runtime**: Node.js (ESM modules, `.mjs`)
-- **Dependencies**: `minimist` (command parsing), `playwright@>=1.59.0-alpha` (browser engine), `ws` (WebSocket server for extension mode)
+- **Runtime**: Node.js (ESM modules)
+- **Language**: TypeScript for `packages/core` and `packages/cli` (compiled to `dist/` via `tsc`); plain JS for `packages/extension`
+- **Build**: `tsc` with project references (`tsconfig.base.json` → per-package `tsconfig.json`). Run `npm run build` at root.
+- **Dependencies**: `minimist` (command parsing), `playwright@>=1.59.0-alpha` (browser engine)
 - **Monorepo**: npm workspaces (`packages/core`, `packages/cli`, `packages/extension`)
-- **Testing**: vitest
+- **Testing**: vitest (unit tests), Playwright Test (extension E2E)
 - **Key insight**: `playwright@1.59.0-alpha` includes `lib/mcp/browser/` (BrowserServerBackend, contextFactory).
   The stable `playwright@1.58` does NOT. Once 1.59 goes stable, the alpha pin can be removed.
-- No build step — plain ESM JavaScript
 
 ## Code Style
 
 - ESM imports (`import ... from`)
+- TypeScript with `"module": "Node16"` — relative imports use `.js` extensions (resolved to `.ts` at compile time)
 - Async/await throughout
-- No TypeScript (keep it simple, scripting-oriented)
 - Sections separated by `// ─── Section Name ───` comments

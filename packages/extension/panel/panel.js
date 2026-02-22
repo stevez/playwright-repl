@@ -225,11 +225,20 @@ function addScreenshot(base64) {
   const saveBtnEl = document.createElement("button");
   saveBtnEl.className = "screenshot-btn";
   saveBtnEl.textContent = "Save";
-  saveBtnEl.addEventListener("click", () => {
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = "screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png";
-    a.click();
+  saveBtnEl.addEventListener("click", async () => {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png",
+        types: [{ description: "PNG images", accept: { "image/png": [".png"] } }],
+      });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    } catch (e) {
+      if (e.name !== "AbortError") console.error("Save failed:", e);
+    }
   });
   actions.appendChild(saveBtnEl);
 
@@ -829,7 +838,7 @@ openBtn.addEventListener("click", () => {
 
 // --- Save button ---
 
-saveBtn.addEventListener("click", () => {
+saveBtn.addEventListener("click", async () => {
   const content = editor.value;
   if (!content.trim()) {
     addInfo("Nothing to save.");
@@ -837,19 +846,20 @@ saveBtn.addEventListener("click", () => {
   }
   const defaultName =
     currentFilename || "commands-" + new Date().toISOString().slice(0, 10) + ".pw";
-  const filename = prompt("Save as:", defaultName);
-  if (!filename) return;
-  const finalName = filename.endsWith(".pw") ? filename : filename + ".pw";
-  const blob = new Blob([content], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = finalName;
-  a.click();
-  URL.revokeObjectURL(url);
-  currentFilename = finalName;
-  updateFileInfo();
-  addSuccess("Saved as " + finalName);
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: defaultName,
+      types: [{ description: "PW command files", accept: { "text/plain": [".pw"] } }],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    currentFilename = handle.name;
+    updateFileInfo();
+    addSuccess("Saved as " + handle.name);
+  } catch (e) {
+    if (e.name !== "AbortError") addError("Save failed: " + e.message);
+  }
 });
 
 // --- Export button ---
@@ -980,11 +990,20 @@ lightboxCloseBtn.addEventListener("click", () => {
   lightboxImg.src = "";
 });
 
-lightboxSaveBtn.addEventListener("click", () => {
-  const a = document.createElement("a");
-  a.href = lightboxImg.src;
-  a.download = "screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png";
-  a.click();
+lightboxSaveBtn.addEventListener("click", async () => {
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: "screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png",
+      types: [{ description: "PNG images", accept: { "image/png": [".png"] } }],
+    });
+    const res = await fetch(lightboxImg.src);
+    const blob = await res.blob();
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  } catch (e) {
+    if (e.name !== "AbortError") console.error("Save failed:", e);
+  }
 });
 
 document.addEventListener("keydown", (e) => {

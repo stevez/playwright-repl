@@ -6,8 +6,7 @@
  */
 
 import { test as base } from '@playwright/test';
-import { Engine } from '../../../core/src/engine.mjs';
-import { CommandServer } from '../../../core/src/extension-server.mjs';
+import { Engine, CommandServer } from '@playwright-repl/core';
 
 export const test = base.extend({
   // Worker-scoped: one Engine + CommandServer per worker

@@ -336,3 +336,6 @@ Phases 7 and 8 are independent of each other. Phase 9 after all modes are verifi
 - [ ] npx support (`npx playwright-repl`)
 - [ ] Config file support (.playwright-repl.json)
 - [ ] Plugin system for custom commands
+- [ ] **CLI strict mode violation hint**: When a text locator command (e.g., `click "npm"`) fails with a strict mode violation (multiple elements match), detect the error and suggest using `--nth 0`, `--nth 1`, etc. The recorder already handles this proactively via `nthSuffix()`, but the CLI gives no guidance when users type commands manually.
+- [ ] **Clean up verbose goto output**: `goto` currently dumps the full accessibility tree (snapshot) because `filterResponse` keeps the `### Snapshot` section for all commands. Suppress the snapshot for non-snapshot commands so `goto` only shows page URL/title.
+- [ ] **CLI replay regression tests**: Support running `.pw` example files as regression tests via the CLI. Accept a file, a folder (runs all `.pw` files), or multiple files. E.g. `playwright-repl --replay examples/` runs all scripts in the folder sequentially, reporting pass/fail per file. Use this to run `packages/cli/examples/*.pw` as integration tests against a real browser.

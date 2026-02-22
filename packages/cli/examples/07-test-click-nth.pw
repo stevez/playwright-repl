@@ -1,0 +1,17 @@
+goto https://playwright.dev/
+click "Get started"
+click "npm" --nth 0
+click "yarn" --nth 0
+click "pnpm" --nth 0
+click "npm" --nth 1
+click "yarn" --nth 1
+click "pnpm" --nth 1
+click "npm" --nth 2
+click "yarn" --nth 2
+click "pnpm" --nth 2
+click "npm" --nth 3
+click "yarn" --nth 3
+click "pnpm" --nth 3
+click "npm" --nth 4
+click "yarn" --nth 4
+click "pnpm" --nth 4
