@@ -98,14 +98,19 @@ describe('filterResponse', () => {
     expect(filterResponse(text)).toBe('[Alert] Are you sure?');
   });
 
-  it('includes Page and Snapshot sections', () => {
+  it('includes Page and Snapshot sections for snapshot command', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- element tree\n### Result\nDone';
-    expect(filterResponse(text)).toBe('http://example.com\n- element tree\nDone');
+    expect(filterResponse(text, 'snapshot')).toBe('http://example.com\n- element tree\nDone');
+  });
+
+  it('suppresses Snapshot section for non-snapshot commands', () => {
+    const text = '### Page\nhttp://example.com\n### Snapshot\n- element tree\n### Result\nDone';
+    expect(filterResponse(text, 'goto')).toBe('http://example.com\nDone');
   });
 
   it('returns Page and Snapshot content when no Result section', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- tree';
-    expect(filterResponse(text)).toBe('http://example.com\n- tree');
+    expect(filterResponse(text, 'snapshot')).toBe('http://example.com\n- tree');
   });
 
   it('returns null for text with no sections', () => {
