@@ -25,12 +25,10 @@ export const test = base.extend<
 >({
   // Worker-scoped: browser context with extension loaded
   extensionContext: [async ({}, use) => {
-    const headlessArgs = process.env.HEADED ? [] : ['--headless=new'];
-
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      channel: 'chromium',
+      headless: !process.env.HEADED,
       args: [
-        ...headlessArgs,
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
         '--no-first-run',

@@ -24,7 +24,7 @@ export const test = base.extend<
     const server = new CommandServer(engine);
     await server.start(0); // OS-assigned port
 
-    await use({ engine, server, port: server.port });
+    await use({ engine, server, port: server.port as number });
 
     await server.close();
     await engine.close();
