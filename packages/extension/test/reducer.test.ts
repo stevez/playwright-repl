@@ -1,0 +1,85 @@
+import { describe, it, expect } from "vitest";
+import { panelReducer, initialState, type PanelState } from "@/reducer";
+import { OutputLine } from "@/types";
+
+describe('Reducer tests', () => {
+   it('should process event ADD_LINE', () => {
+      const line: OutputLine = {text: 'click e5', type: 'command'};
+      const newState = panelReducer(initialState, {type: 'ADD_LINE', line});
+
+      expect(newState.outputLines.length).toEqual(1);
+      expect(newState.outputLines[0]).toEqual(line);
+   })
+
+   it('should process event CLEAR_CONSOLE', () => {
+       const line: OutputLine = {text: 'click e5', type: 'command'};
+       const state: PanelState = {
+         ...initialState,
+         outputLines: new Array(10).fill(line)
+       }
+
+       const newState = panelReducer(state, {type: 'CLEAR_CONSOLE'});
+       expect(newState.outputLines.length).toEqual(0);
+       expect(newState.passCount).toEqual(0);
+       expect(newState.failCount).toEqual(0);
+   })
+   it('should process event COMMAND_SUBMITTED', () => {
+      const line: OutputLine = {text: 'click e5', type: 'command'};
+      const newState = panelReducer(initialState, {type: 'COMMAND_SUBMITTED', line});
+
+      expect(newState.outputLines.length).toEqual(1);
+      expect(newState.outputLines[0]).toEqual(line);
+   })
+   it('should process event COMMAND_SUCCESS', () => {
+      const line: OutputLine = {text: 'click e5', type: 'command'};
+      const newState = panelReducer(initialState, {type: 'COMMAND_SUCCESS', line});
+
+      expect(newState.outputLines.length).toEqual(1);
+      expect(newState.outputLines[0]).toEqual(line);
+   })
+   it('should process event COMMAND_ERROR', () => {
+      const line: OutputLine = {text: 'click e5', type: 'command'};
+      const newState = panelReducer(initialState, {type: 'COMMAND_ERROR', line});
+
+      expect(newState.outputLines.length).toEqual(1);
+      expect(newState.outputLines[0]).toEqual(line);
+   })
+
+   it('should process event EDIT_EDITOR_CONTENT', () => {
+      const newState = panelReducer(initialState, {type: 'EDIT_EDITOR_CONTENT', content: 'click e5'});
+
+      expect(newState.editorContent).toEqual('click e5');
+   })
+
+   it('should process event SET_FILENAME', () => {
+      const newState = panelReducer(initialState, {type: 'SET_FILENAME', fileName: 'test1.pw'});
+
+      expect(newState.fileName).toEqual('test1.pw');
+   })
+
+   it('should process event RUN_START', () => {
+     const newState = panelReducer(initialState, { type: 'RUN_START'})
+     expect(newState.isRunning).toBe(true);
+   })
+
+   it('should process event RUN_STOP', () => {
+     const newState = panelReducer(initialState, { type: 'RUN_STOP'})
+     expect(newState.isRunning).toBe(false);
+     expect(newState.currentRunLine).toEqual(-1);
+   })
+
+   it('should process event SET_RUN_LINE', () => {
+     const newState = panelReducer(initialState, { type: 'SET_RUN_LINE', currentRunLine: 10})
+     expect(newState.currentRunLine).toEqual(10);
+   })
+
+   it('should process event STEP_INIT', () => {
+     const newState = panelReducer(initialState, { type: 'STEP_INIT'})
+     expect(newState.stepLine).toEqual(0);
+   })
+
+   it('should process event STEP_ADVANCE', () => {
+     const newState = panelReducer({...initialState, stepLine: 10}, { type: 'STEP_ADVANCE'})
+     expect(newState.stepLine).toEqual(11);
+   })
+})

@@ -8,9 +8,11 @@
     "build": "vite build",
     "typecheck": "tsc",
     "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "npx playwright test",
     "test:coverage": "vitest run --coverage",
     "test:component": "vitest run --config vitest.component.config.ts",
+    "test:component:watch": "vitest --config vitest.component.config.ts",
     "test:component:ui": "vitest --config vitest.component.config.ts --browser.headless=false --ui --api.port 9527",
     "lint": "eslint ."
   },

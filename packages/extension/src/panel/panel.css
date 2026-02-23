@@ -105,6 +105,12 @@ html, body {
   flex-direction: column;
 }
 
+#root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
 /* === Toolbar (top) === */
 
 #toolbar {
