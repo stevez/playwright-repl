@@ -1,0 +1,79 @@
+import type { OutputLine } from "@/types"
+
+export type PanelState = {
+  outputLines: OutputLine[]
+  editorContent: string
+  fileName: string
+  isRunning: boolean
+  currentRunLine: number      // -1 = none
+  stepLine: number            // -1 = not stepping
+  passCount: number
+  failCount: number
+  lineResults: ('pass' | 'fail' | null)[]
+}
+
+export type Action = 
+     { type: 'ADD_LINE', line: OutputLine}
+   | { type: 'CLEAR_CONSOLE'}
+   | { type: 'COMMAND_SUBMITTED', line: OutputLine}
+   | { type: 'COMMAND_SUCCESS', line: OutputLine }
+   | { type: 'COMMAND_ERROR', line: OutputLine }
+   | { type: 'EDIT_EDITOR_CONTENT', content: string }
+   | { type: 'SET_FILENAME', fileName: string }
+   | { type: 'RUN_START'}
+   | { type: 'RUN_STOP' }
+   | { type: 'SET_RUN_LINE', currentRunLine: number }
+   | { type: 'STEP_INIT'}
+   | { type: 'STEP_ADVANCE' }
+
+export const initialState : PanelState = {
+    outputLines: [],
+    editorContent: '',
+    fileName: '',
+    isRunning: false,
+    currentRunLine: -1,
+    stepLine: -1,
+    passCount: 0,
+    failCount: 0,
+    lineResults: []
+}
+
+export function panelReducer(state: PanelState, action: Action): PanelState {
+    switch(action.type) {
+        case 'ADD_LINE':
+            return { ...state, outputLines: [...state.outputLines, action.line]}
+        case 'CLEAR_CONSOLE':
+            return { ...state, outputLines: [], passCount: 0, failCount: 0}
+        case 'COMMAND_SUBMITTED':
+            return { ...state, outputLines: [ ...state.outputLines, action.line]}
+        case 'COMMAND_SUCCESS':
+            return { ...state, outputLines: [ ...state.outputLines, action.line]}
+        case 'COMMAND_ERROR':
+            return { ...state, outputLines: [ ...state.outputLines, action.line]}
+        case 'EDIT_EDITOR_CONTENT':
+            return { ...state, editorContent: action.content }
+        case 'SET_FILENAME':
+            return { ...state, fileName: action.fileName }
+        case 'RUN_START': {
+            const lineCount = state.editorContent.split('\n').length;
+            return { 
+                ...state, 
+                isRunning: true, 
+                currentRunLine: 0, 
+                passCount: 0,
+                failCount: 0,
+                lineResults: new Array(lineCount).fill(null)
+            }
+        }
+        case 'RUN_STOP':
+            return { ...state, isRunning: false, currentRunLine: -1}
+        case 'SET_RUN_LINE': 
+            return { ...state, currentRunLine: action.currentRunLine}
+        case 'STEP_INIT':
+            return { ...state, stepLine: 0}
+        case 'STEP_ADVANCE': 
+            return { ...state, stepLine: state.stepLine + 1}
+        default:
+            return state
+    }
+}

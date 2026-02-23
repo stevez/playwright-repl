@@ -2,67 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-  <!-- Toolbar (top) -->
-  <div id="toolbar">
-    <div id="toolbar-left">
-      <button id="open-btn" title="Open .pw file">Open</button>
-      <button id="save-btn" title="Save as .pw file" disabled>Save</button>
-      <button id="copy-btn" title="Copy editor content" disabled>Copy</button>
-      <span class="toolbar-sep"></span>
-      <button id="record-btn" title="Toggle recording">&#9210; Record</button>
-      <button id="run-btn" title="Run script (Ctrl+Enter)">&#9654;</button>
-      <button id="step-btn" title="Step: run next line">&#9655;</button>
-      <button id="export-btn" title="Export as Playwright test" disabled>Export</button>
-    </div>
-    <div id="toolbar-right">
-      <span id="file-info"></span>
-    </div>
-  </div>
-
-  <!-- Editor pane -->
-  <div id="editor-pane">
-    <div id="line-numbers"></div>
-    <div id="editor-wrapper">
-      <div id="line-highlight"></div>
-      <textarea id="editor" spellcheck="false" autocomplete="off"
-        placeholder="# Type or open a .pw script..."></textarea>
-    </div>
-  </div>
-
-  <!-- Draggable splitter -->
-  <div id="splitter"><div id="splitter-handle"></div></div>
-
-  <!-- Console pane (REPL) -->
-  <div id="console-pane">
-    <div id="console-header">
-      <span id="console-header-left">
-        <span id="console-title">Terminal</span>
-        <button id="console-clear-btn" title="Clear terminal">Clear</button>
-      </span>
-      <span id="console-stats"></span>
-    </div>
-    <div id="output"></div>
-    <div id="input-bar">
-      <span id="prompt">pw&gt;</span>
-      <div id="input-wrapper">
-        <div id="autocomplete-dropdown" hidden></div>
-        <span id="ghost-text"></span>
-        <input type="text" id="command-input" placeholder="Type a .pw command..."
-          autocomplete="off" spellcheck="false">
-      </div>
-    </div>
-  </div>
-
-  <!-- Screenshot lightbox -->
-  <div id="lightbox" hidden>
-    <button id="lightbox-close-btn">&times;</button>
-    <button id="lightbox-save-btn">Save</button>
-    <img id="lightbox-img">
-  </div>
-
-  <script type="module" src="panel.ts"></script>
+  <div id="root"></div>
+  <script type="module" src="panel.tsx"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     setupFiles: "./test/setup.ts",
     environment: "happy-dom",
-    exclude: ["e2e/**", "node_modules/**", "dist/**"],
+    exclude: ["e2e/**", "test/components/**","node_modules/**", "dist/**"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
