@@ -74,12 +74,35 @@ describe('Reducer tests', () => {
    })
 
    it('should process event STEP_INIT', () => {
-     const newState = panelReducer(initialState, { type: 'STEP_INIT'})
-     expect(newState.stepLine).toEqual(0);
+     const newState = panelReducer(initialState, { type: 'STEP_INIT', stepLine: 10})
+     expect(newState.stepLine).toEqual(10);
    })
 
    it('should process event STEP_ADVANCE', () => {
-     const newState = panelReducer({...initialState, stepLine: 10}, { type: 'STEP_ADVANCE'})
+     const newState = panelReducer({...initialState, stepLine: 10}, { type: 'STEP_ADVANCE', stepLine: 11})
      expect(newState.stepLine).toEqual(11);
+   })
+
+   it('should process event SET_LINE_RESULT with pass status', () => {
+     const newState = panelReducer({...initialState, lineResults: [null]}, {type: 'SET_LINE_RESULT', index: 0, result: 'pass'});
+     expect(newState.lineResults.length).toEqual(1);
+     expect(newState.lineResults[0]).toEqual('pass');
+   })
+
+   it('should process event SET_LINE_RESULT with pass status for multiple line results', () => {
+     const newState = panelReducer({...initialState, lineResults: ['fail', null]}, {type: 'SET_LINE_RESULT', index: 1, result: 'pass'});
+     expect(newState.lineResults.length).toEqual(2);
+     expect(newState.lineResults[1]).toEqual('pass');
+   })
+
+   it('should process event SET_LINE_RESULT with fail status', () => {
+     const newState = panelReducer({...initialState, lineResults: [null]}, {type: 'SET_LINE_RESULT', index: 0, result: 'fail'});
+     expect(newState.lineResults.length).toEqual(1);
+     expect(newState.lineResults[0]).toEqual('fail');
+   })
+
+   it('should remain the same state for the invalid event', () => {
+     const newState = panelReducer(initialState, {type: 'invalid_event'});
+     expect(newState).toEqual(initialState);
    })
 })

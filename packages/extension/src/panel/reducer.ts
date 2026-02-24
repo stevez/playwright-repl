@@ -23,8 +23,9 @@ export type Action =
    | { type: 'RUN_START'}
    | { type: 'RUN_STOP' }
    | { type: 'SET_RUN_LINE', currentRunLine: number }
-   | { type: 'STEP_INIT'}
-   | { type: 'STEP_ADVANCE' }
+   | { type: 'STEP_INIT', stepLine: number }
+   | { type: 'STEP_ADVANCE', stepLine: number }
+   | { type: 'SET_LINE_RESULT', index: number, result: 'pass' | 'fail'}
 
 export const initialState : PanelState = {
     outputLines: [],
@@ -51,7 +52,15 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
         case 'COMMAND_ERROR':
             return { ...state, outputLines: [ ...state.outputLines, action.line]}
         case 'EDIT_EDITOR_CONTENT':
-            return { ...state, editorContent: action.content }
+            return { 
+                ...state, 
+                editorContent: action.content,
+                lineResults: [],
+                currentRunLine: -1,
+                stepLine: -1,
+                passCount: 0,
+                failCount: 0 
+            }
         case 'SET_FILENAME':
             return { ...state, fileName: action.fileName }
         case 'RUN_START': {
@@ -69,11 +78,26 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, isRunning: false, currentRunLine: -1}
         case 'SET_RUN_LINE': 
             return { ...state, currentRunLine: action.currentRunLine}
-        case 'STEP_INIT':
-            return { ...state, stepLine: 0}
+        case 'STEP_INIT': {
+            const lineCount = state.editorContent.split('\n').length;
+            return { 
+                ...state, 
+                stepLine: action.stepLine, 
+                currentRunLine: action.stepLine,
+                passCount: 0,
+                failCount: 0,
+                lineResults: new Array(lineCount).fill(null) 
+            }
+        }
         case 'STEP_ADVANCE': 
-            return { ...state, stepLine: state.stepLine + 1}
+            return { ...state, stepLine: action.stepLine, currentRunLine: action.stepLine }
+        case 'SET_LINE_RESULT': {
+            const newLineResults = state.lineResults.map((result, i) => i === action.index ? action.result : result);
+            const newPassCount = action.result === 'pass' ? state.passCount + 1 : state.passCount;
+            const newFailCount = action.result === 'fail' ? state.failCount + 1 : state.failCount;
+            return { ...state, lineResults: newLineResults, passCount: newPassCount, failCount: newFailCount}
+        }
         default:
-            return state
+            return state 
     }
 }

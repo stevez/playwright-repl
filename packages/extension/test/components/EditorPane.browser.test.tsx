@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { useReducer } from 'react';
 import { panelReducer, initialState, PanelState } from '@/reducer';
@@ -36,9 +36,7 @@ describe('EditorPane component tests', () => {
               ...initialState,
               lineResults: ['pass', 'fail', null],
               currentRunLine: 2,
-              editorContent: `click e5
-              snapshot
-              go-back`
+              editorContent: 'click e5\nsnapshot\ngo-back'
           };
         function LineStatusTestWrapper() {
             const [state, dispatch] = useReducer(panelReducer, preloadedState);

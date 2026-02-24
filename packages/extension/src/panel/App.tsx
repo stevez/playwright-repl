@@ -12,7 +12,12 @@ function App() {
   return (
     <>
       {/* Toolbar */}
-      <Toolbar />
+      <Toolbar 
+        editorContent={state.editorContent}
+        fileName={state.fileName}
+        stepLine={state.stepLine}
+        dispatch={dispatch} 
+      />
 
       {/* Editor pane */}
       <EditorPane
