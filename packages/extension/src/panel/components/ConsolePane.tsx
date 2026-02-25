@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { OutputLine } from "@/types";
 import { executeCommand } from '@/lib/server';
 import { Action } from "@/reducer";
+import CommandInput from './CommandInput';
 
 interface ConsolePaneProps {
     outputLines: OutputLine[]
@@ -9,15 +9,14 @@ interface ConsolePaneProps {
 }
 
 function ConsolePane({outputLines, dispatch} : ConsolePaneProps) {
-    const [input, setInput] = useState<string>('');
-
-    async function handleSubmit() {
-        if(!input.trim()) return;
+    
+    async function handleSubmit(command: string) {
+        if(!command.trim()) return;
         
         // Show what the user typed
-        dispatch({ type: 'COMMAND_SUBMITTED', line: { text: input, type: 'command' }});
+        dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' }});
         try {
-           const result = await executeCommand(input);
+           const result = await executeCommand(command);
            dispatch({type: 'COMMAND_SUCCESS', line: {
             text: result.text,
             type: result.isError ? 'error' : 'success'
@@ -28,7 +27,6 @@ function ConsolePane({outputLines, dispatch} : ConsolePaneProps) {
             type: 'error'
         }});
         }
-        setInput('');
     }
 
     function handleClear() {
@@ -49,26 +47,7 @@ function ConsolePane({outputLines, dispatch} : ConsolePaneProps) {
                     <div key={i} className={`line line-${line.type}`}>{line.text}</div>
                 ))}
             </div>
-            <div id="input-bar">
-                <span id="prompt">pw&gt;</span>
-                <div id="input-wrapper">
-                    <div id="autocomplete-dropdown" hidden></div>
-                    <span id="ghost-text"></span>
-                    <input
-                        type="text"
-                        id="command-input"
-                        value={input}
-                        placeholder="Type a .pw command..."
-                        autoComplete="off"
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if(e.key == 'Enter') {
-                                handleSubmit()
-                            }
-                        }}
-                        spellCheck={false} />
-                </div>
-            </div>
+            <CommandInput onSubmit={handleSubmit} />
         </div>
     )
 }

@@ -619,10 +619,12 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
   color: var(--text-placeholder);
   font-family: inherit;
   font-size: inherit;
-  line-height: normal;
   pointer-events: none;
   white-space: pre;
 }
