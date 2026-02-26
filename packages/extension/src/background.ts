@@ -9,6 +9,36 @@ let navCommittedListener: ((details: chrome.webNavigation.WebNavigationTransitio
 let lastRecordedUrl: string | null = null;
 let urlStack: string[] = [];
 let stackIndex: number = -1;
+let pendingUrlChange: string | null = null;
+let pendingUrlTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ─── Centralized URL Change Handler ──────────────────────────────────────────
+
+function handleUrlChange(url: string, isTyped: boolean) {
+  if (url === lastRecordedUrl) return;
+
+  // Back/forward detection (checked before isTyped — Chrome can misreport SPA back as "typed")
+  if (stackIndex > 0 && url === urlStack[stackIndex - 1]) {
+    stackIndex--;
+    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "go-back" }).catch(() => {});
+  } else if (stackIndex < urlStack.length - 1 && url === urlStack[stackIndex + 1]) {
+    stackIndex++;
+    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "go-forward" }).catch(() => {});
+  } else if (isTyped) {
+    // User typed URL in address bar
+    chrome.runtime.sendMessage({ type: "pw-recorded-command", command: "goto " + url }).catch(() => {});
+    urlStack = urlStack.slice(0, stackIndex + 1);
+    urlStack.push(url);
+    stackIndex = urlStack.length - 1;
+  } else {
+    // Link click, SPA navigation — update stack, no command (click already recorded)
+    urlStack = urlStack.slice(0, stackIndex + 1);
+    urlStack.push(url);
+    stackIndex = urlStack.length - 1;
+  }
+
+  lastRecordedUrl = url;
+}
 
 // ─── Message Handler ────────────────────────────────────────────────────────
 
@@ -52,64 +82,44 @@ async function startRecording(tabId: number): Promise<{ ok: boolean; error?: str
     urlStack = [tab.url ?? ""];
     stackIndex = 0;
 
-    // Listen for navigation commits to detect back/forward vs typed URLs
+    // Listen for navigation commits — only used to detect typed URLs (for goto)
     navCommittedListener = (details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
       if (details.tabId !== recordingTabId) return;
       if (details.frameId !== 0) return; // main frame only
-      if (details.url === lastRecordedUrl) return;
 
-      const qualifiers = details.transitionQualifiers || [];
-
-      if (qualifiers.includes("forward_back")) {
-        // Back or forward — compare to history stack
-        if (stackIndex > 0 && details.url === urlStack[stackIndex - 1]) {
-          stackIndex--;
-          chrome.runtime.sendMessage({
-            type: "pw-recorded-command",
-            command: "go-back",
-          }).catch(() => {});
-        } else if (stackIndex < urlStack.length - 1 && details.url === urlStack[stackIndex + 1]) {
-          stackIndex++;
-          chrome.runtime.sendMessage({
-            type: "pw-recorded-command",
-            command: "go-forward",
-          }).catch(() => {});
-        } else {
-          // Can't determine direction — default to go-back
-          chrome.runtime.sendMessage({
-            type: "pw-recorded-command",
-            command: "go-back",
-          }).catch(() => {});
-        }
-      } else if (details.transitionType === "typed" || qualifiers.includes("from_address_bar")) {
-        // User typed URL in address bar
-        chrome.runtime.sendMessage({
-          type: "pw-recorded-command",
-          command: "goto " + details.url,
-        }).catch(() => {});
-        // Push to history stack (truncate any forward entries)
-        urlStack = urlStack.slice(0, stackIndex + 1);
-        urlStack.push(details.url);
-        stackIndex = urlStack.length - 1;
-      } else {
-        // Link click, form submit, etc. — don't emit goto (click already recorded)
-        // But do update the history stack
-        urlStack = urlStack.slice(0, stackIndex + 1);
-        urlStack.push(details.url);
-        stackIndex = urlStack.length - 1;
+      // Cancel pending tabUpdate handler — onCommitted has transition info, so it takes priority
+      if (pendingUrlTimer) {
+        clearTimeout(pendingUrlTimer);
+        pendingUrlTimer = null;
+        pendingUrlChange = null;
       }
 
-      lastRecordedUrl = details.url;
+      const qualifiers = details.transitionQualifiers || [];
+      const isTyped = (details.transitionType === "typed" || qualifiers.includes("from_address_bar"))
+        && !qualifiers.includes("forward_back");
+      handleUrlChange(details.url, isTyped);
     };
     chrome.webNavigation.onCommitted.addListener(navCommittedListener);
 
-    // Listen for page load completion to re-inject recorder
+    // Listen for tab URL changes — catches SPA (pushState) and BFCache navigations
+    // that onCommitted misses. Uses a short timer so onCommitted can take priority.
     tabUpdateListener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
       if (updatedTabId !== recordingTabId) return;
       if (changeInfo.status === "complete") {
         injectRecorder(updatedTabId).catch((err: unknown) => {
           console.warn("[recorder] re-injection failed:", (err as Error).message);
         });
+      }
+      if (changeInfo.url && changeInfo.url !== lastRecordedUrl) {
+        pendingUrlChange = changeInfo.url;
+        if (pendingUrlTimer) clearTimeout(pendingUrlTimer);
+        pendingUrlTimer = setTimeout(() => {
+          if (pendingUrlChange && pendingUrlChange !== lastRecordedUrl) {
+            handleUrlChange(pendingUrlChange, false);
+          }
+          pendingUrlChange = null;
+          pendingUrlTimer = null;
+        }, 100);
       }
     };
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
@@ -134,6 +144,11 @@ async function stopRecording(tabId: number): Promise<{ ok: boolean }> {
     recordingTabId = null;
     urlStack = [];
     stackIndex = -1;
+    if (pendingUrlTimer) {
+      clearTimeout(pendingUrlTimer);
+      pendingUrlTimer = null;
+      pendingUrlChange = null;
+    }
 
     // Run cleanup on the tab
     await chrome.scripting.executeScript({

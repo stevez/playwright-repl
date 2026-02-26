@@ -1,1 +1,1 @@
-import '../../src/panel/panel.css';
+import '@/panel.css';

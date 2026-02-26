@@ -8,3 +8,5 @@ export type CommandResult = {
     isError: boolean
     image?: string
 }
+
+export type RecordedMessage = { type: 'pw-recorded-command'; command: string };

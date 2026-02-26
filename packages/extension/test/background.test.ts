@@ -14,6 +14,7 @@ describe("background.js recording handlers", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     vi.resetModules();
+    vi.useFakeTimers();
 
     executeScript = vi.fn().mockResolvedValue([]);
     (chrome as any).scripting = { executeScript };
@@ -241,6 +242,113 @@ describe("background.js recording handlers", () => {
       type: "pw-recorded-command",
       command: "go-forward",
     });
+  });
+
+  // ─── SPA / BFCache navigation (tabUpdateListener fallback) ─────────
+
+  it("emits go-back for SPA back navigation via tabUpdateListener", async () => {
+    await startRecording(42);
+    const tabListener = onUpdatedAdd.mock.calls[0][0];
+
+    // SPA navigate to /page2 (only tabUpdate fires, no onCommitted)
+    tabListener(42, { url: "https://example.com/page2" });
+    await vi.advanceTimersByTimeAsync(150);
+    rtSendMessage.mockClear();
+
+    // Press back — goes to original URL
+    tabListener(42, { url: "https://example.com" });
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(rtSendMessage).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: "go-back",
+    });
+  });
+
+  it("emits go-forward for SPA forward navigation via tabUpdateListener", async () => {
+    await startRecording(42);
+    const tabListener = onUpdatedAdd.mock.calls[0][0];
+
+    // SPA navigate to /page2, then back
+    tabListener(42, { url: "https://example.com/page2" });
+    await vi.advanceTimersByTimeAsync(150);
+    tabListener(42, { url: "https://example.com" });
+    await vi.advanceTimersByTimeAsync(150);
+    rtSendMessage.mockClear();
+
+    // Press forward — goes to /page2
+    tabListener(42, { url: "https://example.com/page2" });
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(rtSendMessage).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: "go-forward",
+    });
+  });
+
+  it("does not emit goto for SPA link click navigation", async () => {
+    await startRecording(42);
+    const tabListener = onUpdatedAdd.mock.calls[0][0];
+
+    tabListener(42, { url: "https://example.com/page2" });
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(rtSendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: expect.stringContaining("goto") }),
+    );
+  });
+
+  it("onCommitted cancels pending tabUpdate timer", async () => {
+    await startRecording(42);
+    const tabListener = onUpdatedAdd.mock.calls[0][0];
+    const navListener = onCommittedAdd.mock.calls[0][0];
+
+    // tabUpdate fires first (as Chrome does)
+    tabListener(42, { url: "https://new-url.com" });
+
+    // onCommitted fires shortly after — should cancel tabUpdate timer
+    navListener({
+      tabId: 42, frameId: 0, url: "https://new-url.com",
+      transitionType: "typed", transitionQualifiers: ["from_address_bar"],
+    });
+
+    expect(rtSendMessage).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: "goto https://new-url.com",
+    });
+
+    // Advance past timer — should NOT double-emit
+    rtSendMessage.mockClear();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(rtSendMessage).not.toHaveBeenCalled();
+  });
+
+  it("detects go-back when Chrome misreports SPA back as typed", async () => {
+    await startRecording(42);
+    const tabListener = onUpdatedAdd.mock.calls[0][0];
+    const navListener = onCommittedAdd.mock.calls[0][0];
+
+    // SPA navigate to /page2
+    tabListener(42, { url: "https://example.com/page2" });
+    await vi.advanceTimersByTimeAsync(150);
+    rtSendMessage.mockClear();
+
+    // Back button — tabUpdate fires first, then onCommitted reports as "typed"
+    tabListener(42, { url: "https://example.com" });
+    navListener({
+      tabId: 42, frameId: 0, url: "https://example.com",
+      transitionType: "typed", transitionQualifiers: ["from_address_bar"],
+    });
+    await vi.advanceTimersByTimeAsync(150);
+
+    // Should emit go-back, NOT goto
+    expect(rtSendMessage).toHaveBeenCalledWith({
+      type: "pw-recorded-command",
+      command: "go-back",
+    });
+    expect(rtSendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: expect.stringContaining("goto") }),
+    );
   });
 
   // ─── injectRecorder ────────────────────────────────────────────────────

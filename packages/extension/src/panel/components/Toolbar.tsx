@@ -1,6 +1,7 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { executeCommand } from '@/lib/server';
+import type { RecordedMessage } from '@/types';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>
@@ -8,6 +9,7 @@ interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | '
 
 function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isRecording, setIsRecording] = useState(false);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
@@ -113,6 +115,36 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         dispatch({ type: 'STEP_ADVANCE', stepLine: nextStepLine });
 
     }
+    async function handleRecord() {
+        if (!chrome.tabs?.query) return;
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+        if (!tab?.id) return;
+
+        if (isRecording) {
+            chrome.runtime.sendMessage({ type: "pw-record-stop", tabId: tab.id });
+            setIsRecording(false);
+        } else {
+            const result = await chrome.runtime.sendMessage({ type: "pw-record-start", tabId: tab.id });
+            if (result && !result.ok) {
+                dispatch({ type: 'ADD_LINE', line: { text: 'Recording failed: ' + result.error, type: 'error' } });
+                return;
+            }
+            setIsRecording(true);
+        }
+    }
+
+    useEffect(() => {  
+        const listener = (msg: RecordedMessage) => {
+            if (msg.type === "pw-recorded-command" && msg.command) {
+                dispatch({ type: 'ADD_LINE', line: { text: msg.command, type: 'command' } });
+                dispatch({ type: 'APPEND_EDITOR_CONTENT', command: msg.command });
+            }
+        };
+        if (!chrome.runtime?.onMessage) return;
+        chrome.runtime.onMessage.addListener(listener);
+        return () => chrome.runtime.onMessage.removeListener(listener);
+    }, []);
 
     return (
         <div id="toolbar">
@@ -127,7 +159,14 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 <button id="open-btn" title="Open .pw file" onClick={handleFileOpen}>Open</button>
                 <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}>Save</button>
                 <span className="toolbar-sep"></span>
-                <button id="record-btn" title="Toggle recording">&#9210; Record</button>
+                <button
+                    id="record-btn"
+                    className={isRecording ? 'recording' : ''}
+                    title={isRecording ? "Stop recording" : "Start Recording"}
+                    onClick={handleRecord}
+                >
+                    {isRecording ? '⏹ Stop' : '⏺ Record'}
+                </button>
                 <button id="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim()} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled>Export</button>

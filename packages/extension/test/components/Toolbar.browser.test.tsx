@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
@@ -10,6 +11,23 @@ vi.mock('@/lib/server', () => ({
 }))
 
 describe('Toolbar component tests', () => {
+  beforeEach(() => {
+    Object.assign(window, {
+      chrome: {
+        tabs: {
+          query: vi.fn().mockResolvedValue([{ id: 1, url: 'https://example.com' }]),
+        },
+        runtime: {
+          sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+          onMessage: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+        },
+      },
+    });
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -384,6 +402,140 @@ describe('Toolbar component tests', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('should toggle to stop when record button is clicked', async () => {
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+    await expect.element(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  })
+
+  it('should toggle to record when stop button is clicked', async () => {
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+    await screen.getByRole('button', { name: 'Stop' }).click();
+
+    await expect.element(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+  })
+
+  it('should render when chrome.tabs is undefined', async () => {
+    window.chrome.tabs.query = null as any;
+
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  })
+
+  it('should not send chrome message whtn tabs[0] is null', async () => {
+    window.chrome.tabs.query = vi.fn().mockResolvedValue([null]);
+
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  })
+
+  it('should send out message to console when chrome.runtime.sendMessage return failure', async () => {
+    window.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({ error: 'connection failed' });
+
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Record' }).click();
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Recording failed: connection failed', type: 'error' } })
+  })
+
+  it('should dispatch messages to console and editor console when pw-recorded-command is received', async () => {
+
+    const dispatch = vi.fn();
+    await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+    // Invoke it with a fake message
+    listener({ type: 'pw-recorded-command', command: 'click e5' });
+
+    // Assert dispatch was called
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'ADD_LINE',
+      line: { text: 'click e5', type: 'command' }
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'APPEND_EDITOR_CONTENT',
+      command: 'click e5'
+    });
+  })
+
+  it('should not dispatch messages to console and editor console when non pw-recorded-command is received', async () => {
+
+    const dispatch = vi.fn();
+    await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+    // Invoke it with a fake message
+    listener({ type: 'non-pw-recorded-command', command: 'click e5' });
+
+    // Assert dispatch was not called
+    expect(dispatch).not.toHaveBeenCalled();
+  })
+
+  it('should still render the component when chrome.runtime?.onMessage is null', async () => {
+    window.chrome.runtime.onMessage = null as any;
+
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await expect.element(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+  })
 
 
 
