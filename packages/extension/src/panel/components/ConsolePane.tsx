@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { OutputLine } from "@/types";
-import { executeCommand } from '@/lib/server';
 import { Action } from "@/reducer";
 import CommandInput from './CommandInput';
 import Lightbox from '@/components/Lightbox';
 import { saveImageToFile } from '@/lib/file-utils';
-import { filterResponse } from '@/lib/filter';
+import { runAndDispatch } from '@/lib/run';
 
 interface ConsolePaneProps {
     outputLines: OutputLine[]
@@ -16,6 +15,13 @@ interface ConsolePaneProps {
 
 function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePaneProps) {
     const [lightBoxImage, setLightBoxImage ] = useState<string | undefined>(undefined);
+    const outputRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (outputRef.current) {
+            outputRef.current.scrollTop = outputRef.current.scrollHeight;
+        }
+    }, [outputLines]);
 
     async function handleSubmit(command: string) {
         if (!command.trim()) return;
@@ -28,27 +34,7 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
             dispatch({ type: 'CLEAR_CONSOLE'});
             return;
         }
-        // Show what the user typed
-        dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
-        try {
-            const result = await executeCommand(command);
-            const cmdName = command.trim().split(/\s+/)[0];
-            const text = filterResponse(result.text, cmdName);
-            dispatch({
-                type: 'COMMAND_SUCCESS', line: {
-                    text,
-                    type: result.isError ? 'error' : result.image? 'screenshot' : 'success',
-                    image: result.image
-                }
-            });
-        } catch {
-            dispatch({
-                type: 'COMMAND_ERROR', line: {
-                    text: 'Not connected to server. Run: playwright-repl --extension',
-                    type: 'error'
-                }
-            });
-        }
+        await runAndDispatch(command, dispatch);
     }
 
     function handleClear() {
@@ -81,6 +67,10 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
                             <button className="screenshot-btn" onClick={() => saveScreenshot(line.image)}>Save</button>
                         </div>
                     </div>);
+            case 'snapshot':
+                 return (
+                      <pre key={i} className={`line line-${line.type}`}>{line.text}</pre>
+                 );
             default:
                 return (
                     <div key={i} className={`line line-${line.type}`}>{line.text}</div>
@@ -108,7 +98,7 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
                 </span>
                 
             </div>
-            <div id="output">
+            <div id="output" ref={outputRef}>
                 {outputLines.map(renderLine)}
             </div>
             <CommandInput onSubmit={handleSubmit} />

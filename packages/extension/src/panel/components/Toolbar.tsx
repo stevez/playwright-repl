@@ -1,10 +1,9 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
-import { executeCommand } from '@/lib/server';
 import type { RecordedMessage } from '@/types';
 import { exportToPlaywright } from '@/lib/converter';
-import { filterResponse } from '@/lib/filter';
 import { checkHealth } from '@/lib/server';
+import { runAndDispatch } from '@/lib/run';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>
@@ -63,29 +62,8 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         // set current run line
         dispatch({ type: 'SET_RUN_LINE', currentRunLine: index });
 
-        // Show what the user typed
-        dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
-        try {
-            const result = await executeCommand(command);
-            const cmdName = command.trim().split(/\s+/)[0];
-            const text = filterResponse(result.text, cmdName);
-            dispatch({
-                type: 'COMMAND_SUCCESS', line: {
-                    text,
-                    type: result.isError ? 'error' : result.image ? 'screenshot' : 'success',
-                    image: result.image
-                }
-            });
-            dispatch({ type: 'SET_LINE_RESULT', index: index, result: result.isError ? 'fail' : 'pass' });
-        } catch {
-            dispatch({
-                type: 'COMMAND_ERROR', line: {
-                    text: 'Not connected to server. Run: playwright-repl --extension',
-                    type: 'error'
-                }
-            });
-            dispatch({ type: 'SET_LINE_RESULT', index: index, result: 'fail' });
-        }
+        const result = await runAndDispatch(command, dispatch);
+        dispatch({ type: 'SET_LINE_RESULT', index: index, result: result.isError ? 'fail' : 'pass' });
     }
 
     async function handleRun() {
