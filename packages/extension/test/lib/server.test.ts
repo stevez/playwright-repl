@@ -26,13 +26,16 @@ describe('server', () => {
       });
    })
 
-    it('should run executeCommand', async () => {
-     mockFetch = vi.fn().mockResolvedValue({ok: true});
+    it('should run checkHealth', async () => {
+     mockFetch = vi.fn().mockResolvedValue({
+        json: () => Promise.resolve({ status: 'ok', version: '0.4.0' }),
+     });
      globalThis.fetch = mockFetch;
 
-      await checkHealth();
+      const result = await checkHealth();
 
       expect(mockFetch).toHaveBeenCalledWith('http://localhost:6781/health');
+      expect(result).toEqual({ status: 'ok', version: '0.4.0' });
    })
 
 })

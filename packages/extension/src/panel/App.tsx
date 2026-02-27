@@ -1,13 +1,14 @@
+import { useReducer, useRef } from 'react'
 import Toolbar from './components/Toolbar'
 import EditorPane from "./components/EditorPane"
 import Splitter from './components/Splitter'
 import ConsolePane from './components/ConsolePane'
-import { useReducer, useRef } from 'react'
 import { panelReducer, initialState } from './reducer'
 
 function App() {
   const [state, dispatch ] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
+  
   return (
     <>
       {/* Toolbar */}
@@ -33,6 +34,8 @@ function App() {
       {/* Console pane */}
       <ConsolePane 
          outputLines={state.outputLines}
+         passCount={state.passCount}
+         failCount={state.failCount}
          dispatch={dispatch}
       />
     </>

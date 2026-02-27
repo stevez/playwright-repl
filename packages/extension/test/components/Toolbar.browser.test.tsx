@@ -4,11 +4,14 @@ import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
 import Toolbar from '@/components/Toolbar';
-import { executeCommand } from '@/lib/server';
 
 vi.mock('@/lib/server', () => ({
   executeCommand: vi.fn(),
+  checkHealth: vi.fn().mockResolvedValue({status: 'ok', version: "0.6.0"})
+  
 }))
+
+import { executeCommand, checkHealth } from '@/lib/server';
 
 describe('Toolbar component tests', () => {
   beforeEach(() => {
@@ -84,6 +87,7 @@ describe('Toolbar component tests', () => {
     // find the hidden file input
     const fileInput = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
 
+    dispatch.mockClear(); // clear health check dispatches
     fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 
     await new Promise(r => setTimeout(r, 50));
@@ -200,6 +204,7 @@ describe('Toolbar component tests', () => {
     abortError.name = 'AbortError';
     window.showSaveFilePicker = vi.fn().mockRejectedValue(abortError) as any;
 
+    dispatch.mockClear(); // clear health check dispatches
     const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
     saveBtn.click();
 
@@ -396,6 +401,7 @@ describe('Toolbar component tests', () => {
       dispatch={dispatch}
     />);
 
+    dispatch.mockClear(); // clear health check dispatches
     await screen.getByText('▷').click();
 
     await new Promise(r => setTimeout(r, 50));
@@ -516,6 +522,8 @@ describe('Toolbar component tests', () => {
 
     const listener = (window.chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mock.calls[0][0];
 
+    dispatch.mockClear(); // clear health check dispatches
+
     // Invoke it with a fake message
     listener({ type: 'non-pw-recorded-command', command: 'click e5' });
 
@@ -564,6 +572,37 @@ test('recorded session', async ({ page }) => {
   await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
 });`.trim();
     expect(dispatch).toHaveBeenCalledWith({type: 'ADD_LINE', line: {text: expected_code, type: 'code-block'}})
+  });
+
+  it('should show connection failed message is healthCheck failed', async () => {
+    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
+
+    const dispatch = vi.fn();
+    await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server not running. Start with: playwright-repl --extension', type: 'error' } });
+    });
+  });
+
+  it('should show connection failed message is healthCheck return status non ok', async () => {
+    vi.mocked(checkHealth).mockResolvedValue({status: '403', version: "0.6.0"});
+
+    const dispatch = vi.fn();
+    await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: `Playwright REPL v0.6.0`, type: 'info' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server on port 6781 connection status: 403', type: 'error' } });
+    });
   })
 
 

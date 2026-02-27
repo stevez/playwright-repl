@@ -9,13 +9,12 @@ import { test, expect } from './fixtures.js';
 
 // ─── Initialization ────────────────────────────────────────────────────────
 
-// TODO: React panel doesn't call checkHealth() on startup yet (backlog item)
-test.skip('shows version from health endpoint', async ({ panelPage }) => {
+test('shows version from health endpoint', async ({ panelPage }) => {
   const text = await panelPage.locator('#output').textContent();
   expect(text).toContain('Playwright REPL v0.4.0-test');
 });
 
-test.skip('shows connected status', async ({ panelPage }) => {
+test('shows connected status', async ({ panelPage }) => {
   const text = await panelPage.locator('#output').textContent();
   expect(text).toContain('Connected to server');
 });
@@ -35,29 +34,28 @@ test('has prompt visible', async ({ panelPage }) => {
 test('displays success response after command', async ({ panelPage, mockResponse }) => {
   mockResponse({ text: '### Result\nNavigated to https://example.com', isError: false });
 
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('goto https://example.com');
   await input.press('Enter');
 
-  await panelPage.waitForFunction(
-    () => document.querySelector('.line-success')?.textContent?.includes('Navigated'),
-  );
+  await expect(panelPage.locator('#output')).toContainText('Navigated');
+
 });
 
 test('clears input after submit', async ({ panelPage }) => {
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('snapshot');
   await input.press('Enter');
-  await panelPage.waitForTimeout(200);
+
   const value = await input.inputValue();
   expect(value).toBe('');
 });
 
 test('does not send empty input', async ({ panelPage }) => {
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('   ');
   await input.press('Enter');
-  await panelPage.waitForTimeout(300);
+
   const commands = panelPage.locator('.line-command');
   expect(await commands.count()).toBe(0);
 });
@@ -65,27 +63,25 @@ test('does not send empty input', async ({ panelPage }) => {
 test('displays error responses with error styling', async ({ panelPage, mockResponse }) => {
   mockResponse({ text: '### Error\nElement not found', isError: true });
 
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('click missing');
   await input.press('Enter');
 
-  await panelPage.waitForFunction(
-    () => document.querySelector('.line-error')?.textContent?.includes('Element not found'),
-  );
+  await expect(panelPage.locator('.line-error')).toContainText('Element not found');
 });
 
 // ─── Command History ───────────────────────────────────────────────────────
 
 test('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
 
   await input.fill('goto https://a.com');
   await input.press('Enter');
-  await panelPage.waitForTimeout(300);
+
 
   await input.fill('goto https://b.com');
   await input.press('Enter');
-  await panelPage.waitForTimeout(300);
+
 
   await input.press('ArrowUp');
   expect(await input.inputValue()).toBe('goto https://b.com');
@@ -103,25 +99,22 @@ test('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
 // ─── Local Commands ────────────────────────────────────────────────────────
 
 test('clear button empties the output', async ({ panelPage }) => {
-  const input = panelPage.locator('#command-input');
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('snapshot');
   await input.press('Enter');
-  await panelPage.waitForSelector('.line-command');
+  await expect(panelPage.locator('.line-command')).toBeVisible();
 
-  await panelPage.locator('#console-clear-btn').click();
+  await panelPage.getByRole('button', { name: 'Clear' }).click();
 
   await expect(panelPage.locator('#output .line')).toHaveCount(0);
 });
 
-// TODO: ConsolePane doesn't handle # comments as local commands yet
-test.skip('comments display without server call', async ({ panelPage }) => {
-  const input = panelPage.locator('#command-input');
+test('comments display without server call', async ({ panelPage }) => {
+  const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('# this is a comment');
   await input.press('Enter');
 
-  await panelPage.waitForSelector('.line-comment');
-  const text = await panelPage.locator('.line-comment').last().textContent();
-  expect(text).toContain('# this is a comment');
+  await expect(panelPage.locator('.line-comment')).toContainText('# this is a comment');
 });
 
 // ─── Editor ────────────────────────────────────────────────────────────────
@@ -129,8 +122,6 @@ test.skip('comments display without server call', async ({ panelPage }) => {
 test('shows line numbers for content', async ({ panelPage }) => {
   const editor = panelPage.locator('#editor');
   await editor.fill('goto https://example.com\nclick OK\npress Enter');
-  await editor.dispatchEvent('input');
-  await panelPage.waitForTimeout(100);
 
   const lineNums = panelPage.locator('#line-numbers div');
   expect(await lineNums.count()).toBe(3);
@@ -139,8 +130,7 @@ test('shows line numbers for content', async ({ panelPage }) => {
 test('enables buttons when editor has content', async ({ panelPage }) => {
   const editor = panelPage.locator('#editor');
   await editor.fill('goto https://example.com');
-  await editor.dispatchEvent('input');
-  await panelPage.waitForTimeout(100);
+
 
   expect(await panelPage.locator('#save-btn').isDisabled()).toBe(false);
   expect(await panelPage.locator('#export-btn').isDisabled()).toBe(false);
@@ -149,8 +139,6 @@ test('enables buttons when editor has content', async ({ panelPage }) => {
 test('disables buttons when editor is empty', async ({ panelPage }) => {
   const editor = panelPage.locator('#editor');
   await editor.fill('');
-  await editor.dispatchEvent('input');
-  await panelPage.waitForTimeout(100);
 
   expect(await panelPage.locator('#save-btn').isDisabled()).toBe(true);
   expect(await panelPage.locator('#export-btn').isDisabled()).toBe(true);
@@ -161,14 +149,11 @@ test('disables buttons when editor is empty', async ({ panelPage }) => {
 test('executes all editor lines and shows Run complete', async ({ panelPage }) => {
   const editor = panelPage.locator('#editor');
   await editor.fill('goto https://example.com\nclick OK');
-  await editor.dispatchEvent('input');
+
 
   await panelPage.locator('#run-btn').click();
 
-  await panelPage.waitForFunction(
-    () => document.getElementById('output')!.textContent!.includes('Run complete'),
-    { timeout: 15000 },
-  );
+  await expect(panelPage.locator('#output')).toContainText('Run complete', { timeout: 15000 });
 });
 
 test('shows fail stats when command errors', async ({ panelPage, mockResponse }) => {
@@ -176,14 +161,11 @@ test('shows fail stats when command errors', async ({ panelPage, mockResponse })
 
   const editor = panelPage.locator('#editor');
   await editor.fill('click missing');
-  await editor.dispatchEvent('input');
+
 
   await panelPage.locator('#run-btn').click();
 
-  await panelPage.waitForFunction(
-    () => document.getElementById('output')!.textContent!.includes('Run complete'),
-    { timeout: 15000 },
-  );
+  await expect(panelPage.locator('#output')).toContainText('Run complete', { timeout: 15000 });
 });
 
 // ─── Recording UI ─────────────────────────────────────────────────────────
@@ -243,9 +225,7 @@ test('record button shows error when injection fails', async ({ panelPage }) => 
   await btn.click();
 
   // Should show error
-  await panelPage.waitForFunction(
-    () => document.querySelector('.line-error')?.textContent?.includes('Cannot access'),
-  );
+  await expect(panelPage.locator('.line-error')).toContainText('Cannot access');
 
   // Button should NOT be in recording state
   const hasRecording = await btn.evaluate(el => el.classList.contains('recording'));
@@ -262,27 +242,9 @@ test('received recorded commands appear in editor', async ({ panelPage }) => {
   });
 
   // Verify command appears in the console output
-  await panelPage.waitForFunction(
-    () => document.querySelector('.line-command')?.textContent?.includes('click "Submit"'),
-  );
+  await expect(panelPage.locator('.line-command')).toContainText('click "Submit"');
 
   // Verify command is also appended to the editor
   const editorValue = await panelPage.locator('#editor').inputValue();
   expect(editorValue).toContain('click "Submit"');
-});
-
-// ─── Theme ─────────────────────────────────────────────────────────────────
-
-// TODO: React panel doesn't add theme-dark class to body yet
-test.skip('applies dark theme based on color scheme', async ({ panelPage }) => {
-  await panelPage.emulateMedia({ colorScheme: 'dark' });
-  await panelPage.reload();
-  await panelPage.waitForSelector('#command-input', { timeout: 10000 });
-
-  const hasDark = await panelPage.evaluate(
-    () => document.body.classList.contains('theme-dark'),
-  );
-  expect(hasDark).toBe(true);
-
-  await panelPage.emulateMedia({ colorScheme: 'light' });
 });

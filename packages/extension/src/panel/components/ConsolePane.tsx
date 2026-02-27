@@ -9,15 +9,25 @@ import { filterResponse } from '@/lib/filter';
 
 interface ConsolePaneProps {
     outputLines: OutputLine[]
+    passCount: number
+    failCount: number
     dispatch: React.Dispatch<Action>
 }
 
-function ConsolePane({ outputLines, dispatch }: ConsolePaneProps) {
+function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePaneProps) {
     const [lightBoxImage, setLightBoxImage ] = useState<string | undefined>(undefined);
 
     async function handleSubmit(command: string) {
         if (!command.trim()) return;
 
+        if (command.trim().startsWith('#')) {
+             dispatch({ type: 'ADD_LINE', line: { text: command, type: 'comment' } });
+             return;
+        }
+        if (command.trim().toLowerCase() === 'clear') {
+            dispatch({ type: 'CLEAR_CONSOLE'});
+            return;
+        }
         // Show what the user typed
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
         try {
@@ -85,7 +95,18 @@ function ConsolePane({ outputLines, dispatch }: ConsolePaneProps) {
                     <span id="console-title">Terminal</span>
                     <button id="console-clear-btn" title="Clear terminal" onClick={handleClear}>Clear</button>
                 </span>
-                <span id="console-stats"></span>
+                    <span id="console-stats">
+                        {
+                            (passCount > 0 || failCount > 0) && (
+                                <>
+                                    <span className="pass-count">{passCount} passed</span>
+                                    {' / '}
+                                    <span className="fail-count">{failCount} failed</span>
+                                </>
+                            )
+                        }
+                </span>
+                
             </div>
             <div id="output">
                 {outputLines.map(renderLine)}

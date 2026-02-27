@@ -13,7 +13,7 @@ export async function executeCommand(command: string, activeTabUrl?: string): Pr
     return res.json();
 }
 
-export async function checkHealth(): Promise<boolean> {
+export async function checkHealth(): Promise<{status: string, version: string}> {
     const res = await fetch(`${SERVER_URL}/health`);
-    return res.ok;
+    return res.json();
 }

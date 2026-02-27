@@ -3,6 +3,8 @@ import type { PanelState, Action } from "@/reducer";
 import { executeCommand } from '@/lib/server';
 import type { RecordedMessage } from '@/types';
 import { exportToPlaywright } from '@/lib/converter';
+import { filterResponse } from '@/lib/filter';
+import { checkHealth } from '@/lib/server';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>
@@ -11,6 +13,7 @@ interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | '
 function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
@@ -64,10 +67,13 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
         try {
             const result = await executeCommand(command);
+            const cmdName = command.trim().split(/\s+/)[0];
+            const text = filterResponse(result.text, cmdName);
             dispatch({
                 type: 'COMMAND_SUCCESS', line: {
-                    text: result.text,
-                    type: result.isError ? 'error' : 'success'
+                    text,
+                    type: result.isError ? 'error' : result.image ? 'screenshot' : 'success',
+                    image: result.image
                 }
             });
             dispatch({ type: 'SET_LINE_RESULT', index: index, result: result.isError ? 'fail' : 'pass' });
@@ -138,10 +144,10 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
 
     function handleExport() {
         const code = exportToPlaywright(lines);
-        dispatch({type: 'ADD_LINE', line: {text: code, type: 'code-block'}})
+        dispatch({ type: 'ADD_LINE', line: { text: code, type: 'code-block' } })
     }
 
-    useEffect(() => {  
+    useEffect(() => {
         const listener = (msg: RecordedMessage) => {
             if (msg.type === "pw-recorded-command" && msg.command) {
                 dispatch({ type: 'ADD_LINE', line: { text: msg.command, type: 'command' } });
@@ -151,6 +157,25 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         if (!chrome.runtime?.onMessage) return;
         chrome.runtime.onMessage.addListener(listener);
         return () => chrome.runtime.onMessage.removeListener(listener);
+    }, []);
+
+    useEffect(() => {
+        async function checkServerConnection() {
+            try {
+                const result = await checkHealth();
+                setIsConnected(true);
+                if (result.status === 'ok') {
+                    dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } })
+                    dispatch({ type: 'ADD_LINE', line: { text: 'Connected to server on port 6781', type: 'success' } })
+                } else {
+                    dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } })
+                    dispatch({ type: 'ADD_LINE', line: { text: `Server on port 6781 connection status: ${result.status}`, type: 'error' } })
+                }
+            } catch {
+                dispatch({ type: 'ADD_LINE', line: { text: 'Server not running. Start with: playwright-repl --extension', type: 'error' } });
+            }
+        };
+        checkServerConnection();
     }, []);
 
     return (
@@ -174,8 +199,8 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 >
                     {isRecording ? '⏹ Stop' : '⏺ Record'}
                 </button>
-                <button id="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
-                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim()} onClick={handleStep}>&#9655;</button>
+                <button id="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim() || !isConnected} onClick={handleRun}>&#9654;</button>
+                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || !isConnected} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}>Export</button>
             </div>
             <div id="toolbar-right">

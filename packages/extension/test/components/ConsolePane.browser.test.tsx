@@ -18,11 +18,23 @@ vi.mock('@/lib/file-utils', () => ({
 }));
 import { saveImageToFile } from '@/lib/file-utils';
 
+const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+
+const code_block = `
+import { test, expect } from '@playwright/test';
+
+test('recorded session', async ({ page }) => {
+  // command list
+  await page.goto("https://example.com");
+  await page.getByText("Learn more").click();
+  await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
+});`.trim();
+
 describe("ConsolePane component tests", () => {
 
-  function TestWrapper() {
-    const [state, dispatch] = useReducer(panelReducer, initialState)
-    return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
+  function TestWrapper({ initState = initialState }: { initState?: PanelState } = {}) {
+    const [state, dispatch] = useReducer(panelReducer, initState)
+    return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} passCount={state.passCount} failCount={state.failCount} />;
   }
 
   beforeEach(() => {
@@ -30,7 +42,7 @@ describe("ConsolePane component tests", () => {
   })
 
   it('should render console pane', async () => {
-    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} />);
+    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={0} failCount={0} />);
     await expect.element(screen.getByRole('textbox')).toBeInTheDocument();
     await expect.element(screen.getByText('Terminal')).toBeInTheDocument();
   });
@@ -41,7 +53,7 @@ describe("ConsolePane component tests", () => {
       { text: 'Clicked', type: 'success' },
       { text: 'Element not found', type: 'error' },
     ];
-    const screen = await render(<ConsolePane outputLines={lines} dispatch={vi.fn()} />);
+    const screen = await render(<ConsolePane outputLines={lines} dispatch={vi.fn()} passCount={0} failCount={0} />);
 
     await expect.element(screen.getByText('click e5')).toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).toBeInTheDocument();
@@ -49,10 +61,15 @@ describe("ConsolePane component tests", () => {
   })
 
   it('should render prompt input', async () => {
-    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} />);
+    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={0} failCount={0} />);
     await screen.getByRole('textbox').fill('click e5');
     await expect.element(screen.getByRole('textbox')).toHaveValue('click e5');
   })
+
+  it('should render pass / fail count stats', async () => {
+    const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={2} failCount={0} />);
+    await expect.element(screen.getByText('2 passed / 0 failed')).toBeInTheDocument();
+  });
 
   it('should submit command on Enter', async () => {
     vi.mocked(executeCommand).mockResolvedValue({ text: '### Ran Playwright code\n### Result\nClicked\n', isError: false });
@@ -104,6 +121,37 @@ describe("ConsolePane component tests", () => {
     expect(executeCommand).not.toHaveBeenCalled();
   })
 
+  it('should not submit for comment', async () => {
+    const screen = await render(<TestWrapper />);
+
+    await screen.getByRole('textbox').fill('# this is a comment');
+    await userEvent.keyboard('{Enter}');
+
+    expect(executeCommand).not.toHaveBeenCalled();
+    await expect.element(screen.getByRole('textbox')).toHaveValue('');
+    await expect.element(screen.getByText('# this is a comment')).toBeInTheDocument();
+  });
+
+  it('should not submit for clear command', async () => {
+    const preloadedState: PanelState = {
+      ...initialState,
+      outputLines: [
+        { text: 'click e5', type: 'command' },
+        { text: 'Clicked', type: 'success' },
+      ]
+    };
+
+    const screen = await render(<TestWrapper initState={preloadedState} />);
+
+    await screen.getByRole('textbox').fill('clear');
+    await userEvent.keyboard('{Enter}');
+
+    expect(executeCommand).not.toHaveBeenCalled();
+    await expect.element(screen.getByRole('textbox')).toHaveValue('');
+    await expect.element(screen.getByText('click e5')).not.toBeInTheDocument();
+    await expect.element(screen.getByText('Clicked')).not.toBeInTheDocument();
+  });
+
   it('should clear the console', async () => {
     const preloadedState: PanelState = {
       ...initialState,
@@ -113,12 +161,7 @@ describe("ConsolePane component tests", () => {
       ]
     };
 
-    function ClearTestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<ClearTestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
 
     await expect.element(screen.getByText('click e5')).toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).toBeInTheDocument();
@@ -130,16 +173,6 @@ describe("ConsolePane component tests", () => {
   });
 
   it('should render code-block', async () => {
-    const code_block = `
-import { test, expect } from '@playwright/test';
-
-test('recorded session', async ({ page }) => {
-  // command list
-  await page.goto("https://example.com");
-  await page.getByText("Learn more").click();
-  await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
-});`.trim();
-
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -149,12 +182,7 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
 
     await expect.element(screen.getByText('@playwright/test')).toBeInTheDocument();
     await expect.element(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
@@ -168,16 +196,6 @@ test('recorded session', async ({ page }) => {
       configurable: true,
     });
 
-    const code_block = `
-import { test, expect } from '@playwright/test';
-
-test('recorded session', async ({ page }) => {
-  // command list
-  await page.goto("https://example.com");
-  await page.getByText("Learn more").click();
-  await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
-});`.trim();
-
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -187,19 +205,13 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
 
     await screen.getByRole('button', { name: 'Copy' }).click();
     expect(writeText).toHaveBeenCalledWith(code_block);
   });
 
   it('should render the screenshot image', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -208,19 +220,13 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
+    const screen = await render(<TestWrapper initState={preloadedState} />);
 
-    const screen = await render(<TestWrapper />);
-    
     await expect.element(screen.getByRole('img')).toBeInTheDocument();
     await expect.element(screen.getByText('Click to enlarge')).toBeInTheDocument();
   })
 
   it('should show the lightbox when clicking the image', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -229,19 +235,13 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
     await screen.getByRole('img').click();
 
     await expect.element(screen.getByRole('button', { name: '×' })).toBeInTheDocument();
   })
-  
+
   it('should close the lightbox when clicking the close sign', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -250,12 +250,7 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
     await screen.getByRole('img').click();
 
     await screen.getByRole('button', { name: '×' }).click();
@@ -264,7 +259,6 @@ test('recorded session', async ({ page }) => {
   })
 
   it('should save the image when clicking save button in thumbnail', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -273,19 +267,13 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
     await screen.getByRole('button', {name: 'Save'}).click();
 
     expect(saveImageToFile).toBeCalledWith(testImage);
   })
 
   it('should save the image when clicking save button in lightbox', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     const preloadedState: PanelState = {
       ...initialState,
       outputLines: [
@@ -294,12 +282,7 @@ test('recorded session', async ({ page }) => {
       ]
     };
 
-    function TestWrapper() {
-      const [state, dispatch] = useReducer(panelReducer, preloadedState);
-      return <ConsolePane outputLines={state.outputLines} dispatch={dispatch} />;
-    }
-
-    const screen = await render(<TestWrapper />);
+    const screen = await render(<TestWrapper initState={preloadedState} />);
     await screen.getByRole('img').click();
 
     await screen.getByRole('button', {name: 'Save'}).nth(1).click();
@@ -308,7 +291,6 @@ test('recorded session', async ({ page }) => {
   })
 
   it('should submit command on Enter with image', async () => {
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     vi.mocked(executeCommand).mockResolvedValue({ text: '### Result\nscreenshot\n', image: testImage, isError: false });
     const screen = await render(<TestWrapper />);
 
