@@ -32,8 +32,12 @@ describe('filterResponse', () => {
     expect(filterResponse(text, 'snapshot')).toBe('http://example.com\n- tree');
   });
 
-  it('returns Done for text with no sections', () => {
-    expect(filterResponse('just plain text')).toBe('Done');
+  it('returns raw text when no sections found', () => {
+    expect(filterResponse('just plain text')).toBe('just plain text');
+  });
+
+  it('returns Done for empty text with no sections', () => {
+    expect(filterResponse('')).toBe('Done');
   });
 
   it('joins multiple kept sections with newline', () => {

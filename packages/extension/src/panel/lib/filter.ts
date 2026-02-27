@@ -7,10 +7,11 @@
  * Strategy:
  *   - Keep: Result, Error, Modal state, Page, Snapshot (only when cmdName is 'snapshot')
  *   - Skip: Ran Playwright code, Open tabs, Events
- *   - Fallback: 'Done'
+ *   - Fallback: raw text if no sections found, otherwise 'Done'
  */
 export function filterResponse(text: string, cmdName?: string): string {
     const sections = text.split(/^### /m).slice(1);
+    if (sections.length === 0) return text.trim() || 'Done';
     const kept: string[] = [];
     for (const section of sections) {
         const nl = section.indexOf('\n');

@@ -251,7 +251,7 @@ export class Engine {
 
     // Commands like "close", "list", "kill-all" have empty toolName.
     if (!toolName)
-      return { text: `Command "${args._[0]}" is not supported in engine mode.` };
+      return { text: `Command "${args._[0]}" is not supported in engine mode.`, isError: true };
 
     toolParams._meta = { cwd: args.cwd || process.cwd() };
 
