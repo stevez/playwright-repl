@@ -22,7 +22,8 @@ function ConsolePane({ outputLines, dispatch }: ConsolePaneProps) {
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
         try {
             const result = await executeCommand(command);
-            const text = filterResponse(command, result.text);
+            const cmdName = command.trim().split(/\s+/)[0];
+            const text = filterResponse(result.text, cmdName);
             dispatch({
                 type: 'COMMAND_SUCCESS', line: {
                     text,
