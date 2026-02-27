@@ -321,8 +321,8 @@ export class Engine {
       server: {},
       network: {},
       timeouts: {
-        action: opts.extension ? 30000 : 5000,
-        navigation: opts.extension ? 15000 : 60000,
+        action: 5000,
+        navigation: 15000,
       },
     };
 
