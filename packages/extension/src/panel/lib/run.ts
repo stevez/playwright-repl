@@ -1,9 +1,33 @@
 import { executeCommand } from '@/lib/server';
 import { filterResponse } from '@/lib/filter';
+import { COMMANDS } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 
+function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boolean {
+    if (command.trim().startsWith('#')) {
+        dispatch({ type: 'ADD_LINE', line: { text: command, type: 'comment' } });
+        return true;
+    }
+    if (command.trim().toLowerCase() === 'clear') {
+        dispatch({ type: 'CLEAR_CONSOLE' });
+        return true;
+    }
+    if (command.trim().toLowerCase() === 'help') {
+        const lines = Object.entries(COMMANDS)
+            .map(([name, info]) => `  ${name.padEnd(22)} ${info.desc}`)
+            .join('\n');
+        dispatch({ type: 'ADD_LINE', line: { text: `Available commands:\n${lines}`, type: 'info' } });
+        return true;
+    }
+
+    return false;
+}
 export async function runAndDispatch(command: string, dispatch: React.Dispatch<Action>): Promise<CommandResult> {
+   
+    if (!command.trim() || runLocalCommand(command, dispatch))
+         return { text: '', isError: false };
+
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
     try {
         const result = await executeCommand(command);

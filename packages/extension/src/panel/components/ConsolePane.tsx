@@ -24,16 +24,6 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
     }, [outputLines]);
 
     async function handleSubmit(command: string) {
-        if (!command.trim()) return;
-
-        if (command.trim().startsWith('#')) {
-             dispatch({ type: 'ADD_LINE', line: { text: command, type: 'comment' } });
-             return;
-        }
-        if (command.trim().toLowerCase() === 'clear') {
-            dispatch({ type: 'CLEAR_CONSOLE'});
-            return;
-        }
         await runAndDispatch(command, dispatch);
     }
 
