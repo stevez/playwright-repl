@@ -194,6 +194,14 @@ Also preserve CSS classes used in E2E assertions:
 | `packages/extension/test/panel.test.ts` | **Rewrite** with vitest browser mode + mock server |
 | `packages/extension/e2e/panel/panel.test.ts` | Minor fixes if needed |
 
+## Backlog
+
+- [ ] Fix snapshot response type — use 'snapshot' instead of 'success' for snapshot command, render as `<pre>` with monospace
+- [ ] Support localstorage-clear command
+- [ ] Show connection status — indicator in UI, manual connect method with URL input
+- [ ] Fix #root overflow — add `overflow: hidden` to `#root` to prevent body scroll on long output
+- [ ] Reduce browser test timeout — default 30s is too long for failing tests
+
 ## Verification
 
 1. `npm run build -w packages/extension` — builds without errors

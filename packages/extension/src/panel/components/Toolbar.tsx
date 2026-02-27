@@ -90,6 +90,7 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 await runCommand(i, trimmedValue);
             }
         }
+        dispatch({ type: 'ADD_LINE', line: { text: 'Run complete.', type: 'info' } });
         dispatch({ type: 'RUN_STOP' })
     }
 

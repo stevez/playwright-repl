@@ -68,7 +68,7 @@ export const test = base.extend<
     });
 
     await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
-    await page.waitForSelector('.line-info', { timeout: 10000 });
+    await page.waitForSelector('#command-input', { timeout: 10000 });
 
     await use(page);
     await page.close();
