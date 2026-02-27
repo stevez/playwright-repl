@@ -130,3 +130,28 @@ export function pwToPlaywright(cmd: string): string | null {
       return `// unknown command: ${cmd}`;
   }
 }
+
+/**
+ * Converts an array of .pw commands into a complete Playwright test file.
+ */
+export function exportToPlaywright(cmds: string[]): string {
+  const lines = [
+    `import { test, expect } from '@playwright/test';`,
+    ``,
+    `test('recorded session', async ({ page }) => {`,
+  ];
+  for (const cmd of cmds) {
+    const trimmed = cmd.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("#")) {
+      lines.push(`  ${trimmed.replace("#", "//")}`);
+      continue;
+    }
+    const converted = pwToPlaywright(trimmed);
+    if (converted) {
+      lines.push(`  ${converted}`);
+    }
+  }
+  lines.push(`});`);
+  return lines.join("\n");
+}

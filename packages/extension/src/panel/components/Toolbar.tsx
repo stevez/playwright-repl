@@ -2,6 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { executeCommand } from '@/lib/server';
 import type { RecordedMessage } from '@/types';
+import { exportToPlaywright } from '@/lib/converter';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>
@@ -134,6 +135,11 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         }
     }
 
+    function handleExport() {
+        const code = exportToPlaywright(lines);
+        dispatch({type: 'ADD_LINE', line: {text: code, type: 'code-block'}})
+    }
+
     useEffect(() => {  
         const listener = (msg: RecordedMessage) => {
             if (msg.type === "pw-recorded-command" && msg.command) {
@@ -169,7 +175,7 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 </button>
                 <button id="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim()} onClick={handleStep}>&#9655;</button>
-                <button id="export-btn" title="Export as Playwright test" disabled>Export</button>
+                <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}>Export</button>
             </div>
             <div id="toolbar-right">
                 <span id="file-info">{fileName}</span>

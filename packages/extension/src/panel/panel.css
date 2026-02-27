@@ -561,13 +561,13 @@ html, body {
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   margin: 6px 0;
-  background: var(--bg-editor);
+  background: var(--bg-line-highlight);
 }
 
 .code-block .code-content {
   margin: 0;
   padding: 8px 12px;
-  color: var(--color-snapshot);
+  color: var(--color-command);
   font-family: inherit;
   font-size: 12px;
   line-height: 16px;

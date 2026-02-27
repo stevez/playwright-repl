@@ -1,6 +1,7 @@
 export type OutputLine = {
     text: string
-    type: 'command' | 'success' | 'error' | 'info' | 'comment' | 'snapshot'
+    type: 'command' | 'success' | 'error' | 'info' | 'comment' | 'snapshot' | 'code-block' | 'screenshot'
+    image?: string
 }
 
 export type CommandResult = {

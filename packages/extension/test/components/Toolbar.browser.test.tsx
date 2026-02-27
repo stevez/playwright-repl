@@ -537,6 +537,35 @@ describe('Toolbar component tests', () => {
     await expect.element(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
   })
 
+  it('should support export function', async () => {
+    const pwCommands = `
+    # command list
+    goto https://example.com
+    click "Learn more"
+    verify-text "As described in RFC 2606 and RFC 6761"
+    `
+
+    const dispatch = vi.fn();
+    const screen = await render(<Toolbar
+      editorContent={pwCommands}
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await screen.getByRole('button', { name: 'Export' }).click();
+    const expected_code = `
+import { test, expect } from '@playwright/test';
+
+test('recorded session', async ({ page }) => {
+  // command list
+  await page.goto("https://example.com");
+  await page.getByText("Learn more").click();
+  await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
+});`.trim();
+    expect(dispatch).toHaveBeenCalledWith({type: 'ADD_LINE', line: {text: expected_code, type: 'code-block'}})
+  })
+
 
 
 
