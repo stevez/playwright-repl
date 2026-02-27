@@ -97,7 +97,7 @@ export class CommandServer {
           return;
         }
         args = resolveArgs(args);
-        const result = await withTimeout(this._engine.run(args), 30000);
+        const result = await withTimeout(this._engine.run(args), 15000);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (e: unknown) {

@@ -30,7 +30,8 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
 
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
     try {
-        const result = await executeCommand(command);
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const result = await executeCommand(command, tab?.url);
         const cmdName = command.trim().split(/\s+/)[0];
         const text = filterResponse(result.text, cmdName);
         if (cmdName === 'snapshot') {
