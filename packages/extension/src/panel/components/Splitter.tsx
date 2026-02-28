@@ -47,8 +47,15 @@ function Splitter({editorPaneRef}: SplitterProps) {
       }
     }, [isDragging])
     return (
-        <div id="splitter" onMouseDown={handleMouseDown}>
-            <div id="splitter-handle"></div>
+        <div
+            id="splitter"
+            className="h-[6px] bg-(--bg-splitter) cursor-row-resize shrink-0 flex items-center justify-center border-y border-(--border-primary)"
+            onMouseDown={handleMouseDown}>
+            <div
+                id="splitter-handle"
+                className="w-10 h-[2px] bg-(--color-splitter-handle) rounded-[1px]"
+            >
+            </div>
         </div>
     );
 }

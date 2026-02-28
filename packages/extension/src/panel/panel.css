@@ -89,12 +89,6 @@
 
 /* === Reset === */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 html, body {
   height: 100%;
   background: var(--bg-body);
@@ -338,25 +332,6 @@ html, body {
 
 /* === Splitter === */
 
-#splitter {
-  height: 6px;
-  background: var(--bg-splitter);
-  cursor: row-resize;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-top: 1px solid var(--border-primary);
-  border-bottom: 1px solid var(--border-primary);
-}
-
-#splitter-handle {
-  width: 40px;
-  height: 2px;
-  background: var(--color-splitter-handle);
-  border-radius: 1px;
-}
-
 #splitter:hover {
   background: var(--bg-splitter-hover);
 }
@@ -543,68 +518,7 @@ html, body {
 }
 
 /* Lightbox */
-#lightbox {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  cursor: pointer;
-}
 
-#lightbox[hidden] {
-  display: none;
-}
-
-#lightbox img {
-  max-width: 95%;
-  max-height: 95%;
-  border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  cursor: default;
-}
-
-#lightbox-close-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-family: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-#lightbox-close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-#lightbox-save-btn {
-  position: absolute;
-  top: 10px;
-  right: 50px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 4px 14px;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-#lightbox-save-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
 
 /* Code block (export output) */
 .code-block {

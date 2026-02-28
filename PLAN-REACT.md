@@ -92,7 +92,7 @@ Also preserve CSS classes used in E2E assertions:
 - Vitest browser mode setup: `vitest.component.config.ts` with playwright provider
 - Verify: can type commands, see output
 
-### Step 4: useReducer + EditorPane ← NEXT
+### Step 4: useReducer + EditorPane ✅ DONE
 
 **Step 4a: Create the reducer (`src/panel/reducer.ts`)**
 - State:
@@ -149,13 +149,13 @@ Also preserve CSS classes used in E2E assertions:
 | `test/components/ConsolePane.browser.test.tsx` | **Update** — use dispatch |
 | `test/components/EditorPane.browser.test.tsx` | **New** |
 
-### Step 5: Autocomplete + Ghost text
+### Step 5: Autocomplete + Ghost text ✅ DONE
 - `useAutocomplete` hook
 - `CommandInput.tsx` — dropdown, ghost text overlay
 - Tab/ArrowUp/ArrowDown/Escape handling
 - Verify: ghost text appears, dropdown works
 
-### Step 6: Recording + remaining features
+### Step 6: Recording + remaining features ✅ DONE
 - Record button toggle + chrome.runtime messaging
 - Screenshot display + Lightbox
 - Export (pwToPlaywright)
@@ -163,7 +163,7 @@ Also preserve CSS classes used in E2E assertions:
 - Open/Save/Copy buttons
 - Verify: full functionality
 
-### Step 7: Tests
+### Step 7: Tests ✅ DONE
 - Rewrite `test/panel.test.ts` using vitest browser mode (real browser, not jsdom)
 - Mock server for `/health` and `/run` endpoints (e.g. MSW or simple fetch mock)
 - Mock Chrome extension APIs: `chrome.tabs.query`, `chrome.runtime.sendMessage`, `chrome.runtime.onMessage` for recording flows (start/stop recording, receive recorded commands)
@@ -171,7 +171,7 @@ Also preserve CSS classes used in E2E assertions:
 - E2E tests should mostly pass as-is (same IDs/classes)
 - Fix any E2E test selectors that changed
 
-### Step 8: Cleanup
+### Step 8: Cleanup ✅ DONE
 - Delete old `panel.ts` and `panel.css`
 - Verify all tests pass
 - Verify extension loads and works in Chrome
@@ -200,11 +200,11 @@ Also preserve CSS classes used in E2E assertions:
 - [x] ~~Reduce command execution timeout~~ — unified to 5s action / 15s navigation / 15s server wrapper
 - [x] ~~Send activeTabUrl with commands~~ — bug fix, now auto-selects correct tab
 - [x] ~~Remove CLI-only commands from extension~~ — removed close, kill-all, list, install-browser, reset
-- [ ] Fix snapshot response type — use 'snapshot' instead of 'success' for snapshot command, render as `<pre>` with monospace
-- [ ] Support localstorage-clear command
-- [ ] Fix #root overflow — add `overflow: hidden` to `#root` to prevent body scroll on long output
+- [x] ~~Fix snapshot response type~~ — use 'snapshot' instead of 'success' for snapshot command, render as `<pre>` with monospace
+- [x] ~~Support localstorage-clear command~~
+- [x] ~~Fix #root overflow~~ — add `overflow: hidden` to `#root` to prevent body scroll on long output
 
-### Step 9: Connection Status Indicator ← NEXT
+### Step 9: Connection Status Indicator ✅ DONE
 
 **Context:** The panel does a one-time health check on mount. No visual indicator, no reconnection, no way to change port. We want a persistent status indicator in the toolbar.
 
