@@ -184,8 +184,8 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
     }, [port]);
 
     return (
-        <div id="toolbar">
-            <div id="toolbar-left">
+        <div id="toolbar" className="flex flex-wrap gap-1 justify-between items-center py-1 px-2 bg-(--bg-toolbar) border-b border-solid border-(--border-primary) shrink-0">
+            <div id="toolbar-left" className="flex flex-wrap gap-1 items-center">
                 <input
                     type="file"
                     accept='.pw,.txt'
@@ -195,7 +195,7 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 />
                 <button id="open-btn" title="Open .pw file" onClick={handleFileOpen}>Open</button>
                 <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}>Save</button>
-                <span className="toolbar-sep"></span>
+                <span className="w-[1px] h-[18px] bg-(--color-toolbar-sep) mx-1"></span>
                 <button
                     id="record-btn"
                     className={isRecording ? 'recording' : ''}
@@ -208,18 +208,18 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                 <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || !isConnected} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}>Export</button>
             </div>
-            <div id="toolbar-right">
-                <span id="file-info">{fileName}</span>
-                <span className="toolbar-sep"></span>
+            <div id="toolbar-right" className="flex items-center">
+                <span id="file-info" className="text-(--text-dim) text-[11px]">{fileName}</span>
+                <span className="w-[1px] h-[18px] bg-(--color-toolbar-sep) mx-1"></span>
                 <span
-                    className="status-indicator"
+                    className="flex items-center gap-1 cursor-pointer py-[2px] px-[6px] rounded-[3px] mr-2 hover:bg-(--bg-button)"
                     title={isConnected ? `v${serverVersion} - localhost:${port}` : `Disconnected - click to change port`}
                     onClick={() => setEditingPort(true)}
                 >
-                    <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0  ${isConnected ? 'bg-(--color-success)' : 'bg-(--color-error)'}`} />
                     { editingPort ? (
                         <input
-                            className="port-input"
+                            className="w-[50px] bg(--bg-editor) text=(--text-default) border border-solid"
                             type="number"
                             defaultValue={port}
                             autoFocus

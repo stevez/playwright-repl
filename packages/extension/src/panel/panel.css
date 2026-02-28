@@ -108,37 +108,6 @@ html, body {
 
 /* === Toolbar (top) === */
 
-#toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  background: var(--bg-toolbar);
-  border-bottom: 1px solid var(--border-primary);
-  flex-shrink: 0;
-}
-
-#toolbar-left {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
-#toolbar-right {
-  display: flex;
-  align-items: center;
-}
-
-.toolbar-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--color-toolbar-sep);
-  margin: 0 4px;
-}
-
 #toolbar button {
   background: var(--bg-button);
   color: var(--text-default);
@@ -184,40 +153,6 @@ html, body {
   border-color: var(--color-recording-border) !important;
 }
 
-#file-info {
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-/* Status indicator */
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-  margin-right: 8px;
-}
-
-.status-indicator:hover {
-  background: var(--bg-button);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.status-dot.connected {
-  background: var(--color-success);
-}
-
-.status-dot.disconnected {
-  background: var(--color-error);
-}
 
 .status-label {
   color: var(--text-dim);
