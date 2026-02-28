@@ -16,7 +16,7 @@ test('shows version from health endpoint', async ({ panelPage }) => {
 
 test('shows connected status', async ({ panelPage }) => {
   const text = await panelPage.locator('#output').textContent();
-  expect(text).toContain('Connected to server');
+  expect(text).toContain('Connected to localhost');
 });
 
 test('has record button enabled', async ({ panelPage }) => {

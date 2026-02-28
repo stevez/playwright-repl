@@ -39,6 +39,16 @@ describe("ConsolePane component tests", () => {
 
   beforeEach(() => {
     vi.mocked(executeCommand).mockClear();
+    Object.assign(window, {
+      chrome: {
+        tabs: {
+          query: vi.fn().mockResolvedValue([{ id: 1, url: 'https://example.com' }]),
+        },
+        runtime: {
+          onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+        },
+      },
+    });
   })
 
   it('should render console pane', async () => {

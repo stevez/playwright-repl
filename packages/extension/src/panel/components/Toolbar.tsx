@@ -2,8 +2,9 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import type { RecordedMessage } from '@/types';
 import { exportToPlaywright } from '@/lib/converter';
-import { checkHealth } from '@/lib/server';
+import { checkHealth, setServerPort } from '@/lib/server';
 import { runAndDispatch } from '@/lib/run';
+import { getServerPort } from '@/lib/server';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine'> {
     dispatch: React.Dispatch<Action>
@@ -13,6 +14,9 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
+    const [serverVersion, setServerVersion] = useState('');
+    const [port, setPort] = useState(getServerPort());
+    const [editingPort, setEditingPort] = useState(false);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
@@ -125,6 +129,15 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
         dispatch({ type: 'ADD_LINE', line: { text: code, type: 'code-block' } })
     }
 
+    function commitPort(e: React.SyntheticEvent<HTMLInputElement>) {
+        const val = parseInt(e.currentTarget.value, 10);
+        if(val > 0 && val < 65535) {
+            setPort(val);
+            setServerPort(val);
+        }
+        setEditingPort(false);
+    }
+
     useEffect(() => {
         const listener = (msg: RecordedMessage) => {
             if (msg.type === "pw-recorded-command" && msg.command) {
@@ -138,23 +151,37 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
     }, []);
 
     useEffect(() => {
-        async function checkServerConnection() {
+        async function initialCheck() {
             try {
                 const result = await checkHealth();
                 setIsConnected(true);
-                if (result.status === 'ok') {
-                    dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } })
-                    dispatch({ type: 'ADD_LINE', line: { text: 'Connected to server on port 6781', type: 'success' } })
-                } else {
-                    dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } })
-                    dispatch({ type: 'ADD_LINE', line: { text: `Server on port 6781 connection status: ${result.status}`, type: 'error' } })
-                }
+                setServerVersion(result.version);
+                dispatch({ type: 'ADD_LINE', line: { text: `Playwright REPL v${result.version}`, type: 'info' } });
+                dispatch({ type: 'ADD_LINE', line: { text: `Connected to localhost:${port}`, type: 'success' } });
             } catch {
-                dispatch({ type: 'ADD_LINE', line: { text: 'Server not running. Start with: playwright-repl --extension', type: 'error' } });
+                setIsConnected(false);
+                setServerVersion('');
+                dispatch({ type: 'ADD_LINE', line: { text: 'Server not running.', type: 'error' } });
+                dispatch({ type: 'ADD_LINE', line: { text: 'Start with: playwright-repl --extension', type: 'error' } });
             }
-        };
-        checkServerConnection();
+        }
+        initialCheck();
     }, []);
+
+    useEffect(() => {
+        async function poll() {
+            try {
+                const result = await checkHealth();
+                setIsConnected(true);
+                setServerVersion(result.version);
+            } catch {
+               setIsConnected(false);
+               setServerVersion('');
+            }
+        }
+        const timer = setInterval(poll, 30000);
+        return () => clearInterval(timer);
+    }, [port]);
 
     return (
         <div id="toolbar">
@@ -183,6 +210,32 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
             </div>
             <div id="toolbar-right">
                 <span id="file-info">{fileName}</span>
+                <span className="toolbar-sep"></span>
+                <span
+                    className="status-indicator"
+                    title={isConnected ? `v${serverVersion} - localhost:${port}` : `Disconnected - click to change port`}
+                    onClick={() => setEditingPort(true)}
+                >
+                    <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
+                    { editingPort ? (
+                        <input
+                            className="port-input"
+                            type="number"
+                            defaultValue={port}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={(e) => commitPort(e)}
+                            onKeyDown={(e) => {
+                                if(e.key === "Enter") commitPort(e);
+                                if(e.key === "Escape")setEditingPort(false);
+                            }}
+
+                        />
+                    ) 
+                    : (
+                    <span className="status-label">:{port}</span>
+                    )}
+                </span>
             </div>
         </div>
     )

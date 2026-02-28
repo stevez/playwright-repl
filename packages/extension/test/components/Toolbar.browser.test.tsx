@@ -7,14 +7,16 @@ import Toolbar from '@/components/Toolbar';
 
 vi.mock('@/lib/server', () => ({
   executeCommand: vi.fn(),
-  checkHealth: vi.fn().mockResolvedValue({status: 'ok', version: "0.6.0"})
-  
+  checkHealth: vi.fn().mockResolvedValue({ status: 'ok', version: "0.6.0" }),
+  getServerPort: vi.fn().mockReturnValue(6781),
+  setServerPort: vi.fn(),
 }))
 
-import { executeCommand, checkHealth } from '@/lib/server';
+import { executeCommand, checkHealth, setServerPort } from '@/lib/server';
 
 describe('Toolbar component tests', () => {
   beforeEach(() => {
+    vi.mocked(checkHealth).mockResolvedValue({ status: 'ok', version: '0.6.0' });
     Object.assign(window, {
       chrome: {
         tabs: {
@@ -301,8 +303,8 @@ describe('Toolbar component tests', () => {
 
     await vi.waitFor(() => {
       expect(executeCommand).toHaveBeenCalledTimes(2);
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com');
-      expect(executeCommand).toHaveBeenCalledWith('click e5');
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', 'https://example.com');
+      expect(executeCommand).toHaveBeenCalledWith('click e5', 'https://example.com');
     });
   });
 
@@ -336,7 +338,7 @@ describe('Toolbar component tests', () => {
     await screen.getByText('▷').click();
 
     await vi.waitFor(() => {
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com');
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', 'https://example.com');
       expect(dispatch).toHaveBeenCalledWith({ type: 'STEP_ADVANCE', stepLine: 1 });
     });
   });
@@ -571,10 +573,55 @@ test('recorded session', async ({ page }) => {
   await page.getByText("Learn more").click();
   await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
 });`.trim();
-    expect(dispatch).toHaveBeenCalledWith({type: 'ADD_LINE', line: {text: expected_code, type: 'code-block'}})
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: expected_code, type: 'code-block' } })
   });
 
-  it('should show connection failed message is healthCheck failed', async () => {
+  it('should show connected status dot when health check succeeds', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    await vi.waitFor(() => {
+      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
+      expect(dot.classList.contains('connected')).toBe(true);
+    });
+  });
+
+  it('should show disconnected status dot when health check fails', async () => {
+    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
+
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    await vi.waitFor(() => {
+      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
+      expect(dot.classList.contains('disconnected')).toBe(true);
+    });
+  });
+
+  it('should dispatch version and connected messages on initial health check success', async () => {
+    const dispatch = vi.fn();
+    await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={dispatch}
+    />);
+
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Playwright REPL v0.6.0', type: 'info' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Connected to localhost:6781', type: 'success' } });
+    });
+  });
+
+  it('should dispatch error messages on initial health check failure', async () => {
     vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
 
     const dispatch = vi.fn();
@@ -584,26 +631,195 @@ test('recorded session', async ({ page }) => {
       stepLine={-1}
       dispatch={dispatch}
     />);
+
     await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server not running. Start with: playwright-repl --extension', type: 'error' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server not running.', type: 'error' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Start with: playwright-repl --extension', type: 'error' } });
     });
   });
 
-  it('should show connection failed message is healthCheck return status non ok', async () => {
-    vi.mocked(checkHealth).mockResolvedValue({status: '403', version: "0.6.0"});
+  it('should poll health check every 30 seconds', async () => {
+    vi.useFakeTimers();
 
-    const dispatch = vi.fn();
     await render(<Toolbar
       editorContent=''
       fileName=''
       stepLine={-1}
-      dispatch={dispatch}
+      dispatch={vi.fn()}
     />);
+
+    // initial check from the first useEffect
     await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: `Playwright REPL v0.6.0`, type: 'info' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'ADD_LINE', line: { text: 'Server on port 6781 connection status: 403', type: 'error' } });
+      expect(checkHealth).toHaveBeenCalledTimes(1);
     });
-  })
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(checkHealth).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(checkHealth).toHaveBeenCalledTimes(3);
+
+    vi.useRealTimers();
+  });
+
+  it('should update status dot to disconnected when polling detects failure', async () => {
+    vi.useFakeTimers();
+
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    // initially connected
+    await vi.waitFor(() => {
+      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
+      expect(dot.classList.contains('connected')).toBe(true);
+    });
+
+    // server goes down
+    vi.mocked(checkHealth).mockRejectedValue(new Error('connection refused'));
+    await vi.advanceTimersByTimeAsync(30000);
+
+    await vi.waitFor(() => {
+      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
+      expect(dot.classList.contains('disconnected')).toBe(true);
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('should display port number in status label', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    await expect.element(screen.getByText(':6781')).toBeInTheDocument();
+  });
+
+  it('should show port input when status indicator is clicked', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    indicator.click();
+
+    await vi.waitFor(() => {
+      const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+      expect(input).not.toBeNull();
+      expect(input.value).toBe('6781');
+    });
+  });
+
+  it('should call setServerPort when port is changed and committed', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    indicator.click();
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+    });
+
+    const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+    await userEvent.click(input);
+    await userEvent.clear(input);
+    await userEvent.type(input, '9000');
+    await userEvent.keyboard('{Enter}');
+
+    await vi.waitFor(() => {
+      expect(setServerPort).toHaveBeenCalledWith(9000);
+    });
+  });
+
+  it('should change the port number when leave the input box', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    indicator.click();
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+    });
+
+    const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+    await userEvent.clear(input);
+    await userEvent.type(input, '9000');
+    await userEvent.tab();
+
+    await vi.waitFor(() => {
+      expect(setServerPort).toHaveBeenCalledWith(9000);
+    });
+  });
+
+  it('should dismiss port input on Escape without changing port', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    indicator.click();
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+    });
+
+    await userEvent.keyboard('{Escape}');
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).toBeNull();
+    });
+    expect(setServerPort).not.toHaveBeenCalled();
+  });
+
+  it('should dismiss port input on when input value is 65536', async () => {
+    const screen = await render(<Toolbar
+      editorContent=''
+      fileName=''
+      stepLine={-1}
+      dispatch={vi.fn()}
+    />);
+
+    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    indicator.click();
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+    });
+
+    const input = screen.container.querySelector('.port-input')!;
+    await userEvent.clear(input);
+    await userEvent.type(input, '65536');
+    await userEvent.keyboard('{Enter}');
+
+    await vi.waitFor(() => {
+      expect(screen.container.querySelector('.port-input')).toBeNull();
+    })
+    
+    expect(setServerPort).not.toHaveBeenCalled();
+    await expect.element(screen.getByText(':6781')).toBeInTheDocument();
+  });
 
 
 

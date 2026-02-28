@@ -196,11 +196,116 @@ Also preserve CSS classes used in E2E assertions:
 
 ## Backlog
 
+- [x] ~~Show connection status~~ → see Step 9 below
+- [x] ~~Reduce command execution timeout~~ — unified to 5s action / 15s navigation / 15s server wrapper
+- [x] ~~Send activeTabUrl with commands~~ — bug fix, now auto-selects correct tab
+- [x] ~~Remove CLI-only commands from extension~~ — removed close, kill-all, list, install-browser, reset
 - [ ] Fix snapshot response type — use 'snapshot' instead of 'success' for snapshot command, render as `<pre>` with monospace
 - [ ] Support localstorage-clear command
-- [ ] Show connection status — indicator in UI, manual connect method with URL input
 - [ ] Fix #root overflow — add `overflow: hidden` to `#root` to prevent body scroll on long output
-- [ ] Reduce browser test timeout — default 30s is too long for failing tests
+
+### Step 9: Connection Status Indicator ← NEXT
+
+**Context:** The panel does a one-time health check on mount. No visual indicator, no reconnection, no way to change port. We want a persistent status indicator in the toolbar.
+
+**9a: `server.ts` — configurable port (already done)**
+- `getServerPort()` / `setServerPort()` using `localStorage`
+- `getServerUrl()` builds URL from stored port
+
+**9b: `Toolbar.tsx` — replace one-time check with 30s polling + indicator UI**
+
+Replace the health check `useEffect` with polling:
+```ts
+useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    async function poll() {
+        try {
+            const result = await checkHealth();
+            setIsConnected(true);
+            setServerVersion(result.version);
+        } catch {
+            setIsConnected(false);
+            setServerVersion(null);
+        }
+    }
+    poll();
+    timer = setInterval(poll, 30000);
+    return () => clearInterval(timer);
+}, []);
+```
+
+- Remove console output messages from health check (no more "Connected to server" lines)
+- Add `serverVersion` state for tooltip
+- Add `port` + `editingPort` state for inline port editing
+
+Add status indicator in `toolbar-right` (before file-info):
+```
+[● :6781]  filename.pw
+```
+- Green dot = connected, red dot = disconnected
+- Tooltip shows `v0.6.0 — localhost:6781` or `Disconnected`
+
+**Port editing flow:**
+- New state: `port` (number, init from `getServerPort()`), `editingPort` (boolean)
+- Click the status indicator → `setEditingPort(true)` → renders `<input>` instead of `:6781` label
+- **Enter** or **blur** → commit port change
+- **Escape** → discard changes
+
+JSX for the status indicator:
+```tsx
+<span
+    className="status-indicator"
+    title={isConnected ? `v${serverVersion} — localhost:${port}` : 'Disconnected — click to change port'}
+    onClick={() => setEditingPort(true)}
+>
+    <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
+    {editingPort ? (
+        <input
+            className="port-input"
+            type="number"
+            defaultValue={port}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => commitPort(e)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') commitPort(e);
+                if (e.key === 'Escape') setEditingPort(false);
+            }}
+        />
+    ) : (
+        <span className="status-label">:{port}</span>
+    )}
+</span>
+```
+
+`commitPort` helper:
+```ts
+function commitPort(e: React.SyntheticEvent<HTMLInputElement>) {
+    const val = parseInt(e.currentTarget.value, 10);
+    if (val > 0 && val <= 65535) {
+        setServerPort(val);
+        setPort(val);
+    }
+    setEditingPort(false);
+    poll(); // immediate health check on new port
+}
+```
+
+**9c: `panel.css` — status indicator styles**
+
+New classes: `.status-indicator`, `.status-dot`, `.status-dot.connected`, `.status-dot.disconnected`, `.status-label`, `.port-input`
+
+**9d: Tests**
+- Update Toolbar browser tests: check status dot class instead of console messages
+- Add tests: connected/disconnected dot, click to edit port, port change calls `setServerPort`
+
+**Files:**
+| File | Action |
+|---|---|
+| `src/panel/lib/server.ts` | Already done — `getServerPort()`, `setServerPort()` |
+| `src/panel/components/Toolbar.tsx` | Polling + status indicator UI |
+| `src/panel/panel.css` | Status indicator styles |
+| `test/components/Toolbar.browser.test.tsx` | Update health check tests, add indicator tests |
 
 ## Verification
 
