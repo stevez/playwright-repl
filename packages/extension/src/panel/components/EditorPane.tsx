@@ -13,22 +13,23 @@ function EditorPane({ editorContent, currentRunLine, lineResults, dispatch, ref 
 
     const lineHeight = 18;
     return (
-        <div id="editor-pane" ref={ref}>
-            <div id="line-numbers">
+        <div id="editor-pane" ref={ref} className="flex flex-1 min-h-[80px] overflow-hidden bg-(--bg-editor)">
+            <div id="line-numbers" className="w-10 shrink-0 pt-2 pr-1 pb-2 pl-2 text-right text-(--text-line-numbers) bg-(--bg-editor) leading-[18px] overflow-hidden select-none border-r border-solid border-(--border-primary)">
                 {editorContent.split('\n').map((_, i) => {
                     let cls = ''
-                    if (i === currentRunLine) cls = 'line-active'
-                    else if (lineResults[i] === 'pass') cls = 'line-pass'
-                    else if (lineResults[i] === 'fail') cls = 'line-fail'
-                    return <div key={i} className={cls}>{i + 1}</div>
+                    if (i === currentRunLine) cls = 'text-(--color-active-line) bg-(--bg-line-highlight)'
+                    else if (lineResults[i] === 'pass') cls = 'line-pass text-(--color-line-pass)'
+                    else if (lineResults[i] === 'fail') cls = 'line-fail text-(--color-line-fail)'
+                    return <div key={i} className={`h-[18px] ${cls}`}>{i + 1}</div>
                 })}
             </div>
-            <div id="editor-wrapper">
+            <div id="editor-wrapper" className="flex-1 relative overflow-hidden">
                 {currentRunLine >= 0 &&
-                    <div id="line-highlight" style={{ top: currentRunLine * lineHeight + 8, display: 'block' }}></div>
+                    <div id="line-highlight" className="absolute left-0 right-0 h-[18px] bg-(--bg-line-highlight) pointer-events-none" style={{ top: currentRunLine * lineHeight + 8}}></div>
                 }
                 <textarea
                     id="editor"
+                    className="w-full h-full resize-none bg-transparent text-(--text-default) border-none outline-none p-2 font-[inherit] leading-[18px] whitespace-pre overflow-auto tab-[2px] caret-(--color-caret) relative"
                     value={editorContent}
                     spellCheck={false}
                     autoComplete="off"
