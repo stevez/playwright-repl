@@ -479,17 +479,20 @@ packages/
 │       ├── repl.ts               # Interactive readline loop
 │       ├── recorder.ts           # Session recording/replay
 │       └── index.ts              # Public API exports
-└── extension/      # Chrome side panel extension (TypeScript, Vite)
+└── extension/      # Chrome side panel extension (React, Vite, Tailwind)
     ├── src/
     │   ├── background.ts         # Side panel behavior + recording handlers
-    │   ├── panel/                # Side panel UI
+    │   ├── panel/                # Side panel UI (React)
     │   │   ├── panel.html
-    │   │   ├── panel.ts
-    │   │   └── panel.css
-    │   ├── content/
-    │   │   └── recorder.ts       # Event recorder injected into pages
-    │   └── lib/
-    │       └── converter.ts      # .pw → Playwright test export
+    │   │   ├── panel.tsx         # React entry point
+    │   │   ├── panel.css         # Theme variables + residual styles
+    │   │   ├── App.tsx           # Root component
+    │   │   ├── reducer.ts        # useReducer state management
+    │   │   ├── components/       # Toolbar, EditorPane, ConsolePane, etc.
+    │   │   ├── hooks/            # useCommandHistory
+    │   │   └── lib/              # server, run, autocomplete, filter, etc.
+    │   └── content/
+    │       └── recorder.ts       # Event recorder injected into pages
     └── public/
         └── manifest.json         # Manifest V3 config
 ```

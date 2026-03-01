@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.7.0 — Extension React & Tailwind Migration
+
+**2026-02-28**
+
+### Extension — Complete Rewrite (v2.0.0)
+
+- **React migration**: Rewrote the extension side panel from vanilla TypeScript (1,066-line `panel.ts`) to React with `useReducer` state management. Six components: `Toolbar`, `EditorPane`, `ConsolePane`, `CommandInput`, `Splitter`, `Lightbox`.
+- **Tailwind CSS v4**: Migrated ~750 lines of custom CSS to Tailwind utility classes. `panel.css` reduced to ~211 lines (theme variables, toolbar buttons, pseudo-elements, scrollbars).
+- **Connection status indicator**: Live status dot (green/red) with 30-second health polling and editable port number.
+- **Improved tab targeting**: Each command now sends the active tab URL for correct tab targeting.
+- **Unified timeouts**: Action and navigation timeouts standardized to 5s/15s.
+- **Command list cleanup**: Removed CLI-only commands from extension, show raw text for non-sectioned responses.
+- **Help command**: Added `help` command synced with core command list.
+
+### Technical Details
+
+- **Component architecture**: `App` → `Toolbar` + `Splitter(EditorPane, ConsolePane(CommandInput))` + `Lightbox`
+- **State**: Single `useReducer` with actions: `EDIT_EDITOR_CONTENT`, `ADD_LINE`, `RUN_START/STOP`, `SET_LINE_RESULT`, `STEP_INIT/ADVANCE`, `CLEAR_CONSOLE`, etc.
+- **Testing**: `data-testid` and `data-type` attributes for test selectors instead of CSS class selectors. Browser-based component tests via `vitest-browser-react`.
+- **Build**: Vite with `@tailwindcss/vite` and `@vitejs/plugin-react` plugins.
+
+### Tests
+
+- 535 total tests across all packages (157 CLI + 82 core + 158 extension unit + 80 extension component + 58 extension E2E).
+
+---
+
 ## v0.6.0 — Multi-file Replay & Log Reports
 
 **2026-02-22**
