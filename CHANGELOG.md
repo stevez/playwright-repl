@@ -4,7 +4,7 @@
 
 **2026-02-28**
 
-### Extension — Complete Rewrite (v2.0.0)
+### Extension — Complete Rewrite
 
 - **React migration**: Rewrote the extension side panel from vanilla TypeScript (1,066-line `panel.ts`) to React with `useReducer` state management. Six components: `Toolbar`, `EditorPane`, `ConsolePane`, `CommandInput`, `Splitter`, `Lightbox`.
 - **Tailwind CSS v4**: Migrated ~750 lines of custom CSS to Tailwind utility classes. `panel.css` reduced to ~211 lines (theme variables, toolbar buttons, pseudo-elements, scrollbars).
