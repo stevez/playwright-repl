@@ -29,7 +29,7 @@ function EditorPane({ editorContent, currentRunLine, lineResults, dispatch, ref 
                 }
                 <textarea
                     id="editor"
-                    className="w-full h-full resize-none bg-transparent text-(--text-default) border-none outline-none p-2 font-[inherit] leading-[18px] whitespace-pre overflow-auto tab-[2px] caret-(--color-caret) relative"
+                    className="w-full h-full resize-none bg-transparent text-(--text-default) border-none outline-none p-2 font-[inherit] leading-[18px] whitespace-pre overflow-auto tab-[2px] caret-(--color-caret) relative placeholder:text-(--text-placeholder)"
                     value={editorContent}
                     spellCheck={false}
                     autoComplete="off"

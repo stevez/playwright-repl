@@ -60,26 +60,27 @@ function CommandInput({ onSubmit }: CommandInputProps) {
         }
     }
     return (
-        <div id="input-bar">
-            <span id="prompt">pw&gt;</span>
-            <div id="input-wrapper">
+        <div id="input-bar" className="flex items-center border-t border-solid border-(--border-primary) py-[6px] px-3 bg-(--bg-toolbar) gap-2 shrink-0">
+            <span id="prompt" className="text-(--color-prompt) font-bold shrink-0">pw&gt;</span>
+            <div id="input-wrapper" className="flex-1 relative">
                 {matches.length > 0 && (
-                    <div id="autocomplete-dropdown" data-testid="autocomplete-dropdown">
+                    <div id="autocomplete-dropdown" className="absolute bottom-full left-0 bg-(--bg-toolbar) border border-solid border-(--border-primary) rounded-[4px] py-1 px-0 mb-1 max-h-50 overflow-y-auto z-50 shadow-[0_-2px_8px_rgba(0,0,0,0.15)] " data-testid="autocomplete-dropdown">
                         {matches.map((cmd, i) => (
-                            <div key={cmd} className={`autocomplete-item ${i === selectIndex ? 'active' : ''}`}
+                            <div key={cmd} className={`py-[3px] px-3 cursor-pointer font-[inherit] text-[12px] text-(--text-default) hover:bg-(--bg-button) ${i === selectIndex ? 'bg-(--bg-button)' : ''}`}
                                 onClick={() => setInput(cmd)}>
                                 {cmd}
                             </div>
                         ))}
                     </div>
                 )}
-                <span id="ghost-text" data-testid="ghost-text">
+                <span id="ghost-text" data-testid="ghost-text" className="absolute top-0 left-0 h-full flex items-center text-(--text-placeholder) font-[inherit] text-[inherit] pointer-events-none whitespace-pre">
                     <span style={{ visibility: 'hidden' }}>{input}</span>
                     {getGhostText(input)}
                 </span>
                 <input
                     type="text"
                     id="command-input"
+                    className="w-full bg-transparent border-none outline-none text-(--text-default) font-[inherit] text-[inherit] caret-(--color-caret) relative placeholder:text-(--text-placeholder)"
                     value={input}
                     placeholder="Type a .pw command..."
                     autoComplete="off"
