@@ -196,6 +196,18 @@ Also preserve CSS classes used in E2E assertions:
 
 ## Backlog
 
+### Toolbar button Tailwind deduplication
+The 6 toolbar buttons (Open, Save, Record, Run, Step, Export) still rely on the `#toolbar button { ... }` CSS rules in `panel.css` rather than inline Tailwind classes. The shared descendant rule is clean and DRY, but leaving CSS alongside Tailwind is inconsistent.
+
+Options to resolve:
+1. **`@apply` utility class** — define `.toolbar-btn` in `panel.css` using `@apply` with the shared base styles, then use `className="toolbar-btn"` on each button
+2. **`<ToolbarButton>` wrapper component** — encapsulate shared classes + variant props (`variant="run" | "record" | "default"`) in a small component
+3. **Inline Tailwind on each button** — most verbose; requires a shared `const btnBase = "..."` string to avoid repetition
+
+The run button's `!important` overrides and the record button's dynamic `.recording` class need careful handling in whichever approach is chosen.
+
+
+
 - [x] ~~Show connection status~~ → see Step 9 below
 - [x] ~~Reduce command execution timeout~~ — unified to 5s action / 15s navigation / 15s server wrapper
 - [x] ~~Send activeTabUrl with commands~~ — bug fix, now auto-selects correct tab

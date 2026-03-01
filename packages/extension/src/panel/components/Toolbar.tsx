@@ -219,7 +219,7 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0  ${isConnected ? 'bg-(--color-success)' : 'bg-(--color-error)'}`} />
                     { editingPort ? (
                         <input
-                            className="w-[50px] bg(--bg-editor) text=(--text-default) border border-solid"
+                            className="w-[50px] bg-(--bg-editor) text-(--text-default) border border-solid border-(--border-primary) rounded-[3px] font-[inherit] text-[11px] py-[1px] px-1 outline-none"
                             type="number"
                             defaultValue={port}
                             autoFocus
@@ -233,7 +233,7 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                         />
                     ) 
                     : (
-                    <span className="status-label">:{port}</span>
+                    <span className="text-(--text-dim) text-[11px]">:{port}</span>
                     )}
                 </span>
             </div>

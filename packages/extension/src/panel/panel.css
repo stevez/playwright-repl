@@ -153,24 +153,6 @@ html, body {
   border-color: var(--color-recording-border) !important;
 }
 
-
-.status-label {
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-.port-input {
-  width: 50px;
-  background: var(--bg-editor);
-  color: var(--text-default);
-  border: 1px solid var(--border-primary);
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: 11px;
-  padding: 1px 4px;
-  outline: none;
-}
-
 /* === Editor pane === */
 
 #line-numbers .line-pass::before {
