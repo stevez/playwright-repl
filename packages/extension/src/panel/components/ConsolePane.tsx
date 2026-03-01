@@ -52,11 +52,11 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
         switch (line.type) {
             case 'code-block':
                 return (
-                    <div key={i} className="code-block">
-                        <pre className="code-content">
+                    <div key={i} className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
+                        <pre className="m-0 py-2 px-3 text-(--color-command) font-[inherit] text-[12px] leading-4 whitespace-pre-wrap wrap-break-word">
                             {line.text}
                         </pre>
-                        <button className="code-copy-btn" onClick={() => navigator.clipboard.writeText(line.text)}>Copy</button>
+                        <button className="absolute top-1 right-1 bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[10px] cursor-pointer hover:bg-(--bg-button-hover)" onClick={() => navigator.clipboard.writeText(line.text)}>Copy</button>
                     </div>);
             case 'screenshot':
                 return (
