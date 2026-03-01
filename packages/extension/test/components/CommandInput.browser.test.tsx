@@ -3,12 +3,14 @@ import { render, RenderResult } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
 import CommandInput from '@/components/CommandInput';
+import { addCommand, clearHistory } from '@/lib/command-history';
 
 describe('CommandInput Component tests', () => {
     let onSubmit = vi.fn();
     let screen: RenderResult;
 
     beforeEach(async () => {
+        clearHistory();
         onSubmit = vi.fn();
         screen = await render(<CommandInput onSubmit={onSubmit}/>);
     });
@@ -26,31 +28,29 @@ describe('CommandInput Component tests', () => {
     })
 
     it('should use ArrowUp to load the history command', async () => {
-        await screen.getByRole('textbox').fill('goto https://example.com');
-        await userEvent.keyboard('{Enter}');
+        // Simulate what runAndDispatch does: addCommand is called in run.ts, not the component
+        addCommand('goto https://example.com');
 
         await screen.getByRole('textbox').fill('click e1');
-       
+
         await userEvent.keyboard("{ArrowUp}");
         await expect.element(screen.getByRole('textbox')).toHaveValue('goto https://example.com');
     })
 
     it('should not change input when ArrowUp reach the beginning of the history command', async () => {
-        await screen.getByRole('textbox').fill('goto https://example.com');
-        await userEvent.keyboard('{Enter}');
-       
+        addCommand('goto https://example.com');
+
+        await screen.getByRole('textbox').click();
         await userEvent.keyboard("{ArrowUp}");
         await userEvent.keyboard("{ArrowUp}");
         await expect.element(screen.getByRole('textbox')).toHaveValue('goto https://example.com');
     })
 
     it('should use ArrowDown to load the history command', async () => {
-        await screen.getByRole('textbox').fill('goto https://example.com');
-        await userEvent.keyboard('{Enter}');
+        addCommand('goto https://example.com');
+        addCommand('click e1');
 
-        await screen.getByRole('textbox').fill('click e1');
-        await userEvent.keyboard('{Enter}');
-
+        await screen.getByRole('textbox').click();
         await userEvent.keyboard("{ArrowUp}");
         await userEvent.keyboard("{ArrowUp}");
         await userEvent.keyboard("{ArrowDown}")
@@ -58,12 +58,10 @@ describe('CommandInput Component tests', () => {
     })
 
     it('should not change input when  ArrowDown reach the end of the history command', async () => {
-        await screen.getByRole('textbox').fill('goto https://example.com');
-        await userEvent.keyboard('{Enter}');
+        addCommand('goto https://example.com');
+        addCommand('click e1');
 
-        await screen.getByRole('textbox').fill('click e1');
-        await userEvent.keyboard('{Enter}');
-
+        await screen.getByRole('textbox').click();
         await userEvent.keyboard("{ArrowUp}");
         await userEvent.keyboard("{ArrowUp}");
         await userEvent.keyboard("{ArrowDown}")
