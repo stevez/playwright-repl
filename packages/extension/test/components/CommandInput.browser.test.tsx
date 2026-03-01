@@ -28,12 +28,11 @@ describe('CommandInput Component tests', () => {
     })
 
     it('should use ArrowUp to load the history command', async () => {
-        // Simulate what runAndDispatch does: addCommand is called in run.ts, not the component
         addCommand('goto https://example.com');
 
         await screen.getByRole('textbox').fill('click e1');
-
         await userEvent.keyboard("{ArrowUp}");
+
         await expect.element(screen.getByRole('textbox')).toHaveValue('goto https://example.com');
     })
 
@@ -57,7 +56,7 @@ describe('CommandInput Component tests', () => {
         await expect.element(screen.getByRole('textbox')).toHaveValue('click e1');
     })
 
-    it('should not change input when  ArrowDown reach the end of the history command', async () => {
+    it('should not change input when ArrowDown reach the end of the history command', async () => {
         addCommand('goto https://example.com');
         addCommand('click e1');
 
@@ -70,7 +69,6 @@ describe('CommandInput Component tests', () => {
         //reach to the end, clear the input box
         await userEvent.keyboard("{ArrowDown}");
         await expect.element(screen.getByRole('textbox')).toHaveValue('');
-
 
         // pass the index to history length, do nothing
         await userEvent.keyboard("{ArrowDown}");
