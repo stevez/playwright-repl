@@ -22,10 +22,15 @@ const META_COMMANDS = [
 ];
 
 const EXTRA_COMMANDS = [
-  { cmd: 'verify-text',    desc: 'Assert text is visible on page' },
-  { cmd: 'verify-element', desc: 'Assert element exists by role and name' },
-  { cmd: 'verify-value',   desc: 'Assert input/select/checkbox value' },
-  { cmd: 'verify-list',    desc: 'Assert list contains expected items' },
+  { cmd: 'verify',          desc: 'Assert page state (title, url, text, element, value, list)' },
+  { cmd: 'verify-text',     desc: 'Assert text is visible on page' },
+  { cmd: 'verify-element',  desc: 'Assert element exists by role and name' },
+  { cmd: 'verify-value',    desc: 'Assert input/select/checkbox value' },
+  { cmd: 'verify-list',     desc: 'Assert list contains expected items' },
+  { cmd: 'verify-title',    desc: 'Assert page title contains text' },
+  { cmd: 'verify-url',      desc: 'Assert page URL contains text' },
+  { cmd: 'verify-no-text',  desc: 'Assert text is not visible on page' },
+  { cmd: 'verify-no-element', desc: 'Assert element does not exist' },
 ];
 
 export interface CompletionItem {

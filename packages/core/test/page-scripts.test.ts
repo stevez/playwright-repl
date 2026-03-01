@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText,
   checkByText, uncheckByText,
 } from '../src/page-scripts.js';
@@ -84,6 +85,8 @@ function mockPage(locatorCount = 1) {
   const loc = mockLocator(locatorCount);
   return {
     _loc: loc,
+    title: vi.fn().mockResolvedValue('Test Page Title'),
+    url: vi.fn().mockReturnValue('https://example.com/dashboard'),
     getByText: vi.fn().mockReturnValue(loc),
     getByRole: vi.fn().mockReturnValue(loc),
     getByLabel: vi.fn().mockReturnValue(loc),
@@ -145,6 +148,67 @@ describe('verifyList', () => {
     const page = mockPage(1);
     page._loc.getByText = vi.fn().mockReturnValue(loc);
     await expect(verifyList(page, 'e1', ['missing'])).rejects.toThrow('Item not found: missing');
+  });
+});
+
+describe('verifyTitle', () => {
+  it('succeeds when title contains text', async () => {
+    const page = mockPage(1);
+    page.title.mockResolvedValue('My App — Dashboard');
+    await expect(verifyTitle(page, 'Dashboard')).resolves.toBeUndefined();
+  });
+
+  it('throws when title does not contain text', async () => {
+    const page = mockPage(1);
+    page.title.mockResolvedValue('My App — Home');
+    await expect(verifyTitle(page, 'Dashboard')).rejects.toThrow(
+      'Title "My App — Home" does not contain "Dashboard"'
+    );
+  });
+});
+
+describe('verifyUrl', () => {
+  it('succeeds when URL contains text', async () => {
+    const page = mockPage(1);
+    page.url.mockReturnValue('https://example.com/about');
+    await expect(verifyUrl(page, '/about')).resolves.toBeUndefined();
+  });
+
+  it('throws when URL does not contain text', async () => {
+    const page = mockPage(1);
+    page.url.mockReturnValue('https://example.com/home');
+    await expect(verifyUrl(page, '/about')).rejects.toThrow(
+      'URL "https://example.com/home" does not contain "/about"'
+    );
+  });
+});
+
+describe('verifyNoText', () => {
+  it('succeeds when text is not visible', async () => {
+    const page = mockPage(0);  // count = 0 → not visible
+    await expect(verifyNoText(page, 'Gone')).resolves.toBeUndefined();
+  });
+
+  it('throws when text is still visible', async () => {
+    const page = mockPage(1);  // count = 1 → visible
+    await expect(verifyNoText(page, 'Still here')).rejects.toThrow(
+      'Text still visible: Still here'
+    );
+  });
+});
+
+describe('verifyNoElement', () => {
+  it('succeeds when element does not exist', async () => {
+    const page = mockPage(0);  // count = 0 → not found
+    await expect(verifyNoElement(page, 'button', 'Delete')).resolves.toBeUndefined();
+    expect(page.getByRole).toHaveBeenCalledWith('button', { name: 'Delete' });
+  });
+
+  it('throws when element still exists', async () => {
+    const page = mockPage(1);  // count = 1 → exists
+    await expect(verifyNoElement(page, 'link', 'Remove')).rejects.toThrow(
+      'Element still exists: link "Remove"'
+    );
   });
 });
 

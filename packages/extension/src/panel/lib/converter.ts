@@ -102,6 +102,27 @@ export function pwToPlaywright(cmd: string): string | null {
       return `await page.goForward();`;
     case "reload":
       return `await page.reload();`;
+    case "verify": {
+      const subType = args[0];
+      const rest = args.slice(1);
+      if (subType === "title" && rest[0])
+        return `await expect(page).toHaveTitle(/${rest.join(' ').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/);`;
+      if (subType === "url" && rest[0])
+        return `await expect(page).toHaveURL(/${rest.join(' ').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/);`;
+      if (subType === "text" && rest[0])
+        return `await expect(page.getByText(${JSON.stringify(rest.join(' '))})).toBeVisible();`;
+      if (subType === "no-text" && rest[0])
+        return `await expect(page.getByText(${JSON.stringify(rest.join(' '))})).not.toBeVisible();`;
+      if (subType === "element" && rest.length >= 2)
+        return `await expect(page.getByRole(${JSON.stringify(rest[0])}, { name: ${JSON.stringify(rest.slice(1).join(' '))} })).toBeVisible();`;
+      if (subType === "no-element" && rest.length >= 2)
+        return `await expect(page.getByRole(${JSON.stringify(rest[0])}, { name: ${JSON.stringify(rest.slice(1).join(' '))} })).not.toBeVisible();`;
+      if (subType === "value" && rest.length >= 2)
+        return `// verify value ${rest[0]} — ref-based, use locator`;
+      if (subType === "list" && rest.length >= 2)
+        return `// verify list ${rest[0]} — ref-based, use locator`;
+      return null;
+    }
     case "verify-text": {
       if (!args[0]) return null;
       return `await expect(page.getByText(${JSON.stringify(args[0])})).toBeVisible();`;
@@ -111,12 +132,12 @@ export function pwToPlaywright(cmd: string): string | null {
       return `await expect(page.getByText(${JSON.stringify(args[0])})).not.toBeVisible();`;
     }
     case "verify-element": {
-      if (!args[0]) return null;
-      return `await expect(page.getByText(${JSON.stringify(args[0])})).toBeVisible();`;
+      if (args.length < 2) return null;
+      return `await expect(page.getByRole(${JSON.stringify(args[0])}, { name: ${JSON.stringify(args.slice(1).join(' '))} })).toBeVisible();`;
     }
     case "verify-no-element": {
-      if (!args[0]) return null;
-      return `await expect(page.getByText(${JSON.stringify(args[0])})).not.toBeVisible();`;
+      if (args.length < 2) return null;
+      return `await expect(page.getByRole(${JSON.stringify(args[0])}, { name: ${JSON.stringify(args.slice(1).join(' '))} })).not.toBeVisible();`;
     }
     case "verify-url": {
       if (!args[0]) return null;

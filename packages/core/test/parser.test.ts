@@ -105,7 +105,7 @@ describe('ALIASES', () => {
   it('maps most aliases to known commands', () => {
     // verify-* aliases map to commands handled as knownExtras in repl.ts,
     // not in the COMMANDS vocabulary — that's intentional.
-    const extras = ['verify-text', 'verify-element', 'verify-value', 'verify-list'];
+    const extras = ['verify', 'verify-text', 'verify-element', 'verify-value', 'verify-list'];
     for (const [alias, cmd] of Object.entries(ALIASES)) {
       if (extras.includes(cmd)) continue;
       expect(ALL_COMMANDS, `alias "${alias}" → "${cmd}"`).toContain(cmd);

@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.7.3 — Unified Verify Command
+
+**2026-03-01**
+
+### Features
+
+- **Unified `verify` command**: Single command with sub-types replaces individual `verify-*` commands. All sub-types:
+  - `verify title "Hello"` — assert page title contains text
+  - `verify url "/about"` — assert page URL contains text
+  - `verify text "Welcome"` — assert text is visible
+  - `verify no-text "Gone"` — assert text is not visible
+  - `verify element button "Submit"` — assert element exists by role and name
+  - `verify no-element link "Delete"` — assert element does not exist
+  - `verify value e5 "hello"` — assert input value (ref-based)
+  - `verify list e3 "a" "b"` — assert list contains items (ref-based)
+- **`v` alias**: Short alias for `verify` (e.g., `v title "Hello"`)
+- **Legacy compatibility**: Old `verify-*` commands (`verify-text`, `verify-element`, `verify-title`, `verify-url`, `verify-no-text`, `verify-no-element`) continue to work as aliases
+
+### New page-script functions
+
+- `verifyTitle(page, text)` — throws if `page.title()` does not contain text
+- `verifyUrl(page, text)` — throws if `page.url()` does not contain text
+- `verifyNoText(page, text)` — throws if text is still visible on page
+- `verifyNoElement(page, role, name)` — throws if element still exists
+
+### Fixed
+
+- **`verify-element` / `verify-no-element` converter**: Now correctly exports `getByRole("button", { name: "Submit" })` instead of incorrect `getByText("Submit")` for Playwright test export
+
+### Tests
+
+- 38 new tests across all packages:
+  - 8 page-script function tests (`verifyTitle`, `verifyUrl`, `verifyNoText`, `verifyNoElement`)
+  - 9 processline routing tests (unified verify sub-type dispatch)
+  - 10 converter export tests (Playwright `expect` assertions)
+  - 3 completion-data tests (verify entries present)
+  - 5 autocomplete tests (ghost text and match filtering)
+  - 11 E2E command tests (real browser, full stack)
+- Total: ~470 tests across all packages
+
+---
+
 ## v0.7.2 — Command History & Ghost Text Fix
 
 **2026-03-01**

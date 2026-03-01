@@ -11,6 +11,7 @@ import os from 'node:os';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c,
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   Engine,
 } from '@playwright-repl/core';
@@ -239,7 +240,8 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
 
   // Validate command exists
   const knownExtras = ['help', 'list', 'close-all', 'kill-all', 'install', 'install-browser',
-                       'verify-text', 'verify-element', 'verify-value', 'verify-list'];
+                       'verify', 'verify-text', 'verify-element', 'verify-value', 'verify-list',
+                       'verify-title', 'verify-url', 'verify-no-text', 'verify-no-element'];
   if (!ALL_COMMANDS.includes(cmdName) && !knownExtras.includes(cmdName)) {
     console.log(`${c.yellow}Unknown command: ${cmdName}${c.reset}`);
     console.log(`${c.dim}Type .help for available commands${c.reset}`);
@@ -250,21 +252,56 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   if (cmdName === 'kill-all') return handleKillAll(ctx) as unknown as void;
   if (cmdName === 'close' || cmdName === 'close-all') return handleClose(ctx) as unknown as void;
 
-  // ── Verify commands → run-code translation ──────────────────
+  // ── Unified verify command → run-code translation ──────────
   type PageScriptFn = (...fnArgs: unknown[]) => Promise<void>;
+  if (cmdName === 'verify') {
+    const subType = args._[1];
+    const rest = args._.slice(2);
+    let translated: ParsedArgs | null = null;
+    if (subType === 'title' && rest.length > 0)
+      translated = buildRunCode(verifyTitle as PageScriptFn, rest.join(' '));
+    else if (subType === 'url' && rest.length > 0)
+      translated = buildRunCode(verifyUrl as PageScriptFn, rest.join(' '));
+    else if (subType === 'text' && rest.length > 0)
+      translated = buildRunCode(verifyText as PageScriptFn, rest.join(' '));
+    else if (subType === 'no-text' && rest.length > 0)
+      translated = buildRunCode(verifyNoText as PageScriptFn, rest.join(' '));
+    else if (subType === 'element' && rest.length >= 2)
+      translated = buildRunCode(verifyElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
+    else if (subType === 'no-element' && rest.length >= 2)
+      translated = buildRunCode(verifyNoElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
+    else if (subType === 'value' && rest.length >= 2)
+      translated = buildRunCode(verifyValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
+    else if (subType === 'list' && rest.length >= 2)
+      translated = buildRunCode(verifyList as PageScriptFn, rest[0], rest.slice(1));
+    if (translated) {
+      args = translated;
+    } else {
+      console.log(`${c.yellow}Usage: verify <title|url|text|no-text|element|no-element|value|list> <args>${c.reset}`);
+      return;
+    }
+  }
+
+  // ── Legacy verify-* commands (backward compat) ─────────────
   const verifyFns: Record<string, PageScriptFn> = {
     'verify-text': verifyText as PageScriptFn,
     'verify-element': verifyElement as PageScriptFn,
     'verify-value': verifyValue as PageScriptFn,
     'verify-list': verifyList as PageScriptFn,
+    'verify-title': verifyTitle as PageScriptFn,
+    'verify-url': verifyUrl as PageScriptFn,
+    'verify-no-text': verifyNoText as PageScriptFn,
+    'verify-no-element': verifyNoElement as PageScriptFn,
   };
   if (verifyFns[cmdName]) {
     const pos = args._.slice(1);
     const fn = verifyFns[cmdName];
     let translated: ParsedArgs | null = null;
-    if (cmdName === 'verify-text') {
+    if (cmdName === 'verify-text' || cmdName === 'verify-no-text' || cmdName === 'verify-title' || cmdName === 'verify-url') {
       const text = pos.join(' ');
       if (text) translated = buildRunCode(fn, text);
+    } else if (cmdName === 'verify-no-element' || cmdName === 'verify-element') {
+      if (pos[0] && pos.length >= 2) translated = buildRunCode(fn, pos[0], pos.slice(1).join(' '));
     } else if (pos[0] && pos.length >= 2) {
       const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
       translated = buildRunCode(fn, pos[0], rest);

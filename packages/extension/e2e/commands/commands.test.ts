@@ -224,6 +224,71 @@ test('verify-element passes when element exists', async ({ run }) => {
   expect(result.isError).toBeFalsy();
 });
 
+// ─── Unified verify command ─────────────────────────────────────────────────
+
+test('verify title passes when title matches', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify title "TodoMVC"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('verify title fails when title does not match', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify title "Nonexistent Title XYZ"');
+  expect(result.isError).toBe(true);
+  expect(result.text).toContain('does not contain');
+});
+
+test('verify url passes when URL matches', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify url "todomvc"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('verify url fails when URL does not match', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify url "nonexistent-path"');
+  expect(result.isError).toBe(true);
+  expect(result.text).toContain('does not contain');
+});
+
+test('verify text passes when text is visible', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify text "todos"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('verify text fails when text is not visible', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify text "nonexistent text xyz"');
+  expect(result.isError).toBe(true);
+  expect(result.text).toContain('Text not found');
+});
+
+test('verify no-text passes when text is absent', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify no-text "nonexistent text xyz"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('verify element passes when element exists', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify element heading "todos"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('verify no-element passes when element is absent', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('verify no-element button "Nonexistent XYZ"');
+  expect(result.isError).toBeFalsy();
+});
+
+test('v alias routes to verify', async ({ run }) => {
+  await run(`goto ${TEST_URL}`);
+  const result = await run('v title "TodoMVC"');
+  expect(result.isError).toBeFalsy();
+});
+
 // ─── Aliases ────────────────────────────────────────────────────────────────
 
 test('alias c for click', async ({ run }) => {

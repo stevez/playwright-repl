@@ -59,6 +59,7 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'uncheck':              { desc: 'Uncheck a checkbox' },
     'unroute':              { desc: 'Remove route' },
     'upload':               { desc: 'Upload a file' },
+    'verify':               { desc: 'Assert page state (title, url, text, element, value, list)' },
     'verify-element':       { desc: 'Verify element exists' },
     'verify-no-element':    { desc: 'Verify element not exists' },
     'verify-no-text':       { desc: 'Verify text not visible' },

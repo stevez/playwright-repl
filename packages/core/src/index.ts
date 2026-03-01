@@ -8,6 +8,7 @@ export { buildCompletionItems } from './completion-data.js';
 export { c } from './colors.js';
 export {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
 } from './page-scripts.js';
 export { Engine } from './engine.js';

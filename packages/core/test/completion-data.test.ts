@@ -45,7 +45,31 @@ describe('buildCompletionItems', () => {
   });
 
   it('has correct count (commands + extra + meta-commands)', () => {
-    const expected = Object.keys(COMMANDS).length + 4 + 10;
+    const expected = Object.keys(COMMANDS).length + 9 + 10;
     expect(items.length).toBe(expected);
+  });
+
+  it('includes unified verify command', () => {
+    const cmds = new Set(items.map(i => i.cmd));
+    expect(cmds.has('verify')).toBe(true);
+  });
+
+  it('includes all verify-* extra commands', () => {
+    const cmds = new Set(items.map(i => i.cmd));
+    expect(cmds.has('verify-text')).toBe(true);
+    expect(cmds.has('verify-element')).toBe(true);
+    expect(cmds.has('verify-value')).toBe(true);
+    expect(cmds.has('verify-list')).toBe(true);
+    expect(cmds.has('verify-title')).toBe(true);
+    expect(cmds.has('verify-url')).toBe(true);
+    expect(cmds.has('verify-no-text')).toBe(true);
+    expect(cmds.has('verify-no-element')).toBe(true);
+  });
+
+  it('verify entries have descriptions', () => {
+    const verifyItems = items.filter(i => i.cmd.startsWith('verify'));
+    for (const item of verifyItems) {
+      expect(item.desc.length).toBeGreaterThan(0);
+    }
   });
 });

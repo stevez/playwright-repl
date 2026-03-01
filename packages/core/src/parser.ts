@@ -46,7 +46,8 @@ export const ALIASES: Record<string, string> = {
   'tc':   'tab-close',
   'ts':   'tab-select',
 
-  // Assertions (Phase 2 — mapped to daemon tools that exist but have no CLI keywords)
+  // Assertions
+  'v':    'verify',
   'vt':   'verify-text',
   've':   'verify-element',
   'vv':   'verify-value',

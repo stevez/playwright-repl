@@ -459,6 +459,76 @@ describe('processLine', () => {
     expect(ctx.conn.run).toHaveBeenCalled();
   });
 
+  it('routes verify title to run-code with verifyTitle', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify title "My App"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyTitle');
+    expect(call._[1]).toContain('"My App"');
+  });
+
+  it('routes verify url to run-code with verifyUrl', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify url "/about"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyUrl');
+    expect(call._[1]).toContain('"/about"');
+  });
+
+  it('routes verify text to run-code with verifyText', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify text "Welcome"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyText');
+    expect(call._[1]).toContain('"Welcome"');
+  });
+
+  it('routes verify no-text to run-code with verifyNoText', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify no-text "Gone"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyNoText');
+    expect(call._[1]).toContain('"Gone"');
+  });
+
+  it('routes verify element to run-code with verifyElement', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify element button "Submit"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyElement');
+    expect(call._[1]).toContain('"button"');
+    expect(call._[1]).toContain('"Submit"');
+  });
+
+  it('routes verify no-element to run-code with verifyNoElement', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify no-element link "Delete"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyNoElement');
+    expect(call._[1]).toContain('"link"');
+    expect(call._[1]).toContain('"Delete"');
+  });
+
+  it('shows usage for verify without sub-type', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify');
+    expect(ctx.conn.run).not.toHaveBeenCalled();
+  });
+
+  it('resolves v alias to verify', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'v title "Test"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyTitle');
+  });
+
   it('auto-resolves text for dblclick', async () => {
     const ctx = makeCtx();
     await processLine(ctx, 'dblclick "Item"');

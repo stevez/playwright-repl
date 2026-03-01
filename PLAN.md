@@ -103,6 +103,36 @@ The foundation — a persistent REPL connected to the Playwright MCP daemon.
 
 ---
 
+## Unified `verify` command (done)
+
+Single `verify` command with 8 sub-types replacing individual `verify-*` commands. `query` command dropped — `eval` covers the same use cases.
+
+### Command syntax
+
+```
+verify title "Hello"               # page.title().includes("Hello")
+verify url "/about"                # page.url().includes("/about")
+verify text "Welcome"              # getByText("Welcome") is visible
+verify no-text "Gone"              # getByText("Gone") is NOT visible
+verify element button "Submit"     # getByRole("button", {name: "Submit"}) exists
+verify no-element button "Submit"  # getByRole("button", {name: "Submit"}) NOT exists
+verify value e5 "hello"            # inputValue() === "hello"
+verify list e3 "a" "b"             # list contains items
+```
+
+### Files modified
+
+- `packages/core/src/page-scripts.ts` — Added verifyTitle, verifyUrl, verifyNoText, verifyNoElement
+- `packages/core/src/index.ts` — Exported new functions
+- `packages/core/src/extension-server.ts` — Unified verify sub-type routing + legacy verify-* compat
+- `packages/cli/src/repl.ts` — Same routing + knownExtras updated
+- `packages/core/src/parser.ts` — Added `v`→`verify` alias
+- `packages/core/src/completion-data.ts` — Added verify + verify-* completions
+- `packages/extension/src/panel/lib/commands.ts` — Added `verify` entry
+- `packages/extension/src/panel/lib/converter.ts` — Added verify sub-type Playwright export
+
+---
+
 ## Tailwind CSS Migration: Extension Side Panel
 
 ### Context

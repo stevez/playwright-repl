@@ -34,5 +34,38 @@ describe('test useAutoComplete', () => {
 
     })
 
+    describe('verify commands autocomplete', () => {
+        it('getGhostText completes "ver" to "ify"', () => {
+            expect(getGhostText('ver')).toEqual('ify');
+        })
+
+        it('getGhostText returns empty for full "verify"', () => {
+            expect(getGhostText('verify')).toEqual('');
+        })
+
+        it('getMatches for "verify" returns verify-* variants', () => {
+            const matches = getMatches('verify');
+            expect(matches).toContain('verify-element');
+            expect(matches).toContain('verify-no-element');
+            expect(matches).toContain('verify-no-text');
+            expect(matches).toContain('verify-text');
+            expect(matches).toContain('verify-title');
+            expect(matches).toContain('verify-url');
+        })
+
+        it('getMatches for "verify-t" returns title and text', () => {
+            const matches = getMatches('verify-t');
+            expect(matches).toContain('verify-text');
+            expect(matches).toContain('verify-title');
+            expect(matches).not.toContain('verify-url');
+        })
+
+        it('getMatches for "verify-no" returns no-text and no-element', () => {
+            const matches = getMatches('verify-no');
+            expect(matches).toContain('verify-no-text');
+            expect(matches).toContain('verify-no-element');
+            expect(matches.length).toBe(2);
+        })
+    })
 
 })

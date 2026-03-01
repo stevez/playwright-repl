@@ -57,6 +57,28 @@ export async function verifyList(page, ref, items) {
   }
 }
 
+export async function verifyTitle(page, text) {
+  const title = await page.title();
+  if (!title.includes(text))
+    throw new Error('Title "' + title + '" does not contain "' + text + '"');
+}
+
+export async function verifyUrl(page, text) {
+  const url = page.url();
+  if (!url.includes(text))
+    throw new Error('URL "' + url + '" does not contain "' + text + '"');
+}
+
+export async function verifyNoText(page, text) {
+  if (await page.getByText(text).filter({ visible: true }).count() > 0)
+    throw new Error('Text still visible: ' + text);
+}
+
+export async function verifyNoElement(page, role, name) {
+  if (await page.getByRole(role, { name }).count() > 0)
+    throw new Error('Element still exists: ' + role + ' "' + name + '"');
+}
+
 // ─── Text locator actions ───────────────────────────────────────────────────
 
 export async function actionByText(page, text, action, nth) {

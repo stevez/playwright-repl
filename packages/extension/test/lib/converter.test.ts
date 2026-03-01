@@ -227,7 +227,64 @@ describe("pwToPlaywright", () => {
     expect(pwToPlaywright("reload")).toBe("await page.reload();");
   });
 
-  // verify commands
+  // unified verify command
+  it("converts verify title", () => {
+    expect(pwToPlaywright('verify title "My App"')).toBe(
+      "await expect(page).toHaveTitle(/My App/);"
+    );
+  });
+
+  it("converts verify url", () => {
+    expect(pwToPlaywright('verify url "/about"')).toBe(
+      "await expect(page).toHaveURL(/\\/about/);"
+    );
+  });
+
+  it("converts verify text", () => {
+    expect(pwToPlaywright('verify text "Welcome"')).toBe(
+      'await expect(page.getByText("Welcome")).toBeVisible();'
+    );
+  });
+
+  it("converts verify no-text", () => {
+    expect(pwToPlaywright('verify no-text "Gone"')).toBe(
+      'await expect(page.getByText("Gone")).not.toBeVisible();'
+    );
+  });
+
+  it("converts verify element", () => {
+    expect(pwToPlaywright('verify element button "Submit"')).toBe(
+      'await expect(page.getByRole("button", { name: "Submit" })).toBeVisible();'
+    );
+  });
+
+  it("converts verify no-element", () => {
+    expect(pwToPlaywright('verify no-element link "Delete"')).toBe(
+      'await expect(page.getByRole("link", { name: "Delete" })).not.toBeVisible();'
+    );
+  });
+
+  it("converts verify value to comment", () => {
+    expect(pwToPlaywright('verify value e5 "hello"')).toBe(
+      "// verify value e5 — ref-based, use locator"
+    );
+  });
+
+  it("converts verify list to comment", () => {
+    expect(pwToPlaywright('verify list e3 "a" "b"')).toBe(
+      "// verify list e3 — ref-based, use locator"
+    );
+  });
+
+  it("returns null for verify without sub-type", () => {
+    expect(pwToPlaywright("verify")).toBeNull();
+  });
+
+  it("returns null for verify with unknown sub-type", () => {
+    expect(pwToPlaywright("verify unknown")).toBeNull();
+  });
+
+  // legacy verify-* commands
   it("converts verify-text", () => {
     expect(pwToPlaywright('verify-text "Hello"')).toBe(
       'await expect(page.getByText("Hello")).toBeVisible();'
@@ -241,14 +298,14 @@ describe("pwToPlaywright", () => {
   });
 
   it("converts verify-element", () => {
-    expect(pwToPlaywright('verify-element "Submit"')).toBe(
-      'await expect(page.getByText("Submit")).toBeVisible();'
+    expect(pwToPlaywright('verify-element button "Submit"')).toBe(
+      'await expect(page.getByRole("button", { name: "Submit" })).toBeVisible();'
     );
   });
 
   it("converts verify-no-element", () => {
-    expect(pwToPlaywright('verify-no-element "Deleted"')).toBe(
-      'await expect(page.getByText("Deleted")).not.toBeVisible();'
+    expect(pwToPlaywright('verify-no-element button "Deleted"')).toBe(
+      'await expect(page.getByRole("button", { name: "Deleted" })).not.toBeVisible();'
     );
   });
 
