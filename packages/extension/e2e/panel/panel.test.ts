@@ -56,7 +56,7 @@ test('does not send empty input', async ({ panelPage }) => {
   await input.fill('   ');
   await input.press('Enter');
 
-  const commands = panelPage.locator('.line-command');
+  const commands = panelPage.locator('[data-type="command"]');
   expect(await commands.count()).toBe(0);
 });
 
@@ -67,7 +67,7 @@ test('displays error responses with error styling', async ({ panelPage, mockResp
   await input.fill('click missing');
   await input.press('Enter');
 
-  await expect(panelPage.locator('.line-error')).toContainText('Element not found');
+  await expect(panelPage.locator('[data-type="error"]')).toContainText('Element not found');
 });
 
 // ─── Command History ───────────────────────────────────────────────────────
@@ -102,11 +102,11 @@ test('clear button empties the output', async ({ panelPage }) => {
   const input = panelPage.getByPlaceholder('Type a .pw command...');
   await input.fill('snapshot');
   await input.press('Enter');
-  await expect(panelPage.locator('.line-command')).toBeVisible();
+  await expect(panelPage.locator('[data-type="command"]')).toBeVisible();
 
   await panelPage.getByRole('button', { name: 'Clear' }).click();
 
-  await expect(panelPage.locator('#output .line')).toHaveCount(0);
+  await expect(panelPage.locator('#output [data-type]')).toHaveCount(0);
 });
 
 test('comments display without server call', async ({ panelPage }) => {
@@ -114,7 +114,7 @@ test('comments display without server call', async ({ panelPage }) => {
   await input.fill('# this is a comment');
   await input.press('Enter');
 
-  await expect(panelPage.locator('.line-comment')).toContainText('# this is a comment');
+  await expect(panelPage.locator('[data-type="comment"]')).toContainText('# this is a comment');
 });
 
 // ─── Editor ────────────────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ test('record button shows error when injection fails', async ({ panelPage }) => 
   await btn.click();
 
   // Should show error
-  await expect(panelPage.locator('.line-error')).toContainText('Cannot access');
+  await expect(panelPage.locator('[data-type="error"]')).toContainText('Cannot access');
 
   // Button should NOT be in recording state
   const hasRecording = await btn.evaluate(el => el.classList.contains('recording'));
@@ -242,7 +242,7 @@ test('received recorded commands appear in editor', async ({ panelPage }) => {
   });
 
   // Verify command appears in the console output
-  await expect(panelPage.locator('.line-command')).toContainText('click "Submit"');
+  await expect(panelPage.locator('[data-type="command"]')).toContainText('click "Submit"');
 
   // Verify command is also appended to the editor
   const editorValue = await panelPage.locator('#editor').inputValue();

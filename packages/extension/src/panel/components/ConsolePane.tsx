@@ -69,11 +69,11 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
                     </div>);
             case 'snapshot':
                  return (
-                      <pre key={i} className={`py-[1px] ${lineStyles[line.type] ?? ''}`}>{line.text}</pre>
+                      <pre key={i} className={`py-[1px] ${lineStyles[line.type] ?? ''}`} data-type={line.type}>{line.text}</pre>
                  );
             default:
                 return (
-                    <div key={i} className={`py-[1px] ${lineStyles[line.type] ?? ''}`}>{line.text}</div>
+                    <div key={i} className={`py-[1px] ${lineStyles[line.type] ?? ''}`} data-type={line.type}>{line.text}</div>
                 );
         }
     }

@@ -585,8 +585,8 @@ test('recorded session', async ({ page }) => {
     />);
 
     await vi.waitFor(() => {
-      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
-      expect(dot.classList.contains('connected')).toBe(true);
+      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+      expect(dot.dataset.status).toBe('connected');
     });
   });
 
@@ -601,8 +601,8 @@ test('recorded session', async ({ page }) => {
     />);
 
     await vi.waitFor(() => {
-      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
-      expect(dot.classList.contains('disconnected')).toBe(true);
+      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+      expect(dot.dataset.status).toBe('disconnected');
     });
   });
 
@@ -674,8 +674,8 @@ test('recorded session', async ({ page }) => {
 
     // initially connected
     await vi.waitFor(() => {
-      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
-      expect(dot.classList.contains('connected')).toBe(true);
+      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+      expect(dot.dataset.status).toBe('connected');
     });
 
     // server goes down
@@ -683,8 +683,8 @@ test('recorded session', async ({ page }) => {
     await vi.advanceTimersByTimeAsync(30000);
 
     await vi.waitFor(() => {
-      const dot = screen.container.querySelector('.status-dot') as HTMLElement;
-      expect(dot.classList.contains('disconnected')).toBe(true);
+      const dot = screen.container.querySelector('[data-testid="status-dot"]') as HTMLElement;
+      expect(dot.dataset.status).toBe('disconnected');
     });
 
     vi.useRealTimers();
@@ -709,11 +709,11 @@ test('recorded session', async ({ page }) => {
       dispatch={vi.fn()}
     />);
 
-    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
     indicator.click();
 
     await vi.waitFor(() => {
-      const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+      const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
       expect(input).not.toBeNull();
       expect(input.value).toBe('6781');
     });
@@ -727,14 +727,14 @@ test('recorded session', async ({ page }) => {
       dispatch={vi.fn()}
     />);
 
-    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
     indicator.click();
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
     });
 
-    const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+    const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
     await userEvent.click(input);
     await userEvent.clear(input);
     await userEvent.type(input, '9000');
@@ -753,14 +753,14 @@ test('recorded session', async ({ page }) => {
       dispatch={vi.fn()}
     />);
 
-    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
     indicator.click();
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
     });
 
-    const input = screen.container.querySelector('.port-input') as HTMLInputElement;
+    const input = screen.container.querySelector('[data-testid="port-input"]') as HTMLInputElement;
     await userEvent.clear(input);
     await userEvent.type(input, '9000');
     await userEvent.tab();
@@ -778,17 +778,17 @@ test('recorded session', async ({ page }) => {
       dispatch={vi.fn()}
     />);
 
-    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
     indicator.click();
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
     });
 
     await userEvent.keyboard('{Escape}');
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).toBeNull();
     });
     expect(setServerPort).not.toHaveBeenCalled();
   });
@@ -801,20 +801,20 @@ test('recorded session', async ({ page }) => {
       dispatch={vi.fn()}
     />);
 
-    const indicator = screen.container.querySelector('.status-indicator') as HTMLElement;
+    const indicator = screen.container.querySelector('[data-testid="status-indicator"]') as HTMLElement;
     indicator.click();
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).not.toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).not.toBeNull();
     });
 
-    const input = screen.container.querySelector('.port-input')!;
+    const input = screen.container.querySelector('[data-testid="port-input"]')!;
     await userEvent.clear(input);
     await userEvent.type(input, '65536');
     await userEvent.keyboard('{Enter}');
 
     await vi.waitFor(() => {
-      expect(screen.container.querySelector('.port-input')).toBeNull();
+      expect(screen.container.querySelector('[data-testid="port-input"]')).toBeNull();
     })
     
     expect(setServerPort).not.toHaveBeenCalled();

@@ -52,13 +52,13 @@ describe('EditorPane component tests', () => {
         const screen = await render(<LineStatusTestWrapper />);
         
         // Line 1 has 'pass' → line-pass class
-        await expect.element(screen.getByText('1')).toHaveAttribute('class', 'line-pass');
+        await expect.element(screen.getByText('1')).toHaveClass('line-pass');
 
         // Line 2 has 'fail' → line-fail class
-        await expect.element(screen.getByText('2')).toHaveAttribute('class', 'line-fail');
+        await expect.element(screen.getByText('2')).toHaveClass('line-fail');
 
-        // Line 3 has currentRunLine=2 (0-indexed) → line-active class
-        await expect.element(screen.getByText('3')).toHaveAttribute('class', 'line-active');
+        // Line 3 has currentRunLine=2 (0-indexed) → active line highlight
+        await expect.element(screen.getByText('3')).toHaveClass('bg-(--bg-line-highlight)');
     })
 
 })

@@ -126,17 +126,17 @@ describe('CommandInput Component tests', () => {
         await userEvent.keyboard('{ArrowDown}');
 
         const dropdown = screen.getByTestId('autocomplete-dropdown');
-        await expect.element(dropdown.getByText('go-back')).toHaveClass('active');
+        await expect.element(dropdown.getByText('go-back')).toHaveAttribute('data-active', 'true');
 
         await userEvent.keyboard('{ArrowDown}');
-        await expect.element(dropdown.getByText('go-forward')).toHaveClass('active');
+        await expect.element(dropdown.getByText('go-forward')).toHaveAttribute('data-active', 'true');
 
         await userEvent.keyboard('{ArrowDown}');
-        await expect.element(dropdown.getByText('goto')).toHaveClass('active');
+        await expect.element(dropdown.getByText('goto')).toHaveAttribute('data-active', 'true');
 
         // go to the bottom of the dropdown and stay
         await userEvent.keyboard('{ArrowDown}');
-        await expect.element(dropdown.getByText('goto')).toHaveClass('active');
+        await expect.element(dropdown.getByText('goto')).toHaveAttribute('data-active', 'true');
     })
 
     it('should select auto complete drop down items by using ArrowUp key', async () => {
@@ -146,18 +146,18 @@ describe('CommandInput Component tests', () => {
         const dropdown = screen.getByTestId('autocomplete-dropdown');
 
         // alway first item is to be active
-        await expect.element(dropdown.getByText('go-back')).toHaveClass('active');
+        await expect.element(dropdown.getByText('go-back')).toHaveAttribute('data-active', 'true');
 
         // index will not be changed if it is in the head already
         await userEvent.keyboard('{ArrowUp}');
-        await expect.element(dropdown.getByText('go-back')).toHaveClass('active');
+        await expect.element(dropdown.getByText('go-back')).toHaveAttribute('data-active', 'true');
 
         await userEvent.keyboard('{ArrowDown}');
         await userEvent.keyboard('{ArrowDown}');
         await userEvent.keyboard('{ArrowDown}');
 
         await userEvent.keyboard('{ArrowUp}');
-        await expect.element(dropdown.getByText('go-forward')).toHaveClass('active');
+        await expect.element(dropdown.getByText('go-forward')).toHaveAttribute('data-active', 'true');
        ;
     })
 

@@ -215,11 +215,13 @@ function Toolbar({ editorContent, fileName, stepLine, dispatch }: ToolbarProps) 
                     className="flex items-center gap-1 cursor-pointer py-[2px] px-[6px] rounded-[3px] mr-2 hover:bg-(--bg-button)"
                     title={isConnected ? `v${serverVersion} - localhost:${port}` : `Disconnected - click to change port`}
                     onClick={() => setEditingPort(true)}
+                    data-testid="status-indicator"
                 >
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0  ${isConnected ? 'bg-(--color-success)' : 'bg-(--color-error)'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0  ${isConnected ? 'bg-(--color-success)' : 'bg-(--color-error)'}`} data-testid="status-dot" data-status={isConnected ? 'connected' : 'disconnected'} />
                     { editingPort ? (
                         <input
                             className="w-[50px] bg-(--bg-editor) text-(--text-default) border border-solid border-(--border-primary) rounded-[3px] font-[inherit] text-[11px] py-[1px] px-1 outline-none"
+                            data-testid="port-input"
                             type="number"
                             defaultValue={port}
                             autoFocus

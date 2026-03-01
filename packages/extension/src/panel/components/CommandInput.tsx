@@ -67,6 +67,7 @@ function CommandInput({ onSubmit }: CommandInputProps) {
                     <div id="autocomplete-dropdown" className="absolute bottom-full left-0 bg-(--bg-toolbar) border border-solid border-(--border-primary) rounded-[4px] py-1 px-0 mb-1 max-h-50 overflow-y-auto z-50 shadow-[0_-2px_8px_rgba(0,0,0,0.15)] " data-testid="autocomplete-dropdown">
                         {matches.map((cmd, i) => (
                             <div key={cmd} className={`py-[3px] px-3 cursor-pointer font-[inherit] text-[12px] text-(--text-default) hover:bg-(--bg-button) ${i === selectIndex ? 'bg-(--bg-button)' : ''}`}
+                                data-active={i === selectIndex || undefined}
                                 onClick={() => setInput(cmd)}>
                                 {cmd}
                             </div>

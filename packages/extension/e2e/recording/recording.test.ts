@@ -48,7 +48,7 @@ async function stopRecordingOn(panelPage: Page, targetPage: Page): Promise<{ ok:
 async function waitForConsoleCommand(panelPage: Page, pattern: string, timeoutMs: number = 10000): Promise<void> {
   await panelPage.waitForFunction(
     ([pat]) => {
-      const cmds = document.querySelectorAll('.line-command');
+      const cmds = document.querySelectorAll('[data-type="command"]');
       return [...cmds].some(el => new RegExp(pat).test(el.textContent!));
     },
     [pattern],
