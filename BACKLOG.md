@@ -4,7 +4,7 @@
 
 - [ ] **History loads in wrong order** — `packages/cli/src/repl.ts`: `.reverse()` before `.push()` means Up arrow shows oldest commands first instead of most recent
 - [ ] **Dark mode toggle** — Add a toggle button to the extension toolbar to switch between light/dark themes. The `.theme-dark` CSS variables already exist in `panel.css` but nothing applies them. Plan: `useState` in `App.tsx`, pass `isDark`/`onToggleTheme` to `Toolbar`, wrap children in a div with `theme-dark` class, move `background`/`color` from `html,body` to `#root` in CSS, persist with `localStorage`.
-- [ ] **Extension spawn path bug** — `engine.ts:133` resolves `--load-extension` to `packages/extension` instead of `packages/extension/dist`. Chrome needs the folder containing `manifest.json`, which is in `dist/`. Fix: append `/dist` to the resolved path.
+- [x] **Extension spawn path bug** — `engine.ts:133` resolves `--load-extension` to `packages/extension` instead of `packages/extension/dist`. Chrome needs the folder containing `manifest.json`, which is in `dist/`. Fix: append `/dist` to the resolved path.
 - [ ] **Auto-inject `expect` in `run-code`** — auto-prepend `const { expect } = require('@playwright/test')` in the `run-code` auto-wrap so users can write `run-code await expect(page).toHaveTitle('Todo')` without manual imports
 
 ## Medium Priority
@@ -21,3 +21,4 @@
 - [x] **Convert to TypeScript** — All packages migrated to TypeScript.
 - [x] **Extension server (Phase 8)** — `playwright-repl --extension` starts HTTP server; extension connects as thin CDP relay.
 - [x] **Restructure the extension code structure** — Extension has `src/` folder with React components, Vite build step.
+- [x] **Tailwind CSS migration** — Extension panel styles migrated from custom CSS to Tailwind v4 utility classes.

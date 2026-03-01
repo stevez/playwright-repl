@@ -130,7 +130,7 @@ export class Engine {
 
       // 2. Spawn Chrome (only with --spawn).
       if (opts.spawn) {
-        const extPath = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../../extension');
+        const extPath = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../../extension/dist');
         const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
         const execPath = execInfo?.executablePath();
         if (!execPath)
