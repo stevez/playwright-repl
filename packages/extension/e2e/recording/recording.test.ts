@@ -209,7 +209,7 @@ test('stop recording cleans up — no more commands captured', async ({ recordin
   await panelPage.bringToFront();
   await panelPage.waitForTimeout(2000);
   // CM6 shows .cm-placeholder only when the editor is empty
-  await expect(panelPage.locator('.cm-placeholder')).toBeVisible();
+  await expect(panelPage.getByTestId('editor').locator('.cm-placeholder')).toBeVisible();
 });
 
 test('recorder re-injects after page navigation', async ({ recordingPages }) => {

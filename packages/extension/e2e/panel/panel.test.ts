@@ -10,38 +10,32 @@ import type { Page } from '@playwright/test';
 
 /** Fill the CodeMirror 6 editor (contenteditable, not textarea). */
 async function fillEditor(page: Page, text: string) {
-  const editor = page.getByTestId('editor').getByRole('textbox');
-  await editor.click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.press('Backspace');
+  await page.getByTestId('editor').getByRole('textbox').click();
   if (text) await page.keyboard.type(text, { delay: 0 });
 }
 
-/** Read the CodeMirror 6 editor content. */
-async function getEditorContent(page: Page): Promise<string> {
-  return (await page.getByTestId('editor').getByRole('textbox').textContent()) ?? '';
+/** Type into the CM6 command input. */
+async function fillInput(page: Page, text: string) {
+  await page.getByTestId('command-input').locator('.cm-content').click();
+  if (text) await page.keyboard.type(text, { delay: 0 });
 }
 
 // ─── Initialization ────────────────────────────────────────────────────────
 
 test('shows version from health endpoint', async ({ panelPage }) => {
-  const text = await panelPage.getByTestId('output').textContent();
-  expect(text).toContain('Playwright REPL v0.4.0-test');
+  await expect(panelPage.getByTestId('output')).toContainText('Playwright REPL v0.4.0-test');
 });
 
 test('shows connected status', async ({ panelPage }) => {
-  const text = await panelPage.getByTestId('output').textContent();
-  expect(text).toContain('Connected to localhost');
+  await expect(panelPage.getByTestId('output')).toContainText('Connected to localhost');
 });
 
 test('has record button enabled', async ({ panelPage }) => {
-  const enabled = await panelPage.getByTestId('record-btn').isEnabled();
-  expect(enabled).toBe(true);
+  await expect(panelPage.getByTestId('record-btn')).toBeEnabled();
 });
 
 test('has prompt visible', async ({ panelPage }) => {
-  const visible = await panelPage.getByTestId('prompt').isVisible();
-  expect(visible).toBe(true);
+  await expect(panelPage.getByTestId('prompt')).toBeVisible();
 });
 
 // ─── REPL Command Input ────────────────────────────────────────────────────
@@ -49,38 +43,34 @@ test('has prompt visible', async ({ panelPage }) => {
 test('displays success response after command', async ({ panelPage, mockResponse }) => {
   mockResponse({ text: '### Result\nNavigated to https://example.com', isError: false });
 
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('goto https://example.com');
-  await input.press('Enter');
+  await fillInput(panelPage, 'goto https://example.com');
+  await panelPage.keyboard.press('Escape');  // close autocomplete
+  await panelPage.keyboard.press('Enter');
 
   await expect(panelPage.getByTestId('output')).toContainText('Navigated');
-
 });
 
 test('clears input after submit', async ({ panelPage }) => {
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('snapshot');
-  await input.press('Enter');
+  await fillInput(panelPage, 'snapshot');
+  await panelPage.keyboard.press('Escape');
+  await panelPage.keyboard.press('Enter');
 
-  const value = await input.inputValue();
-  expect(value).toBe('');
+  await expect(panelPage.getByTestId('command-input').locator('.cm-placeholder')).toBeVisible();
 });
 
 test('does not send empty input', async ({ panelPage }) => {
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('   ');
-  await input.press('Enter');
+  await fillInput(panelPage, '   ');
+  await panelPage.keyboard.press('Enter');
 
-  const commands = panelPage.locator('[data-type="command"]');
-  expect(await commands.count()).toBe(0);
+  await expect(panelPage.locator('[data-type="command"]')).toHaveCount(0);
 });
 
 test('displays error responses with error styling', async ({ panelPage, mockResponse }) => {
   mockResponse({ text: '### Error\nElement not found', isError: true });
 
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('click missing');
-  await input.press('Enter');
+  await fillInput(panelPage, 'click missing');
+  await panelPage.keyboard.press('Escape');
+  await panelPage.keyboard.press('Enter');
 
   await expect(panelPage.locator('[data-type="error"]')).toContainText('Element not found');
 });
@@ -88,35 +78,36 @@ test('displays error responses with error styling', async ({ panelPage, mockResp
 // ─── Command History ───────────────────────────────────────────────────────
 
 test('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
+  await fillInput(panelPage, 'goto https://a.com');
+  await panelPage.keyboard.press('Escape');
+  await panelPage.keyboard.press('Enter');
 
-  await input.fill('goto https://a.com');
-  await input.press('Enter');
+  await fillInput(panelPage, 'goto https://b.com');
+  await panelPage.keyboard.press('Escape');
+  await panelPage.keyboard.press('Enter');
 
+  // Re-focus the input before navigating history
+  await panelPage.getByTestId('command-input').locator('.cm-content').click();
 
-  await input.fill('goto https://b.com');
-  await input.press('Enter');
+  await panelPage.keyboard.press('ArrowUp');
+  await expect(panelPage.getByTestId('command-input')).toContainText('goto https://b.com');
 
+  await panelPage.keyboard.press('ArrowUp');
+  await expect(panelPage.getByTestId('command-input')).toContainText('goto https://a.com');
 
-  await input.press('ArrowUp');
-  expect(await input.inputValue()).toBe('goto https://b.com');
+  await panelPage.keyboard.press('ArrowDown');
+  await expect(panelPage.getByTestId('command-input')).toContainText('goto https://b.com');
 
-  await input.press('ArrowUp');
-  expect(await input.inputValue()).toBe('goto https://a.com');
-
-  await input.press('ArrowDown');
-  expect(await input.inputValue()).toBe('goto https://b.com');
-
-  await input.press('ArrowDown');
-  expect(await input.inputValue()).toBe('');
+  await panelPage.keyboard.press('ArrowDown');
+  await expect(panelPage.getByTestId('command-input').locator('.cm-placeholder')).toBeVisible();
 });
 
 // ─── Local Commands ────────────────────────────────────────────────────────
 
 test('clear button empties the output', async ({ panelPage }) => {
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('snapshot');
-  await input.press('Enter');
+  await fillInput(panelPage, 'snapshot');
+  await panelPage.keyboard.press('Escape');
+  await panelPage.keyboard.press('Enter');
   await expect(panelPage.locator('[data-type="command"]')).toBeVisible();
 
   await panelPage.getByRole('button', { name: 'Clear' }).click();
@@ -125,9 +116,8 @@ test('clear button empties the output', async ({ panelPage }) => {
 });
 
 test('comments display without server call', async ({ panelPage }) => {
-  const input = panelPage.getByPlaceholder('Type a .pw command...');
-  await input.fill('# this is a comment');
-  await input.press('Enter');
+  await fillInput(panelPage, '# this is a comment');
+  await panelPage.keyboard.press('Enter');
 
   await expect(panelPage.locator('[data-type="comment"]')).toContainText('# this is a comment');
 });
@@ -138,22 +128,22 @@ test('shows line numbers for content', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com\nclick OK\npress Enter');
 
   const lineNums = panelPage.locator('.cm-lineNumbers .cm-gutterElement');
-  // CM6 may include an extra gutter element; check at least 3 lines
+  // CM6 may include an extra gutter element; no exact-count Playwright assertion for >=
   expect(await lineNums.count()).toBeGreaterThanOrEqual(3);
 });
 
 test('enables buttons when editor has content', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
 
-  expect(await panelPage.getByRole('button', { name: 'Save' }).isDisabled()).toBe(false);
-  expect(await panelPage.getByRole('button', { name: 'Export' }).isDisabled()).toBe(false);
+  await expect(panelPage.getByRole('button', { name: 'Save' })).toBeEnabled();
+  await expect(panelPage.getByRole('button', { name: 'Export' })).toBeEnabled();
 });
 
 test('disables buttons when editor is empty', async ({ panelPage }) => {
   await fillEditor(panelPage, '');
 
-  expect(await panelPage.getByRole('button', { name: 'Save' }).isDisabled()).toBe(true);
-  expect(await panelPage.getByRole('button', { name: 'Export' }).isDisabled()).toBe(true);
+  await expect(panelPage.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await expect(panelPage.getByRole('button', { name: 'Export' })).toBeDisabled();
 });
 
 // ─── Run Button ────────────────────────────────────────────────────────────
@@ -214,8 +204,7 @@ test('record button toggles back to Record when stopped', async ({ panelPage }) 
   await expect(btn).toHaveAttribute('title', 'Stop recording');
   await btn.click();
   await expect(btn).toHaveAttribute('title', 'Start Recording');
-  const hasRecording = await btn.evaluate(el => el.classList.contains('recording'));
-  expect(hasRecording).toBe(false);
+  await expect(btn).not.toHaveClass(/recording/);
 });
 
 test('record button shows error when injection fails', async ({ panelPage }) => {
@@ -235,8 +224,7 @@ test('record button shows error when injection fails', async ({ panelPage }) => 
   await expect(panelPage.locator('[data-type="error"]')).toContainText('Cannot access');
 
   // Button should NOT be in recording state
-  const hasRecording = await btn.evaluate(el => el.classList.contains('recording'));
-  expect(hasRecording).toBe(false);
+  await expect(btn).not.toHaveClass(/recording/);
 });
 
 test('received recorded commands appear in editor', async ({ panelPage }) => {
@@ -252,6 +240,5 @@ test('received recorded commands appear in editor', async ({ panelPage }) => {
   await expect(panelPage.locator('[data-type="command"]')).toContainText('click "Submit"');
 
   // Verify command is also appended to the editor
-  const editorValue = await getEditorContent(panelPage);
-  expect(editorValue).toContain('click "Submit"');
+  await expect(panelPage.getByTestId('editor').getByRole('textbox')).toContainText('click "Submit"');
 });

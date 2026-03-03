@@ -21,6 +21,8 @@
 - [ ] **Playwright version too loose** — `packages/cli/package.json`: `>=1.59.0-alpha` accepts any future version; pin to `<1.60.0` or similar
 - [ ] **Publish CLI to npm** — Requires fixing `file:../core` dependency (bundle core into CLI or publish core separately) and waiting for Playwright 1.59 stable.
 
+- [ ] **Fix skipped autocomplete keyboard test** — `test/components/CommandInput.browser.test.tsx`: "should accept autocomplete item on Enter when dropdown is open" is skipped. After `waitForVisible`, subsequent `userEvent.keyboard` events don't reach CM6's autocomplete handler (CDP focus vs JS focus mismatch). Needs investigation into vitest-browser keyboard dispatch and CM6 completion state.
+
 ## Low Priority
 
 - [ ] **Recorder: merge fill + Enter into `fill --submit`** — When recording, absorb `press Enter` after a `fill` into a single `fill "loc" "value" --submit` command. The `--submit` flag already exists in the engine. Change is in `recorder.ts` `handleKeydown`.
