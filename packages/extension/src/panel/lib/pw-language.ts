@@ -1,17 +1,7 @@
 import { StreamLanguage, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import type { StringStream } from '@codemirror/language';
-import { COMMAND_NAMES } from './commands';
-
-// Aliases from parser.ts (core package not available in extension bundle)
-const ALIASES = [
-  'o', 'g', 'go', 'back', 'fwd', 'r',
-  'c', 'dc', 't', 'f', 'h', 'p', 'sel', 'chk', 'unchk',
-  'hl', 's', 'snap', 'ss', 'e', 'con', 'net',
-  'tl', 'tn', 'tc', 'ts',
-  'v', 'vt', 've', 'vv', 'vl',
-  'q', 'ls',
-];
+import { COMMAND_NAMES, ALIASES } from './commands';
 
 const COMMANDS = new Set([...COMMAND_NAMES, ...ALIASES]);
 

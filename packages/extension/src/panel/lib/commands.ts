@@ -68,4 +68,14 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'verify-url':           { desc: 'Verify page URL' },
 };
 
+// Aliases from parser.ts (core package not available in extension bundle)
+export const ALIASES = [
+  'o', 'g', 'go', 'back', 'fwd', 'r',
+  'c', 'dc', 't', 'f', 'h', 'p', 'sel', 'chk', 'unchk',
+  'hl', 's', 'snap', 'ss', 'e', 'con', 'net',
+  'tl', 'tn', 'tc', 'ts',
+  'v', 'vt', 've', 'vv', 'vl',
+  'q', 'ls',
+];
+
 export const COMMAND_NAMES = Object.keys(COMMANDS);

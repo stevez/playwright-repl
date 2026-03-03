@@ -7,6 +7,8 @@ import { pwSyntax } from './pw-language';
 import { search, searchKeymap } from '@codemirror/search';
 import { StateEffect, StateField, EditorState, RangeSet } from '@codemirror/state';
 import { Decoration, GutterMarker, gutter } from '@codemirror/view';
+import { autocompletion } from '@codemirror/autocomplete';
+import { pwCompletion } from './pw-completion'
 
 const pwTheme = EditorView.theme({
     '&': {
@@ -43,7 +45,15 @@ const pwTheme = EditorView.theme({
     },
     '.cm-run-line': {
         background: 'var(--bg-line-highlight)'
-    }
+    },
+    '.cm-tooltip-autocomplete': {
+        backgroundColor: 'var(--bg-toolbar)',
+        border: '1px solid var(--border-primary)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+        backgroundColor: 'var(--bg-button)',
+    },
 });
 
 export const setRunLineEffect = StateEffect.define<number>();           // -1 = none
@@ -123,6 +133,7 @@ export function dispatchRunState(
 
 export const baseExtensions = [
     ...pwSyntax,                             // .pw syntax highlighting
+    autocompletion({ override: [pwCompletion], icons: false}),
     lineNumbers(),                           // built-in line numbers (replaces manual div)
     highlightActiveLineGutter(),             // highlights gutter on cursor line
     highlightActiveLine(),                   // highlights content on cursor line
