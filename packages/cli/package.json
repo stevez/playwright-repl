@@ -1,6 +1,6 @@
 {
   "name": "playwright-repl",
-  "version": "0.7.8",
+  "version": "0.7.10",
   "description": "Interactive REPL for Playwright browser automation — keyword-driven testing from your terminal",
   "type": "module",
   "bin": {
@@ -38,7 +38,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@playwright-repl/core": "0.7.8",
+    "@playwright-repl/core": "0.7.10",
     "playwright": ">=1.59.0-alpha-2026-02-01"
   },
   "devDependencies": {
