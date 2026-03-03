@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
 import { SessionManager } from '../src/recorder.js';
 import {
   processLine,
@@ -28,6 +29,7 @@ function makeCtx(overrides = {}) {
     opts: {},
     log: vi.fn(),
     historyFile: '/tmp/test-history',
+    sessionHistory: [],
     commandCount: 0,
     errors: 0,
     ...overrides,
@@ -257,6 +259,38 @@ describe('processLine', () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
+  it('.clear clears the terminal', async () => {
+    const clearSpy = vi.spyOn(console, 'clear').mockImplementation(() => {});
+    const ctx = makeCtx();
+    await processLine(ctx, '.clear');
+    expect(clearSpy).toHaveBeenCalled();
+    expect(ctx.rl!.prompt).toHaveBeenCalled();
+    clearSpy.mockRestore();
+  });
+
+  it('.history prints session command history', async () => {
+    const ctx = makeCtx();
+    ctx.sessionHistory.push('goto https://example.com', 'click e5');
+    await processLine(ctx, '.history');
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('goto https://example.com');
+    expect(output).toContain('click e5');
+  });
+
+  it('.history prints message when empty', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, '.history');
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('(no history)');
+  });
+
+  it('.history clear clears session history', async () => {
+    const ctx = makeCtx();
+    ctx.sessionHistory.push('click e5', 'goto https://example.com');
+    await processLine(ctx, '.history clear');
+    expect(ctx.sessionHistory).toHaveLength(0);
+  });
+
   it('sends regular command to daemon and increments count', async () => {
     const ctx = makeCtx();
     await processLine(ctx, 'snapshot');
@@ -277,6 +311,20 @@ describe('processLine', () => {
     await processLine(ctx, 'notacommand');
     const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
     expect(output).toContain('Unknown command');
+  });
+
+  it('passes highlight command through to engine', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'highlight .btn');
+    expect(ctx.conn.run).toHaveBeenCalledWith(expect.objectContaining({ _: ['highlight', '.btn'] }));
+  });
+
+  it('passes >> chained selector through to engine', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'click ".nav >> button"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('click');
+    expect(call._[1]).toBe('.nav >> button');
   });
 
   it('auto-resolves text to run-code for click', async () => {
@@ -457,6 +505,76 @@ describe('processLine', () => {
     const ctx = makeCtx();
     await processLine(ctx, 'verify-element button Submit');
     expect(ctx.conn.run).toHaveBeenCalled();
+  });
+
+  it('routes verify title to run-code with verifyTitle', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify title "My App"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyTitle');
+    expect(call._[1]).toContain('"My App"');
+  });
+
+  it('routes verify url to run-code with verifyUrl', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify url "/about"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyUrl');
+    expect(call._[1]).toContain('"/about"');
+  });
+
+  it('routes verify text to run-code with verifyText', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify text "Welcome"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyText');
+    expect(call._[1]).toContain('"Welcome"');
+  });
+
+  it('routes verify no-text to run-code with verifyNoText', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify no-text "Gone"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyNoText');
+    expect(call._[1]).toContain('"Gone"');
+  });
+
+  it('routes verify element to run-code with verifyElement', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify element button "Submit"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyElement');
+    expect(call._[1]).toContain('"button"');
+    expect(call._[1]).toContain('"Submit"');
+  });
+
+  it('routes verify no-element to run-code with verifyNoElement', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify no-element link "Delete"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyNoElement');
+    expect(call._[1]).toContain('"link"');
+    expect(call._[1]).toContain('"Delete"');
+  });
+
+  it('shows usage for verify without sub-type', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'verify');
+    expect(ctx.conn.run).not.toHaveBeenCalled();
+  });
+
+  it('resolves v alias to verify', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, 'v title "Test"');
+    const call = ctx.conn.run.mock.calls[0][0];
+    expect(call._[0]).toBe('run-code');
+    expect(call._[1]).toContain('verifyTitle');
   });
 
   it('auto-resolves text for dblclick', async () => {

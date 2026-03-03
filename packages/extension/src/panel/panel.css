@@ -35,6 +35,9 @@
   --color-command: #0451a5;
   --color-snapshot: #0070c1;
   --color-comment: #6a9955;
+  --color-string: #a31515;
+  --color-flag: #795e26;
+  --color-url: #0070c1;
   --color-active-line: #795e26;
   --color-line-pass: #2e7d32;
   --color-line-fail: #d32f2f;
@@ -77,6 +80,9 @@
   --color-command: #569cd6;
   --color-snapshot: #9cdcfe;
   --color-comment: #6a9955;
+  --color-string: #ce9178;
+  --color-flag: #dcdcaa;
+  --color-url: #9cdcfe;
   --color-active-line: #dcdcaa;
   --color-line-pass: #6a9955;
   --color-line-fail: #f44747;
@@ -113,10 +119,13 @@ html, body {
   color: var(--text-default);
   border: 1px solid var(--border-button);
   border-radius: 4px;
-  padding: 4px 10px;
+  padding: 4px 6px;
   font-family: inherit;
   font-size: 11px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #toolbar button:hover {
@@ -153,19 +162,6 @@ html, body {
   border-color: var(--color-recording-border) !important;
 }
 
-/* === Editor pane === */
-
-#line-numbers .line-pass::before {
-  content: "\2713";
-  margin-right: 2px;
-  font-size: 10px;
-}
-
-#line-numbers .line-fail::before {
-  content: "\2717";
-  margin-right: 2px;
-  font-size: 10px;
-}
 
 /* === Splitter === */
 
@@ -179,22 +175,22 @@ html, body {
 
 /* Scrollbar styling */
 #output::-webkit-scrollbar,
-#editor::-webkit-scrollbar {
+.cm-scroller::-webkit-scrollbar {
   width: 8px;
 }
 
 #output::-webkit-scrollbar-track,
-#editor::-webkit-scrollbar-track {
+.cm-scroller::-webkit-scrollbar-track {
   background: var(--bg-scrollbar-track);
 }
 
 #output::-webkit-scrollbar-thumb,
-#editor::-webkit-scrollbar-thumb {
+.cm-scroller::-webkit-scrollbar-thumb {
   background: var(--bg-scrollbar-thumb);
   border-radius: 4px;
 }
 
 #output::-webkit-scrollbar-thumb:hover,
-#editor::-webkit-scrollbar-thumb:hover {
+.cm-scroller::-webkit-scrollbar-thumb:hover {
   background: var(--bg-scrollbar-thumb-hover);
 }

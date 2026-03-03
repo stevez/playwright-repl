@@ -34,6 +34,7 @@ function makeCtx(overrides = {}) {
     opts: {},
     log: vi.fn(),
     historyFile: path.join(os.tmpdir(), 'pw-test-history-' + Date.now()),
+    sessionHistory: [],
     commandCount: 0,
     errors: 0,
     ...overrides,

@@ -3,6 +3,7 @@ import { filterResponse } from '@/lib/filter';
 import { COMMANDS } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
+import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
 
 function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boolean {
     if (command.trim().startsWith('#')) {
@@ -20,6 +21,17 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
         dispatch({ type: 'ADD_LINE', line: { text: `Available commands:\n${lines}`, type: 'info' } });
         return true;
     }
+    if (command.trim().toLowerCase() === 'history clear') {
+        clearHistory();
+        dispatch({ type: 'ADD_LINE', line: { text: 'History cleared.', type: 'info' } });
+        return true;
+    }
+    if (command.trim().toLowerCase() === 'history') {
+        const history = getCommandHistory();
+        const text = history.length ? history.join('\n') : '(no history)';
+        dispatch({ type: 'ADD_LINE', line: { text, type: 'info'} });
+        return true;
+    }
 
     return false;
 }
@@ -28,6 +40,7 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     if (!command.trim() || runLocalCommand(command, dispatch))
          return { text: '', isError: false };
 
+    addCommand(command);
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

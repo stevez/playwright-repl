@@ -24,6 +24,8 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'go-forward':           { desc: 'Go forward' },
     'goto':                 { desc: 'Navigate to a URL' },
     'help':                 { desc: 'Show available commands' },
+    'history':              { desc: 'Show command history' },
+    'history clear':        { desc: 'Clear command history' },
     'hover':                { desc: 'Hover over element' },
     'localstorage-clear':   { desc: 'Clear localStorage' },
     'localstorage-delete':  { desc: 'Delete localStorage' },
@@ -57,6 +59,7 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'uncheck':              { desc: 'Uncheck a checkbox' },
     'unroute':              { desc: 'Remove route' },
     'upload':               { desc: 'Upload a file' },
+    'verify':               { desc: 'Assert page state (title, url, text, element, value, list)' },
     'verify-element':       { desc: 'Verify element exists' },
     'verify-no-element':    { desc: 'Verify element not exists' },
     'verify-no-text':       { desc: 'Verify text not visible' },
@@ -64,5 +67,15 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'verify-title':         { desc: 'Verify page title' },
     'verify-url':           { desc: 'Verify page URL' },
 };
+
+// Aliases from parser.ts (core package not available in extension bundle)
+export const ALIASES = [
+  'o', 'g', 'go', 'back', 'fwd', 'r',
+  'c', 'dc', 't', 'f', 'h', 'p', 'sel', 'chk', 'unchk',
+  'hl', 's', 'snap', 'ss', 'e', 'con', 'net',
+  'tl', 'tn', 'tc', 'ts',
+  'v', 'vt', 've', 'vv', 'vl',
+  'q', 'ls',
+];
 
 export const COMMAND_NAMES = Object.keys(COMMANDS);

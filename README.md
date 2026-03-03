@@ -488,9 +488,9 @@ packages/
     │   │   ├── panel.css         # Theme variables + residual styles
     │   │   ├── App.tsx           # Root component
     │   │   ├── reducer.ts        # useReducer state management
-    │   │   ├── components/       # Toolbar, EditorPane, ConsolePane, etc.
-    │   │   ├── hooks/            # useCommandHistory
-    │   │   └── lib/              # server, run, autocomplete, filter, etc.
+    │   │   ├── types.ts          # TypeScript types
+    │   │   ├── components/       # Toolbar, CommandInput, EditorPane, ConsolePane, etc.
+    │   │   └── lib/              # server, run, commands, autocomplete, command-history, etc.
     │   └── content/
     │       └── recorder.ts       # Event recorder injected into pages
     └── public/

@@ -74,8 +74,7 @@ test('recorder injects and captures a click on a link', async ({ recordingPages 
   await waitForConsoleCommand(panelPage, 'click');
 
   // Verify it also appeared in the editor
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).toContain('click');
+  await expect(panelPage.getByTestId('editor').getByRole('textbox')).toContainText('click');
 
   await stopRecordingOn(panelPage, targetPage);
 });
@@ -102,8 +101,7 @@ test('recorder appends --nth for ambiguous locators', async ({ recordingPages })
   await panelPage.bringToFront();
   await waitForConsoleCommand(panelPage, 'click.*--nth 1');
 
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).toContain('--nth 1');
+  await expect(panelPage.getByTestId('editor').getByRole('textbox')).toContainText('--nth 1');
   await stopRecordingOn(panelPage, targetPage);
 });
 
@@ -123,8 +121,7 @@ test('recorder ignores clicks on non-interactive elements', async ({ recordingPa
   // Wait and verify no command was recorded
   await panelPage.bringToFront();
   await panelPage.waitForTimeout(2000);
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).not.toContain('click');
+  await expect(panelPage.getByTestId('editor').getByRole('textbox')).not.toContainText('click');
 
   await stopRecordingOn(panelPage, targetPage);
 });
@@ -150,9 +147,9 @@ test('recorder captures input/fill events', async ({ recordingPages }) => {
   await panelPage.bringToFront();
   await waitForConsoleCommand(panelPage, 'fill.*Buy groceries');
 
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).toContain('fill');
-  expect(editorValue).toContain('Buy groceries');
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('fill');
+  await expect(editor).toContainText('Buy groceries');
 
   await stopRecordingOn(panelPage, targetPage);
 });
@@ -176,8 +173,7 @@ test('recorder captures keyboard press events', async ({ recordingPages }) => {
   await panelPage.bringToFront();
   await waitForConsoleCommand(panelPage, 'press Enter');
 
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).toContain('press Enter');
+  await expect(panelPage.getByTestId('editor').getByRole('textbox')).toContainText('press Enter');
 
   await stopRecordingOn(panelPage, targetPage);
 });
@@ -198,9 +194,10 @@ test('stop recording cleans up — no more commands captured', async ({ recordin
   await stopRecordingOn(panelPage, targetPage);
 
   // Clear editor to check for new commands
-  await panelPage.evaluate(() => {
-    (document.getElementById('editor') as HTMLTextAreaElement).value = '';
-  });
+  const editor1 = panelPage.getByTestId('editor').getByRole('textbox');
+  await editor1.click();
+  await panelPage.keyboard.press('Control+A');
+  await panelPage.keyboard.press('Backspace');
 
   // Navigate back and click again — should NOT be captured
   await targetPage.bringToFront();
@@ -211,8 +208,8 @@ test('stop recording cleans up — no more commands captured', async ({ recordin
   // Wait a bit and verify no new commands appeared in editor
   await panelPage.bringToFront();
   await panelPage.waitForTimeout(2000);
-  const editorValue = await panelPage.locator('#editor').inputValue();
-  expect(editorValue).toBe('');
+  // CM6 shows .cm-placeholder only when the editor is empty
+  await expect(panelPage.getByTestId('editor').locator('.cm-placeholder')).toBeVisible();
 });
 
 test('recorder re-injects after page navigation', async ({ recordingPages }) => {
@@ -231,9 +228,10 @@ test('recorder re-injects after page navigation', async ({ recordingPages }) => 
 
   // Clear the editor to isolate new commands
   await panelPage.bringToFront();
-  await panelPage.evaluate(() => {
-    (document.getElementById('editor') as HTMLTextAreaElement).value = '';
-  });
+  const editor2 = panelPage.getByTestId('editor').getByRole('textbox');
+  await editor2.click();
+  await panelPage.keyboard.press('Control+A');
+  await panelPage.keyboard.press('Backspace');
 
   // Now interact with the new page — recorder should still work
   await targetPage.bringToFront();

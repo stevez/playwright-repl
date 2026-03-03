@@ -65,7 +65,7 @@ export const test = base.extend<
     });
 
     await panelPage.goto(`chrome-extension://${extensionId}/panel/panel.html`);
-    await panelPage.waitForSelector('#command-input', { timeout: 10000 });
+    await panelPage.waitForSelector('#input-bar', { timeout: 10000 });
 
     // Open a target page with a simple test form
     const targetPage = await context.newPage();

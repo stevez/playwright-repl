@@ -1,6 +1,6 @@
 import { useReducer, useRef } from 'react'
 import Toolbar from './components/Toolbar'
-import EditorPane from "./components/EditorPane"
+import CodeMirrorEditorPane from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
 import ConsolePane from './components/ConsolePane'
 import { panelReducer, initialState } from './reducer'
@@ -20,7 +20,7 @@ function App() {
       />
 
       {/* Editor pane */}
-      <EditorPane
+      <CodeMirrorEditorPane
          ref={editorPaneRef}
          editorContent={state.editorContent}
          currentRunLine={state.currentRunLine}

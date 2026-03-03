@@ -73,7 +73,7 @@ describe("ConsolePane component tests", () => {
   it('should render prompt input', async () => {
     const screen = await render(<ConsolePane outputLines={[]} dispatch={vi.fn()} passCount={0} failCount={0} />);
     await screen.getByRole('textbox').fill('click e5');
-    await expect.element(screen.getByRole('textbox')).toHaveValue('click e5');
+    await expect.element(screen.getByRole('textbox')).toHaveTextContent('click e5');
   })
 
   it('should render pass / fail count stats', async () => {
@@ -138,7 +138,7 @@ describe("ConsolePane component tests", () => {
     await userEvent.keyboard('{Enter}');
 
     expect(executeCommand).not.toHaveBeenCalled();
-    await expect.element(screen.getByRole('textbox')).toHaveValue('');
+    expect(document.querySelector('.cm-placeholder')).toBeTruthy();
     await expect.element(screen.getByText('# this is a comment')).toBeInTheDocument();
   });
 
@@ -157,7 +157,7 @@ describe("ConsolePane component tests", () => {
     await userEvent.keyboard('{Enter}');
 
     expect(executeCommand).not.toHaveBeenCalled();
-    await expect.element(screen.getByRole('textbox')).toHaveValue('');
+    expect(document.querySelector('.cm-placeholder')).toBeTruthy();
     await expect.element(screen.getByText('click e5')).not.toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).not.toBeInTheDocument();
   });

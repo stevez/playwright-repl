@@ -98,7 +98,7 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
                 </span>
                 
             </div>
-            <div id="output" ref={outputRef} className='flex-1 overflow-y-auto py-2 px-3 whitespace-pre-wrap wrap-break-word'>
+            <div id="output" ref={outputRef} data-testid="output" className='flex-1 overflow-y-auto py-2 px-3 whitespace-pre-wrap wrap-break-word'>
                 {outputLines.map(renderLine)}
             </div>
             <CommandInput onSubmit={handleSubmit} />

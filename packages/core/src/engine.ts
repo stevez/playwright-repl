@@ -242,6 +242,46 @@ export class Engine {
     if (!this._backend)
       throw new Error('Engine not started');
 
+    // ── highlight → run-code translation ──
+    if (args._[0] === 'highlight') {
+      const loc = args._.slice(1).join(' ');
+      if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
+      const isSelector = /[.#\[\]>:=]/.test(loc);
+      const locExpr = isSelector
+        ? `page.locator(${JSON.stringify(loc)})`
+        : `page.getByText(${JSON.stringify(loc)})`;
+      args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
+    }
+
+    // ── >> chaining → run-code translation ──
+    const LOCATOR_ACTIONS: Record<string, string> = {
+      click: 'click', dblclick: 'dblclick', hover: 'hover',
+      check: 'check', uncheck: 'uncheck',
+      fill: 'fill', select: 'selectOption',
+    };
+    if (LOCATOR_ACTIONS[args._[0]] && args._.some(a => a.includes('>>'))) {
+      const action = LOCATOR_ACTIONS[args._[0]];
+      const positional = args._.slice(1);
+
+      // Find last >> — everything up to the token after it is the selector,
+      // everything after that is the action argument (e.g., value for fill).
+      let lastChainIdx = -1;
+      for (let i = 0; i < positional.length; i++) {
+        if (positional[i] === '>>' || positional[i].includes('>>')) lastChainIdx = i;
+      }
+      const selectorEnd = positional[lastChainIdx] !== '>>' && positional[lastChainIdx]?.includes('>>')
+        ? lastChainIdx     // >> inside quoted token like ".nav >> button"
+        : lastChainIdx + 1;
+      const selector = positional.slice(0, selectorEnd + 1).join(' ');
+      const rest = positional.slice(selectorEnd + 1).join(' ');
+
+      const locExpr = `page.locator(${JSON.stringify(selector)})`;
+      const actionCall = rest
+        ? `${locExpr}.${action}(${JSON.stringify(rest)})`
+        : `${locExpr}.${action}()`;
+      args = { _: ['run-code', `async (page) => { await ${actionCall}; return "Done"; }`] };
+    }
+
     const deps = this._deps || loadDeps();
     const command = deps.commands[args._[0]];
     if (!command)

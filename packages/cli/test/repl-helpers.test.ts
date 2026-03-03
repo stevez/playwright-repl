@@ -156,8 +156,13 @@ describe('getGhostMatches', () => {
     expect(getGhostMatches(cmds, '')).toEqual([]);
   });
 
-  it('returns empty when input contains a space', () => {
+  it('returns empty when input contains a space but no multi-word commands match', () => {
     expect(getGhostMatches(cmds, 'close ')).toEqual([]);
+  });
+
+  it('matches multi-word commands when input contains a space', () => {
+    const withMulti = [...cmds, '.history', '.history clear'];
+    expect(getGhostMatches(withMulti, '.history ')).toEqual(['.history clear']);
   });
 
   it('returns empty when no commands match', () => {

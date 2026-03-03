@@ -1,5 +1,145 @@
 # Changelog
 
+## v0.7.8 — CodeMirror 6 Editor
+
+**2026-03-02**
+
+### Features
+
+- **CodeMirror 6 editor**: Replaced plain `<textarea>` with CodeMirror 6 for a proper code editing experience
+  - Built-in undo/redo (Ctrl+Z / Ctrl+Y)
+  - Search & replace (Ctrl+F)
+  - Line numbers via CM6 gutter
+  - Active line highlighting
+  - Bracket matching
+  - Pass/fail gutter markers (✓/✗) for run results
+  - Current run line highlighting
+  - Placeholder text when empty
+
+### Improvements
+
+- **E2E test selectors**: Replaced brittle CSS ID selectors with `getByTestId` and `getByRole` locators
+- Added `data-testid` attributes to editor pane, output, prompt, run button, and record button
+
+## v0.7.7 — Toolbar Icons
+
+**2026-03-01**
+
+### Improvements
+
+- **Toolbar icons**: Replaced text labels (Open, Save, Record/Stop, Export) with SVG icons for a cleaner, more compact toolbar
+- Added `FolderOpenIcon`, `SaveIcon`, `RecordIcon`, `StopIcon`, `ExportIcon` components
+- Adjusted button padding and centering for icon-only buttons
+
+## v0.7.6 — Chaining Selectors with >>
+
+**2026-03-01**
+
+### Features
+
+- **`>>` chaining**: Use Playwright's chained selector syntax with any interaction command (closes [#16](https://github.com/stevez/playwright-repl/issues/16))
+  - `click ".nav >> button"` → `page.locator(".nav >> button").click()`
+  - `fill ".form >> input" "hello"` → `page.locator(".form >> input").fill("hello")`
+  - Works with: click, dblclick, hover, check, uncheck, fill, select
+  - Supports both quoted (`click ".nav >> button"`) and unquoted (`click .nav >> button`) syntax
+
+## v0.7.5 — Highlight Command
+
+**2026-03-01**
+
+### Features
+
+- **`highlight` command**: Visualize which elements a locator matches with `highlight <locator>` (closes [#14](https://github.com/stevez/playwright-repl/issues/14))
+  - CSS selectors: `highlight .btn` → `page.locator(".btn").highlight()`
+  - Text matching: `highlight Submit` → `page.getByText("Submit").highlight()`
+  - Auto-detects selector vs text based on CSS-like characters (`.#[]>:=`)
+- **`hl` alias**: Short alias for `highlight` (e.g., `hl .btn`)
+- **Autocomplete**: `highlight` appears in ghost text suggestions
+
+## v0.7.4 — CLI .clear and .history Commands
+
+**2026-03-01**
+
+### Features
+
+- **`.clear` command**: Clears terminal output in the CLI REPL (closes [#15](https://github.com/stevez/playwright-repl/issues/15))
+- **`.history` command**: Shows commands entered in the current session
+- **`.history clear` command**: Clears the current session history
+- **Ghost text for new commands**: `.clear`, `.history`, and `.history clear` now appear in autocomplete suggestions
+- **Multi-word ghost text**: Ghost text now supports commands with spaces (e.g., typing `.history ` suggests `clear`)
+
+## v0.7.3 — Unified Verify Command
+
+**2026-03-01**
+
+### Features
+
+- **Unified `verify` command**: Single command with sub-types replaces individual `verify-*` commands. All sub-types:
+  - `verify title "Hello"` — assert page title contains text
+  - `verify url "/about"` — assert page URL contains text
+  - `verify text "Welcome"` — assert text is visible
+  - `verify no-text "Gone"` — assert text is not visible
+  - `verify element button "Submit"` — assert element exists by role and name
+  - `verify no-element link "Delete"` — assert element does not exist
+  - `verify value e5 "hello"` — assert input value (ref-based)
+  - `verify list e3 "a" "b"` — assert list contains items (ref-based)
+- **`v` alias**: Short alias for `verify` (e.g., `v title "Hello"`)
+- **Legacy compatibility**: Old `verify-*` commands (`verify-text`, `verify-element`, `verify-title`, `verify-url`, `verify-no-text`, `verify-no-element`) continue to work as aliases
+
+### New page-script functions
+
+- `verifyTitle(page, text)` — throws if `page.title()` does not contain text
+- `verifyUrl(page, text)` — throws if `page.url()` does not contain text
+- `verifyNoText(page, text)` — throws if text is still visible on page
+- `verifyNoElement(page, role, name)` — throws if element still exists
+
+### Fixed
+
+- **`verify-element` / `verify-no-element` converter**: Now correctly exports `getByRole("button", { name: "Submit" })` instead of incorrect `getByText("Submit")` for Playwright test export
+
+### Tests
+
+- 38 new tests across all packages:
+  - 8 page-script function tests (`verifyTitle`, `verifyUrl`, `verifyNoText`, `verifyNoElement`)
+  - 9 processline routing tests (unified verify sub-type dispatch)
+  - 10 converter export tests (Playwright `expect` assertions)
+  - 3 completion-data tests (verify entries present)
+  - 5 autocomplete tests (ghost text and match filtering)
+  - 11 E2E command tests (real browser, full stack)
+- Total: ~470 tests across all packages
+
+---
+
+## v0.7.2 — Command History & Ghost Text Fix
+
+**2026-03-01**
+
+### Features
+
+- **`history` command**: Type `history` in the extension prompt to view command history. `history clear` clears it. Both are local commands — no server connection needed.
+- **Command history module**: Refactored from React hook (`useCommandHistory`) to plain module-level store (`lib/command-history.ts`). No React dependencies, shared via ES module singleton.
+
+### Fixed
+
+- **Ghost text persists on complete commands**: Typing a complete command name (e.g., `history`) no longer shows ghost suggestions for longer matches (e.g., `history clear`). Ghost text now stops when input exactly matches a known command.
+- **`history clear` leaking into history**: Local commands (`help`, `clear`, `history`, `history clear`) are no longer recorded in command history. Only server commands appear in arrow-up recall.
+
+---
+
+## v0.7.1 — Dark Mode & Bug Fixes
+
+**2026-03-01**
+
+### Features
+
+- **Dark mode toggle**: Sun/moon SVG button in the extension toolbar. Toggles `.theme-dark` CSS class on the document root, switching all CSS variables instantly. Preference persisted via `localStorage`.
+
+### Fixed
+
+- **Extension spawn path**: `--load-extension` now correctly points to `packages/extension/dist` (where `manifest.json` lives) instead of `packages/extension`.
+
+---
+
 ## v0.7.0 — Extension React & Tailwind Migration
 
 **2026-02-28**
