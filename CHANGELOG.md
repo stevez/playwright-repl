@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.14 — Focus Fix + Command Timeout
+
+**2026-03-03**
+
+### Bug Fixes
+
+- **Focus restored after commands**: Removed `chrome.tabs.query()` IPC from the command path — it was the root cause of focus loss on every command. Active tab URL is now cached via `onActivated` listener only
+- **Navigation focus**: `cmdInputRef.current?.focus()` called after `await runAndDispatch()` restores focus after `goto` and other navigation commands
+- **Clear button**: Added `onMouseDown preventDefault` so the Clear button no longer steals focus from the input
+- **First-command focus**: Removed initial `chrome.tabs.query` in `App.tsx` useEffect that caused focus loss on the very first command via async IPC timing
+
+### Improvements
+
+- **30s command timeout**: `executeCommand` now uses `AbortController` to abort hung fetch requests after 30 seconds, preventing the extension from locking up when a Playwright command hangs (e.g. `goto` with "Frame was detached")
+- **React 19 ref**: Simplified `CommandInput` from `forwardRef` to a plain function component using React 19's native `ref` prop
+
 ## v0.7.8 — CodeMirror 6 Editor
 
 **2026-03-02**
