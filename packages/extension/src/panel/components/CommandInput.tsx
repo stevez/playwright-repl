@@ -1,14 +1,23 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useImperativeHandle } from "react";
 import { EditorView } from 'codemirror';
 import { inputExtensions } from '@/lib/cm-input-setup';
 
 interface CommandInputProps {
     onSubmit: (command: string) => void,
+    ref?: React.Ref<CommandInputHandle>,
 }
 
-function CommandInput({ onSubmit }: CommandInputProps) {
+export interface CommandInputHandle {
+    focus: () => void;
+}
+
+function CommandInput({ onSubmit, ref }: CommandInputProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+
+    useImperativeHandle(ref, () => ({
+        focus: () => viewRef.current?.focus(),
+    }), []);
 
     useEffect(() => {
         const view = new EditorView({
@@ -26,7 +35,6 @@ function CommandInput({ onSubmit }: CommandInputProps) {
             <div ref={containerRef} data-testid="command-input" className="flex-1" />
         </div>
     );
-
 }
 
 export default CommandInput;

@@ -21,6 +21,8 @@
 - [ ] **Playwright version too loose** — `packages/cli/package.json`: `>=1.59.0-alpha` accepts any future version; pin to `<1.60.0` or similar
 - [x] **Publish CLI to npm** — Published `@playwright-repl/core@0.7.10` and `playwright-repl@0.7.10` to npm. Closes #37.
 
+- [x] **Command timeout** — `executeCommand` in `server.ts` has no timeout; a stuck Playwright command (e.g. `goto` with "Frame was detached") hangs the fetch forever, blocking all subsequent commands and requiring a full browser restart. Add a 30s `AbortController` timeout so the fetch aborts and returns an error instead.
+- [ ] **Client-initiated reattach** ([#39](https://github.com/stevez/playwright-repl/issues/39)) — After a "Frame was detached" error (e.g. `goto` to a site with aggressive redirects), the Playwright backend loses its page reference and subsequent commands fail. Add a `/reattach` endpoint to the server that re-selects the current page via `browser_tabs`, and a "Reconnect" button or automatic retry in the extension panel to call it.
 - [ ] **Fix skipped autocomplete keyboard test** — `test/components/CommandInput.browser.test.tsx`: "should accept autocomplete item on Enter when dropdown is open" is skipped. After `waitForVisible`, subsequent `userEvent.keyboard` events don't reach CM6's autocomplete handler (CDP focus vs JS focus mismatch). Needs investigation into vitest-browser keyboard dispatch and CM6 completion state.
 
 ## Low Priority

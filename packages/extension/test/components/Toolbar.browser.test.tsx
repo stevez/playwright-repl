@@ -303,8 +303,8 @@ describe('Toolbar component tests', () => {
 
     await vi.waitFor(() => {
       expect(executeCommand).toHaveBeenCalledTimes(2);
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', 'https://example.com');
-      expect(executeCommand).toHaveBeenCalledWith('click e5', 'https://example.com');
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', undefined);
+      expect(executeCommand).toHaveBeenCalledWith('click e5', undefined);
     });
   });
 
@@ -338,7 +338,7 @@ describe('Toolbar component tests', () => {
     await screen.getByText('▷').click();
 
     await vi.waitFor(() => {
-      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', 'https://example.com');
+      expect(executeCommand).toHaveBeenCalledWith('goto https://example.com', undefined);
       expect(dispatch).toHaveBeenCalledWith({ type: 'STEP_ADVANCE', stepLine: 1 });
     });
   });

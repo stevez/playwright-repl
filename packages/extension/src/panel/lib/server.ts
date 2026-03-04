@@ -17,13 +17,22 @@ export function setServerPort(port: number): void {
     localStorage.setItem(STORAGE_KEY, String(port));
 }
 
+const COMMAND_TIMEOUT_MS = 30_000;
+
 export async function executeCommand(command: string, activeTabUrl?: string): Promise<CommandResult> {
-    const res = await fetch(`${getServerUrl()}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw: command, activeTabUrl }),
-    });
-    return res.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), COMMAND_TIMEOUT_MS);
+    try {
+        const res = await fetch(`${getServerUrl()}/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ raw: command, activeTabUrl }),
+            signal: controller.signal,
+        });
+        return res.json();
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 export async function checkHealth(): Promise<{status: string, version: string, browserConnected?: boolean}> {

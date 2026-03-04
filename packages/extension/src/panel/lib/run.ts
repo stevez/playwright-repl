@@ -5,6 +5,9 @@ import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
 
+let cachedTabUrl: string | undefined;
+export function setTabUrl(url: string | undefined) { cachedTabUrl = url; }
+
 function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boolean {
     if (command.trim().startsWith('#')) {
         dispatch({ type: 'ADD_LINE', line: { text: command, type: 'comment' } });
@@ -43,8 +46,7 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     addCommand(command);
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const result = await executeCommand(command, tab?.url);
+        const result = await executeCommand(command, cachedTabUrl);
         const cmdName = command.trim().split(/\s+/)[0];
         const text = filterResponse(result.text, cmdName);
         if (cmdName === 'snapshot') {

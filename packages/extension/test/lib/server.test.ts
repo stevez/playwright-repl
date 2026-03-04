@@ -22,7 +22,8 @@ describe('server', () => {
       expect(mockFetch).toHaveBeenCalledWith('http://localhost:6781/run', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: `{"raw":"click e5","activeTabUrl":"https://playwright.dev"}`
+            body: `{"raw":"click e5","activeTabUrl":"https://playwright.dev"}`,
+            signal: expect.any(AbortSignal),
       });
    })
 

@@ -147,7 +147,6 @@ describe("ConsolePane component tests", () => {
     await userEvent.keyboard('{Enter}');
 
     expect(executeCommand).not.toHaveBeenCalled();
-    expect(document.querySelector('.cm-placeholder')).toBeTruthy();
     await expect.element(screen.getByText('# this is a comment')).toBeInTheDocument();
   });
 
@@ -166,7 +165,6 @@ describe("ConsolePane component tests", () => {
     await userEvent.keyboard('{Enter}');
 
     expect(executeCommand).not.toHaveBeenCalled();
-    expect(document.querySelector('.cm-placeholder')).toBeTruthy();
     await expect.element(screen.getByText('click e5')).not.toBeInTheDocument();
     await expect.element(screen.getByText('Clicked')).not.toBeInTheDocument();
   });

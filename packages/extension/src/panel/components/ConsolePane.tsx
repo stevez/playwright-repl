@@ -77,7 +77,7 @@ function ConsolePane({ outputLines, passCount, failCount, dispatch }: ConsolePan
             <div id="console-header" className='flex justify-between items-center py-1 px-3 bg-(--bg-toolbar) border-b border-solid border-(--border-primary) shrink-0 text-[11px]'>
                 <span id="console-header-left" className='flex items-center gap-2'>
                     <span id="console-title" className='text-(--text-default) text-[12px] font-semibold'>Terminal</span>
-                    <button id="console-clear-btn" className="bg-transparent border-none text-(--text-dim) font-[inherit] text-[11px] cursor-pointer py-[1px] px-1.5 rounded-[3px] hover:text-(--text-default) hover:bg-(--bg-button)" title="Clear terminal" onClick={handleClear}>Clear</button>
+                    <button id="console-clear-btn" className="bg-transparent border-none text-(--text-dim) font-[inherit] text-[11px] cursor-pointer py-[1px] px-1.5 rounded-[3px] hover:text-(--text-default) hover:bg-(--bg-button)" title="Clear terminal" onClick={handleClear} onMouseDown={(e) => e.preventDefault()}>Clear</button>
                 </span>
                     <span id="console-stats" className='text-(--text-dim)'>
                         {
