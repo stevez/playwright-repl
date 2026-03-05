@@ -12,6 +12,7 @@ interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | '
 function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
+    const prevActionCountRef = useRef(0);
     const [isRecording, setIsRecording] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
@@ -127,6 +128,15 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const source = sources.find((s: any) => s.id === 'jsonl') || sources[0];
         if (!source?.actions?.length) return;
+        const newActions = (source.actions as string[]).slice(prevActionCountRef.current);
+        prevActionCountRef.current = source.actions.length;
+        for (const a of newActions) {
+            try {
+                dispatch({ type: 'ADD_LINE', line: { text: JSON.stringify(JSON.parse(a), null, 2), type: 'code-block' } });
+            } catch {
+                dispatch({ type: 'ADD_LINE', line: { text: a, type: 'info' } });
+            }
+        }
         const replLines = (source.actions as string[])
             .map((a: string) => jsonlToRepl(a, false))
             .filter(Boolean) as string[];
@@ -162,6 +172,7 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, isAttaching, 
         }
 
         setIsRecording(true);
+        prevActionCountRef.current = 0;
 
         if (result.url && result.url !== 'about:blank') {
             dispatch({ type: 'APPEND_EDITOR_CONTENT', command: `goto "${result.url}"` });

@@ -108,7 +108,7 @@ const resultGutter = gutter({
     markers(view) {
         const results = view.state.field(lineResultsField);
         const markers: any[] = [];
-        for (let i = 0; i < results.length; i++) {
+        for (let i = 0; i < results.length && i < view.state.doc.lines; i++) {
             if (results[i]) {
                 const line = view.state.doc.line(i + 1);
                 markers.push(new ResultMarker(results[i]!).range(line.from));

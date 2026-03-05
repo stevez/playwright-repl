@@ -232,9 +232,12 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
         return '# tab closed';
 
       case 'click':
+        // Skip focus-clicks on inputs — they're noise before fill/press
+        if (kind === 'role' && (body === 'textbox' || body === 'combobox')) return null;
         if (text) return `click ${q(text)}${nth}`;
-        // CSS fallback: quote the full selector (contains >> so chainAction picks it up)
-        if (kind === 'default' && a.selector) return `click ${q(a.selector)}`;
+        // CSS fallback: skip top-level noise (html/body clicks are "click outside" events)
+        if (kind === 'default' && a.selector && !['html', 'body'].includes(a.selector.trim()))
+          return `click ${q(a.selector)}`;
         return null;
 
       case 'fill':

@@ -110,6 +110,9 @@ export async function actionByText(page, text, action, nth) {
   let loc = page.getByText(text, { exact: true });
   if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
   if (await loc.count() === 0) loc = page.getByRole('link', { name: text });
+  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+  if (await loc.count() === 0) loc = page.getByPlaceholder(text);
   if (await loc.count() === 0) loc = page.getByText(text);
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc[action]();
@@ -279,9 +282,15 @@ export async function pressKey(page, target, key) {
     return 'Pressed ' + target;
   }
   const isRef = /^e\d+$/.test(target);
-  const loc = isRef
-    ? page.locator('aria-ref=' + target)
-    : page.getByText(target, { exact: true });
+  if (isRef) {
+    await page.locator('aria-ref=' + target).press(key);
+    return 'Pressed ' + key;
+  }
+  let loc = page.getByText(target, { exact: true });
+  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: target });
+  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: target });
+  if (await loc.count() === 0) loc = page.getByPlaceholder(target);
+  if (await loc.count() === 0) loc = page.getByText(target);
   await loc.press(key);
   return 'Pressed ' + key;
 }
