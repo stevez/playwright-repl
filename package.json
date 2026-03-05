@@ -1,14 +1,15 @@
 {
   "name": "playwright-repl",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.26.0",
   "scripts": {
-    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json && npm run build -w packages/extension",
-    "test": "npm test --workspaces --if-present",
-    "test:core": "npm test -w packages/core",
-    "test:cli": "npm test -w packages/cli"
+    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json && pnpm --filter @playwright-repl/extension run build",
+    "test": "pnpm run --recursive --if-present test",
+    "test:core": "pnpm --filter @playwright-repl/core run test",
+    "test:cli": "pnpm --filter playwright-repl run test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   },
   "devDependencies": {
     "@types/minimist": "^1.2.5",
