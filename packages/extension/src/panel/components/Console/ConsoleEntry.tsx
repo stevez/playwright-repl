@@ -5,11 +5,13 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
     return (
         <div className="py-0.5 pb-1 border-b border-(--border-primary) last:border-b-0" data-status={entry.status}>
 
-            {/* Input line */}
-            <div className="flex items-baseline gap-1">
-                <span className="text-(--color-prompt) shrink-0">&gt;</span>
-                <span className="flex-1 text-(--color-command)">{entry.input}</span>
-            </div>
+            {/* Input line(s) */}
+            {entry.input.split('\n').map((line, i) => (
+                <div key={i} className="flex items-baseline gap-1">
+                    <span className="text-(--color-prompt) shrink-0">{i === 0 ? '>' : ' '}</span>
+                    <span className="flex-1 text-(--color-command)">{line}</span>
+                </div>
+            ))}
 
             {/* Result */}
             {entry.status === 'pending' && (

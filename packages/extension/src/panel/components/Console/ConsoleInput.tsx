@@ -86,7 +86,7 @@ export function ConsoleInput({ onSubmit, onClear, ref }: Props) {
             className="flex-1 bg-transparent border-none outline-none resize-none font-[inherit] text-inherit leading-4.5 p-0 max-h-30 overflow-y-auto placeholder:text-(--text-placeholder)"
             rows={1}
             spellCheck={false}
-            placeholder="js expression, page.url(), or .pw command…"
+            placeholder="js expression, page.url(), or .pw command… (Shift+Enter for newline)"
             onKeyDown={handleKeyDown}
             onInput={handleInput}
         />
