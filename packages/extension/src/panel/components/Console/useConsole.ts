@@ -118,5 +118,24 @@ export function useConsole() {
         addEntry({ id, input, status: 'done', value, text, image, getProperties });
     }
 
-    return { entries, execute, clear, addResult };
+    async function runScript(code: string) {
+        const id = Math.random().toString(36).slice(2);
+        addEntry({ id, input: '(run JS script)', status: 'pending' });
+        try {
+            const raw = await swDebugEval(code) as { result?: CdpRemoteObject };
+            const r = raw?.result;
+            let text: string;
+            if (!r || r.type === 'undefined' || r.type === 'object' || r.type === 'function') text = 'Done';
+            else if (r.type === 'string') text = r.value as string;
+            else if (r.type === 'number' || r.type === 'boolean') text = String(r.value);
+            else text = 'Done';
+            updateEntry(id, { status: 'done', text });
+        } catch (e: any) {
+            const raw: string = e?.message ?? String(e);
+            const errorText = raw.split('\n    at ')[0].split('\nCall log:')[0].trim();
+            updateEntry(id, { status: 'error', errorText });
+        }
+    }
+
+    return { entries, execute, clear, addResult, runScript };
 }

@@ -59,6 +59,7 @@ function App() {
         attachedTabId={state.attachedTabId}
         isAttaching={state.isAttaching}
         dispatch={dispatch}
+        consoleRef={consoleRef}
       />
 
       {/* Editor pane */}

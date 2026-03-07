@@ -26,6 +26,7 @@ export interface ConsoleEntry {
 export interface ConsoleHandle {
   clear: () => void;
   addResult: (result: { input: string; value?: SerializedValue; text?: string; image?: string; getProperties?: (objectId: string) => Promise<unknown> }) => void;
+  runScript: (code: string) => Promise<void>;
 }
 
 export interface ConsoleProps {

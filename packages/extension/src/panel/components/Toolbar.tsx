@@ -2,14 +2,16 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { exportToPlaywright, jsonlToRepl } from '@/lib/converter';
 import { connectWithRetry, attachToTab } from '@/lib/bridge';
-import { runAndDispatch, runJsScript } from '@/lib/run';
+import { runAndDispatch } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
+import type { ConsoleHandle } from './Console';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
     dispatch: React.Dispatch<Action>,
+    consoleRef: React.RefObject<ConsoleHandle | null>,
 };
 
-function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch, consoleRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
@@ -145,7 +147,7 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
     async function handleRun() {
         dispatch({ type: 'RUN_START' });
         if (editorMode === 'js') {
-            await runJsScript(editorContent, dispatch);
+            await consoleRef.current?.runScript(editorContent);
         } else {
             for (let i = 0; i < lines.length; i++) {
                 const trimmedValue = lines[i].trim();

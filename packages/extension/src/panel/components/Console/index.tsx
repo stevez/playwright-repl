@@ -55,7 +55,7 @@ interface Props extends ConsoleProps {
 
 export function Console({ outputLines, className, ref }: Props) {
     const [historyOffset, setHistoryOffset] = useState(0);
-    const { entries, execute, clear, addResult } = useConsole();
+    const { entries, execute, clear, addResult, runScript } = useConsole();
     const allHistorical = useMemo(() => outputLinesToEntries(outputLines ?? []), [outputLines]);
     const historicalEntries = allHistorical.slice(historyOffset);
     const inputRef = useRef<ConsoleInputHandle>(null);
@@ -72,7 +72,7 @@ export function Console({ outputLines, className, ref }: Props) {
         execute(input);
     }
 
-    useImperativeHandle(ref, () => ({ clear: clearAll, addResult }));
+    useImperativeHandle(ref, () => ({ clear: clearAll, addResult, runScript }));
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'instant' });
