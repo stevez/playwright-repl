@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, RenderResult } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
-import CommandInput from '@/components/CommandInput';
+import { ConsoleInput } from '@/components/Console/ConsoleInput';
 import { addCommand, clearHistory } from '@/lib/command-history';
 
 // Helper: get the CM6 content element
@@ -51,7 +51,7 @@ describe('CommandInput Component tests', () => {
     beforeEach(async () => {
         clearHistory();
         onSubmit = vi.fn();
-        screen = await render(<CommandInput onSubmit={onSubmit}/>);
+        screen = await render(<ConsoleInput onSubmit={onSubmit} onClear={vi.fn()} />);
     });
 
     it('should render the CM6 editor', async () => {
