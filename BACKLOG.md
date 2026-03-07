@@ -53,6 +53,7 @@
 - [ ] **Richer console output types** ([#89](https://github.com/stevez/playwright-repl/issues/89)) — info/warning banners, code-block highlighting, screenshot rendering.
 - [ ] **Terminal → console output parity** ([#90](https://github.com/stevez/playwright-repl/issues/90)) — Terminal commands stream results into console too.
 - [ ] **Editor JS mode** ([#91](https://github.com/stevez/playwright-repl/issues/91)) — `.pw`/`JS` toggle; JS mode uses `swDebugEval` directly.
+- [ ] **Capture `console.log` in JS mode** — Intercept `console.log`/`console.error` in `swDebugEval` wrapper and route output to the panel console instead of service worker DevTools.
 - [ ] **Console recording / export** ([#92](https://github.com/stevez/playwright-repl/issues/92)) — "Copy session" exports console inputs as `.pw`/JS file.
 
 ## Console (Phase 3 — terminal replacement)

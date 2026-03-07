@@ -4,6 +4,7 @@ export type PanelState = {
   outputLines: OutputLine[]
   editorContent: string
   fileName: string
+  editorMode: 'pw' | 'js'
   isRunning: boolean
   currentRunLine: number      // -1 = none
   stepLine: number            // -1 = not stepping
@@ -34,11 +35,13 @@ export type Action =
    | { type: 'ATTACH_SUCCESS', url: string, tabId: number }
    | { type: 'ATTACH_FAIL' }
    | { type: 'DETACH' }
+   | { type: 'SET_EDITOR_MODE', mode: 'pw' | 'js' }
 
 export const initialState : PanelState = {
     outputLines: [],
     editorContent: '',
     fileName: '',
+    editorMode: 'pw',
     isRunning: false,
     currentRunLine: -1,
     stepLine: -1,
@@ -120,6 +123,8 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, isAttaching: false, attachedUrl: null, attachedTabId: null }
         case 'DETACH':
             return { ...state, attachedUrl: null, attachedTabId: null }
+        case 'SET_EDITOR_MODE':
+            return { ...state, editorMode: action.mode }
         default:
             return state
     }

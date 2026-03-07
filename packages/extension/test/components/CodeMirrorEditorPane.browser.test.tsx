@@ -13,6 +13,7 @@ describe('CodeMirrorEditorPane component tests', () => {
             <div style={{ height: '300px', width: '600px' }}>
                 <CodeMirrorEditorPane
                     editorContent={state.editorContent}
+                    editorMode={state.editorMode}
                     currentRunLine={state.currentRunLine}
                     lineResults={state.lineResults}
                     dispatch={dispatch}
@@ -88,5 +89,14 @@ describe('CodeMirrorEditorPane component tests', () => {
         const placeholder = screen.container.querySelector('.cm-placeholder');
         expect(placeholder).not.toBeNull();
         expect(placeholder?.textContent).toBe('# Type or open a .pw script...');
+    });
+
+    it('should show JS placeholder in JS mode', async () => {
+        const preloadedState: PanelState = { ...initialState, editorMode: 'js' };
+        const screen = await render(<TestWrapper preloadedState={preloadedState} />);
+
+        const placeholder = screen.container.querySelector('.cm-placeholder');
+        expect(placeholder).not.toBeNull();
+        expect(placeholder?.textContent).toBe('// Type JavaScript...');
     });
 });

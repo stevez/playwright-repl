@@ -2,14 +2,14 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { exportToPlaywright, jsonlToRepl } from '@/lib/converter';
 import { connectWithRetry, attachToTab } from '@/lib/bridge';
-import { runAndDispatch } from '@/lib/run';
+import { runAndDispatch, runJsScript } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
     dispatch: React.Dispatch<Action>,
 };
 
-function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
@@ -144,13 +144,17 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
 
     async function handleRun() {
         dispatch({ type: 'RUN_START' });
-        for (let i = 0; i < lines.length; i++) {
-            const trimmedValue = lines[i].trim();
-            if (!lines[i].startsWith('#') && trimmedValue) {
-                await runCommand(i, trimmedValue);
+        if (editorMode === 'js') {
+            await runJsScript(editorContent, dispatch);
+        } else {
+            for (let i = 0; i < lines.length; i++) {
+                const trimmedValue = lines[i].trim();
+                if (!lines[i].startsWith('#') && trimmedValue) {
+                    await runCommand(i, trimmedValue);
+                }
             }
+            dispatch({ type: 'ADD_LINE', line: { text: 'Run complete.', type: 'info' } });
         }
-        dispatch({ type: 'ADD_LINE', line: { text: 'Run complete.', type: 'info' } });
         dispatch({ type: 'RUN_STOP' })
     }
 
@@ -291,8 +295,16 @@ function Toolbar({ editorContent, fileName, stepLine, attachedUrl, attachedTabId
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
                 <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
-                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim()} onClick={handleStep}>&#9655;</button>
+                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}><ExportIcon /></button>
+                <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
+                <button
+                    data-testid="mode-toggle"
+                    title={`Switch to ${editorMode === 'pw' ? 'JS' : '.pw'} mode`}
+                    onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: editorMode === 'pw' ? 'js' : 'pw' })}
+                >
+                    {editorMode === 'pw' ? '.pw' : 'JS'}
+                </button>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                     {isDarkMode ? <SunIcon /> : <MoonIcon />}
                 </button>

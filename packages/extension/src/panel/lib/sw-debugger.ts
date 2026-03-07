@@ -75,13 +75,31 @@ export async function swGetProperties(objectId: string): Promise<unknown> {
     });
 }
 
+/** Attempt to insert `return` before the last expression line so the caller gets the value. */
+export function tryReturnLastExpr(code: string): string {
+    const lines = code.split('\n');
+    let i = lines.length - 1;
+    while (i >= 0 && !lines[i].trim()) i--;
+    if (i < 0) return code;
+    const trimmed = lines[i].trimStart();
+    // Skip lines that are statements, not expressions
+    if (/^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(trimmed)) return code;
+    const leading = lines[i].slice(0, lines[i].length - trimmed.length);
+    lines[i] = leading + 'return ' + trimmed;
+    return lines.join('\n');
+}
+
 export async function swDebugEval(expression: string): Promise<unknown> {
     const targetId = await ensureAttached();
     const isMultiLine = expression.includes('\n');
-    // Statement form (ends with ';') can't be used in `return (...)` — use bare async IIFE
+    // Statement form (ends with ';') can't be used in `return (...)`.
+    // Use AsyncFunction constructor so that:
+    //   (1) await is valid (proper async function scope),
+    //   (2) const/let are scoped per call and don't leak between runs,
+    //   (3) last expression value is captured via tryReturnLastExpr.
     const isStatement = isMultiLine || expression.trimEnd().endsWith(';');
     const wrapped = isStatement
-        ? `(async () => {\n${expression}\n})()`
+        ? `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(tryReturnLastExpr(expression))}))()`
         : `(async () => { return (${expression}) })()`;
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand(

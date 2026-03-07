@@ -53,6 +53,7 @@ function App() {
       <Toolbar
         editorContent={state.editorContent}
         fileName={state.fileName}
+        editorMode={state.editorMode}
         stepLine={state.stepLine}
         attachedUrl={state.attachedUrl}
         attachedTabId={state.attachedTabId}
@@ -64,6 +65,7 @@ function App() {
       <CodeMirrorEditorPane
          ref={editorPaneRef}
          editorContent={state.editorContent}
+         editorMode={state.editorMode}
          currentRunLine={state.currentRunLine}
          lineResults={state.lineResults}
          dispatch={dispatch}

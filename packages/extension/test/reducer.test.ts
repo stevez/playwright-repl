@@ -138,4 +138,21 @@ describe('Reducer tests', () => {
      );
      expect(newState.attachedUrl).toBeNull();
    });
+
+   // ─── Editor mode ─────────────────────────────────────────────────────────
+
+   it('initialState should have editorMode pw', () => {
+     expect(initialState.editorMode).toBe('pw');
+   });
+
+   it('should process event SET_EDITOR_MODE to js', () => {
+     const newState = panelReducer(initialState, { type: 'SET_EDITOR_MODE', mode: 'js' });
+     expect(newState.editorMode).toBe('js');
+   });
+
+   it('should process event SET_EDITOR_MODE back to pw', () => {
+     const state = { ...initialState, editorMode: 'js' as const };
+     const newState = panelReducer(state, { type: 'SET_EDITOR_MODE', mode: 'pw' });
+     expect(newState.editorMode).toBe('pw');
+   });
 })

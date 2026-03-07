@@ -38,6 +38,27 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
     return false;
 }
 
+function trimStack(msg: string): string {
+    return msg.split('\n    at ')[0].split('\nCall log:')[0].trim();
+}
+
+export async function runJsScript(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
+    dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
+    try {
+        const raw = await swDebugEval(code) as { result?: CdpRemoteObject };
+        const r = raw?.result;
+        let text: string;
+        if (!r || r.type === 'undefined' || r.type === 'object' || r.type === 'function') text = 'Done';
+        else if (r.type === 'string') text = r.value as string;
+        else if (r.type === 'number' || r.type === 'boolean') text = String(r.value);
+        else text = 'Done';
+        dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success' } });
+    } catch (e: unknown) {
+        const text = trimStack(e instanceof Error ? e.message : String(e));
+        dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
+    }
+}
+
 export async function runAndDispatch(command: string, dispatch: React.Dispatch<Action>): Promise<CommandResult> {
 
     if (!command.trim() || runLocalCommand(command, dispatch))
@@ -61,7 +82,7 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success' } });
             return { text, isError: false };
         } catch (e: any) {
-            const text = e?.message ?? String(e);
+            const text = trimStack(e?.message ?? String(e));
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'error' } });
             return { text, isError: true };
         }

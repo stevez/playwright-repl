@@ -17,7 +17,12 @@ vi.mock('@/lib/bridge', () => ({
   }),
 }));
 
+vi.mock('@/lib/sw-debugger', () => ({
+  swDebugEval: vi.fn().mockResolvedValue({ result: { type: 'string', value: 'JS result' } }),
+}));
+
 import { executeCommand, attachToTab, connectWithRetry } from '@/lib/bridge';
+import { swDebugEval } from '@/lib/sw-debugger';
 
 // ─── Helper to render Toolbar with default required props ─────────────────────
 
@@ -25,6 +30,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
   return render(<Toolbar
     editorContent=''
     fileName=''
+    editorMode='pw'
     stepLine={-1}
     attachedUrl={null}
     attachedTabId={null}
@@ -663,6 +669,177 @@ test('recorded session', async ({ page }) => {
         expect(values).not.toContain('4'); // about:blank excluded
         expect(values).toContain('1');     // https://example.com included
         expect(values).toContain('2');     // chrome://newtab included
+      });
+    });
+  });
+
+  // ─── Editor mode toggle ────────────────────────────────────────────────────
+
+  describe('editor mode toggle', () => {
+    it('should render the mode toggle button showing current mode', async () => {
+      const screen = await renderToolbar({ editorMode: 'pw' });
+      const toggle = screen.container.querySelector('[data-testid="mode-toggle"]');
+      expect(toggle).not.toBeNull();
+      expect(toggle?.textContent).toBe('.pw');
+    });
+
+    it('should dispatch SET_EDITOR_MODE js when toggled from pw', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorMode: 'pw', dispatch });
+
+      const toggle = screen.container.querySelector('[data-testid="mode-toggle"]') as HTMLButtonElement;
+      toggle.click();
+
+      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'js' });
+    });
+
+    it('should dispatch SET_EDITOR_MODE pw when toggled from js', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorMode: 'js', dispatch });
+
+      const toggle = screen.container.querySelector('[data-testid="mode-toggle"]') as HTMLButtonElement;
+      toggle.click();
+
+      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'pw' });
+    });
+
+    it('step button is disabled in JS mode', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'goto https://example.com',
+        editorMode: 'js',
+      });
+
+      const stepBtn = screen.container.querySelector('#step-btn') as HTMLButtonElement;
+      expect(stepBtn.disabled).toBe(true);
+    });
+
+    it('step button is enabled in pw mode with content', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'goto https://example.com',
+        editorMode: 'pw',
+      });
+
+      const stepBtn = screen.container.querySelector('#step-btn') as HTMLButtonElement;
+      expect(stepBtn.disabled).toBe(false);
+    });
+
+    it('should call swDebugEval with full script in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({
+        editorContent: 'document.title',
+        editorMode: 'js',
+        dispatch,
+      });
+
+      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'string', value: 'My Page' } });
+
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(swDebugEval).toHaveBeenCalledWith('document.title');
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUBMITTED',
+          line: { text: '(run JS script)', type: 'command' },
+        });
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUCCESS',
+          line: { text: 'My Page', type: 'success' },
+        });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
+      });
+    });
+
+    it('should not call executeCommand in JS mode', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'document.title',
+        editorMode: 'js',
+      });
+
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => expect(swDebugEval).toHaveBeenCalled());
+      expect(executeCommand).not.toHaveBeenCalled();
+    });
+
+    it('should show numeric result in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorContent: '6', editorMode: 'js', dispatch });
+
+      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'number', value: 6 } });
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUCCESS',
+          line: { text: '6', type: 'success' },
+        });
+      });
+    });
+
+    it('should show boolean result in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorContent: 'true', editorMode: 'js', dispatch });
+
+      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'boolean', value: true } });
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUCCESS',
+          line: { text: 'true', type: 'success' },
+        });
+      });
+    });
+
+    it('should show Done for undefined result in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorContent: 'void 0', editorMode: 'js', dispatch });
+
+      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'undefined' } });
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUCCESS',
+          line: { text: 'Done', type: 'success' },
+        });
+      });
+    });
+
+    it('should show Done for object result in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ editorContent: '({})', editorMode: 'js', dispatch });
+
+      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'object' } });
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_SUCCESS',
+          line: { text: 'Done', type: 'success' },
+        });
+      });
+    });
+
+    it('should dispatch COMMAND_ERROR when swDebugEval throws in JS mode', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({
+        editorContent: 'invalid()',
+        editorMode: 'js',
+        dispatch,
+      });
+
+      vi.mocked(swDebugEval).mockRejectedValue(new Error('ReferenceError: invalid is not defined'));
+
+      await screen.getByText('▶').click();
+
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'COMMAND_ERROR',
+          line: { text: 'ReferenceError: invalid is not defined', type: 'error' },
+        });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
       });
     });
   });

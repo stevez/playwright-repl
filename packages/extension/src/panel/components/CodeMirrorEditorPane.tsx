@@ -1,15 +1,15 @@
 import { useRef, useEffect } from 'react';
 import { EditorView } from 'codemirror';
-import { baseExtensions, dispatchRunState } from '@/lib/codemirror-setup';
+import { baseExtensions, dispatchRunState, languageCompartment, pwModeExtension, jsModeExtension } from '@/lib/codemirror-setup';
 import type { PanelState, Action } from "@/reducer";
 
-interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults'> {
+interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
     dispatch: React.Dispatch<Action>
     ref?: React.Ref<HTMLDivElement>
 }
 
 
-function CodeMirrorEditorPane({ editorContent, currentRunLine, lineResults, dispatch, ref }: EditorPaneProps) {
+function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref }: EditorPaneProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
@@ -47,6 +47,12 @@ function CodeMirrorEditorPane({ editorContent, currentRunLine, lineResults, disp
         if(!view) return;
         dispatchRunState(view, currentRunLine, lineResults);
     }, [currentRunLine, lineResults]);
+
+    useEffect(() => {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({ effects: languageCompartment.reconfigure(editorMode === 'js' ? jsModeExtension : pwModeExtension) });
+    }, [editorMode]);
 
 
     return (

@@ -2,10 +2,13 @@
 import { EditorView } from "codemirror";
 import { lineNumbers, highlightActiveLineGutter, highlightActiveLine, keymap, placeholder } from '@codemirror/view';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
-import { bracketMatching } from '@codemirror/language';
+import { bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
+import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
+import type { CompletionContext, CompletionResult } from '@codemirror/autocomplete';
 import { pwSyntax } from './pw-language';
 import { search, searchKeymap } from '@codemirror/search';
-import { StateEffect, StateField, EditorState, RangeSet } from '@codemirror/state';
+import { StateEffect, StateField, EditorState, RangeSet, Compartment } from '@codemirror/state';
 import { Decoration, GutterMarker, gutter } from '@codemirror/view';
 import { autocompletion } from '@codemirror/autocomplete';
 import { pwCompletion } from './pw-completion'
@@ -131,10 +134,48 @@ export function dispatchRunState(
     });
 }
 
+export const languageCompartment = new Compartment();
+
+const jsHighlightStyle = HighlightStyle.define([
+    { tag: tags.keyword,                      color: 'var(--color-command)' },
+    { tag: tags.string,                       color: 'var(--color-string)' },
+    { tag: tags.number,                       color: 'var(--color-url)' },
+    { tag: tags.bool,                         color: 'var(--color-url)' },
+    { tag: tags.null,                         color: 'var(--text-dim)', fontStyle: 'italic' },
+    { tag: tags.comment,                      color: 'var(--color-comment)', fontStyle: 'italic' },
+    { tag: tags.propertyName,                 color: 'var(--color-flag)' },
+    { tag: tags.definition(tags.variableName),color: 'var(--color-active-line)' },
+]);
+
+export const pwModeExtension = [
+    ...pwSyntax,
+    autocompletion({ override: [pwCompletion], icons: false }),
+    placeholder('# Type or open a .pw script...'),
+];
+
+function jsAsyncCompletion(context: CompletionContext): CompletionResult | null {
+    const word = context.matchBefore(/\w*/);
+    if (!word || (word.from === word.to && !context.explicit)) return null;
+    return {
+        from: word.from,
+        options: [
+            { label: 'async', type: 'keyword' },
+            { label: 'await', type: 'keyword' },
+        ],
+    };
+}
+
+export const jsModeExtension = [
+    javascript(),
+    javascriptLanguage.data.of({ autocomplete: jsAsyncCompletion }),
+    syntaxHighlighting(jsHighlightStyle),
+    autocompletion({ icons: false }),
+    placeholder('// Type JavaScript...'),
+];
+
 export const baseExtensions = [
-    ...pwSyntax,                             // .pw syntax highlighting
-    autocompletion({ override: [pwCompletion], icons: false}),
-    lineNumbers(),                           // built-in line numbers (replaces manual div)
+    languageCompartment.of(pwModeExtension), // dynamic language compartment
+    lineNumbers(),                           // built-in line numbers
     highlightActiveLineGutter(),             // highlights gutter on cursor line
     highlightActiveLine(),                   // highlights content on cursor line
     history(),                               // undo/redo stack
@@ -146,7 +187,6 @@ export const baseExtensions = [
         ...searchKeymap,                       // Ctrl+F, Ctrl+H
     ]),
     EditorState.tabSize.of(2),              // tab = 2 spaces
-    placeholder('# Type or open a .pw script...'),
     pwTheme,
     runLineField,          // ← register the StateField so CM6 tracks it
     lineResultsField,      // ← register the StateField so CM6 tracks it
