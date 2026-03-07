@@ -38,9 +38,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                                 {lightbox && <Lightbox image={entry.image} onClose={() => setLightbox(false)} />}
                             </div>
                         ) : (
-                            <div data-type="success">
-                                <span className="text-(--color-success)">{entry.text}</span>
-                            </div>
+                            <div data-type="success" className="whitespace-pre-wrap text-(--color-success)">{entry.text}</div>
                         )}
                     </div>
                 )}
