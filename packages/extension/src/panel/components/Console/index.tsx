@@ -64,6 +64,7 @@ export function Console({ outputLines, className, ref }: Props) {
     function clearAll() {
         setHistoryOffset(allHistorical.length);
         clear();
+        inputRef.current?.clear();
     }
 
     function handleExecute(input: string) {

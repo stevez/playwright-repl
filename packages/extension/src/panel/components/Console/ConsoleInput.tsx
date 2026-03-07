@@ -5,6 +5,7 @@ import { consoleExtensions } from '@/lib/cm-console-setup';
 
 export interface ConsoleInputHandle {
     focus: () => void;
+    clear: () => void;
 }
 
 interface Props {
@@ -38,6 +39,10 @@ export function ConsoleInput({ onSubmit, onClear, ref }: Props) {
 
     useImperativeHandle(ref, () => ({
         focus: () => viewRef.current?.focus(),
+        clear: () => {
+            const view = viewRef.current;
+            if (view) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' } });
+        },
     }));
 
     return <div ref={containerRef} data-testid="command-input" className="flex-1 min-w-0" />;
