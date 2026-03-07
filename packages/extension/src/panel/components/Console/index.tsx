@@ -74,13 +74,14 @@ export function Console({ outputLines, className, ref }: Props) {
     return (
         <div className={`flex flex-col flex-1 min-h-20 overflow-hidden ${className ?? ''}`} data-testid="console-pane">
             <div className="flex items-center px-2 py-0.5 border-b border-(--border-primary) bg-(--bg-toolbar) shrink-0">
-                <button className="console-clear-btn" onClick={clearAll} title="Clear console (Ctrl+L)">⊘</button>
+                <span className="text-xs text-(--text-dim) font-medium">Console</span>
             </div>
             <div className="flex-1 overflow-y-auto py-1 px-2" data-testid="output">
                 <ConsoleOutput entries={[...historicalEntries, ...entries]} />
                 <div className="flex items-start gap-1 py-0.5">
                     <span className="text-(--color-prompt) shrink-0" data-testid="prompt">&gt;</span>
                     <ConsoleInput ref={inputRef} onSubmit={handleExecute} onClear={clearAll} />
+                    <button className="console-clear-btn shrink-0" onClick={clearAll} title="Clear console (Ctrl+L)">⊘</button>
                 </div>
                 <div ref={bottomRef} />
             </div>
