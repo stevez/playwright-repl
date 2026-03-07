@@ -1,19 +1,14 @@
-import { useReducer, useRef, useEffect, useState } from 'react'
+import { useReducer, useRef, useEffect } from 'react'
 import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
-import TerminalPane from './components/TerminalPane'
-import CommandInput, { CommandInputHandle } from './components/CommandInput'
 import { panelReducer, initialState } from './reducer'
-import { runAndDispatch } from './lib/run'
 import { attachToTab } from './lib/bridge'
 import { Console, type ConsoleHandle } from './components/Console';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
-  const cmdInputRef = useRef<CommandInputHandle>(null)
-  const [bottomTab, setBottomTab] = useState<'terminal' | 'console'>('terminal');
   const consoleRef = useRef<ConsoleHandle>(null);
 
 
@@ -52,12 +47,6 @@ function App() {
     return () => chrome.tabs.onActivated.removeListener(onActivated);
   }, []);
 
-  async function handleSubmit(command: string) {
-    await runAndDispatch(command, dispatch);
-    window.focus();
-    cmdInputRef.current?.focus();
-  }
-
   return (
     <>
       {/* Toolbar */}
@@ -83,35 +72,7 @@ function App() {
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef}/>
 
-      <div className="bottom-tab-bar">
-        <button
-          data-active={bottomTab === 'terminal'}
-          onClick={() => setBottomTab('terminal')}
-        >Terminal</button>
-        <button
-          data-active={bottomTab === 'console'}
-          onClick={() => setBottomTab('console')}
-        >Console</button>
-        <div className="bottom-tab-spacer" />
-        {bottomTab === 'console' && (
-          <button
-            className="console-clear-btn"
-            onClick={() => consoleRef.current?.clear()}
-            title="Clear console (Ctrl+L)"
-          >⊘</button>
-        )}
-      </div>
-      
-      {bottomTab === 'terminal' ? (
-        <>
-          <TerminalPane
-            outputLines={state.outputLines}
-          />
-          <CommandInput ref={cmdInputRef} onSubmit={handleSubmit} />
-        </>
-      ) : (
-        <Console ref={consoleRef} outputLines={state.outputLines} />
-      )}
+      <Console ref={consoleRef} outputLines={state.outputLines} />
     </>
   )
 }

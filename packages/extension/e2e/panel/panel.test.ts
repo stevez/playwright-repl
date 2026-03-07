@@ -51,7 +51,7 @@ test('does not send empty input', async ({ panelPage }) => {
   await fillInput(panelPage, '   ');
   await panelPage.keyboard.press('Enter');
 
-  await expect(panelPage.locator('[data-type="command"]')).toHaveCount(0);
+  await expect(panelPage.locator('[data-status]')).toHaveCount(0);
 });
 
 test('displays error responses with error styling', async ({ panelPage }) => {
@@ -96,7 +96,7 @@ test('comments display without server call', async ({ panelPage }) => {
   await fillInput(panelPage, '# this is a comment');
   await panelPage.keyboard.press('Enter');
 
-  await expect(panelPage.locator('[data-type="comment"]')).toContainText('# this is a comment');
+  await expect(panelPage.getByTestId('output')).toContainText('# this is a comment');
 });
 
 // ─── Editor ────────────────────────────────────────────────────────────────

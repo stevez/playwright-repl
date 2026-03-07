@@ -70,7 +70,7 @@ export const test = base.extend<
       });
     });
 
-    await page.waitForSelector('#input-bar', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
 
     await use(page);
     await page.close();

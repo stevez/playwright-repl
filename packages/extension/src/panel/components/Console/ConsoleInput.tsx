@@ -40,5 +40,5 @@ export function ConsoleInput({ onSubmit, onClear, ref }: Props) {
         focus: () => viewRef.current?.focus(),
     }));
 
-    return <div ref={containerRef} className="flex-1 min-w-0" />;
+    return <div ref={containerRef} data-testid="command-input" className="flex-1 min-w-0" />;
 }

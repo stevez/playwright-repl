@@ -21,7 +21,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                         {entry.value !== undefined ? (
                             <ObjectTree data={entry.value} getProperties={entry.getProperties} />
                         ) : entry.codeBlock !== undefined ? (
-                            <div className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
+                            <div data-type="snapshot" className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
                                 <pre className="m-0 py-2 px-3 text-(--color-command) font-[inherit] text-[12px] leading-4 whitespace-pre-wrap wrap-break-word">{entry.codeBlock}</pre>
                                 <button
                                     className="absolute top-1 right-1 bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[10px] cursor-pointer hover:bg-(--bg-button-hover)"
@@ -29,21 +29,23 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                                 >Copy</button>
                             </div>
                         ) : entry.image !== undefined ? (
-                            <>
+                            <div data-type="screenshot">
                                 <img
                                     src={entry.image}
                                     className="max-w-100 cursor-zoom-in rounded"
                                     onClick={() => setLightbox(true)}
                                 />
                                 {lightbox && <Lightbox image={entry.image} onClose={() => setLightbox(false)} />}
-                            </>
+                            </div>
                         ) : (
-                            <span className="text-(--color-success)">{entry.text}</span>
+                            <div data-type="success">
+                                <span className="text-(--color-success)">{entry.text}</span>
+                            </div>
                         )}
                     </div>
                 )}
                 {entry.status === 'error' && (
-                    <div className="pt-0.5 text-(--color-error) whitespace-pre-wrap">{entry.errorText}</div>
+                    <div data-type="error" className="pt-0.5 text-(--color-error) whitespace-pre-wrap">{entry.errorText}</div>
                 )}
             </div>
         </div>

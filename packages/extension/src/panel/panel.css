@@ -174,23 +174,19 @@ html, body {
 }
 
 /* Scrollbar styling */
-#output::-webkit-scrollbar,
 .cm-scroller::-webkit-scrollbar {
   width: 8px;
 }
 
-#output::-webkit-scrollbar-track,
 .cm-scroller::-webkit-scrollbar-track {
   background: var(--bg-scrollbar-track);
 }
 
-#output::-webkit-scrollbar-thumb,
 .cm-scroller::-webkit-scrollbar-thumb {
   background: var(--bg-scrollbar-thumb);
   border-radius: 4px;
 }
 
-#output::-webkit-scrollbar-thumb:hover,
 .cm-scroller::-webkit-scrollbar-thumb:hover {
   background: var(--bg-scrollbar-thumb-hover);
 }
@@ -218,41 +214,6 @@ html, body {
 
 .ot-row { display: flex; align-items: baseline; }
 
-/* === Bottom Tab Bar === */
-
-.bottom-tab-bar {
-  display: flex;
-  align-items: center;
-  background: var(--bg-toolbar);
-  border-top: 1px solid var(--border-primary);
-  border-bottom: 1px solid var(--border-primary);
-  flex-shrink: 0;
-  height: 28px;
-  padding: 0 4px;
-}
-
-.bottom-tab-bar button {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  padding: 0 10px;
-  height: 100%;
-}
-
-.bottom-tab-bar button:hover {
-  color: var(--text-default);
-}
-
-.bottom-tab-bar button[data-active="true"] {
-  color: var(--text-default);
-  border-bottom-color: var(--color-command);
-}
-
-.bottom-tab-spacer { flex: 1; }
 
 .console-clear-btn {
   background: transparent;
