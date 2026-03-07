@@ -39,13 +39,6 @@ describe("verify-visible", () => {
     expect(jsExpr).toContain('"Getting Started"');
   });
 
-  it("vvis alias resolves to verifyVisible", () => {
-    const { jsExpr } = direct('vvis link "Learn more"');
-    expect(jsExpr).toContain('verifyVisible');
-    expect(jsExpr).toContain('"link"');
-    expect(jsExpr).toContain('"Learn more"');
-  });
-
   it("returns error when missing name arg", () => {
     isError("verify-visible button");
   });

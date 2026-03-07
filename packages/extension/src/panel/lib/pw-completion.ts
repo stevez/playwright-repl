@@ -1,10 +1,7 @@
 import { CompletionContext, CompletionResult } from '@codemirror/autocomplete';
-import { COMMAND_NAMES, ALIASES } from './commands';
+import { COMMAND_NAMES } from './commands';
 
-const completions = [
-  ...COMMAND_NAMES.map(name => ({ label: name })),
-  ...ALIASES.map(alias => ({ label: alias })),
-];
+const completions = COMMAND_NAMES.map(name => ({ label: name }));
 
 export function pwCompletion(context: CompletionContext): CompletionResult | null {
   // Only complete the first word on a line

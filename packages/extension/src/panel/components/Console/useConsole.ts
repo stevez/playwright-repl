@@ -62,6 +62,9 @@ export function useConsole() {
             t === 'crxApp' || t.startsWith('crxApp.') ||
             t === 'context' || t.startsWith('context.') || t.startsWith('await context') ||
             t === 'activeTabId') return 'playwright';
+        // If it looks like a command name (word + optional hyphens, no JS operators),
+        // route to pw so unknown commands return a proper error message.
+        if (/^[a-z][\w-]*$/.test(firstToken) && !/[.()[\]=+`$;{}"']/.test(t)) return 'pw';
         return 'js';
     }
 

@@ -1,7 +1,7 @@
 /**
  * Command parser — transforms human input into executable JavaScript expressions.
  *
- * Pipeline: tokenize → alias → resolveArgs → DirectExecution or TabOperation
+ * Pipeline: tokenize → resolveArgs → DirectExecution or TabOperation
  *
  * resolveArgs returns either:
  *   - DirectExecution { jsExpr } — a JS string for swDebugEval (runs in SW where `page` is global)
@@ -57,52 +57,6 @@ function call(fn: any, ...args: unknown[]): string {
   return `return await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
 }
 
-// ─── Command aliases ────────────────────────────────────────────────────────
-
-const ALIASES: Record<string, string> = {
-  // Navigation
-  'o':    'open',
-  'g':    'goto',
-  'go':   'goto',
-  'back': 'go-back',
-  'fwd':  'go-forward',
-  'r':    'reload',
-
-  // Interaction
-  'c':    'click',
-  'dc':   'dblclick',
-  't':    'type',
-  'f':    'fill',
-  'h':    'hover',
-  'p':    'press',
-  'sel':  'select',
-  'chk':  'check',
-  'unchk':'uncheck',
-
-  // Inspection
-  'hl':   'highlight',
-  's':    'snapshot',
-  'snap': 'snapshot',
-  'ss':   'screenshot',
-  'e':    'eval',
-  'con':  'console',
-  'net':  'network',
-
-  // Tabs
-  'tl':   'tab-list',
-  'tn':   'tab-new',
-  'tc':   'tab-close',
-  'ts':   'tab-select',
-
-  // Assertions
-  'v':    'verify',
-  'vt':   'verify-text',
-  've':   'verify-element',
-  'vvis': 'verify-visible',
-  'vv':   'verify-value',
-  'vl':   'verify-list',
-};
-
 // ─── Known boolean options ──────────────────────────────────────────────────
 
 const BOOLEAN_OPTIONS = new Set([
@@ -151,16 +105,13 @@ const RAW_COMMANDS = new Set(['run-code', 'eval']);
 
 /**
  * Parse a REPL input line into a ParsedArgs object.
- * Handles tokenization, alias resolution, and option extraction.
+ * Handles tokenization and option extraction.
  */
 function parseInput(line: string): ParsedArgs | null {
   const tokens = tokenize(line);
   if (tokens.length === 0) return null;
 
-  // Resolve alias
-  const cmd = tokens[0].toLowerCase();
-  if (ALIASES[cmd]) tokens[0] = ALIASES[cmd];
-  else tokens[0] = cmd;
+  tokens[0] = tokens[0].toLowerCase();
 
   // For run-code / eval, preserve the rest of the line as a single raw string
   if (RAW_COMMANDS.has(tokens[0])) {

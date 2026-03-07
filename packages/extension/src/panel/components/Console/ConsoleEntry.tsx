@@ -19,7 +19,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                 {entry.status === 'done' && (
                     <div className="pt-0.5">
                         {entry.value !== undefined ? (
-                            <ObjectTree data={entry.value} getProperties={entry.getProperties} />
+                            <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (
                             <div data-type="snapshot" className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
                                 <pre className="m-0 py-2 px-3 text-(--color-command) font-[inherit] text-[12px] leading-4 whitespace-pre-wrap wrap-break-word">{entry.codeBlock}</pre>

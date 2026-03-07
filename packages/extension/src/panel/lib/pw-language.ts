@@ -1,9 +1,9 @@
 import { StreamLanguage, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import type { StringStream } from '@codemirror/language';
-import { COMMAND_NAMES, ALIASES } from './commands';
+import { COMMAND_NAMES } from './commands';
 
-const COMMANDS = new Set([...COMMAND_NAMES, ...ALIASES]);
+const COMMANDS = new Set(COMMAND_NAMES);
 
 interface PwState {
   commandSeen: boolean;

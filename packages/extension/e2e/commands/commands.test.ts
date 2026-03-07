@@ -75,12 +75,6 @@ test.describe('Navigation', () => {
     expect(result.text).toContain(TEST_URL);
   });
 
-  test('goto with alias g', async ({ testPage: _, panelPage }) => {
-    const result = await sendCommand(panelPage, `g ${TEST_URL}`);
-    expect(result.isError).toBeFalsy();
-    expect(result.text).toContain(TEST_URL);
-  });
-
   test('go-back navigates to previous page', async ({ testPage: _, panelPage }) => {
     await sendCommand(panelPage, `goto ${TEST_URL}`);
     await sendCommand(panelPage, `goto ${SECOND_URL}`);
@@ -110,13 +104,6 @@ test.describe('Snapshot', () => {
     expect(result.text).toMatch(/\[ref=e\d+\]/);
   });
 
-  test('snapshot with alias s', async ({ testPage: _, panelPage }) => {
-    await sendCommand(panelPage, `goto ${TEST_URL}`);
-    const result = await sendCommand(panelPage, 's');
-    expect(result.isError).toBeFalsy();
-    expect(result.text).toContain('todos');
-    expect(result.text).toMatch(/\[ref=e\d+\]/);
-  });
 });
 
 // ─── Click ───────────────────────────────────────────────────────────────────
@@ -174,12 +161,6 @@ test.describe('Eval', () => {
     expect(result.text).toContain('TodoMVC');
   });
 
-  test('eval with alias e', async ({ testPage: _, panelPage }) => {
-    await sendCommand(panelPage, `goto ${TEST_URL}`);
-    const result = await sendCommand(panelPage, 'e document.title');
-    expect(result.isError).toBeFalsy();
-    expect(result.text).toContain('TodoMVC');
-  });
 });
 
 // ─── Screenshot ──────────────────────────────────────────────────────────────
@@ -303,23 +284,6 @@ test.describe('Verify', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  test('v alias routes to verify', async ({ testPage: _, panelPage }) => {
-    await sendCommand(panelPage, `goto ${TEST_URL}`);
-    const result = await sendCommand(panelPage, 'v title "TodoMVC"');
-    expect(result.isError).toBeFalsy();
-  });
-});
-
-// ─── Aliases ─────────────────────────────────────────────────────────────────
-
-test.describe('Aliases', () => {
-  test('alias c for click', async ({ testPage: _, panelPage }) => {
-    await sendCommand(panelPage, `goto ${TEST_URL}`);
-    const snap = await sendCommand(panelPage, 's');
-    const ref = findRef(snap.text, 'TodoMVC');
-    const result = await sendCommand(panelPage, `c ${ref}`);
-    expect(result.isError).toBeFalsy();
-  });
 });
 
 // ─── Tab commands ─────────────────────────────────────────────────────────────
@@ -369,13 +333,6 @@ test.describe('Tab commands', () => {
     expect(tabsAfter).toBe(tabsBefore - 1);
   });
 
-  test('tab aliases tl, tn work', async ({ testPage: _, panelPage }) => {
-    const list = await sendCommand(panelPage, 'tl');
-    expect(list.isError).toBeFalsy();
-
-    const newTab = await sendCommand(panelPage, 'tn');
-    expect(newTab.isError).toBeFalsy();
-  });
 });
 
 // ─── Errors ──────────────────────────────────────────────────────────────────

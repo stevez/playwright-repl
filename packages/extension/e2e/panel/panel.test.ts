@@ -51,7 +51,7 @@ test('does not send empty input', async ({ panelPage }) => {
   await fillInput(panelPage, '   ');
   await panelPage.keyboard.press('Enter');
 
-  await expect(panelPage.locator('[data-status]')).toHaveCount(0);
+  await expect(panelPage.locator('[data-testid="output"] [data-status]')).toHaveCount(0);
 });
 
 test('displays error responses with error styling', async ({ panelPage }) => {

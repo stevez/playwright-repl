@@ -68,7 +68,7 @@ describe('Console component tests', () => {
     });
 
     it('should submit command on Enter and display result', async () => {
-        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked', isError: false });
+        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked' });
         const screen = await render(<Console />);
 
         await typeInEditor(screen, 'click e5');
@@ -80,7 +80,7 @@ describe('Console component tests', () => {
     });
 
     it('should submit command on Enter and display error message', async () => {
-        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'element e5 not found', isError: true });
+        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'element e5 not found' });
         const screen = await render(<Console />);
 
         await typeInEditor(screen, 'click e5');
@@ -122,7 +122,7 @@ describe('Console component tests', () => {
     });
 
     it('should not submit for clear command', async () => {
-        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked', isError: false });
+        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked' });
         const screen = await render(<Console />);
 
         await typeInEditor(screen, 'click e5');
@@ -226,7 +226,7 @@ describe('Console component tests', () => {
     });
 
     it('should render screenshot image when command returns image', async () => {
-        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: '', isError: false, image: testImage });
+        vi.mocked(executeCommandForConsole).mockResolvedValue({ text: '', image: testImage });
         const screen = await render(<Console />);
 
         await typeInEditor(screen, 'screenshot');

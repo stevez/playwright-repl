@@ -233,10 +233,10 @@ export async function runCode(page, code) {
   const trimmed = code.trim();
   // If code is a function expression, call it with page; otherwise treat as function body
   const isFnExpr = /^(async\s*)?\(|^(async\s+)?function\b/.test(trimmed);
-  const body = isFnExpr ? `return (${trimmed})(page)` : trimmed;
+  const body = isFnExpr ? `return (${trimmed})(page)` : `return ${trimmed}`;
   const fn = new AsyncFunction('page', body);
   const result = await fn(page);
-  return result !== undefined ? String(result) : 'Done';
+  return result != null && typeof result !== 'object' ? String(result) : 'Done';
 }
 
 // ─── Screenshot ──────────────────────────────────────────────────────────────
