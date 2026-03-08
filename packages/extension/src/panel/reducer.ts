@@ -96,7 +96,7 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             }
         }
         case 'RUN_STOP':
-            return { ...state, isRunning: false, isStepDebugging: false, currentRunLine: -1}
+            return { ...state, isRunning: false, isStepDebugging: false, currentRunLine: -1, stepLine: -1 }
         case 'SET_RUN_LINE':
             return { ...state, currentRunLine: action.currentRunLine}
         case 'STEP_INIT': {

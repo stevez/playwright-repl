@@ -355,8 +355,8 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
-                {isRunning
-                    ? <button id="stop-run-btn" data-testid="stop-run-btn" title={isStepDebugging ? "Abort debug session" : "Stop run"} onClick={handleStop}>{isStepDebugging ? <AbortIcon /> : <StopIcon />}</button>
+                {(isRunning || stepLine !== -1)
+                    ? <button id="stop-run-btn" data-testid="stop-run-btn" title={isStepDebugging ? "Abort" : "Stop"} onClick={handleStop}>{isStepDebugging ? <AbortIcon /> : <StopIcon />}</button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 }
                 <button id="step-btn" data-testid="step-btn" title={editorMode === 'js' ? (isStepDebugging ? 'Step: advance to next line' : 'Step: start debug session') : 'Step: run next line'} disabled={!editorContent.trim() || (isRunning && !isStepDebugging)} onClick={handleStep}><StepForwardIcon /></button>

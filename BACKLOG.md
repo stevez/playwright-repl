@@ -31,6 +31,7 @@
 - [x] **Publish CLI to npm** — Published `@playwright-repl/core@0.7.10` and `playwright-repl@0.7.10` to npm. Closes #37.
 - [x] **Command timeout** — 15s `AbortController` timeout in `executeCommand`.
 - [x] **Fix failing recording component tab**
+- [ ] **Close file without saving** — Button to discard editor content and reset `fileName` so the same file can be re-opened via the file picker.
 - [ ] **Editor context menu** ([#74](https://github.com/stevez/playwright-repl/issues/74)) — Right-click: Run line, Copy, Export to TypeScript.
 - [ ] **Record into editor (dual mode)** ([#75](https://github.com/stevez/playwright-repl/issues/75)) — Live incremental recording in `.pw` and `JS` modes.
 - [ ] **Capture locator** ([#76](https://github.com/stevez/playwright-repl/issues/76)) — "Pick element" mode captures `getByRole(...)`/`getByText(...)` locator strings.

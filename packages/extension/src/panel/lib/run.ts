@@ -69,8 +69,18 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
     const transformed = injectBreakpoints(code);
     try {
-        await swDebugEval(transformed);
-        dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+        const raw = await swDebugEval(transformed) as { result?: CdpRemoteObject };
+        const r = raw?.result;
+        if (!r || r.type === 'undefined') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+        } else if (r.type === 'string') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success' } });
+        } else if (r.type === 'number' || r.type === 'boolean') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
+        } else {
+            const value = fromCdpRemoteObject(r);
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
+        }
     } catch (e: any) {
         const msg: string = e?.message ?? String(e);
         if (msg.includes('__debug_stopped__')) {
