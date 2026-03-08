@@ -4,13 +4,12 @@ import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirror
 import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
-import { Console, type ConsoleHandle } from './components/Console';
+import { Console } from './components/Console';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorHandle | null>(null);
-  const consoleRef = useRef<ConsoleHandle>(null);
 
 
   async function doAttach(tabId: number) {
@@ -60,7 +59,6 @@ function App() {
         attachedTabId={state.attachedTabId}
         isAttaching={state.isAttaching}
         dispatch={dispatch}
-        consoleRef={consoleRef}
         editorRef={editorRef}
       />
 
@@ -78,7 +76,7 @@ function App() {
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef}/>
 
-      <Console ref={consoleRef} outputLines={state.outputLines} />
+      <Console outputLines={state.outputLines} dispatch={dispatch} />
     </>
   )
 }

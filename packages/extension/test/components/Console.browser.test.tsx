@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, RenderResult } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
+import { useReducer } from 'react';
 
 import { Console } from '@/components/Console';
+import { panelReducer, initialState } from '@/reducer';
 import type { OutputLine } from '@/types';
 
 vi.mock('@/lib/bridge', () => ({
     attachToTab: vi.fn(),
+    executeCommand: vi.fn(),
     executeCommandForConsole: vi.fn(),
     cdpEvaluate: vi.fn(),
     cdpGetProperties: vi.fn(),
@@ -33,6 +36,15 @@ test('recorded session', async ({ page }) => {
   await page.goto("https://example.com");
 });`.trim();
 
+// Wrapper that wires Console to a real reducer so dispatched actions update outputLines
+function ConsoleWithReducer({ initialLines = [] as OutputLine[] } = {}) {
+    const [state, dispatch] = useReducer(panelReducer, {
+        ...initialState,
+        outputLines: initialLines,
+    });
+    return <Console outputLines={state.outputLines} dispatch={dispatch} />;
+}
+
 function getEditor(container: Element) {
     return container.querySelector('.cm-content') as HTMLElement;
 }
@@ -55,7 +67,7 @@ describe('Console component tests', () => {
             { text: 'click e99', type: 'command' },
             { text: 'Element not found', type: 'error' },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
 
         await expect.element(screen.getByText('click e5')).toBeInTheDocument();
         await expect.element(screen.getByText('Clicked')).toBeInTheDocument();
@@ -63,13 +75,13 @@ describe('Console component tests', () => {
     });
 
     it('should render prompt input', async () => {
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
         expect(getEditor(screen.container)).toBeTruthy();
     });
 
     it('should submit command on Enter and display result', async () => {
         vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked' });
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, 'click e5');
         await userEvent.keyboard('{Escape}');
@@ -81,7 +93,7 @@ describe('Console component tests', () => {
 
     it('should submit command on Enter and display error message', async () => {
         vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'element e5 not found' });
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, 'click e5');
         await userEvent.keyboard('{Escape}');
@@ -93,7 +105,7 @@ describe('Console component tests', () => {
 
     it('should render error message when server fails to respond', async () => {
         vi.mocked(executeCommandForConsole).mockRejectedValue(new Error('Network error'));
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, 'click e5');
         await userEvent.keyboard('{Escape}');
@@ -103,7 +115,7 @@ describe('Console component tests', () => {
     });
 
     it('should not submit empty input on Enter', async () => {
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         getEditor(screen.container).focus();
         await userEvent.keyboard('{Enter}');
@@ -112,7 +124,7 @@ describe('Console component tests', () => {
     });
 
     it('should not submit for comment', async () => {
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, '# this is a comment');
         await userEvent.keyboard('{Enter}');
@@ -123,7 +135,7 @@ describe('Console component tests', () => {
 
     it('should not submit for clear command', async () => {
         vi.mocked(executeCommandForConsole).mockResolvedValue({ text: 'Clicked' });
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, 'click e5');
         await userEvent.keyboard('{Escape}');
@@ -142,7 +154,7 @@ describe('Console component tests', () => {
             { text: 'click e5', type: 'command' },
             { text: 'Clicked', type: 'success' },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
         await expect.element(screen.getByText('click e5')).toBeInTheDocument();
 
         await typeInEditor(screen, 'clear');
@@ -156,7 +168,7 @@ describe('Console component tests', () => {
             { text: 'snapshot', type: 'command' },
             { text: codeBlock, type: 'snapshot' },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
 
         await expect.element(screen.getByText('@playwright/test', { exact: false })).toBeInTheDocument();
         await expect.element(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
@@ -174,7 +186,7 @@ describe('Console component tests', () => {
             { text: 'snapshot', type: 'command' },
             { text: codeBlock, type: 'snapshot' },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
         await screen.getByRole('button', { name: 'Copy' }).click();
 
         expect(writeText).toHaveBeenCalledWith(codeBlock);
@@ -185,7 +197,7 @@ describe('Console component tests', () => {
             { text: 'screenshot', type: 'command' },
             { text: '', type: 'screenshot', image: testImage },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
 
         await expect.element(screen.getByRole('img')).toBeInTheDocument();
     });
@@ -195,7 +207,7 @@ describe('Console component tests', () => {
             { text: 'screenshot', type: 'command' },
             { text: '', type: 'screenshot', image: testImage },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
         (screen.container.querySelector('img') as HTMLElement).click();
 
         await expect.element(screen.getByRole('button', { name: '×' })).toBeInTheDocument();
@@ -206,7 +218,7 @@ describe('Console component tests', () => {
             { text: 'screenshot', type: 'command' },
             { text: '', type: 'screenshot', image: testImage },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
         (screen.container.querySelector('img') as HTMLElement).click();
         await screen.getByRole('button', { name: '×' }).click();
 
@@ -218,7 +230,7 @@ describe('Console component tests', () => {
             { text: 'screenshot', type: 'command' },
             { text: '', type: 'screenshot', image: testImage },
         ];
-        const screen = await render(<Console outputLines={lines} />);
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
         (screen.container.querySelector('img') as HTMLElement).click();
         await screen.getByRole('button', { name: 'Save' }).click();
 
@@ -227,7 +239,7 @@ describe('Console component tests', () => {
 
     it('should render screenshot image when command returns image', async () => {
         vi.mocked(executeCommandForConsole).mockResolvedValue({ text: '', image: testImage });
-        const screen = await render(<Console />);
+        const screen = await render(<ConsoleWithReducer />);
 
         await typeInEditor(screen, 'screenshot');
         await userEvent.keyboard('{Escape}');
@@ -235,6 +247,16 @@ describe('Console component tests', () => {
 
         await expect.element(screen.getByText('screenshot')).toBeInTheDocument();
         await expect.element(screen.getByRole('img')).toBeInTheDocument();
+    });
+
+    it('should render ObjectTree for outputLine with a value field', async () => {
+        const lines: OutputLine[] = [
+            { text: 'eval document.title', type: 'command' },
+            { text: '', type: 'success', value: { __type: 'string', v: 'My Page Title' } },
+        ];
+        const screen = await render(<ConsoleWithReducer initialLines={lines} />);
+
+        await expect.element(screen.getByText('"My Page Title"', { exact: false })).toBeInTheDocument();
     });
 
 });

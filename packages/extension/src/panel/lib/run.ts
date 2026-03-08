@@ -1,11 +1,13 @@
-import { executeCommand } from '@/lib/bridge';
+import { executeCommand, cdpEvaluate } from '@/lib/bridge';
 import { filterResponse } from '@/lib/filter';
 import { COMMANDS } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
-import { swDebugEval } from '@/lib/sw-debugger';
+import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
+import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
+import { detectMode } from '@/lib/execute';
 
 function trimStack(msg: string): string {
     return msg.split('\n    at ')[0].split('\nCall log:')[0].trim();
@@ -40,6 +42,31 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
     }
 
     return false;
+}
+
+export async function runJsScript(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
+    dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
+    try {
+        const mode = detectMode(code);
+        const raw = (mode === 'js'
+            ? await cdpEvaluate(code)
+            : await swDebugEval(code)) as { result?: CdpRemoteObject };
+        const r = raw?.result;
+        if (!r || r.type === 'undefined') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+        } else if (r.type === 'string') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success' } });
+        } else if (r.type === 'number' || r.type === 'boolean') {
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
+        } else {
+            const value = fromCdpRemoteObject(r);
+            const getProperties = mode !== 'js' ? swGetProperties : undefined;
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties } });
+        }
+    } catch (e: any) {
+        const text = trimStack(e?.message ?? String(e));
+        dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
+    }
 }
 
 export async function runAndDispatch(command: string, dispatch: React.Dispatch<Action>): Promise<CommandResult> {

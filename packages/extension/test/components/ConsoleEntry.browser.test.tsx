@@ -8,6 +8,10 @@ vi.mock('@/lib/file-utils', () => ({
 }));
 import { saveImageToFile } from '@/lib/file-utils';
 
+vi.mock('@/lib/bridge', () => ({
+    cdpGetProperties: vi.fn().mockResolvedValue({ result: [] }),
+}));
+
 const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
 const codeBlock = `import { test, expect } from '@playwright/test';
@@ -85,6 +89,42 @@ describe('ConsoleEntry component tests', () => {
         (screen.container.querySelector('img') as HTMLElement).click();
         await screen.getByRole('button', { name: 'Save' }).click();
         expect(saveImageToFile).toHaveBeenCalledWith(testImage);
+    });
+
+    // ─── ObjectTree rendering ─────────────────────────────────────────────────
+
+    it('should render ObjectTree for a string value', async () => {
+        const screen = await render(<ConsoleEntry entry={makeEntry({ value: { __type: 'string', v: 'hello' } })} />);
+        await expect.element(screen.getByText('"hello"', { exact: false })).toBeInTheDocument();
+    });
+
+    it('should render ObjectTree for a number value', async () => {
+        const screen = await render(<ConsoleEntry entry={makeEntry({ value: { __type: 'number', v: 42 } })} />);
+        await expect.element(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('should render ObjectTree summary for an empty object value', async () => {
+        const screen = await render(<ConsoleEntry entry={makeEntry({ value: { __type: 'object', cls: 'Object', props: {} } })} />);
+        await expect.element(screen.getByText('Object {}')).toBeInTheDocument();
+    });
+
+    it('should render ObjectTree summary header for an array value', async () => {
+        const screen = await render(<ConsoleEntry entry={makeEntry({
+            value: {
+                __type: 'array', cls: 'Array', len: 3,
+                props: {
+                    '0': { __type: 'number', v: 1 },
+                    '1': { __type: 'number', v: 2 },
+                    '2': { __type: 'number', v: 3 },
+                }
+            }
+        })} />);
+        await expect.element(screen.getByText('Array(3)', { exact: false })).toBeInTheDocument();
+    });
+
+    it('should set data-type="success" on ObjectTree container', async () => {
+        const screen = await render(<ConsoleEntry entry={makeEntry({ value: { __type: 'string', v: 'ok' } })} />);
+        expect(screen.container.querySelector('[data-type="success"]')).toBeTruthy();
     });
 
 });

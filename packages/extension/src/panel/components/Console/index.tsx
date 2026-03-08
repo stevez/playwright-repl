@@ -1,8 +1,8 @@
-import { useImperativeHandle, useRef, useEffect, useMemo, useState, Ref } from 'react';
+import { useImperativeHandle, useRef, useEffect, useMemo, type Ref } from 'react';
 import { useConsole } from './useConsole';
 import { ConsoleOutput } from './ConsoleOutput';
 import { ConsoleInput, type ConsoleInputHandle } from './ConsoleInput';
-import type { ConsoleHandle, ConsoleProps, ConsoleEntry } from './types';
+import type { ConsoleHandle, ConsoleProps, ConsoleEntry, SerializedValue } from './types';
 import type { OutputLine } from '@/types';
 
 export { type ConsoleHandle } from './types';
@@ -17,7 +17,14 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
             const next = lines[i + 1];
             if (next && next.type !== 'command' && next.type !== 'comment') {
                 const entry: ConsoleEntry = { id, input: line.text, status: next.type === 'error' ? 'error' : 'done' };
-                if (next.type === 'success') entry.text = next.text;
+                if (next.type === 'success') {
+                    if (next.value !== undefined) {
+                        entry.value = next.value as SerializedValue;
+                        if (next.getProperties) entry.getProperties = next.getProperties;
+                    } else {
+                        entry.text = next.text;
+                    }
+                }
                 else if (next.type === 'error') entry.errorText = next.text;
                 else if (next.type === 'snapshot' || next.type === 'code-block') entry.codeBlock = next.text;
                 else if (next.type === 'screenshot') entry.image = next.image;
@@ -53,17 +60,14 @@ interface Props extends ConsoleProps {
     ref?: Ref<ConsoleHandle>;
 }
 
-export function Console({ outputLines, className, ref }: Props) {
-    const [historyOffset, setHistoryOffset] = useState(0);
-    const { entries, execute, clear, addResult, runScript } = useConsole();
-    const allHistorical = useMemo(() => outputLinesToEntries(outputLines ?? []), [outputLines]);
-    const historicalEntries = allHistorical.slice(historyOffset);
+export function Console({ outputLines, dispatch, className, ref }: Props) {
+    const { execute, addResult, runScript } = useConsole(dispatch);
     const inputRef = useRef<ConsoleInputHandle>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const entries = useMemo(() => outputLinesToEntries(outputLines ?? []), [outputLines]);
 
     function clearAll() {
-        setHistoryOffset(allHistorical.length);
-        clear();
+        dispatch({ type: 'CLEAR_CONSOLE' });
         inputRef.current?.clear();
     }
 
@@ -87,7 +91,7 @@ export function Console({ outputLines, className, ref }: Props) {
                 <button className="console-clear-btn" onClick={clearAll} title="Clear console (Ctrl+L)">⊘</button>
             </div>
             <div className="flex-1 overflow-y-auto py-1 px-2" data-testid="output">
-                <ConsoleOutput entries={[...historicalEntries, ...entries]} />
+                <ConsoleOutput entries={entries} />
                 <div className="flex items-start gap-1 py-0.5">
                     <span className="text-(--color-prompt) shrink-0" data-testid="prompt">&gt;</span>
                     <ConsoleInput ref={inputRef} onSubmit={handleExecute} onClear={clearAll} />

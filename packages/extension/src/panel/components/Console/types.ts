@@ -1,3 +1,7 @@
+import type { Dispatch } from 'react';
+import type { Action } from '@/reducer';
+import type { OutputLine } from '@/types';
+
 export type SerializedValue =
   | { __type: 'null' }
   | { __type: 'undefined' }
@@ -30,6 +34,7 @@ export interface ConsoleHandle {
 }
 
 export interface ConsoleProps {
-  outputLines?: import('@/types').OutputLine[];
+  outputLines?: OutputLine[];
+  dispatch: Dispatch<Action>;
   className?: string;
 }
