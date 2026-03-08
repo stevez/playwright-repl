@@ -497,34 +497,6 @@ describe('Toolbar component tests', () => {
     });
   });
 
-  // ─── Export ────────────────────────────────────────────────────────────────
-
-  it('should support export function', async () => {
-    const pwCommands = `
-    # command list
-    goto https://example.com
-    click "Learn more"
-    verify-text "As described in RFC 2606 and RFC 6761"
-    `;
-
-    const dispatch = vi.fn();
-    const screen = await renderToolbar({ editorContent: pwCommands, dispatch });
-
-    await screen.getByRole('button', { name: 'Export' }).click();
-    const expected_code = `
-import { test, expect } from '@playwright/test';
-
-test('recorded session', async ({ page }) => {
-  // command list
-  await page.goto("https://example.com");
-  await page.getByText("Learn more").click();
-  await expect(page.getByText("As described in RFC 2606 and RFC 6761")).toBeVisible();
-});`.trim();
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'ADD_LINE',
-      line: { text: expected_code, type: 'code-block' }
-    });
-  });
 
   // ─── Attach status indicator ───────────────────────────────────────────────
 
@@ -831,25 +803,6 @@ test('recorded session', async ({ page }) => {
       });
     });
 
-    it('export button is disabled in JS mode', async () => {
-      const screen = await renderToolbar({
-        editorContent: 'document.title',
-        editorMode: 'js',
-      });
-
-      const exportBtn = screen.container.querySelector('#export-btn') as HTMLButtonElement;
-      expect(exportBtn.disabled).toBe(true);
-    });
-
-    it('export button is enabled in pw mode with content', async () => {
-      const screen = await renderToolbar({
-        editorContent: 'goto https://example.com',
-        editorMode: 'pw',
-      });
-
-      const exportBtn = screen.container.querySelector('#export-btn') as HTMLButtonElement;
-      expect(exportBtn.disabled).toBe(false);
-    });
 
     it('shows stop button when isRunning is true', async () => {
       const screen = await renderToolbar({ isRunning: true, editorContent: 'goto https://example.com' });

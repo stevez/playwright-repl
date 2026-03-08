@@ -1,9 +1,9 @@
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { PanelState, Action } from "@/reducer";
-import { exportToPlaywright, jsonlToRepl } from '@/lib/converter';
+import { jsonlToRepl } from '@/lib/converter';
 import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon, StepForwardIcon, AbortIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
@@ -316,13 +316,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         });
     }
 
-    // ─── Export ───
-
-    function handleExport() {
-        const code = exportToPlaywright(lines);
-        dispatch({ type: 'ADD_LINE', line: { text: code, type: 'code-block' } })
-    }
-
     // ─── Theme toggle ───
 
     useEffect(() => {
@@ -357,7 +350,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 }
                 <button id="step-btn" data-testid="step-btn" title={editorMode === 'js' ? (isStepDebugging ? 'Step: advance to next line' : 'Step: start debug session') : 'Step: run next line'} disabled={!editorContent.trim() || (isRunning && !isStepDebugging)} onClick={handleStep}><StepForwardIcon /></button>
-                <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleExport}><ExportIcon /></button>
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
                 <button
                     data-testid="mode-toggle"
