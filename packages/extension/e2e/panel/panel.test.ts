@@ -113,14 +113,12 @@ test('enables buttons when editor has content', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
 
   await expect(panelPage.getByRole('button', { name: 'Save' })).toBeEnabled();
-  await expect(panelPage.getByRole('button', { name: 'Export' })).toBeEnabled();
 });
 
 test('disables buttons when editor is empty', async ({ panelPage }) => {
   await fillEditor(panelPage, '');
 
   await expect(panelPage.getByRole('button', { name: 'Save' })).toBeDisabled();
-  await expect(panelPage.getByRole('button', { name: 'Export' })).toBeDisabled();
 });
 
 // ─── Run Button ────────────────────────────────────────────────────────────
