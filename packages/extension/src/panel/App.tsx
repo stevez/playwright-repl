@@ -82,7 +82,6 @@ function App() {
          editorMode={state.editorMode}
          currentRunLine={state.currentRunLine}
          lineResults={state.lineResults}
-         isStepDebugging={state.isStepDebugging}
          dispatch={dispatch}
       />
 

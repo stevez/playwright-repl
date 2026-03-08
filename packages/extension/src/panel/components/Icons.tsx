@@ -66,6 +66,44 @@ export function ExportIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function BugIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="15" rx="4" ry="5" />
+      <circle cx="12" cy="7.5" r="2.5" />
+      <line x1="10.5" y1="5.5" x2="8" y2="3" />
+      <line x1="13.5" y1="5.5" x2="16" y2="3" />
+      <line x1="8" y1="13" x2="4" y2="12" />
+      <line x1="8" y1="15" x2="4" y2="15" />
+      <line x1="8" y1="17" x2="4" y2="18" />
+      <line x1="16" y1="13" x2="20" y2="12" />
+      <line x1="16" y1="15" x2="20" y2="15" />
+      <line x1="16" y1="17" x2="20" y2="18" />
+      <line x1="12" y1="10" x2="12" y2="20" />
+    </svg>
+  );
+}
+
+export function StepForwardIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="15" y2="12" />
+      <polyline points="11 8 15 12 11 16" />
+      <line x1="19" y1="7" x2="19" y2="17" />
+    </svg>
+  );
+}
+
+export function AbortIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+    </svg>
+  );
+}
+
 export function TabsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

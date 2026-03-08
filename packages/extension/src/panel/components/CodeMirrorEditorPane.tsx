@@ -7,14 +7,14 @@ export interface EditorHandle {
     insertAtCursor: (text: string) => void;
 }
 
-interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode' | 'isStepDebugging'> {
+interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
     dispatch: React.Dispatch<Action>
     ref?: React.Ref<EditorHandle | null>
     containerRef?: React.Ref<HTMLDivElement>
 }
 
 
-function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, isStepDebugging, dispatch, ref, containerRef }: EditorPaneProps) {
+function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref, containerRef }: EditorPaneProps) {
     const cmContainerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
@@ -57,11 +57,8 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
         if(!view) return;
         if(view.state.doc.toString() === editorContent) return;
         externalUpdateRef.current = true;
-        view.dispatch({
-            changes: { from: 0, to: view.state.doc.length, insert: editorContent },
-            selection: { anchor: editorContent.length },
-            scrollIntoView: true,
-        });
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: editorContent } });
+        view.dispatch({ selection: { anchor: view.state.doc.length }, scrollIntoView: true });
         externalUpdateRef.current = false;
         view.focus();
     }, [editorContent]);
@@ -69,8 +66,8 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
     useEffect(()=> {
         const view = viewRef.current;
         if(!view) return;
-        dispatchRunState(view, currentRunLine, lineResults, isStepDebugging);
-    }, [currentRunLine, lineResults, isStepDebugging]);
+        dispatchRunState(view, currentRunLine, lineResults);
+    }, [currentRunLine, lineResults]);
 
     useEffect(() => {
         const view = viewRef.current;
