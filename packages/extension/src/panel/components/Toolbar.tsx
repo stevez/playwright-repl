@@ -6,15 +6,16 @@ import { runAndDispatch, runJsScript } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning'> {
     dispatch: React.Dispatch<Action>,
     editorRef: React.RefObject<EditorHandle | null>,
 };
 
-function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch, editorRef }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, dispatch, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
+    const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
@@ -119,9 +120,16 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
     }
 
     async function handleSave() {
+        const isJs = editorMode === 'js';
+        const ext = isJs ? '.js' : '.pw';
+        const defaultName = fileName
+            ? (isJs && fileName.endsWith('.pw') ? fileName.replace(/\.pw$/, '.js') : fileName)
+            : `commands-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}${ext}`;
         const opts = {
-            suggestedName: fileName || "commands-" + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + ".pw",
-            types: [{ description: "PW command files", accept: { "text/plain": [".pw"] } }],
+            suggestedName: defaultName,
+            types: isJs
+                ? [{ description: "JavaScript files", accept: { "text/javascript": [".js"] } }]
+                : [{ description: "PW command files", accept: { "text/plain": [".pw"] } }],
         };
         try {
             const fileHandle: FileSystemFileHandle = await window.showSaveFilePicker(opts);
@@ -136,7 +144,7 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
         }
     }
 
-    // ─── Run / Step ───
+    // ─── Run / Step / Stop ───
 
     async function runCommand(index: number, command: string) {
         dispatch({ type: 'SET_RUN_LINE', currentRunLine: index });
@@ -145,19 +153,28 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
     }
 
     async function handleRun() {
+        cancelRunRef.current = false;
         dispatch({ type: 'RUN_START' });
         if (editorMode === 'js') {
             await runJsScript(editorContent, dispatch);
         } else {
             for (let i = 0; i < lines.length; i++) {
+                if (cancelRunRef.current) break;
                 const trimmedValue = lines[i].trim();
                 if (!lines[i].startsWith('#') && trimmedValue) {
                     await runCommand(i, trimmedValue);
                 }
             }
-            dispatch({ type: 'ADD_LINE', line: { text: 'Run complete.', type: 'info' } });
+            if (!cancelRunRef.current) {
+                dispatch({ type: 'ADD_LINE', line: { text: 'Run complete.', type: 'info' } });
+            }
         }
-        dispatch({ type: 'RUN_STOP' })
+        dispatch({ type: 'RUN_STOP' });
+    }
+
+    function handleStop() {
+        cancelRunRef.current = true;
+        dispatch({ type: 'RUN_STOP' });
     }
 
     function findExecutableIndex(fromIndex: number) {
@@ -320,9 +337,12 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
-                <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
+                {isRunning
+                    ? <button id="stop-run-btn" data-testid="stop-run-btn" title="Stop run" onClick={handleStop}><StopIcon /></button>
+                    : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
+                }
                 <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleStep}>&#9655;</button>
-                <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim()} onClick={handleExport}><ExportIcon /></button>
+                <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleExport}><ExportIcon /></button>
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
                 <button
                     data-testid="mode-toggle"

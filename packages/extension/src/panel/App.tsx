@@ -55,6 +55,7 @@ function App() {
         fileName={state.fileName}
         editorMode={state.editorMode}
         stepLine={state.stepLine}
+        isRunning={state.isRunning}
         attachedUrl={state.attachedUrl}
         attachedTabId={state.attachedTabId}
         isAttaching={state.isAttaching}

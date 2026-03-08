@@ -38,6 +38,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     attachedUrl={null}
     attachedTabId={null}
     isAttaching={false}
+    isRunning={false}
     dispatch={vi.fn()}
     editorRef={editorRef}
     {...overrides}
@@ -833,6 +834,83 @@ test('recorded session', async ({ page }) => {
           type: 'COMMAND_ERROR',
           line: { text: 'ReferenceError: invalid is not defined', type: 'error' },
         });
+      });
+    });
+
+    it('export button is disabled in JS mode', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'document.title',
+        editorMode: 'js',
+      });
+
+      const exportBtn = screen.container.querySelector('#export-btn') as HTMLButtonElement;
+      expect(exportBtn.disabled).toBe(true);
+    });
+
+    it('export button is enabled in pw mode with content', async () => {
+      const screen = await renderToolbar({
+        editorContent: 'goto https://example.com',
+        editorMode: 'pw',
+      });
+
+      const exportBtn = screen.container.querySelector('#export-btn') as HTMLButtonElement;
+      expect(exportBtn.disabled).toBe(false);
+    });
+
+    it('shows stop button when isRunning is true', async () => {
+      const screen = await renderToolbar({ isRunning: true, editorContent: 'goto https://example.com' });
+      const stopBtn = screen.container.querySelector('#stop-run-btn') as HTMLButtonElement;
+      const runBtn = screen.container.querySelector('#run-btn');
+      expect(stopBtn).not.toBeNull();
+      expect(runBtn).toBeNull();
+    });
+
+    it('shows run button when isRunning is false', async () => {
+      const screen = await renderToolbar({ isRunning: false, editorContent: 'goto https://example.com' });
+      const runBtn = screen.container.querySelector('#run-btn') as HTMLButtonElement;
+      const stopBtn = screen.container.querySelector('#stop-run-btn');
+      expect(runBtn).not.toBeNull();
+      expect(stopBtn).toBeNull();
+    });
+
+    it('stop button dispatches RUN_STOP', async () => {
+      const dispatch = vi.fn();
+      const screen = await renderToolbar({ isRunning: true, editorContent: 'goto https://example.com', dispatch });
+      const stopBtn = screen.container.querySelector('#stop-run-btn') as HTMLButtonElement;
+      stopBtn.click();
+      expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
+    });
+
+    it('save uses .js extension in JS mode', async () => {
+      const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js' });
+
+      const mockWritable = { write: vi.fn(), close: vi.fn() };
+      const mockFileHandle = { name: 'commands.js', createWritable: vi.fn().mockResolvedValue(mockWritable) };
+      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as any;
+
+      const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
+      saveBtn.click();
+
+      await vi.waitFor(() => {
+        const opts = (window.showSaveFilePicker as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(opts.suggestedName).toMatch(/\.js$/);
+        expect(opts.types[0].accept).toHaveProperty('text/javascript');
+      });
+    });
+
+    it('save renames .pw filename to .js in JS mode', async () => {
+      const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js', fileName: 'script.pw' });
+
+      const mockWritable = { write: vi.fn(), close: vi.fn() };
+      const mockFileHandle = { name: 'script.js', createWritable: vi.fn().mockResolvedValue(mockWritable) };
+      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as any;
+
+      const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
+      saveBtn.click();
+
+      await vi.waitFor(() => {
+        const opts = (window.showSaveFilePicker as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(opts.suggestedName).toBe('script.js');
       });
     });
   });
