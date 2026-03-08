@@ -298,7 +298,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             const gotoCmd = editorMode === 'js'
                 ? `await page.goto(${JSON.stringify(result.url)});`
                 : `goto "${result.url}"`;
-            dispatch({ type: 'APPEND_EDITOR_CONTENT', command: gotoCmd });
+            editorRef.current?.insertAtCursor(gotoCmd);
         }
 
         dispatch({ type: 'ADD_LINE', line: { text: 'Recording started. Interact with the page...', type: 'command' } });
