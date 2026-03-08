@@ -1,18 +1,39 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useImperativeHandle } from 'react';
 import { EditorView } from 'codemirror';
 import { baseExtensions, dispatchRunState, languageCompartment, pwModeExtension, jsModeExtension } from '@/lib/codemirror-setup';
 import type { PanelState, Action } from "@/reducer";
 
+export interface EditorHandle {
+    insertAtCursor: (text: string) => void;
+}
+
 interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
     dispatch: React.Dispatch<Action>
-    ref?: React.Ref<HTMLDivElement>
+    ref?: React.Ref<EditorHandle | null>
+    containerRef?: React.Ref<HTMLDivElement>
 }
 
 
-function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref }: EditorPaneProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
+function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref, containerRef }: EditorPaneProps) {
+    const cmContainerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
+
+    useImperativeHandle(ref, () => ({
+        insertAtCursor(text: string) {
+            const view = viewRef.current;
+            if (!view) return;
+            const { from } = view.state.selection.main;
+            const before = view.state.doc.sliceString(Math.max(0, from - 1), from);
+            const insert = (before && before !== '\n' ? '\n' : '') + text;
+            view.dispatch({
+                changes: { from, to: from, insert },
+                selection: { anchor: from + insert.length },
+                scrollIntoView: true,
+            });
+            view.focus();
+        },
+    }));
 
     useEffect(() => {
         const view = new EditorView({
@@ -25,7 +46,7 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
                     }
                 }),
             ],
-            parent: containerRef.current!,
+            parent: cmContainerRef.current!,
         });
         viewRef.current = view;
         return () => view.destroy();
@@ -37,9 +58,12 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
         if(view.state.doc.toString() === editorContent) return;
         externalUpdateRef.current = true;
         view.dispatch({
-            changes: { from: 0, to: view.state.doc.length, insert: editorContent}
+            changes: { from: 0, to: view.state.doc.length, insert: editorContent },
+            selection: { anchor: editorContent.length },
+            scrollIntoView: true,
         });
         externalUpdateRef.current = false;
+        view.focus();
     }, [editorContent]);
 
     useEffect(()=> {
@@ -56,8 +80,8 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
 
 
     return (
-        <div id="editor-pane" ref={ref} data-testid="editor" className="flex flex-1 min-h-[80px] overflow-hidden bg-(--bg-editor)">
-           <div ref={containerRef} className='flex-1' />
+        <div id="editor-pane" ref={containerRef} data-testid="editor" className="flex flex-1 min-h-[80px] overflow-hidden bg-(--bg-editor)">
+           <div ref={cmContainerRef} className='flex-1' />
         </div>
     )
 }

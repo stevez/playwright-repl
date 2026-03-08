@@ -1,6 +1,6 @@
 import { useReducer, useRef, useEffect } from 'react'
 import Toolbar from './components/Toolbar'
-import CodeMirrorEditorPane from "./components/CodeMirrorEditorPane"
+import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
@@ -9,6 +9,7 @@ import { Console, type ConsoleHandle } from './components/Console';
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<EditorHandle | null>(null);
   const consoleRef = useRef<ConsoleHandle>(null);
 
 
@@ -60,11 +61,13 @@ function App() {
         isAttaching={state.isAttaching}
         dispatch={dispatch}
         consoleRef={consoleRef}
+        editorRef={editorRef}
       />
 
       {/* Editor pane */}
       <CodeMirrorEditorPane
-         ref={editorPaneRef}
+         ref={editorRef}
+         containerRef={editorPaneRef}
          editorContent={state.editorContent}
          editorMode={state.editorMode}
          currentRunLine={state.currentRunLine}

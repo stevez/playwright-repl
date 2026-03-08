@@ -5,13 +5,15 @@ import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 import type { ConsoleHandle } from './Console';
+import type { EditorHandle } from './CodeMirrorEditorPane';
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching'> {
     dispatch: React.Dispatch<Action>,
     consoleRef: React.RefObject<ConsoleHandle | null>,
+    editorRef: React.RefObject<EditorHandle | null>,
 };
 
-function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch, consoleRef }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, dispatch, consoleRef, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
@@ -187,10 +189,13 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleRecordedSources = useCallback((sources: any[]) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const source = sources.find((s: any) => s.id === 'jsonl') || sources[0];
-        if (!source?.actions?.length) return;
-        const newActions = (source.actions as string[]).slice(prevActionCountRef.current);
-        prevActionCountRef.current = source.actions.length;
+        const jsonlSource = sources.find((s: any) => s.id === 'jsonl') || sources[0];
+        if (!jsonlSource?.actions?.length) return;
+        const prevCount = prevActionCountRef.current;
+        const newActions = (jsonlSource.actions as string[]).slice(prevCount);
+        prevActionCountRef.current = jsonlSource.actions.length;
+
+        // Console: show new JSONL actions as pretty JSON
         for (const a of newActions) {
             try {
                 dispatch({ type: 'ADD_LINE', line: { text: JSON.stringify(JSON.parse(a), null, 2), type: 'code-block' } });
@@ -198,13 +203,31 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
                 dispatch({ type: 'ADD_LINE', line: { text: a, type: 'info' } });
             }
         }
-        const replLines = (source.actions as string[])
-            .map((a: string) => jsonlToRepl(a, false))
-            .filter(Boolean) as string[];
-        if (replLines.length > 0) {
-            dispatch({ type: 'EDIT_EDITOR_CONTENT', content: replLines.join('\n') });
+
+        // Editor: insert only new actions at cursor; skip openPage (handleRecord already adds goto)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isOpenPage = (jsonl: string) => { try { return JSON.parse(jsonl).name === 'openPage'; } catch { return false; } };
+
+        if (editorMode === 'js') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const jsSource = sources.find((s: any) => s.id === 'javascript');
+            const jsLines = newActions.flatMap((a, i) => {
+                if (isOpenPage(a)) return [];
+                const jsAction = (jsSource?.actions as string[] | undefined)?.[prevCount + i];
+                if (!jsAction) return [];
+                return jsAction.split('\n')
+                    .map((line: string) => line.replace(/^ {2}/, ''))          // strip 2-space base offset
+                    .filter((line: string) => !line.startsWith('const page =')); // page already exists
+            }).filter(Boolean);
+            if (jsLines.length) editorRef.current?.insertAtCursor(jsLines.join('\n'));
+        } else {
+            const replLines = newActions
+                .filter(a => !isOpenPage(a))
+                .map((a: string) => jsonlToRepl(a, false))
+                .filter(Boolean) as string[];
+            if (replLines.length) editorRef.current?.insertAtCursor(replLines.join('\n'));
         }
-    }, [dispatch]);
+    }, [dispatch, editorMode]);
 
     async function handleRecord() {
         if (!chrome.tabs?.query) return;
@@ -242,7 +265,10 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
         prevActionCountRef.current = 0;
 
         if (result.url && result.url !== 'about:blank') {
-            dispatch({ type: 'APPEND_EDITOR_CONTENT', command: `goto "${result.url}"` });
+            const gotoCmd = editorMode === 'js'
+                ? `await page.goto(${JSON.stringify(result.url)});`
+                : `goto "${result.url}"`;
+            dispatch({ type: 'APPEND_EDITOR_CONTENT', command: gotoCmd });
         }
 
         dispatch({ type: 'ADD_LINE', line: { text: 'Recording started. Interact with the page...', type: 'command' } });

@@ -29,6 +29,10 @@ const pwTheme = EditorView.theme({
     '.cm-cursor': {                 // blinking cursor
         borderLeftColor: 'var(--color-caret)',
     },
+    '&:not(.cm-focused) .cm-cursorLayer': { // keep cursor visible when unfocused (e.g. during recording)
+        visibility: 'visible',
+        animation: 'none',
+    },
     '.cm-gutters': {                // line number column
         backgroundColor: 'var(--bg-editor)',
         color: 'var(--text-line-numbers)',

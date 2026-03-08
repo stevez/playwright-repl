@@ -24,6 +24,7 @@ import { executeCommand, attachToTab, connectWithRetry } from '@/lib/bridge';
 const mockConsoleRef = { current: { clear: vi.fn(), addResult: vi.fn(), runScript: vi.fn().mockResolvedValue(undefined) } };
 
 function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
+  const editorRef = { current: null };
   return render(<Toolbar
     editorContent=''
     fileName=''
@@ -34,6 +35,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     isAttaching={false}
     dispatch={vi.fn()}
     consoleRef={mockConsoleRef}
+    editorRef={editorRef}
     {...overrides}
   />);
 }
