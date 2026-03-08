@@ -176,6 +176,170 @@ test('record button shows error when record-start fails', async ({ panelPage }) 
   await expect(btn).not.toHaveClass(/recording/);
 });
 
+// ─── Recording content insertion ──────────────────────────────────────────
+
+/**
+ * Override chrome.runtime.connect() so the port's onMessage listener is captured.
+ * Returns a helper that fires a setSources message into the panel.
+ * Must be called BEFORE clicking the record button.
+ */
+async function setupRecorderPort(page: Page): Promise<(sources: any[]) => Promise<void>> {
+  await page.evaluate(() => {
+    let msgListener: ((msg: any) => void) | null = null;
+    (window as any).__fireRecorderSources = (sources: any[]) =>
+      msgListener?.({ type: 'recorder', method: 'setSources', sources });
+    (chrome.runtime as any).connect = () => ({
+      onMessage: { addListener: (fn: any) => { msgListener = fn; } },
+      onDisconnect: { addListener: () => {} },
+      disconnect: () => {},
+    });
+  });
+  return async (sources: any[]) => {
+    await page.evaluate((s) => (window as any).__fireRecorderSources(s), sources);
+  };
+}
+
+/** Build a sources payload with jsonl + optional javascript actions. */
+function recorderSources(jsonlActions: object[], jsActions?: string[]) {
+  return [
+    { id: 'jsonl', actions: jsonlActions.map((a) => JSON.stringify(a)) },
+    ...(jsActions ? [{ id: 'javascript', actions: jsActions }] : []),
+  ];
+}
+
+test('recording inserts goto in pw mode', async ({ panelPage }) => {
+  await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await expect(panelPage.getByTestId('editor').getByRole('textbox'))
+    .toContainText('goto "https://example.com"');
+});
+
+test('recording inserts goto in JS syntax in JS mode', async ({ panelPage }) => {
+  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await expect(panelPage.getByTestId('editor').getByRole('textbox'))
+    .toContainText('await page.goto("https://example.com")');
+});
+
+test('recorded pw action appears after goto', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'text', body: 'Submit' } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('click "Submit"');
+
+  const text = await editor.textContent();
+  expect(text!.indexOf('goto')).toBeGreaterThanOrEqual(0);
+  expect(text!.indexOf('click')).toBeGreaterThan(text!.indexOf('goto'));
+});
+
+test('recorded JS action appears after goto in JS mode', async ({ panelPage }) => {
+  await panelPage.getByTestId('mode-toggle').click(); // pw → js
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources(
+    [{ name: 'click', locator: { kind: 'text', body: 'Submit' } }],
+    ['  await page.click("text=Submit");'],
+  ));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('page.click("text=Submit")');
+
+  const text = await editor.textContent();
+  expect(text!.indexOf('page.goto')).toBeGreaterThanOrEqual(0);
+  expect(text!.indexOf('page.click')).toBeGreaterThan(text!.indexOf('page.goto'));
+});
+
+test('openPage action is skipped in pw mode', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources([
+    { name: 'openPage', url: 'https://example.com' },
+    { name: 'click', locator: { kind: 'text', body: 'Login' } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('click "Login"');
+  expect(await editor.textContent()).not.toContain('openPage');
+});
+
+test('incremental setSources calls append only new actions', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  // First setSources: one action
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'text', body: 'First' } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('click "First"');
+
+  // Second setSources: cumulative list, only Second is new
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'text', body: 'First' } },
+    { name: 'click', locator: { kind: 'text', body: 'Second' } },
+  ]));
+
+  await expect(editor).toContainText('click "Second"');
+
+  const text = await editor.textContent();
+  // First appears only once (not duplicated)
+  expect(text!.split('First').length - 1).toBe(1);
+  // Second comes after First
+  expect(text!.indexOf('First')).toBeLessThan(text!.indexOf('Second'));
+});
+
+test('recording into existing content inserts goto after cursor', async ({ panelPage }) => {
+  // Type existing content — cursor ends up at the end
+  await fillEditor(panelPage, '# existing script\n');
+  await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('goto "https://example.com"');
+
+  const text = await editor.textContent();
+  expect(text!.indexOf('# existing script')).toBeLessThan(text!.indexOf('goto'));
+});
+
+test('recorded actions appear in console as JSON', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'text', body: 'Submit' } },
+  ]));
+
+  await expect(panelPage.getByTestId('output')).toContainText('"name": "click"');
+});
+
+test('recording stopped message appears when record button clicked again', async ({ panelPage }) => {
+  await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('output')).toContainText('Recording stopped.');
+});
+
 // ─── Editor mode toggle ─────────────────────────────────────────────────────
 
 test('has mode toggle button showing current mode', async ({ panelPage }) => {
