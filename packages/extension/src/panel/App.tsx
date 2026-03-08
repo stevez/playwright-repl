@@ -62,7 +62,6 @@ function App() {
       {/* Toolbar */}
       <Toolbar
         editorContent={state.editorContent}
-        fileName={state.fileName}
         editorMode={state.editorMode}
         stepLine={state.stepLine}
         isRunning={state.isRunning}

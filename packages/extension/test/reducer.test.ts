@@ -51,12 +51,6 @@ describe('Reducer tests', () => {
       expect(newState.editorContent).toEqual('click e5');
    })
 
-   it('should process event SET_FILENAME', () => {
-      const newState = panelReducer(initialState, {type: 'SET_FILENAME', fileName: 'test1.pw'});
-
-      expect(newState.fileName).toEqual('test1.pw');
-   })
-
    it('should process event RUN_START', () => {
      const newState = panelReducer(initialState, { type: 'RUN_START'})
      expect(newState.isRunning).toBe(true);

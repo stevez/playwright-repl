@@ -32,7 +32,6 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
   const editorRef = { current: null };
   return render(<Toolbar
     editorContent=''
-    fileName=''
     editorMode='pw'
     stepLine={-1}
     attachedUrl={null}
@@ -99,10 +98,6 @@ describe('Toolbar component tests', () => {
         type: 'EDIT_EDITOR_CONTENT',
         content: 'go to https://example.com\nclick e5'
       });
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'SET_FILENAME',
-        fileName: 'test.pw'
-      });
     });
   });
 
@@ -153,7 +148,7 @@ describe('Toolbar component tests', () => {
     expect(inputClicked).toBe(true);
   });
 
-  it('should save file and dispatch SET_FILENAME', async () => {
+  it('should save file content', async () => {
     const dispatch = vi.fn();
     const screen = await renderToolbar({ editorContent: 'goto https://example.com', dispatch });
 
@@ -170,7 +165,6 @@ describe('Toolbar component tests', () => {
     await vi.waitFor(() => {
       expect(mockWritable.write).toHaveBeenCalledWith('goto https://example.com');
       expect(mockWritable.close).toHaveBeenCalled();
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_FILENAME', fileName: 'saved.pw' });
     });
   });
 
@@ -898,8 +892,8 @@ test('recorded session', async ({ page }) => {
       });
     });
 
-    it('save renames .pw filename to .js in JS mode', async () => {
-      const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js', fileName: 'script.pw' });
+    it('save uses .js extension in JS mode', async () => {
+      const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js' });
 
       const mockWritable = { write: vi.fn(), close: vi.fn() };
       const mockFileHandle = { name: 'script.js', createWritable: vi.fn().mockResolvedValue(mockWritable) };
@@ -910,7 +904,7 @@ test('recorded session', async ({ page }) => {
 
       await vi.waitFor(() => {
         const opts = (window.showSaveFilePicker as ReturnType<typeof vi.fn>).mock.calls[0][0];
-        expect(opts.suggestedName).toBe('script.js');
+        expect(opts.suggestedName).toMatch(/\.js$/);
       });
     });
   });

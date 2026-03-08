@@ -3,7 +3,6 @@ import type { OutputLine } from "@/types"
 export type PanelState = {
   outputLines: OutputLine[]
   editorContent: string
-  fileName: string
   editorMode: 'pw' | 'js'
   isRunning: boolean
   isStepDebugging: boolean
@@ -25,7 +24,6 @@ export type Action =
    | { type: 'COMMAND_ERROR', line: OutputLine }
    | { type: 'EDIT_EDITOR_CONTENT', content: string }
    | { type: 'APPEND_EDITOR_CONTENT', command: string}
-   | { type: 'SET_FILENAME', fileName: string }
    | { type: 'RUN_START', stepDebug?: boolean }
    | { type: 'RUN_STOP' }
    | { type: 'SET_RUN_LINE', currentRunLine: number }
@@ -41,7 +39,6 @@ export type Action =
 export const initialState : PanelState = {
     outputLines: [],
     editorContent: '',
-    fileName: '',
     editorMode: 'pw',
     isRunning: false,
     isStepDebugging: false,
@@ -81,8 +78,6 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             const separator = state.editorContent && !state.editorContent.endsWith('\n') ? '\n' : '';
             return { ...state, editorContent: state.editorContent + separator + action.command };
         }
-        case 'SET_FILENAME':
-            return { ...state, fileName: action.fileName }
         case 'RUN_START': {
             const lineCount = state.editorContent.split('\n').length;
             return {
