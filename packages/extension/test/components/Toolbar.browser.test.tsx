@@ -17,14 +17,11 @@ vi.mock('@/lib/bridge', () => ({
   }),
 }));
 
-vi.mock('@/lib/sw-debugger', () => ({
-  swDebugEval: vi.fn().mockResolvedValue({ result: { type: 'string', value: 'JS result' } }),
-}));
-
 import { executeCommand, attachToTab, connectWithRetry } from '@/lib/bridge';
-import { swDebugEval } from '@/lib/sw-debugger';
 
 // ─── Helper to render Toolbar with default required props ─────────────────────
+
+const mockConsoleRef = { current: { clear: vi.fn(), addResult: vi.fn(), runScript: vi.fn().mockResolvedValue(undefined) } };
 
 function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
   return render(<Toolbar
@@ -36,6 +33,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     attachedTabId={null}
     isAttaching={false}
     dispatch={vi.fn()}
+    consoleRef={mockConsoleRef}
     {...overrides}
   />);
 }
@@ -64,6 +62,9 @@ describe('Toolbar component tests', () => {
       onDisconnect: { addListener: vi.fn() },
       disconnect: vi.fn(),
     } as unknown as chrome.runtime.Port);
+    mockConsoleRef.current.runScript.mockResolvedValue(undefined);
+    mockConsoleRef.current.clear.mockReset();
+    mockConsoleRef.current.addResult.mockReset();
   });
 
   afterEach(() => {
@@ -723,7 +724,7 @@ test('recorded session', async ({ page }) => {
       expect(stepBtn.disabled).toBe(false);
     });
 
-    it('should call swDebugEval with full script in JS mode', async () => {
+    it('should call consoleRef.runScript in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({
         editorContent: 'document.title',
@@ -731,21 +732,11 @@ test('recorded session', async ({ page }) => {
         dispatch,
       });
 
-      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'string', value: 'My Page' } });
-
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(swDebugEval).toHaveBeenCalledWith('document.title');
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUBMITTED',
-          line: { text: '(run JS script)', type: 'command' },
-        });
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUCCESS',
-          line: { text: 'My Page', type: 'success' },
-        });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('document.title');
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
       });
     });
@@ -758,71 +749,55 @@ test('recorded session', async ({ page }) => {
 
       await screen.getByText('▶').click();
 
-      await vi.waitFor(() => expect(swDebugEval).toHaveBeenCalled());
+      await vi.waitFor(() => expect(mockConsoleRef.current.runScript).toHaveBeenCalled());
       expect(executeCommand).not.toHaveBeenCalled();
     });
 
-    it('should show numeric result in JS mode', async () => {
+    it('should delegate to consoleRef.runScript for numeric input in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorContent: '6', editorMode: 'js', dispatch });
 
-      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'number', value: 6 } });
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUCCESS',
-          line: { text: '6', type: 'success' },
-        });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('6');
       });
     });
 
-    it('should show boolean result in JS mode', async () => {
+    it('should delegate to consoleRef.runScript for boolean input in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorContent: 'true', editorMode: 'js', dispatch });
 
-      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'boolean', value: true } });
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUCCESS',
-          line: { text: 'true', type: 'success' },
-        });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('true');
       });
     });
 
-    it('should show Done for undefined result in JS mode', async () => {
+    it('should delegate to consoleRef.runScript for undefined result in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorContent: 'void 0', editorMode: 'js', dispatch });
 
-      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'undefined' } });
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUCCESS',
-          line: { text: 'Done', type: 'success' },
-        });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('void 0');
       });
     });
 
-    it('should show Done for object result in JS mode', async () => {
+    it('should delegate to consoleRef.runScript for object input in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({ editorContent: '({})', editorMode: 'js', dispatch });
 
-      vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'object' } });
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_SUCCESS',
-          line: { text: 'Done', type: 'success' },
-        });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('({})');
       });
     });
 
-    it('should dispatch COMMAND_ERROR when swDebugEval throws in JS mode', async () => {
+    it('should delegate to consoleRef.runScript for error input in JS mode', async () => {
       const dispatch = vi.fn();
       const screen = await renderToolbar({
         editorContent: 'invalid()',
@@ -830,16 +805,10 @@ test('recorded session', async ({ page }) => {
         dispatch,
       });
 
-      vi.mocked(swDebugEval).mockRejectedValue(new Error('ReferenceError: invalid is not defined'));
-
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({
-          type: 'COMMAND_ERROR',
-          line: { text: 'ReferenceError: invalid is not defined', type: 'error' },
-        });
-        expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
+        expect(mockConsoleRef.current.runScript).toHaveBeenCalledWith('invalid()');
       });
     });
   });
