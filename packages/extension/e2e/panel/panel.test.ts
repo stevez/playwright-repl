@@ -188,13 +188,13 @@ test('has mode toggle button showing current mode', async ({ panelPage }) => {
   await expect(toggle).toContainText('JS');
 });
 
-test('step button is disabled in JS mode', async ({ panelPage }) => {
+test('step button is enabled in JS mode (starts debug session)', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
   await panelPage.getByTestId('mode-toggle').click(); // pw → js
-  await expect(panelPage.locator('#step-btn')).toBeDisabled();
+  await expect(panelPage.locator('#step-btn')).toBeEnabled();
 });
 
-test('step button re-enabled when switching back to pw mode', async ({ panelPage }) => {
+test('step button is enabled when switching back to pw mode', async ({ panelPage }) => {
   await fillEditor(panelPage, 'goto https://example.com');
   await panelPage.getByTestId('mode-toggle').click(); // pw → js
   await panelPage.getByTestId('mode-toggle').click(); // js → pw
