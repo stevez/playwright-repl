@@ -463,7 +463,7 @@ describe('Toolbar component tests', () => {
     });
   });
 
-  it('should dispatch EDIT_EDITOR_CONTENT when port receives setSources', async () => {
+  it('should call insertAtCursor when port receives setSources', async () => {
     let portMessageListener: ((...args: unknown[]) => unknown) | null = null;
     const mockPort = {
       onMessage: {
@@ -474,8 +474,9 @@ describe('Toolbar component tests', () => {
     } as unknown as chrome.runtime.Port;
     vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
 
-    const dispatch = vi.fn();
-    const screen = await renderToolbar({ dispatch });
+    const insertAtCursor = vi.fn();
+    const editorRef = { current: { insertAtCursor } };
+    const screen = await renderToolbar({ editorRef: editorRef as any });
 
     await screen.getByRole('button', { name: 'Record' }).click();
     await vi.waitFor(() => expect(portMessageListener).not.toBeNull());
@@ -487,15 +488,13 @@ describe('Toolbar component tests', () => {
       sources: [{
         id: 'jsonl',
         actions: [
-          JSON.stringify({ action: { type: 'navigate', url: 'https://example.com' } }),
+          JSON.stringify({ name: 'click', locator: { kind: 'text', body: 'Submit' } }),
         ],
       }],
     });
 
     await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'EDIT_EDITOR_CONTENT' })
-      );
+      expect(insertAtCursor).toHaveBeenCalledWith(expect.stringContaining('click'));
     });
   });
 
