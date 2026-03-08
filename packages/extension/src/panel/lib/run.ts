@@ -1,4 +1,4 @@
-import { executeCommand, cdpEvaluate } from '@/lib/bridge';
+import { executeCommand } from '@/lib/bridge';
 import { filterResponse } from '@/lib/filter';
 import { COMMANDS } from '@/lib/commands';
 import type { CommandResult } from '@/types';
@@ -7,7 +7,7 @@ import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-histo
 import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
-import { detectMode } from '@/lib/execute';
+import { injectBreakpoints } from '@/lib/js-step-transform';
 
 function trimStack(msg: string): string {
     return msg.split('\n    at ')[0].split('\nCall log:')[0].trim();
@@ -47,10 +47,7 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
 export async function runJsScript(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
     try {
-        const mode = detectMode(code);
-        const raw = (mode === 'js'
-            ? await cdpEvaluate(code)
-            : await swDebugEval(code)) as { result?: CdpRemoteObject };
+        const raw = await swDebugEval(code) as { result?: CdpRemoteObject };
         const r = raw?.result;
         if (!r || r.type === 'undefined') {
             dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
@@ -60,12 +57,27 @@ export async function runJsScript(code: string, dispatch: React.Dispatch<Action>
             dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
         } else {
             const value = fromCdpRemoteObject(r);
-            const getProperties = mode !== 'js' ? swGetProperties : undefined;
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
         }
     } catch (e: any) {
         const text = trimStack(e?.message ?? String(e));
         dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
+    }
+}
+
+export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
+    dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
+    const transformed = injectBreakpoints(code);
+    try {
+        await swDebugEval(transformed);
+        dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+    } catch (e: any) {
+        const msg: string = e?.message ?? String(e);
+        if (msg.includes('__debug_stopped__')) {
+            dispatch({ type: 'ADD_LINE', line: { text: 'Stopped.', type: 'info' } });
+        } else {
+            dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(msg), type: 'error' } });
+        }
     }
 }
 

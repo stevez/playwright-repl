@@ -53,6 +53,9 @@ const pwTheme = EditorView.theme({
     '.cm-run-line': {
         background: 'var(--bg-line-highlight)'
     },
+    '.cm-debug-line': {
+        background: 'var(--bg-debug-line)'
+    },
     '.cm-tooltip-autocomplete': {
         backgroundColor: 'var(--bg-toolbar)',
         border: '1px solid var(--border-primary)',
@@ -65,12 +68,23 @@ const pwTheme = EditorView.theme({
 
 export const setRunLineEffect = StateEffect.define<number>();           // -1 = none
 export const setLineResultsEffect = StateEffect.define<(string | null)[]>();  // per-line
+export const setIsDebugEffect = StateEffect.define<boolean>();
 
 const runLineField = StateField.define<number>({
     create: () => -1,
     update(value, tr) {
         for (const e of tr.effects) {
             if (e.is(setRunLineEffect)) return e.value;
+        }
+        return value;
+    },
+});
+
+const isDebugField = StateField.define<boolean>({
+    create: () => false,
+    update(value, tr) {
+        for (const e of tr.effects) {
+            if (e.is(setIsDebugEffect)) return e.value;
         }
         return value;
     },
@@ -87,13 +101,14 @@ const lineResultsField = StateField.define<(string | null)[]>({
 });
 
 const runLineHighlight = EditorView.decorations.compute(
-    [runLineField],
+    [runLineField, isDebugField],
     (state) => {
         const lineNum = state.field(runLineField);
         if (lineNum < 0 || lineNum >= state.doc.lines) return Decoration.none;
         const line = state.doc.line(lineNum + 1);  // CM6 lines are 1-indexed
+        const cls = state.field(isDebugField) ? 'cm-debug-line' : 'cm-run-line';
         return Decoration.set([
-            Decoration.line({ class: 'cm-run-line' }).range(line.from),
+            Decoration.line({ class: cls }).range(line.from),
         ]);
     }
 );
@@ -128,12 +143,14 @@ const resultGutter = gutter({
 export function dispatchRunState(
     view: EditorView,
     runLine: number,
-    lineResults: (string | null)[]
+    lineResults: (string | null)[],
+    isDebug: boolean = false,
 ) {
     view.dispatch({
         effects: [
             setRunLineEffect.of(runLine),
             setLineResultsEffect.of(lineResults),
+            setIsDebugEffect.of(isDebug),
         ],
     });
 }
@@ -194,7 +211,8 @@ export const baseExtensions = [
     pwTheme,
     runLineField,          // ← register the StateField so CM6 tracks it
     lineResultsField,      // ← register the StateField so CM6 tracks it
-    runLineHighlight,      // ← decoration that reads runLineField
+    isDebugField,          // ← register the StateField so CM6 tracks it
+    runLineHighlight,      // ← decoration that reads runLineField + isDebugField
     resultGutter,          // ← gutter that reads lineResultsField
 ];
 

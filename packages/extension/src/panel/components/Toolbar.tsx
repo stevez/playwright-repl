@@ -2,16 +2,16 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { exportToPlaywright, jsonlToRepl } from '@/lib/converter';
 import { connectWithRetry, attachToTab } from '@/lib/bridge';
-import { runAndDispatch, runJsScript } from '@/lib/run';
+import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, ExportIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'fileName' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
     dispatch: React.Dispatch<Action>,
     editorRef: React.RefObject<EditorHandle | null>,
 };
 
-function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, dispatch, editorRef }: ToolbarProps) {
+function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, dispatch, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionCountRef = useRef(0);
@@ -174,6 +174,15 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
 
     function handleStop() {
         cancelRunRef.current = true;
+        if (isStepDebugging) {
+            chrome.runtime.sendMessage({ type: 'debug-stop' }).catch(() => {});
+        }
+        dispatch({ type: 'RUN_STOP' });
+    }
+
+    async function handleDebug() {
+        dispatch({ type: 'RUN_START', stepDebug: true });
+        await runJsScriptStep(editorContent, dispatch);
         dispatch({ type: 'RUN_STOP' });
     }
 
@@ -189,6 +198,12 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
     }
 
     async function handleStep() {
+        if (isStepDebugging) {
+            // JS debug mode: advance past the current breakpoint
+            chrome.runtime.sendMessage({ type: 'debug-resume' }).catch(() => {});
+            return;
+        }
+        // pw step mode: run next line via runAndDispatch
         if (stepLine === -1) {
             const nextStepLine = findExecutableIndex(0);
             if (nextStepLine !== -1) dispatch({ type: 'STEP_INIT', stepLine: nextStepLine });
@@ -341,7 +356,8 @@ function Toolbar({ editorContent, fileName, editorMode, stepLine, attachedUrl, a
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title="Stop run" onClick={handleStop}><StopIcon /></button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
                 }
-                <button id="step-btn" title="Step: run next line" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleStep}>&#9655;</button>
+                <button id="debug-btn" data-testid="debug-btn" title="Debug: step through JS script" disabled={!editorContent.trim() || editorMode !== 'js' || isRunning} onClick={handleDebug}>&#9650;</button>
+                <button id="step-btn" title="Step: run next line" disabled={editorMode === 'js' ? !isStepDebugging : (!editorContent.trim())} onClick={handleStep}>&#9655;</button>
                 <button id="export-btn" title="Export as Playwright test" disabled={!editorContent.trim() || editorMode === 'js'} onClick={handleExport}><ExportIcon /></button>
                 <span className="w-px h-4.5 bg-(--color-toolbar-sep) mx-1"></span>
                 <button

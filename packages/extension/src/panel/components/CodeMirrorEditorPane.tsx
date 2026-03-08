@@ -7,14 +7,14 @@ export interface EditorHandle {
     insertAtCursor: (text: string) => void;
 }
 
-interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
+interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode' | 'isStepDebugging'> {
     dispatch: React.Dispatch<Action>
     ref?: React.Ref<EditorHandle | null>
     containerRef?: React.Ref<HTMLDivElement>
 }
 
 
-function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref, containerRef }: EditorPaneProps) {
+function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, isStepDebugging, dispatch, ref, containerRef }: EditorPaneProps) {
     const cmContainerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
@@ -69,8 +69,8 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
     useEffect(()=> {
         const view = viewRef.current;
         if(!view) return;
-        dispatchRunState(view, currentRunLine, lineResults);
-    }, [currentRunLine, lineResults]);
+        dispatchRunState(view, currentRunLine, lineResults, isStepDebugging);
+    }, [currentRunLine, lineResults, isStepDebugging]);
 
     useEffect(() => {
         const view = viewRef.current;

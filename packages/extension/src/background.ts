@@ -164,7 +164,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
+  if (msg.type === 'debug-resume') { if (__dbgResolve) __dbgResolve(false); sendResponse({ ok: true }); return false; }
+  if (msg.type === 'debug-stop')   { if (__dbgResolve) __dbgResolve(true);  sendResponse({ ok: true }); return false; }
 });
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;
+
+// ─── JS Step Debugger ─────────────────────────────────────────────────────────
+
+let __dbgResolve: ((stop: boolean) => void) | null = null;
+
+(globalThis as any).__breakpoint__ = async function __breakpoint__(lineIndex: number): Promise<void> {
+    chrome.runtime.sendMessage({ type: 'debug-paused', line: lineIndex }).catch(() => {});
+    const stop = await new Promise<boolean>(resolve => { __dbgResolve = resolve; });
+    __dbgResolve = null;
+    if (stop) throw new Error('__debug_stopped__');
+};

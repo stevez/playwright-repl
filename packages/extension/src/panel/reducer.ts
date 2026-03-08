@@ -6,6 +6,7 @@ export type PanelState = {
   fileName: string
   editorMode: 'pw' | 'js'
   isRunning: boolean
+  isStepDebugging: boolean
   currentRunLine: number      // -1 = none
   stepLine: number            // -1 = not stepping
   passCount: number
@@ -25,7 +26,7 @@ export type Action =
    | { type: 'EDIT_EDITOR_CONTENT', content: string }
    | { type: 'APPEND_EDITOR_CONTENT', command: string}
    | { type: 'SET_FILENAME', fileName: string }
-   | { type: 'RUN_START'}
+   | { type: 'RUN_START', stepDebug?: boolean }
    | { type: 'RUN_STOP' }
    | { type: 'SET_RUN_LINE', currentRunLine: number }
    | { type: 'STEP_INIT', stepLine: number }
@@ -43,6 +44,7 @@ export const initialState : PanelState = {
     fileName: '',
     editorMode: 'pw',
     isRunning: false,
+    isStepDebugging: false,
     currentRunLine: -1,
     stepLine: -1,
     passCount: 0,
@@ -86,14 +88,15 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return {
                 ...state,
                 isRunning: true,
-                currentRunLine: 0,
+                isStepDebugging: action.stepDebug ?? false,
+                currentRunLine: -1,
                 passCount: 0,
                 failCount: 0,
                 lineResults: new Array(lineCount).fill(null)
             }
         }
         case 'RUN_STOP':
-            return { ...state, isRunning: false, currentRunLine: -1}
+            return { ...state, isRunning: false, isStepDebugging: false, currentRunLine: -1}
         case 'SET_RUN_LINE':
             return { ...state, currentRunLine: action.currentRunLine}
         case 'STEP_INIT': {

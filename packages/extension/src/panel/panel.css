@@ -8,6 +8,7 @@
   --bg-toolbar: #f3f3f3;
   --bg-editor: #ffffff;
   --bg-line-highlight: #e8e8e8;
+  --bg-debug-line: #fef08a;
   --bg-button: #e0e0e0;
   --bg-button-hover: #d0d0d0;
   --bg-splitter: #f3f3f3;
@@ -53,6 +54,7 @@
   --bg-toolbar: #252526;
   --bg-editor: #1e1e1e;
   --bg-line-highlight: #2a2d2e;
+  --bg-debug-line: #4a400a;
   --bg-button: #333333;
   --bg-button-hover: #3c3c3c;
   --bg-splitter: #252526;
