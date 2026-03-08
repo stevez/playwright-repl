@@ -31,7 +31,7 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
                 entries.push(entry);
                 i += 2;
             } else {
-                entries.push({ id, input: line.text, status: 'done' });
+                entries.push({ id, input: line.text, status: 'pending' });
                 i++;
             }
         } else if (line.type === 'comment') {
