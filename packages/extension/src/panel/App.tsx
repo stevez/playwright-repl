@@ -108,7 +108,8 @@ function App() {
     const onActivated = async (info: chrome.tabs.TabActiveInfo) => {
       const tab = await chrome.tabs.get(info.tabId).catch(() => null);
       const url = tab?.url ?? '';
-      if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) {
+      if (url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
+      if (url.startsWith('chrome://')) {
         dispatch({ type: 'DETACH' });
         return;
       }
