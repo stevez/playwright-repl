@@ -98,18 +98,39 @@ function App() {
 
     // Side panel mode — attach to current active tab, then follow tab switches
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id;
-      if (tabId) doAttach(tabId);
+      const tab = tabs[0];
+      const url = tab?.url ?? '';
+      if (tab?.id && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://') && !url.startsWith('about:')) {
+        doAttach(tab.id);
+      }
     });
 
     const onActivated = async (info: chrome.tabs.TabActiveInfo) => {
       const tab = await chrome.tabs.get(info.tabId).catch(() => null);
       const url = tab?.url ?? '';
-      if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) return;
+      if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:')) {
+        dispatch({ type: 'DETACH' });
+        return;
+      }
       doAttach(info.tabId);
     };
     chrome.tabs.onActivated.addListener(onActivated);
-    return () => chrome.tabs.onActivated.removeListener(onActivated);
+
+    // Auto-attach when the active tab navigates from an internal URL to a regular one
+    // (e.g. user opens a new tab from chrome://extensions and types a URL)
+    const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (changeInfo.url && !changeInfo.url.startsWith('chrome://') && !changeInfo.url.startsWith('chrome-extension://') && !changeInfo.url.startsWith('about:')) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id === tabId) doAttach(tabId);
+        });
+      }
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(onActivated);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+    };
   }, []);
 
   return (

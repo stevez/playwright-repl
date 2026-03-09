@@ -59,7 +59,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         loadTabs();
         checkActiveTab();
         if (!chrome.tabs?.onActivated) return;
-        const onActivated = () => { setSelectedTabId(null); checkActiveTab(); };
+        const onActivated = (info: chrome.tabs.TabActiveInfo) => { setSelectedTabId(info.tabId); checkActiveTab(); };
         chrome.tabs.onActivated.addListener(onActivated);
         return () => chrome.tabs.onActivated.removeListener(onActivated);
     }, []);
@@ -80,7 +80,10 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     async function handleTabChange(tabId: number) {
         const tab = availableTabs.find(t => t.id === tabId);
         setSelectedTabId(tabId); // show in dropdown immediately
-        if (tab && isInternalUrl(tab.url)) return; // internal: Attach disabled, don't try
+        if (tab && isInternalUrl(tab.url)) {
+            dispatch({ type: 'DETACH' });
+            return;
+        }
         await doAttach(tabId);
     }
 
