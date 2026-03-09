@@ -20,7 +20,7 @@ It consists of two parts working together: **Dramaturg** (a Chrome extension tha
 
 | | `@playwright-repl/mcp` | Playwright MCP | Playwriter |
 |---|:---:|:---:|:---:|
-| MCP tools exposed | **1** `run_command` | ~70 tools | **1** `execute` |
+| MCP tools exposed | **2** (`run_command` + `run_script`) | ~70 tools | **1** `execute` |
 | Uses your real session | ✅ | ❌ | ✅ |
 | Playwright runs inside browser | ✅ | ❌ | ❌ |
 | `expect()` assertions | ✅ | ❌ | ❌ |
@@ -146,6 +146,46 @@ document.title
 window.location.href
 document.querySelectorAll('a').length
 ```
+
+## Tool: `run_script`
+
+Batch execution for multi-line scripts. Two language modes:
+
+### Keyword script (`language="pw"`)
+
+Splits by line, runs each command sequentially, returns ✓/✗ per line:
+
+```
+goto https://demo.playwright.dev/todomvc/
+fill "What needs to be done?" "Buy groceries"
+press Enter
+verify-text "Buy groceries"
+```
+
+### JavaScript (`language="javascript"`)
+
+Runs the entire block as one evaluation — use for Playwright API with assertions:
+
+```js
+await page.goto('https://demo.playwright.dev/todomvc/');
+await page.getByPlaceholder('What needs to be done?').fill('Buy groceries');
+await page.keyboard.press('Enter');
+await expect(page.getByText('Buy groceries')).toBeVisible();
+```
+
+## Prompt: `generate-test`
+
+A prompt template that guides the AI to generate a passing Playwright test from a described scenario.
+
+**Args:**
+- `steps` (required) — describe the test scenario, e.g. "log in with email/password, verify the dashboard loads". Also accepts pasted `.pw` scripts.
+- `url` (optional) — URL to navigate to first.
+
+**In Claude Desktop:** click "+" → select `generate-test` → fill in the form → send.
+
+**In Claude Code:** `/mcp__playwright-repl__generate-test`
+
+The AI navigates the page, takes snapshots, writes Playwright assertions, runs them via `run_script(language="javascript")`, and iterates until all pass.
 
 ## Tips for AI agents
 

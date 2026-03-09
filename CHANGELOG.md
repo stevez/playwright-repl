@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.14.0 — AI Test Generation
+
+**2026-03-09**
+
+### New: `run_script` MCP tool
+
+- **Batch script execution**: `run_script` sends multi-line scripts to the extension in a single call. Supports two languages:
+  - `language="pw"` — splits by line, runs each keyword command sequentially, returns ✓/✗ per line
+  - `language="javascript"` — runs the entire block as one `swDebugEval` call (for `await page.*`, `expect()`, etc.)
+
+### New: `generate-test` MCP prompt
+
+- **AI-driven test generation**: `/generate-test` prompt template in Claude Desktop and Claude Code. Provide a test scenario description (and optional URL), and the AI navigates the page, takes snapshots, writes Playwright assertions, runs them via `run_script`, and iterates until all pass. Works with both natural language steps and pasted `.pw` scripts.
+
+### Features
+
+- **Pick locator**: Click elements in the page to insert their locator into the editor. ([#121](https://github.com/stevez/playwright-repl/pull/121))
+- **JS mode assertion recording**: Recording in JS mode now correctly generates `expect()` assertions. ([#121](https://github.com/stevez/playwright-repl/pull/121))
+
+### Internal
+
+- Consolidated `commands.ts` and `page-scripts.ts` into `src/panel/lib/`.
+
+---
+
 ## v0.13.0 — MCP Server + Dramaturg
 
 **2026-03-09**

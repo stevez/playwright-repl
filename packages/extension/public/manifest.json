@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dramaturg",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Playwright automation console inside Chrome — keyword commands, Playwright API, and JavaScript in one side panel.",
   "permissions": [
     "activeTab",

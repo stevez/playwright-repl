@@ -110,5 +110,50 @@ server.registerTool(
     }
 );
 
+
+const GENERATE_TEST_PROMPT = (steps: string, url?: string) => `\
+Generate a passing Playwright test for the following scenario:
+${steps}
+
+Workflow:
+1. ${url ? `Navigate to ${url} using run_command('goto ${url}').` : 'Navigate to the target URL using run_command.'}
+2. Take a snapshot using run_command('snapshot') to understand the page structure.
+3. Interact with the page as needed (click, fill, press) using run_command.
+4. After each interaction, take another snapshot to verify the state before asserting.
+5. Write assertions using \`expect\`.
+
+Example pattern:
+  await page.goto('https://example.com');
+  await expect(page).toHaveTitle('Example', { exact: true });
+  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+  await page.getByRole('link', { name: 'Get started', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
+
+Code constraints:
+- Use only \`page\` and \`expect\` — available as globals, do NOT import them
+- Plain \`await\` statements only — no \`import\`, no \`test()\` wrapper, no \`describe()\`
+- Use \`exact: true\` when a locator text might match multiple elements
+
+Once you have the code, run it with run_script(language="javascript").
+If any assertion fails, read the error, fix the code, and run again until all pass.
+Show the final passing code.`;
+
+server.registerPrompt(
+  'generate-test',
+  {
+    description: 'Generate a passing Playwright test from a described scenario',
+    argsSchema: {
+      steps: z.string().describe('Describe the test scenario, e.g. "log in with email/password, verify the dashboard loads"'),
+      url: z.string().optional().describe('URL to navigate to first (optional)'),
+    },
+  },
+  ({ steps, url }) => ({
+    messages: [{
+      role: 'user' as const,
+      content: { type: 'text' as const, text: GENERATE_TEST_PROMPT(steps, url) },
+    }],
+  })
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
