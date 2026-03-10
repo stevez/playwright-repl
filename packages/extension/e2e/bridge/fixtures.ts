@@ -24,9 +24,10 @@ type BridgeContext = {
   bridge: BridgeServer;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- no test-scoped fixtures
+type NoTestFixtures = { _bridge?: never };
+
 export const test = base.extend<
-  {},
+  NoTestFixtures,
   { bridgeContext: BridgeContext; testPage: Page }
 >({
   // Worker-scoped: BridgeServer + browser, reused across all tests in a worker
