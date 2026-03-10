@@ -13,7 +13,16 @@ export class BridgeServer {
     get connected()              { return this.socket?.readyState === WebSocket.OPEN; }
 
     async start(port = 9876): Promise<void> {
-        this.wss = new WebSocketServer({ port });
+        this.wss = new WebSocketServer({
+            port,
+            verifyClient: ({ origin }: { origin: string }) => {
+                // Allow: no origin (Node.js ws clients, curl, tests)
+                // Allow: chrome-extension:// (our offscreen document)
+                // Block: http://, https:// (web pages)
+                if (!origin) return true;
+                return origin.startsWith('chrome-extension://');
+            },
+        });
         await new Promise<void>((resolve, reject) => {
             this.wss.on('listening', resolve);
             this.wss.on('error', reject);
