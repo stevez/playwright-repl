@@ -35,12 +35,23 @@ export class BridgeServer {
                 this.pending.get(msg.id)?.(msg);
                 this.pending.delete(msg.id);
             });
-            ws.on('close', () => { this.socket = null; this._onDisconnect?.(); });
+            ws.on('close', () => {
+                this.socket = null;
+                // Reject all in-flight commands so tests don't hang
+                for (const [, resolve] of this.pending) {
+                    resolve({ text: 'WebSocket disconnected', isError: true });
+                }
+                this.pending.clear();
+                this._onDisconnect?.();
+            });
         });
     }
 
     async run(command: string): Promise<EngineResult> {
-        if (!this.connected) return { text: 'Extension not connected', isError: true };
+        if (!this.connected) {
+            try { await this.waitForConnection(10000); }
+            catch { return { text: 'Extension not connected', isError: true }; }
+        }
         const id = Math.random().toString(36).slice(2);
         return new Promise((resolve) => {
             this.pending.set(id, resolve);
@@ -49,7 +60,10 @@ export class BridgeServer {
     }
 
     async runScript(script: string, language: 'pw' | 'javascript' = 'pw'): Promise<EngineResult> {
-        if (!this.connected) return { text: 'Extension not connected', isError: true };
+        if (!this.connected) {
+            try { await this.waitForConnection(10000); }
+            catch { return { text: 'Extension not connected', isError: true }; }
+        }
         const id = Math.random().toString(36).slice(2);
         return new Promise((resolve) => {
             this.pending.set(id, resolve);
@@ -71,6 +85,14 @@ export class BridgeServer {
                 resolve();
             };
         });
+    }
+
+    /** Drop the current connection and wait for offscreen doc to reconnect. */
+    async reconnect(timeoutMs = 10000): Promise<void> {
+        if (this.socket?.readyState === WebSocket.OPEN) {
+            this.socket.close();
+        }
+        await this.waitForConnection(timeoutMs);
     }
 
     async close(): Promise<void> {

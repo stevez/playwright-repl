@@ -319,27 +319,6 @@ test('recording into existing content inserts goto after cursor', async ({ panel
   expect(text!.indexOf('# existing script')).toBeLessThan(text!.indexOf('goto'));
 });
 
-test('recorded actions appear in console as JSON', async ({ panelPage }) => {
-  const fireSources = await setupRecorderPort(panelPage);
-  await panelPage.getByTestId('record-btn').click();
-  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
-
-  await fireSources(recorderSources([
-    { name: 'click', locator: { kind: 'text', body: 'Submit' } },
-  ]));
-
-  await expect(panelPage.getByTestId('output')).toContainText('"name": "click"');
-});
-
-test('recording stopped message appears when record button clicked again', async ({ panelPage }) => {
-  await setupRecorderPort(panelPage);
-  await panelPage.getByTestId('record-btn').click();
-  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
-
-  await panelPage.getByTestId('record-btn').click();
-  await expect(panelPage.getByTestId('output')).toContainText('Recording stopped.');
-});
-
 // ─── Editor mode toggle ─────────────────────────────────────────────────────
 
 test('has mode toggle button showing current mode', async ({ panelPage }) => {

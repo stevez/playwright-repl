@@ -24,12 +24,16 @@ type BridgeContext = {
   bridge: BridgeServer;
 };
 
-type NoTestFixtures = { _bridge?: never };
-
 export const test = base.extend<
-  NoTestFixtures,
+  // Test-scoped: auto-use fixture that reconnects the bridge before each test
+  { _reconnect: void },
   { bridgeContext: BridgeContext }
 >({
+  // Force fresh WebSocket connection before each test
+  _reconnect: [async ({ bridgeContext }, use) => {
+    await bridgeContext.bridge.reconnect();
+    await use();
+  }, { auto: true }],
   // Worker-scoped: BridgeServer + browser, reused across all tests in a worker
   bridgeContext: [async ({}, use) => {
     // 1. Start BridgeServer BEFORE the browser so the offscreen doc connects on init
@@ -70,11 +74,16 @@ export const test = base.extend<
 
     // Close browser first (terminates WebSocket client), then bridge server
     await context.close();
-    // bridge.close() can hang if wss.close waits for dead connections — race with timeout
-    await Promise.race([
-      bridge.close(),
-      new Promise<void>(r => setTimeout(r, 5000)),
+    // bridge.close() can hang if wss.close waits for dead connections — use timeout
+    const closed = await Promise.race([
+      bridge.close().then(() => true),
+      new Promise<false>(r => setTimeout(() => r(false), 5000)),
     ]);
+    if (!closed) {
+      // Force-kill: terminate lingering connections so the port is freed
+      (bridge as any).wss?.clients?.forEach((ws: any) => ws.terminate());
+      await bridge.close().catch(() => {});
+    }
   }, { scope: 'worker' }],
 
 });
