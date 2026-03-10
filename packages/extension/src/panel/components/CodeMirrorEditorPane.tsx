@@ -5,6 +5,7 @@ import type { PanelState, Action } from "@/reducer";
 
 export interface EditorHandle {
     insertAtCursor: (text: string) => void;
+    replaceLastInsert: (text: string) => void;
 }
 
 interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
@@ -18,6 +19,7 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
     const cmContainerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
+    const lastInsertRangeRef = useRef<{ from: number; to: number } | null>(null);
 
     useImperativeHandle(ref, () => ({
         insertAtCursor(text: string) {
@@ -26,11 +28,27 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
             const { from } = view.state.selection.main;
             const before = view.state.doc.sliceString(Math.max(0, from - 1), from);
             const insert = (before && before !== '\n' ? '\n' : '') + text;
+            const insertFrom = from;
             view.dispatch({
                 changes: { from, to: from, insert },
                 selection: { anchor: from + insert.length },
                 scrollIntoView: true,
             });
+            lastInsertRangeRef.current = { from: insertFrom, to: insertFrom + insert.length };
+            view.focus();
+        },
+        replaceLastInsert(text: string) {
+            const view = viewRef.current;
+            const range = lastInsertRangeRef.current;
+            if (!view || !range) return;
+            const before = view.state.doc.sliceString(Math.max(0, range.from - 1), range.from);
+            const insert = (before && before !== '\n' ? '\n' : '') + text;
+            view.dispatch({
+                changes: { from: range.from, to: range.to, insert },
+                selection: { anchor: range.from + insert.length },
+                scrollIntoView: true,
+            });
+            lastInsertRangeRef.current = { from: range.from, to: range.from + insert.length };
             view.focus();
         },
     }));

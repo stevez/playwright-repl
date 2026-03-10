@@ -18,6 +18,7 @@ export type PanelState = {
 
 export type Action =
      { type: 'ADD_LINE', line: OutputLine}
+   | { type: 'REPLACE_LAST_LINE', line: OutputLine }
    | { type: 'CLEAR_CONSOLE'}
    | { type: 'COMMAND_SUBMITTED', line: OutputLine}
    | { type: 'COMMAND_SUCCESS', line: OutputLine }
@@ -56,6 +57,8 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
     switch(action.type) {
         case 'ADD_LINE':
             return { ...state, outputLines: [...state.outputLines, action.line]}
+        case 'REPLACE_LAST_LINE':
+            return { ...state, outputLines: [...state.outputLines.slice(0, -1), action.line]}
         case 'CLEAR_CONSOLE':
             return { ...state, outputLines: [], passCount: 0, failCount: 0}
         case 'COMMAND_SUBMITTED':

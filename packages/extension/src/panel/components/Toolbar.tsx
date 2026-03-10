@@ -15,7 +15,7 @@ interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' |
 function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, dispatch, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
-    const prevActionCountRef = useRef(0);
+    const prevActionsRef = useRef<string[]>([]);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
@@ -224,9 +224,15 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     const handleRecordedSources = useCallback((sources: any[]) => {
         const jsonlSource = sources.find(s => s.id === 'jsonl') || sources[0];
         if (!jsonlSource?.actions?.length) return;
-        const prevCount = prevActionCountRef.current;
-        const newActions = (jsonlSource.actions as string[]).slice(prevCount);
-        prevActionCountRef.current = jsonlSource.actions.length;
+        const actions = jsonlSource.actions as string[];
+        const prev = prevActionsRef.current;
+
+        // Detect new actions (appended) vs updated actions (in-place edit, e.g. fill text changing)
+        const newActions = actions.slice(prev.length);
+        const lastUpdated = prev.length > 0 && actions.length === prev.length &&
+            actions[actions.length - 1] !== prev[prev.length - 1];
+
+        prevActionsRef.current = [...actions];
 
         // Console: show new JSONL actions as pretty JSON
         for (const a of newActions) {
@@ -239,24 +245,42 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         const isOpenPage = (jsonl: string) => { try { return JSON.parse(jsonl).name === 'openPage'; } catch { return false; } };
 
-        if (editorMode === 'js') {
-            const jsSource = sources.find(s => s.id === 'javascript');
-            const jsLines = newActions.flatMap((a, i) => {
-                if (isOpenPage(a)) return [];
-                const jsAction = (jsSource?.actions as string[] | undefined)?.[prevCount + i];
-                if (!jsAction) return [];
+        // Helper: convert a single action to editor text
+        const actionToEditorText = (jsonl: string, idx: number): string | null => {
+            if (isOpenPage(jsonl)) return null;
+            if (editorMode === 'js') {
+                const jsSource = sources.find(s => s.id === 'javascript');
+                const jsAction = (jsSource?.actions as string[] | undefined)?.[idx];
+                if (!jsAction) return null;
                 return jsAction.split('\n')
-                    .map((line: string) => line.replace(/^ {2}/, ''))           // strip 2-space base offset
-                    .map((line: string) => line.replace(/^\/\/ (await expect\()/, '$1')) // uncomment assertions
-                    .filter((line: string) => !line.startsWith('const page =')); // page already exists
-            }).filter(Boolean);
-            if (jsLines.length) editorRef.current?.insertAtCursor(jsLines.join('\n'));
-        } else {
-            const replLines = newActions
-                .filter(a => !isOpenPage(a))
-                .map((a: string) => jsonlToRepl(a, false))
+                    .map((line: string) => line.replace(/^ {2}/, ''))
+                    .map((line: string) => line.replace(/^\/\/ (await expect\()/, '$1'))
+                    .filter((line: string) => !line.startsWith('const page ='))
+                    .join('\n') || null;
+            } else {
+                return jsonlToRepl(jsonl, false) || null;
+            }
+        };
+
+        // In-place update: replace the last inserted line in the editor + console
+        if (lastUpdated) {
+            const lastAction = actions[actions.length - 1];
+            const text = actionToEditorText(lastAction, actions.length - 1);
+            if (text) editorRef.current?.replaceLastInsert(text);
+            try {
+                dispatch({ type: 'REPLACE_LAST_LINE', line: { text: JSON.stringify(JSON.parse(lastAction), null, 2), type: 'code-block' } });
+            } catch {
+                dispatch({ type: 'REPLACE_LAST_LINE', line: { text: lastAction, type: 'info' } });
+            }
+            return;
+        }
+
+        // New actions: insert at cursor
+        if (newActions.length) {
+            const texts = newActions
+                .map((a, i) => actionToEditorText(a, prev.length + i))
                 .filter(Boolean) as string[];
-            if (replLines.length) editorRef.current?.insertAtCursor(replLines.join('\n'));
+            if (texts.length) editorRef.current?.insertAtCursor(texts.join('\n'));
         }
     }, [dispatch, editorMode]);
 
@@ -293,7 +317,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         }
 
         setIsRecording(true);
-        prevActionCountRef.current = 0;
+        prevActionsRef.current = [];
 
         if (result.url && result.url !== 'about:blank') {
             const gotoCmd = editorMode === 'js'
