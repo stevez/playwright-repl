@@ -24,6 +24,7 @@ type BridgeContext = {
   bridge: BridgeServer;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- no test-scoped fixtures
 export const test = base.extend<
   {},
   { bridgeContext: BridgeContext; testPage: Page }
