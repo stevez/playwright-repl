@@ -3,9 +3,8 @@ import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
-import { attachToTab, executeCommand } from './lib/bridge'
+import { attachToTab } from './lib/bridge'
 import { Console } from './components/Console';
-import { loadSettings } from './lib/settings';
 import { onConsoleEvent } from '@/lib/sw-debugger';
 
 function App() {
@@ -45,60 +44,6 @@ function App() {
     }
     chrome.runtime.onMessage.addListener(onMessage);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
-  }, []);
-
-  // ─── CLI Bridge ──────────────────────────────────────────────────────────────
-  // The panel owns the WebSocket connection — it's persistent (user keeps it open)
-  // and has chrome.debugger access needed for executeCommand().
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let unmounted = false;
-
-    function connect(port: number) {
-      if (unmounted) return;
-      try {
-        ws = new WebSocket(`ws://localhost:${port}`);
-        ws.onmessage = async (e) => {
-          const msg = JSON.parse(e.data as string) as { id: string; command: string; type?: 'command' | 'script'; language?: 'pw' | 'javascript' };
-          let result: { text: string; isError: boolean; image?: string };
-          if (msg.type === 'script') {
-            if (msg.language !== 'javascript') {
-              const lines = msg.command.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-              const output: string[] = [];
-              let isError = false;
-              for (const line of lines) {
-                const r = await executeCommand(line).catch((err: unknown) => ({ text: String(err), isError: true }));
-                output.push(`${r.isError ? '✗' : '✓'} ${line}${r.text ? `\n  ${r.text}` : ''}`);
-                if (r.isError) { isError = true; break; }
-              }
-              result = { text: output.join('\n'), isError };
-            } else {
-              result = await executeCommand(msg.command).catch((err: unknown) => ({ text: String(err), isError: true }));
-            }
-          } else {
-            result = await executeCommand(msg.command).catch((err: unknown) => ({ text: String(err), isError: true }));
-          }
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ id: msg.id, ...result }));
-          }
-        };
-        ws.onclose = () => {
-          if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
-        };
-        ws.onerror = () => { };
-      } catch {
-        if (!unmounted) reconnectTimer = setTimeout(() => connect(port), 3000);
-      }
-    }
-
-    loadSettings().then(({ bridgePort }) => connect(bridgePort));
-
-    return () => {
-      unmounted = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
-    };
   }, []);
 
   useEffect(() => {

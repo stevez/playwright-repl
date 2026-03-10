@@ -4,6 +4,20 @@ import { expect } from '@playwright-repl/playwright-crx/test';
 import type { Page } from '@playwright-repl/playwright-crx/test';
 import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
+import { parseReplCommand } from './panel/lib/commands';
+import { detectMode } from './panel/lib/execute';
+
+// ─── Offscreen Document (CLI Bridge) ─────────────────────────────────────────
+
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: 'offscreen/offscreen.html',
+    reasons: [chrome.offscreen.Reason.BLOBS],
+    justification: 'Maintains WebSocket connection to CLI/MCP bridge server',
+  });
+}
+ensureOffscreen().catch(() => {});
 
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
@@ -16,6 +30,9 @@ loadSettings().then(s => cachedSettings = s).catch(() => {});
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.openAs) {
     cachedSettings.openAs = changes.openAs.newValue;
+  }
+  if (area === 'local' && changes.bridgePort) {
+    chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => {});
   }
 });
 
@@ -146,9 +163,198 @@ function cdpGetProperties(tabId: number, objectId: string): Promise<unknown> {
   });
 }
 
+// ─── Bridge Command Execution ────────────────────────────────────────────────
+
+/** Attempt to insert `return` before the last expression line so the caller gets the value. */
+function tryReturnLastExpr(code: string): string {
+  const lines = code.split('\n');
+  let i = lines.length - 1;
+  while (i >= 0 && !lines[i].trim()) i--;
+  if (i < 0) return code;
+  const trimmed = lines[i].trimStart();
+  if (/^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(trimmed)) return code;
+  const leading = lines[i].slice(0, lines[i].length - trimmed.length);
+  lines[i] = leading + 'return ' + trimmed;
+  return lines.join('\n');
+}
+
+// ─── Self-debug eval (chrome.debugger → own SW target, bypasses MV3 CSP) ────
+
+let selfTargetId: string | null = null;
+
+async function ensureSelfAttached(): Promise<string> {
+  const swUrl = `chrome-extension://${chrome.runtime.id}/background.js`;
+  const targets = await new Promise<chrome.debugger.TargetInfo[]>(resolve =>
+    chrome.debugger.getTargets(resolve)
+  );
+  const sw = targets.find(t => t.type === 'worker' && t.url === swUrl);
+  if (!sw) throw new Error('Background worker target not found.');
+  if (selfTargetId === sw.id) return sw.id;
+  await new Promise<void>((resolve, reject) => {
+    chrome.debugger.attach({ targetId: sw.id }, '1.3', () => {
+      if (chrome.runtime.lastError) {
+        if (/already attached/i.test(chrome.runtime.lastError.message ?? '')) {
+          selfTargetId = sw.id; resolve();
+        } else reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        chrome.debugger.sendCommand({ targetId: sw.id }, 'Runtime.enable', {}, () => {});
+        selfTargetId = sw.id; resolve();
+      }
+    });
+  });
+  return sw.id;
+}
+
+chrome.debugger.onDetach.addListener((source) => {
+  if (source.targetId === selfTargetId) selfTargetId = null;
+});
+
+async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isError: boolean; image?: string }> {
+  try {
+    const targetId = await ensureSelfAttached();
+    const isMultiLine = jsExpr.includes('\n');
+    const isStatement = isMultiLine || jsExpr.trimEnd().endsWith(';');
+    const wrapped = isStatement
+      ? `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(tryReturnLastExpr(jsExpr))}))()`
+      : `(async () => { ${jsExpr} })()`;
+
+    const result = await new Promise<any>((resolve, reject) => {
+      chrome.debugger.sendCommand(
+        { targetId },
+        'Runtime.evaluate',
+        { expression: wrapped, awaitPromise: true, returnByValue: false, generatePreview: false, objectGroup: 'bridge' },
+        (res: any) => {
+          if (chrome.runtime.lastError) {
+            selfTargetId = null;
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (res?.exceptionDetails) {
+            const msg = res.exceptionDetails.exception?.description
+              ?? res.exceptionDetails.text ?? 'Unknown error';
+            reject(new Error(msg));
+          } else {
+            const r = res?.result;
+            if (!r || r.type === 'undefined') resolve(undefined);
+            else if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') resolve(r.value);
+            else resolve(r.description ?? 'Done');
+          }
+        }
+      );
+    });
+
+    return formatBridgeResult(result);
+  } catch (e: any) {
+    return { text: e?.message ?? String(e), isError: true };
+  }
+}
+
+function formatBridgeResult(result: unknown): { text: string; isError: boolean; image?: string } {
+  if (result === undefined || result === null) return { text: 'Done', isError: false };
+
+  if (typeof result === 'string') {
+    try {
+      const obj = JSON.parse(result);
+      if (obj && typeof obj === 'object' && '__image' in obj) {
+        return { text: '', isError: false, image: `data:${obj.mimeType};base64,${obj.__image}` };
+      }
+    } catch { /* not JSON */ }
+    return { text: result, isError: false };
+  }
+
+  if (typeof result === 'number' || typeof result === 'boolean') {
+    return { text: String(result), isError: false };
+  }
+
+  try {
+    return { text: JSON.stringify(result, null, 2), isError: false };
+  } catch {
+    return { text: String(result), isError: false };
+  }
+}
+
+async function executeSingleCommand(command: string): Promise<{ text: string; isError: boolean; image?: string }> {
+  const parsed = parseReplCommand(command);
+
+  if ('help' in parsed) return { text: parsed.help, isError: false };
+
+  if ('error' in parsed) {
+    const mode = detectMode(command.trim());
+
+    if (mode === 'playwright') {
+      const isMultiLine = command.includes('\n');
+      const isStatement = isMultiLine || command.trimEnd().endsWith(';');
+      const body = isStatement ? tryReturnLastExpr(command.trim()) : `return (${command.trim()})`;
+      return executeBridgeExpr(body);
+    }
+
+    if (mode === 'js' || mode === 'pw') {
+      try {
+        const expr = command.trim();
+        const wrapped = `(function(){try{var __v=(${expr});`
+          + `if(__v===undefined)return undefined;`
+          + `try{return JSON.stringify(__v,null,2);}catch(_){return String(__v);}`
+          + `}catch(e){throw e;}})()`;
+        const raw = await cdpEvaluate(activeTabId!, wrapped) as any;
+        if (raw?.exceptionDetails) {
+          const errMsg = raw.exceptionDetails.exception?.description ?? raw.exceptionDetails.text ?? 'Unknown error';
+          return { text: errMsg, isError: true };
+        }
+        const r = raw?.result;
+        if (!r || r.type === 'undefined') return { text: 'Done', isError: false };
+        if (r.type === 'string') return { text: r.value as string, isError: false };
+        if (r.type === 'number' || r.type === 'boolean') return { text: String(r.value), isError: false };
+        return { text: r.description ?? 'Done', isError: false };
+      } catch (e: any) {
+        if (mode === 'pw') return { text: parsed.error, isError: true };
+        return { text: e?.message ?? String(e), isError: true };
+      }
+    }
+
+    return { text: parsed.error, isError: true };
+  }
+
+  // Known keyword command — evaluate jsExpr directly in SW scope
+  return executeBridgeExpr(parsed.jsExpr);
+}
+
+async function handleBridgeCommand(msg: {
+  command: string;
+  scriptType?: 'command' | 'script';
+  language?: 'pw' | 'javascript';
+}): Promise<{ text: string; isError: boolean; image?: string }> {
+  if (!currentPage) {
+    const tabId = await getActiveTabId();
+    if (tabId) await attachToTab(tabId);
+    if (!currentPage) return { text: 'No active tab to attach to.', isError: true };
+  }
+
+  const { command, scriptType, language } = msg;
+
+  // Script mode: execute each line as a separate pw command
+  if (scriptType === 'script' && language !== 'javascript') {
+    const lines = command.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    const output: string[] = [];
+    let isError = false;
+    for (const line of lines) {
+      const r = await executeSingleCommand(line).catch((err: unknown) => ({ text: String(err), isError: true }));
+      output.push(`${r.isError ? '\u2717' : '\u2713'} ${line}${r.text ? `\n  ${r.text}` : ''}`);
+      if (r.isError) { isError = true; break; }
+    }
+    return { text: output.join('\n'), isError };
+  }
+
+  // Single command or JS script
+  return executeSingleCommand(command);
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'bridge-command') {
+    handleBridgeCommand(msg).then(sendResponse).catch(e =>
+      sendResponse({ text: String(e), isError: true })
+    );
+    return true;
+  }
   if (msg.type === 'attach')        { attachToTab(msg.tabId).then(sendResponse); return true; }
   if (msg.type === 'health')        { sendResponse({ ok: !!crxApp }); return false; }
   if (msg.type === 'record-start')  { startRecording().then(sendResponse); return true; }
@@ -161,6 +367,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'cdp-get-properties') {
     if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
     cdpGetProperties(activeTabId, msg.objectId).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
+    return true;
+  }
+  if (msg.type === 'get-bridge-port') {
+    chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
