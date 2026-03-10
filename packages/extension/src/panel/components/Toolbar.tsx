@@ -234,15 +234,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         prevActionsRef.current = [...actions];
 
-        // Console: show new JSONL actions as pretty JSON
-        for (const a of newActions) {
-            try {
-                dispatch({ type: 'ADD_LINE', line: { text: JSON.stringify(JSON.parse(a), null, 2), type: 'code-block' } });
-            } catch {
-                dispatch({ type: 'ADD_LINE', line: { text: a, type: 'info' } });
-            }
-        }
-
         const isOpenPage = (jsonl: string) => { try { return JSON.parse(jsonl).name === 'openPage'; } catch { return false; } };
 
         // Helper: convert a single action to editor text
@@ -267,11 +258,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             const lastAction = actions[actions.length - 1];
             const text = actionToEditorText(lastAction, actions.length - 1);
             if (text) editorRef.current?.replaceLastInsert(text);
-            try {
-                dispatch({ type: 'REPLACE_LAST_LINE', line: { text: JSON.stringify(JSON.parse(lastAction), null, 2), type: 'code-block' } });
-            } catch {
-                dispatch({ type: 'REPLACE_LAST_LINE', line: { text: lastAction, type: 'info' } });
-            }
             return;
         }
 
@@ -293,7 +279,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             setIsRecording(false);
             chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
             port?.disconnect();
-            dispatch({ type: 'ADD_LINE', line: { text: 'Recording stopped.', type: 'command' } });
             return;
         }
 
@@ -325,8 +310,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 : `goto "${result.url}"`;
             editorRef.current?.insertAtCursor(gotoCmd);
         }
-
-        dispatch({ type: 'ADD_LINE', line: { text: 'Recording started. Interact with the page...', type: 'command' } });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recorderPortRef.current!.onMessage.addListener((msg: any) => {
