@@ -6,7 +6,7 @@
  * Commands are sent via bridge.run() — no panel UI involved.
  */
 
-import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { test as base, chromium, type BrowserContext, type Worker } from '@playwright/test';
 import { BridgeServer } from '../../../core/dist/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,7 @@ type NoTestFixtures = { _bridge?: never };
 
 export const test = base.extend<
   NoTestFixtures,
-  { bridgeContext: BridgeContext; testPage: Page }
+  { bridgeContext: BridgeContext }
 >({
   // Worker-scoped: BridgeServer + browser, reused across all tests in a worker
   bridgeContext: [async ({}, use) => {
@@ -53,12 +53,18 @@ export const test = base.extend<
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
 
-    // 4. Navigate initial tab away from about:blank
+    // 4. Navigate initial tab away from about:blank and make it "active"
     const [initialPage] = context.pages();
-    if (initialPage) await initialPage.goto('https://httpbin.org');
+    if (initialPage) {
+      await initialPage.goto('https://httpbin.org');
+      await initialPage.bringToFront();
+    }
 
     // 5. Wait for offscreen document to connect via WebSocket
     await bridge.waitForConnection(30000);
+
+    // 6. Small delay to let Chrome register the active tab for chrome.tabs.query
+    await new Promise(r => setTimeout(r, 500));
 
     await use({ context, extensionId, sw, bridge });
 
@@ -71,13 +77,4 @@ export const test = base.extend<
     ]);
   }, { scope: 'worker' }],
 
-  // Worker-scoped: persistent test page reused across tests
-  testPage: [async ({ bridgeContext }, use) => {
-    const { context } = bridgeContext;
-    const page = await context.newPage();
-    await page.goto('https://demo.playwright.dev/todomvc/');
-    await page.bringToFront();
-    await use(page);
-    await page.close();
-  }, { scope: 'worker' }],
 });
