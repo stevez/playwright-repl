@@ -73,6 +73,8 @@ export const test = base.extend<
     await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
 
     await use(page);
+    // Clear persisted settings so the next test starts with defaults (pw mode)
+    await page.evaluate(() => chrome.storage.local.clear());
     await page.close();
   },
 });
