@@ -245,10 +245,18 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             if (a?.name !== 'click') return false;
             let loc = a.locator;
             while (loc) {
-                if (loc.kind === 'role' && ['textbox', 'combobox', 'checkbox', 'radio', 'listbox', 'switch'].includes(loc.body)) return true;
+                if (loc.kind === 'role' && loc.body === 'textbox') return true;
                 loc = loc.next;
             }
             return false;
+        };
+        // Click immediately followed by check/uncheck/select → redundant (recorder artifact)
+        const isClickBeforeToggle = (jsonl: string, nextJsonl: string | undefined) => {
+            if (!nextJsonl) return false;
+            const a = parseAction(jsonl);
+            if (a?.name !== 'click') return false;
+            const next = parseAction(nextJsonl);
+            return ['check', 'uncheck', 'select', 'selectOption'].includes(next?.name);
         };
         const isFill = (jsonl: string) => parseAction(jsonl)?.name === 'fill';
         const isBareEnter = (jsonl: string) => {
@@ -300,8 +308,15 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 const jsonl = newActions[i];
                 const idx = prev.length + i;
 
-                // Click on input → buffer (wait for fill)
+                // Deduplicate consecutive identical actions (recorder artifact: emits same action twice)
+                const prevJsonl = i > 0 ? newActions[i - 1] : (prev.length > 0 ? prev[prev.length - 1] : null);
+                if (prevJsonl && jsonl === prevJsonl) continue;
+
+                // Click on input → skip (noise before fill)
                 if (isFocusClick(jsonl)) continue;
+
+                // Click followed by check/uncheck/select → skip (keep the semantic action)
+                if (isClickBeforeToggle(jsonl, newActions[i + 1])) continue;
 
                 // Fill → buffer (wait for Enter)
                 if (isFill(jsonl)) {

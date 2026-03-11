@@ -218,6 +218,7 @@ test('recording inserts goto in pw mode', async ({ panelPage }) => {
 
 test('recording inserts goto in JS syntax in JS mode', async ({ panelPage }) => {
   await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
+  await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
   await setupRecorderPort(panelPage);
   await panelPage.getByTestId('record-btn').click();
   await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
@@ -245,6 +246,7 @@ test('recorded pw action appears after goto', async ({ panelPage }) => {
 
 test('recorded JS action appears after goto in JS mode', async ({ panelPage }) => {
   await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
+  await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
   const fireSources = await setupRecorderPort(panelPage);
   await panelPage.getByTestId('record-btn').click();
   await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
@@ -317,6 +319,155 @@ test('recording into existing content inserts goto after cursor', async ({ panel
 
   const text = await editor.textContent();
   expect(text!.indexOf('# existing script')).toBeLessThan(text!.indexOf('goto'));
+});
+
+test('checkbox click + check deduplicates to single check in pw mode', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  // Recorder emits both click and check for a single checkbox interaction
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
+    { name: 'check', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('check "Remember me"');
+
+  const text = await editor.textContent();
+  // click should be filtered — only check appears
+  expect(text!.match(/check/g)?.length).toBe(1);
+  expect(text).not.toContain('click');
+});
+
+test('checkbox click + check deduplicates to single check in JS mode', async ({ panelPage }) => {
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click();
+  await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  // Recorder emits both click and check — JS source has .check() for both
+  await fireSources(recorderSources(
+    [
+      { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
+      { name: 'check', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
+    ],
+    [
+      "  await page.getByRole('checkbox', { name: 'Remember me' }).check();",
+      "  await page.getByRole('checkbox', { name: 'Remember me' }).check();",
+    ],
+  ));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('.check()');
+
+  const text = await editor.textContent();
+  // Only one .check() should appear (click is deduplicated)
+  expect(text!.match(/\.check\(\)/g)?.length).toBe(1);
+});
+
+test('uncheck deduplication works the same as check', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Accept terms' } } },
+    { name: 'uncheck', locator: { kind: 'role', body: 'checkbox', options: { name: 'Accept terms' } } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('uncheck "Accept terms"');
+
+  const text = await editor.textContent();
+  expect(text).not.toContain('click');
+});
+
+test('click + selectOption deduplicates to single select in pw mode', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  // Recorder emits click + selectOption for dropdown selection
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } } },
+    { name: 'selectOption', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } }, options: ['US'] },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('select "Country" "US"');
+
+  const text = await editor.textContent();
+  expect(text).not.toContain('click');
+});
+
+test('click + selectOption deduplicates in JS mode', async ({ panelPage }) => {
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click();
+  await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources(
+    [
+      { name: 'click', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } } },
+      { name: 'selectOption', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } }, options: ['US'] },
+    ],
+    [
+      "  await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
+      "  await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
+    ],
+  ));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText("selectOption('US')");
+
+  const text = await editor.textContent();
+  expect(text!.match(/selectOption/g)?.length).toBe(1);
+});
+
+test('click + check deduplicates for radio buttons in pw mode', async ({ panelPage }) => {
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources([
+    { name: 'click', locator: { kind: 'role', body: 'radio', options: { name: 'Option A' } } },
+    { name: 'check', locator: { kind: 'role', body: 'radio', options: { name: 'Option A' } } },
+  ]));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('check "Option A"');
+
+  const text = await editor.textContent();
+  expect(text).not.toContain('click');
+});
+
+test('click + check deduplicates for switch in JS mode', async ({ panelPage }) => {
+  await panelPage.getByTestId('mode-toggle').getByText('JS').click();
+  await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
+  const fireSources = await setupRecorderPort(panelPage);
+  await panelPage.getByTestId('record-btn').click();
+  await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
+
+  await fireSources(recorderSources(
+    [
+      { name: 'click', locator: { kind: 'role', body: 'switch', options: { name: 'Dark mode' } } },
+      { name: 'check', locator: { kind: 'role', body: 'switch', options: { name: 'Dark mode' } } },
+    ],
+    [
+      "  await page.getByRole('switch', { name: 'Dark mode' }).check();",
+      "  await page.getByRole('switch', { name: 'Dark mode' }).check();",
+    ],
+  ));
+
+  const editor = panelPage.getByTestId('editor').getByRole('textbox');
+  await expect(editor).toContainText('.check()');
+
+  const text = await editor.textContent();
+  expect(text!.match(/\.check\(\)/g)?.length).toBe(1);
 });
 
 // ─── Editor mode toggle ─────────────────────────────────────────────────────

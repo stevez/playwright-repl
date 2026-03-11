@@ -1,5 +1,7 @@
 // ─── JSONL → REPL conversion (for port-based recorder) ───
 
+import { parseSelector, parseAttributeSelector } from '@/lib/locator/selectorParser';
+
 function extractNth(action: any): string {
   let node = action.locator?.next;
   while (node) {
@@ -35,14 +37,35 @@ function extractLocatorMeta(action: any): LocatorMeta {
       loc = loc.next;
       continue;
     }
-    if (k === 'role' && loc.options?.name) {
-      meta = { text: loc.options.name, kind: 'role', body: loc.body ?? '' };
+    if (k === 'role') {
+      meta = { text: loc.options?.name ?? null, kind: 'role', body: loc.body ?? '' };
     } else if (['text', 'label', 'placeholder', 'alt', 'title', 'test-id'].includes(k) && loc.body) {
       meta = { text: loc.body, kind: k, body: loc.body };
     } else if (k === 'default' && loc.body) {
       meta = { text: null, kind: 'default', body: loc.body };
     }
     loc = loc.next;
+  }
+  // Fallback: parse role/text from selector string (e.g. "internal:role=checkbox[name=...]")
+  if (!meta.kind && action.selector) {
+    try {
+      const parsed = parseSelector(action.selector);
+      for (const part of parsed.parts) {
+        if (part.name === 'internal:role') {
+          const attr = parseAttributeSelector(part.body as string, true);
+          const name = attr.attributes.find(a => a.name === 'name')?.value as string | undefined;
+          meta = { text: name ?? null, kind: 'role', body: attr.name };
+        } else if (part.name === 'internal:text') {
+          meta = { text: part.body as string, kind: 'text', body: part.body as string };
+        } else if (part.name === 'internal:label') {
+          meta = { text: part.body as string, kind: 'label', body: part.body as string };
+        } else if (part.name === 'internal:testid') {
+          const attr = parseAttributeSelector(part.body as string, true);
+          const val = attr.attributes[0]?.value as string | undefined;
+          if (val) meta = { text: val, kind: 'test-id', body: val };
+        }
+      }
+    } catch { /* non-parseable selector — leave meta empty */ }
   }
   return meta;
 }
@@ -70,40 +93,49 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
         return '# tab closed';
 
       case 'click':
-        // Skip focus-clicks on form controls — noise before fill/check/select
-        if (kind === 'role' && ['textbox', 'combobox', 'checkbox', 'radio', 'listbox', 'switch'].includes(body)) return null;
+        // Skip focus-clicks on text inputs — noise before fill
+        if (kind === 'role' && body === 'textbox') return null;
         if (text) return `click ${q(text)}${nth}`;
-        // CSS fallback: skip top-level noise (html/body clicks are "click outside" events)
+        if (kind === 'role' && body) return `click ${body}${nth}`;
         if (kind === 'default' && a.selector && !['html', 'body'].includes(a.selector.trim()))
           return `click ${q(a.selector)}`;
         return null;
 
       case 'fill':
         if (text) return `fill ${q(text)} ${q(a.text ?? '')}${nth}`;
+        if (kind === 'role' && body) return `fill ${body} ${q(a.text ?? '')}${nth}`;
         if (kind === 'default' && a.selector) return `fill ${q(a.selector)} ${q(a.text ?? '')}`;
         return null;
 
       case 'press':
         if (text) return `press ${q(text)} ${a.key ?? ''}${nth}`;
+        if (kind === 'role' && body) return `press ${body} ${a.key ?? ''}${nth}`;
         // Global key press (no locator)
         return a.key ? `press ${a.key}` : null;
 
       case 'hover':
         if (text) return `hover ${q(text)}${nth}`;
+        if (kind === 'role' && body) return `hover ${body}${nth}`;
         if (kind === 'default' && a.selector) return `hover ${q(a.selector)}`;
         return null;
 
       case 'check':
         if (text) return `check ${q(text)}${nth}`;
+        if (kind === 'role' && body) return `check ${body}${nth}`;
+        if (a.selector) return `check ${q(a.selector)}`;
         return null;
 
       case 'uncheck':
         if (text) return `uncheck ${q(text)}${nth}`;
+        if (kind === 'role' && body) return `uncheck ${body}${nth}`;
+        if (a.selector) return `uncheck ${q(a.selector)}`;
         return null;
 
       case 'selectOption':
       case 'select':
         if (text) return `select ${q(text)} ${q(a.options?.[0] ?? '')}${nth}`;
+        if (kind === 'role' && body) return `select ${body} ${q(a.options?.[0] ?? '')}${nth}`;
+        if (a.selector) return `select ${q(a.selector)} ${q(a.options?.[0] ?? '')}`;
         return null;
 
       case 'setInputFiles':
