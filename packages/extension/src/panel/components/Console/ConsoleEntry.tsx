@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ObjectTree } from './ObjectTree';
+import { SnapshotTree } from './SnapshotTree';
+import { parseSnapshot } from '@/lib/snapshot-parser';
 import Lightbox from '../Lightbox';
 import type { ConsoleEntry as Entry } from './types';
 
@@ -21,13 +23,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                         {entry.value !== undefined ? (
                             <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (
-                            <div data-type="snapshot" className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
-                                <pre className="m-0 py-2 px-3 text-(--color-command) font-[inherit] text-[12px] leading-4 whitespace-pre-wrap wrap-break-word">{entry.codeBlock}</pre>
-                                <button
-                                    className="absolute top-1 right-1 bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[10px] cursor-pointer hover:bg-(--bg-button-hover)"
-                                    onClick={() => navigator.clipboard.writeText(entry.codeBlock!)}
-                                >Copy</button>
-                            </div>
+                            <SnapshotCodeBlock codeBlock={entry.codeBlock} />
                         ) : entry.image !== undefined ? (
                             <div data-type="screenshot">
                                 <img
@@ -50,6 +46,22 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function SnapshotCodeBlock({ codeBlock }: { codeBlock: string }) {
+    const node = codeBlock.trimStart().startsWith('- ') ? parseSnapshot(codeBlock) : null;
+    return (
+        <div data-type="snapshot" className="relative border border-solid border-(--border-primary) rounded-[4px] my-[6px] mx-0 bg-(--bg-line-highlight)">
+            {node
+                ? <div className="py-2 px-3"><SnapshotTree node={node} depth={0} /></div>
+                : <pre className="m-0 py-2 px-3 text-(--color-command) font-[inherit] text-[12px] leading-4 whitespace-pre-wrap wrap-break-word">{codeBlock}</pre>
+            }
+            <button
+                className="absolute top-1 right-1 bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[10px] cursor-pointer hover:bg-(--bg-button-hover)"
+                onClick={() => navigator.clipboard.writeText(codeBlock)}
+            >Copy</button>
         </div>
     );
 }
