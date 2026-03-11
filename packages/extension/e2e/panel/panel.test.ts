@@ -36,7 +36,7 @@ test('displays output after command', async ({ panelPage }) => {
   await fillInput(panelPage, 'help');
   await panelPage.keyboard.press('Enter');
 
-  await expect(panelPage.getByTestId('output')).toContainText('Available commands', { timeout: 5000 });
+  await expect(panelPage.getByTestId('output')).toContainText('Keyword commands', { timeout: 5000 });
 });
 
 test('clears input after submit', async ({ panelPage }) => {
