@@ -70,8 +70,8 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
         return '# tab closed';
 
       case 'click':
-        // Skip focus-clicks on inputs — they're noise before fill/press
-        if (kind === 'role' && (body === 'textbox' || body === 'combobox')) return null;
+        // Skip focus-clicks on form controls — noise before fill/check/select
+        if (kind === 'role' && ['textbox', 'combobox', 'checkbox', 'radio', 'listbox', 'switch'].includes(body)) return null;
         if (text) return `click ${q(text)}${nth}`;
         // CSS fallback: skip top-level noise (html/body clicks are "click outside" events)
         if (kind === 'default' && a.selector && !['html', 'body'].includes(a.selector.trim()))

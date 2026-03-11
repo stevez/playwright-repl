@@ -17,6 +17,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
     const prevActionsRef = useRef<string[]>([]);
+    // State machine for fill sequence: click → fill → Enter → release as single command
+    const pendingFillRef = useRef<{ text: string; jsonl: string } | null>(null);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
@@ -235,7 +237,24 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
         prevActionsRef.current = [...actions];
 
-        const isOpenPage = (jsonl: string) => { try { return JSON.parse(jsonl).name === 'openPage'; } catch { return false; } };
+        // ─── JSONL-level helpers (mode-independent) ───
+        const parseAction = (jsonl: string) => { try { return JSON.parse(jsonl); } catch { return null; } };
+        const isOpenPage = (jsonl: string) => parseAction(jsonl)?.name === 'openPage';
+        const isFocusClick = (jsonl: string) => {
+            const a = parseAction(jsonl);
+            if (a?.name !== 'click') return false;
+            let loc = a.locator;
+            while (loc) {
+                if (loc.kind === 'role' && ['textbox', 'combobox', 'checkbox', 'radio', 'listbox', 'switch'].includes(loc.body)) return true;
+                loc = loc.next;
+            }
+            return false;
+        };
+        const isFill = (jsonl: string) => parseAction(jsonl)?.name === 'fill';
+        const isBareEnter = (jsonl: string) => {
+            const a = parseAction(jsonl);
+            return a?.name === 'press' && a?.key === 'Enter';
+        };
 
         // Helper: convert a single action to editor text
         const actionToEditorText = (jsonl: string, idx: number): string | null => {
@@ -257,17 +276,59 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         // In-place update: replace the last inserted line in the editor + console
         if (lastUpdated) {
             const lastAction = actions[actions.length - 1];
+            // Update pending fill text if it's being edited (user still typing)
+            if (pendingFillRef.current && isFill(lastAction)) {
+                const text = actionToEditorText(lastAction, actions.length - 1);
+                if (text) pendingFillRef.current = { text, jsonl: lastAction };
+                return;
+            }
             const text = actionToEditorText(lastAction, actions.length - 1);
             if (text) editorRef.current?.replaceLastInsert(text);
             return;
         }
 
-        // New actions: insert at cursor
+        // ─── State machine: buffer click→fill→Enter, release as single command ───
         if (newActions.length) {
-            const texts = newActions
-                .map((a, i) => actionToEditorText(a, prev.length + i))
-                .filter(Boolean) as string[];
-            if (texts.length) editorRef.current?.insertAtCursor(texts.join('\n'));
+            const flush = () => {
+                if (pendingFillRef.current) {
+                    editorRef.current?.insertAtCursor(pendingFillRef.current.text);
+                    pendingFillRef.current = null;
+                }
+            };
+
+            for (let i = 0; i < newActions.length; i++) {
+                const jsonl = newActions[i];
+                const idx = prev.length + i;
+
+                // Click on input → buffer (wait for fill)
+                if (isFocusClick(jsonl)) continue;
+
+                // Fill → buffer (wait for Enter)
+                if (isFill(jsonl)) {
+                    flush(); // release any previous pending fill
+                    const text = actionToEditorText(jsonl, idx);
+                    if (text) pendingFillRef.current = { text, jsonl };
+                    continue;
+                }
+
+                // Press Enter after fill → release as fill --submit
+                if (isBareEnter(jsonl) && pendingFillRef.current) {
+                    if (editorMode === 'pw') {
+                        editorRef.current?.insertAtCursor(pendingFillRef.current.text + ' --submit');
+                    } else {
+                        // JS mode: emit fill, skip Enter (form submit is implicit)
+                        editorRef.current?.insertAtCursor(pendingFillRef.current.text);
+                    }
+                    pendingFillRef.current = null;
+                    continue;
+                }
+
+                // Any other action → flush pending fill, emit this action
+                flush();
+                const text = actionToEditorText(jsonl, idx);
+                if (text) editorRef.current?.insertAtCursor(text);
+            }
+            // Don't flush at end — keep pending fill buffered for cross-batch Enter
         }
     }, [dispatch, editorMode]);
 
