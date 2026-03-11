@@ -5,13 +5,13 @@ import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
-import type { CompletionContext, CompletionResult } from '@codemirror/autocomplete';
 import { pwSyntax } from './pw-language';
 import { search, searchKeymap } from '@codemirror/search';
 import { StateEffect, StateField, EditorState, RangeSet, Compartment } from '@codemirror/state';
 import { Decoration, GutterMarker, gutter } from '@codemirror/view';
-import { autocompletion } from '@codemirror/autocomplete';
+import { autocompletion, acceptCompletion } from '@codemirror/autocomplete';
 import { pwCompletion } from './pw-completion'
+import { playwrightCompletions } from './pw-completion-source'
 
 const pwTheme = EditorView.theme({
     '&': {
@@ -157,21 +157,9 @@ export const pwModeExtension = [
     placeholder('# Type or open a .pw script...'),
 ];
 
-function jsAsyncCompletion(context: CompletionContext): CompletionResult | null {
-    const word = context.matchBefore(/\w*/);
-    if (!word || (word.from === word.to && !context.explicit)) return null;
-    return {
-        from: word.from,
-        options: [
-            { label: 'async', type: 'keyword' },
-            { label: 'await', type: 'keyword' },
-        ],
-    };
-}
-
 export const jsModeExtension = [
     javascript(),
-    javascriptLanguage.data.of({ autocomplete: jsAsyncCompletion }),
+    javascriptLanguage.data.of({ autocomplete: playwrightCompletions }),
     syntaxHighlighting(jsHighlightStyle),
     autocompletion({ icons: false }),
     placeholder('// Type JavaScript...'),
@@ -186,6 +174,7 @@ export const baseExtensions = [
     bracketMatching(),                       // highlight matching brackets
     search(),                                // Ctrl+F search panel
     keymap.of([
+        { key: 'Tab', run: acceptCompletion }, // accept completion with Tab
         ...defaultKeymap,                      // basic editing keys
         ...historyKeymap,                      // Ctrl+Z, Ctrl+Y
         ...searchKeymap,                       // Ctrl+F, Ctrl+H

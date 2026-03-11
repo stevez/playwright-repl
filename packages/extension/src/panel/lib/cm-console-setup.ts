@@ -1,10 +1,11 @@
 import { EditorView, keymap, placeholder, drawSelection } from '@codemirror/view';
-import { javascript } from '@codemirror/lang-javascript';
+import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { history, historyKeymap } from '@codemirror/commands';
 import { autocompletion, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
 import type { Extension } from '@codemirror/state';
 import { pwCompletion } from '@/lib/pw-completion';
+import { playwrightCompletions } from '@/lib/pw-completion-source';
 
 interface Opts {
     onSubmit:    (value: string) => void;
@@ -77,8 +78,10 @@ export function consoleExtensions(opts: Opts): Extension[] {
 
     return [
         customKeymap,
-        autocompletion({ override: [pwCompletion] }),
         javascript(),
+        javascriptLanguage.data.of({ autocomplete: playwrightCompletions }),
+        javascriptLanguage.data.of({ autocomplete: pwCompletion }),
+        autocompletion(),
         syntaxHighlighting(defaultHighlightStyle),
         drawSelection(),
         history(),

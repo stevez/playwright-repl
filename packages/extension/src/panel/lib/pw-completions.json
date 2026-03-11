@@ -1,0 +1,2211 @@
+{
+  "Page": [
+    {
+      "label": "evaluate",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg) => Promise<R>",
+      "info": "Returns the value of the [`pageFunction`](https://playwright.dev/docs/api/class-page#page-evaluate-option-expression) invocation. If the function passed to the [page.evaluate(pageFunction[, arg])](https://playwright.dev/docs/api/class-page#page-evaluate) returns a [Promise], then [page.evaluate(page"
+    },
+    {
+      "label": "evaluateHandle",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg) => Promise<SmartHandle<R>>",
+      "info": "Returns the value of the [`pageFunction`](https://playwright.dev/docs/api/class-page#page-evaluate-handle-option-expression) invocation as a [JSHandle](https://playwright.dev/docs/api/class-jshandle). The only difference between [page.evaluate(pageFunction[, arg])](https://playwright.dev/docs/api/cl"
+    },
+    {
+      "label": "addInitScript",
+      "type": "method",
+      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<void>",
+      "info": "Adds a script which would be evaluated in one of the following scenarios: - Whenever the page is navigated. - Whenever the child frame is attached or navigated. In this case, the script is evaluated in the context of the newly attached frame. The script is evaluated after the document was created bu"
+    },
+    {
+      "label": "waitForFunction",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg, options: PageWaitForFunctionOptions) => Promise<SmartHandle<R>>",
+      "info": "Returns when the [`pageFunction`](https://playwright.dev/docs/api/class-page#page-wait-for-function-option-expression) returns a truthy value. It resolves to a JSHandle of the truthy value. **Usage** The [page.waitForFunction(pageFunction[, arg, options])](https://playwright.dev/docs/api/class-page#"
+    },
+    {
+      "label": "exposeBinding",
+      "type": "method",
+      "detail": "(name: string, playwrightBinding: (source: BindingSource, arg: JSHandle<any>) => any, options: { handle: true; }) => Pro…",
+      "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-page#page-expose-binding-option-name) on the `window` object of every frame in this page. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-page#page-expose-binding-option-callback) a"
+    },
+    {
+      "label": "removeAllListeners",
+      "type": "method",
+      "detail": "(type: string) => this",
+      "info": "Removes all the listeners of the given type (or all registered listeners if no type given). Allows to wait for async listeners to complete or to ignore subsequent errors from these listeners. **Usage** page.on('request', async request => { const response = await request.response(); const body = awai"
+    },
+    {
+      "label": "on",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Emitted when the page closes."
+    },
+    {
+      "label": "once",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Adds an event listener that will be automatically removed after it is triggered once. See `addListener` for more information about this event."
+    },
+    {
+      "label": "addListener",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Emitted when the page closes."
+    },
+    {
+      "label": "removeListener",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "off",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "prependListener",
+      "type": "method",
+      "detail": "(event: \"close\", listener: (page: Page) => any) => this",
+      "info": "Emitted when the page closes."
+    },
+    {
+      "label": "addLocatorHandler",
+      "type": "method",
+      "detail": "(locator: Locator, handler: (locator: Locator) => Promise<any>, options: { noWaitAfter?: boolean; times?: number; }) => …",
+      "info": "When testing a web page, sometimes unexpected overlays like a \"Sign up\" dialog appear and block actions you want to automate, e.g. clicking a button. These overlays don't always show up in the same way or at the same time, making them tricky to handle in automated tests. This method lets you set up"
+    },
+    {
+      "label": "addScriptTag",
+      "type": "method",
+      "detail": "(options: { content?: string; path?: string; type?: string; url?: string; }) => Promise<ElementHandle<Node>>",
+      "info": "Adds a `<script>` tag into the page with the desired url or content. Returns the added tag when the script's onload fires or when the script content was injected into frame."
+    },
+    {
+      "label": "addStyleTag",
+      "type": "method",
+      "detail": "(options: { content?: string; path?: string; url?: string; }) => Promise<ElementHandle<Node>>",
+      "info": "Adds a `<link rel=\"stylesheet\">` tag into the page with the desired url or a `<style type=\"text/css\">` tag with the content. Returns the added tag when the stylesheet's onload fires or when the CSS content was injected into frame."
+    },
+    {
+      "label": "agent",
+      "type": "method",
+      "detail": "(options: { cache?: { cacheFile?: string; cacheOutFile?: string; }; expect?: { timeout?: number; }; limits?: { maxTokens…",
+      "info": "Initialize page agent with the llm provider and cache."
+    },
+    {
+      "label": "bringToFront",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Brings page to front (activates tab)."
+    },
+    {
+      "label": "check",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; strict?: boo…",
+      "info": "**NOTE** Use locator-based [locator.check([options])](https://playwright.dev/docs/api/class-locator#locator-check) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-check-opti"
+    },
+    {
+      "label": "clearConsoleMessages",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Clears all stored console messages from this page. Subsequent calls to [page.consoleMessages()](https://playwright.dev/docs/api/class-page#page-console-messages) will only return messages logged after the clear."
+    },
+    {
+      "label": "clearPageErrors",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Clears all stored page errors from this page. Subsequent calls to [page.pageErrors()](https://playwright.dev/docs/api/class-page#page-page-errors) will only return errors thrown after the clear."
+    },
+    {
+      "label": "click",
+      "type": "method",
+      "detail": "(selector: string, options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; delay?: number; force?: boolean…",
+      "info": "**NOTE** Use locator-based [locator.click([options])](https://playwright.dev/docs/api/class-locator#locator-click) instead. Read more about [locators](https://playwright.dev/docs/locators). This method clicks an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-click-opti"
+    },
+    {
+      "label": "close",
+      "type": "method",
+      "detail": "(options: { reason?: string; runBeforeUnload?: boolean; }) => Promise<void>",
+      "info": "If [`runBeforeUnload`](https://playwright.dev/docs/api/class-page#page-close-option-run-before-unload) is `false`, does not run any unload handlers and waits for the page to be closed. If [`runBeforeUnload`](https://playwright.dev/docs/api/class-page#page-close-option-run-before-unload) is `true` th"
+    },
+    {
+      "label": "consoleMessages",
+      "type": "method",
+      "detail": "() => Promise<ConsoleMessage[]>",
+      "info": "Returns up to (currently) 200 last console messages from this page. See [page.on('console')](https://playwright.dev/docs/api/class-page#page-event-console) for more details."
+    },
+    {
+      "label": "content",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Gets the full HTML contents of the page, including the doctype."
+    },
+    {
+      "label": "context",
+      "type": "method",
+      "detail": "() => BrowserContext",
+      "info": "Get the browser context that the page belongs to."
+    },
+    {
+      "label": "dblclick",
+      "type": "method",
+      "detail": "(selector: string, options: { button?: \"left\" | \"right\" | \"middle\"; delay?: number; force?: boolean; modifiers?: (\"Alt\" …",
+      "info": "**NOTE** Use locator-based [locator.dblclick([options])](https://playwright.dev/docs/api/class-locator#locator-dblclick) instead. Read more about [locators](https://playwright.dev/docs/locators). This method double clicks an element matching [`selector`](https://playwright.dev/docs/api/class-page#pa"
+    },
+    {
+      "label": "dispatchEvent",
+      "type": "method",
+      "detail": "(selector: string, type: string, eventInit: EvaluationArgument, options: { strict?: boolean; timeout?: number; }) => Pro…",
+      "info": "**NOTE** Use locator-based [locator.dispatchEvent(type[, eventInit, options])](https://playwright.dev/docs/api/class-locator#locator-dispatch-event) instead. Read more about [locators](https://playwright.dev/docs/locators). The snippet below dispatches the `click` event on the element. Regardless of"
+    },
+    {
+      "label": "dragAndDrop",
+      "type": "method",
+      "detail": "(source: string, target: string, options: { force?: boolean; noWaitAfter?: boolean; sourcePosition?: { x: number; y: num…",
+      "info": "This method drags the source element to the target element. It will first move to the source element, perform a `mousedown`, then move to the target element and perform a `mouseup`. **Usage** await page.dragAndDrop('#source', '#target'); // or specify exact positions relative to the top-left corners"
+    },
+    {
+      "label": "emulateMedia",
+      "type": "method",
+      "detail": "(options: { colorScheme?: \"light\" | \"dark\" | \"no-preference\"; contrast?: \"no-preference\" | \"more\"; forcedColors?: \"activ…",
+      "info": "This method changes the `CSS media type` through the `media` argument, and/or the `'prefers-colors-scheme'` media feature, using the `colorScheme` argument. **Usage** await page.evaluate(() => matchMedia('screen').matches); // → true await page.evaluate(() => matchMedia('print').matches); // → false"
+    },
+    {
+      "label": "exposeFunction",
+      "type": "method",
+      "detail": "(name: string, callback: Function) => Promise<void>",
+      "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-page#page-expose-function-option-name) on the `window` object of every frame in the page. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-page#page-expose-function-option-callback)"
+    },
+    {
+      "label": "fill",
+      "type": "method",
+      "detail": "(selector: string, value: string, options: { force?: boolean; noWaitAfter?: boolean; strict?: boolean; timeout?: number;…",
+      "info": "**NOTE** Use locator-based [locator.fill(value[, options])](https://playwright.dev/docs/api/class-locator#locator-fill) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-fi"
+    },
+    {
+      "label": "focus",
+      "type": "method",
+      "detail": "(selector: string, options: { strict?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.focus([options])](https://playwright.dev/docs/api/class-locator#locator-focus) instead. Read more about [locators](https://playwright.dev/docs/locators). This method fetches an element with [`selector`](https://playwright.dev/docs/api/class-page#page-focus-option-"
+    },
+    {
+      "label": "frame",
+      "type": "method",
+      "detail": "(frameSelector: string | { name?: string; url?: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, …",
+      "info": "Returns frame matching the specified criteria. Either `name` or `url` must be specified. **Usage** const frame = page.frame('frame-name'); const frame = page.frame({ url: /.*domain.*\\/ });"
+    },
+    {
+      "label": "frameLocator",
+      "type": "method",
+      "detail": "(selector: string) => FrameLocator",
+      "info": "When working with iframes, you can create a frame locator that will enter the iframe and allow selecting elements in that iframe. **Usage** Following snippet locates element with text \"Submit\" in the iframe with id `my-frame`, like `<iframe id=\"my-frame\">`: const locator = page.frameLocator('#my-ifr"
+    },
+    {
+      "label": "frames",
+      "type": "method",
+      "detail": "() => Frame[]",
+      "info": "An array of all frames attached to the page."
+    },
+    {
+      "label": "getByAltText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their alt text. **Usage** For example, this method will find the image by alt text \"Playwright logo\": <img alt='Playwright logo'> await page.getByAltText('Playwright logo').click();"
+    },
+    {
+      "label": "getByLabel",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the text of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute. **Usage** For example, this method will find inputs by label \"Username\" and \"Password\" in the following DOM: <input aria-label=\"Username\"> <label for=\"password-input"
+    },
+    {
+      "label": "getByPlaceholder",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the placeholder text. **Usage** For example, consider the following DOM structure. <input type=\"email\" placeholder=\"name@example.com\" /> You can fill the input after locating it by the placeholder text: await page .getByPlaceholder('name@example.com') .fill('playwri"
+    },
+    {
+      "label": "getByRole",
+      "type": "method",
+      "detail": "(role: \"none\" | \"alert\" | \"alertdialog\" | \"application\" | \"article\" | \"banner\" | \"blockquote\" | \"button\" | \"caption\" | \"…",
+      "info": "Allows locating elements by their [ARIA role](https://www.w3.org/TR/wai-aria-1.2/#roles), [ARIA attributes](https://www.w3.org/TR/wai-aria-1.2/#aria-attributes) and [accessible name](https://w3c.github.io/accname/#dfn-accessible-name). **Usage** Consider the following DOM structure. <h3>Sign up</h3>"
+    },
+    {
+      "label": "getByTestId",
+      "type": "method",
+      "detail": "(testId: string | RegExp) => Locator",
+      "info": "Locate element by the test id. **Usage** Consider the following DOM structure. <button data-testid=\"directions\">Itinéraire</button> You can locate the element by its test id: await page.getByTestId('directions').click(); **Details** By default, the `data-testid` attribute is used as a test id. Use ["
+    },
+    {
+      "label": "getByText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements that contain given text. See also [locator.filter([options])](https://playwright.dev/docs/api/class-locator#locator-filter) that allows to match by another criteria, like an accessible role, and then filter by the text content. **Usage** Consider the following DOM structure:"
+    },
+    {
+      "label": "getByTitle",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their title attribute. **Usage** Consider the following DOM structure. <span title='Issues count'>25 issues</span> You can check the issues count after locating it by the title text: await expect(page.getByTitle('Issues count')).toHaveText('25 issues');"
+    },
+    {
+      "label": "goBack",
+      "type": "method",
+      "detail": "(options: { timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"commit\"; }) => Promise<Response…",
+      "info": "Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect. If cannot go back, returns `null`. Navigate to the previous page in history."
+    },
+    {
+      "label": "goForward",
+      "type": "method",
+      "detail": "(options: { timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"commit\"; }) => Promise<Response…",
+      "info": "Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect. If cannot go forward, returns `null`. Navigate to the next page in history."
+    },
+    {
+      "label": "goto",
+      "type": "method",
+      "detail": "(url: string, options: { referer?: string; timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"…",
+      "info": "Returns the main resource response. In case of multiple redirects, the navigation will resolve with the first non-redirect response. The method will throw an error if: - there's an SSL error (e.g. in case of self-signed certificates). - target URL is invalid. - the [`timeout`](https://playwright.dev"
+    },
+    {
+      "label": "hover",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; n…",
+      "info": "**NOTE** Use locator-based [locator.hover([options])](https://playwright.dev/docs/api/class-locator#locator-hover) instead. Read more about [locators](https://playwright.dev/docs/locators). This method hovers over an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-hover"
+    },
+    {
+      "label": "isClosed",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Indicates that the page has been closed."
+    },
+    {
+      "label": "locator",
+      "type": "method",
+      "detail": "(selector: string, options: { has?: Locator; hasNot?: Locator; hasNotText?: string | RegExp; hasText?: string | RegExp; …",
+      "info": "The method returns an element locator that can be used to perform actions on this page / frame. Locator is resolved to the element immediately before performing an action, so a series of actions on the same locator can in fact be performed on different DOM elements. That would happen if the DOM stru"
+    },
+    {
+      "label": "mainFrame",
+      "type": "method",
+      "detail": "() => Frame",
+      "info": "The page's main frame. Page is guaranteed to have a main frame which persists during navigations."
+    },
+    {
+      "label": "opener",
+      "type": "method",
+      "detail": "() => Promise<Page>",
+      "info": "Returns the opener for popup pages and `null` for others. If the opener has been closed already the returns `null`."
+    },
+    {
+      "label": "pageErrors",
+      "type": "method",
+      "detail": "() => Promise<Error[]>",
+      "info": "Returns up to (currently) 200 last page errors from this page. See [page.on('pageerror')](https://playwright.dev/docs/api/class-page#page-event-page-error) for more details."
+    },
+    {
+      "label": "pause",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Pauses script execution. Playwright will stop executing the script and wait for the user to either press the 'Resume' button in the page overlay or to call `playwright.resume()` in the DevTools console. User can inspect selectors or perform manual steps while paused. Resume will continue running the"
+    },
+    {
+      "label": "pdf",
+      "type": "method",
+      "detail": "(options: { displayHeaderFooter?: boolean; footerTemplate?: string; format?: string; headerTemplate?: string; height?: s…",
+      "info": "Returns the PDF buffer. `page.pdf()` generates a pdf of the page with `print` css media. To generate a pdf with `screen` media, call [page.emulateMedia([options])](https://playwright.dev/docs/api/class-page#page-emulate-media) before calling `page.pdf()`: **NOTE** By default, `page.pdf()` generates"
+    },
+    {
+      "label": "press",
+      "type": "method",
+      "detail": "(selector: string, key: string, options: { delay?: number; noWaitAfter?: boolean; strict?: boolean; timeout?: number; })…",
+      "info": "**NOTE** Use locator-based [locator.press(key[, options])](https://playwright.dev/docs/api/class-locator#locator-press) instead. Read more about [locators](https://playwright.dev/docs/locators). Focuses the element, and then uses [keyboard.down(key)](https://playwright.dev/docs/api/class-keyboard#ke"
+    },
+    {
+      "label": "reload",
+      "type": "method",
+      "detail": "(options: { timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"commit\"; }) => Promise<Response…",
+      "info": "This method reloads the current page, in the same way as if the user had triggered a browser refresh. Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect."
+    },
+    {
+      "label": "removeLocatorHandler",
+      "type": "method",
+      "detail": "(locator: Locator) => Promise<void>",
+      "info": "Removes all locator handlers added by [page.addLocatorHandler(locator, handler[, options])](https://playwright.dev/docs/api/class-page#page-add-locator-handler) for a specific locator. [page.addLocatorHandler(locator, handler[, options])](https://playwright.dev/docs/api/class-page#page-add-locator-h"
+    },
+    {
+      "label": "requestGC",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Request the page to perform garbage collection. Note that there is no guarantee that all unreachable objects will be collected. This is useful to help detect memory leaks. For example, if your page has a large object `'suspect'` that might be leaked, you can check that it does not leak by using a [`"
+    },
+    {
+      "label": "requests",
+      "type": "method",
+      "detail": "() => Promise<Request[]>",
+      "info": "Returns up to (currently) 100 last network request from this page. See [page.on('request')](https://playwright.dev/docs/api/class-page#page-event-request) for more details. Returned requests should be accessed immediately, otherwise they might be collected to prevent unbounded memory growth as new r"
+    },
+    {
+      "label": "route",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Routing provides the capability to modify network requests that are made by a page. Once routing is enabled, every request matching the url pattern will stall unless it's continued, fulfilled or aborted. **NOTE** The handler will only be called for the first url if the response is a redirect. **NOTE"
+    },
+    {
+      "label": "routeFromHAR",
+      "type": "method",
+      "detail": "(har: string, options: { notFound?: \"abort\" | \"fallback\"; update?: boolean; updateContent?: \"embed\" | \"attach\"; updateMo…",
+      "info": "If specified the network requests that are made in the page will be served from the HAR file. Read more about [Replaying from HAR](https://playwright.dev/docs/mock#replaying-from-har). Playwright will not serve requests intercepted by Service Worker from the HAR file. See [this](https://github.com/m"
+    },
+    {
+      "label": "routeWebSocket",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "This method allows to modify websocket connections that are made by the page. Note that only `WebSocket`s created after this method was called will be routed. It is recommended to call this method before navigating the page. **Usage** Below is an example of a simple mock that responds to a single me"
+    },
+    {
+      "label": "screenshot",
+      "type": "method",
+      "detail": "(options: PageScreenshotOptions) => Promise<Buffer<ArrayBufferLike>>",
+      "info": "Returns the buffer with the captured screenshot."
+    },
+    {
+      "label": "selectOption",
+      "type": "method",
+      "detail": "(selector: string, values: string | ElementHandle<Node> | readonly string[] | { value?: string; label?: string; index?: …",
+      "info": "**NOTE** Use locator-based [locator.selectOption(values[, options])](https://playwright.dev/docs/api/class-locator#locator-select-option) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for an element matching [`selector`](https://playwright.dev/docs/api/"
+    },
+    {
+      "label": "setChecked",
+      "type": "method",
+      "detail": "(selector: string, checked: boolean, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: numbe…",
+      "info": "**NOTE** Use locator-based [locator.setChecked(checked[, options])](https://playwright.dev/docs/api/class-locator#locator-set-checked) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks or unchecks an element matching [`selector`](https://playwright.dev/doc"
+    },
+    {
+      "label": "setContent",
+      "type": "method",
+      "detail": "(html: string, options: { timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"commit\"; }) => Pr…",
+      "info": "This method internally calls [document.write()](https://developer.mozilla.org/en-US/docs/Web/API/Document/write), inheriting all its specific characteristics and behaviors."
+    },
+    {
+      "label": "setDefaultNavigationTimeout",
+      "type": "method",
+      "detail": "(timeout: number) => void",
+      "info": "This setting will change the default maximum navigation time for the following methods and related shortcuts: - [page.goBack([options])](https://playwright.dev/docs/api/class-page#page-go-back) - [page.goForward([options])](https://playwright.dev/docs/api/class-page#page-go-forward) - [page.goto(url"
+    },
+    {
+      "label": "setDefaultTimeout",
+      "type": "method",
+      "detail": "(timeout: number) => void",
+      "info": "This setting will change the default maximum time for all the methods accepting [`timeout`](https://playwright.dev/docs/api/class-page#page-set-default-timeout-option-timeout) option. **NOTE** [page.setDefaultNavigationTimeout(timeout)](https://playwright.dev/docs/api/class-page#page-set-default-nav"
+    },
+    {
+      "label": "setExtraHTTPHeaders",
+      "type": "method",
+      "detail": "(headers: { [key: string]: string; }) => Promise<void>",
+      "info": "The extra HTTP headers will be sent with every request the page initiates. **NOTE** [page.setExtraHTTPHeaders(headers)](https://playwright.dev/docs/api/class-page#page-set-extra-http-headers) does not guarantee the order of headers in the outgoing requests."
+    },
+    {
+      "label": "setInputFiles",
+      "type": "method",
+      "detail": "(selector: string, files: string | readonly string[] | { name: string; mimeType: string; buffer: Buffer<ArrayBufferLike>…",
+      "info": "**NOTE** Use locator-based [locator.setInputFiles(files[, options])](https://playwright.dev/docs/api/class-locator#locator-set-input-files) instead. Read more about [locators](https://playwright.dev/docs/locators). Sets the value of the file input to these file paths or files. If some of the `filePa"
+    },
+    {
+      "label": "setViewportSize",
+      "type": "method",
+      "detail": "(viewportSize: { width: number; height: number; }) => Promise<void>",
+      "info": "In the case of multiple pages in a single browser, each page can have its own viewport size. However, [browser.newContext([options])](https://playwright.dev/docs/api/class-browser#browser-new-context) allows to set viewport size (and more) for all pages in the context at once. [page.setViewportSize("
+    },
+    {
+      "label": "tap",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; n…",
+      "info": "**NOTE** Use locator-based [locator.tap([options])](https://playwright.dev/docs/api/class-locator#locator-tap) instead. Read more about [locators](https://playwright.dev/docs/locators). This method taps an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-tap-option-selec"
+    },
+    {
+      "label": "title",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns the page's title."
+    },
+    {
+      "label": "uncheck",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; strict?: boo…",
+      "info": "**NOTE** Use locator-based [locator.uncheck([options])](https://playwright.dev/docs/api/class-locator#locator-uncheck) instead. Read more about [locators](https://playwright.dev/docs/locators). This method unchecks an element matching [`selector`](https://playwright.dev/docs/api/class-page#page-unch"
+    },
+    {
+      "label": "unroute",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Removes a route created with [page.route(url, handler[, options])](https://playwright.dev/docs/api/class-page#page-route). When [`handler`](https://playwright.dev/docs/api/class-page#page-unroute-option-handler) is not specified, removes all routes for the [`url`](https://playwright.dev/docs/api/cla"
+    },
+    {
+      "label": "unrouteAll",
+      "type": "method",
+      "detail": "(options: { behavior?: \"wait\" | \"ignoreErrors\" | \"default\"; }) => Promise<void>",
+      "info": "Removes all routes created with [page.route(url, handler[, options])](https://playwright.dev/docs/api/class-page#page-route) and [page.routeFromHAR(har[, options])](https://playwright.dev/docs/api/class-page#page-route-from-har)."
+    },
+    {
+      "label": "url",
+      "type": "method",
+      "detail": "() => string"
+    },
+    {
+      "label": "video",
+      "type": "method",
+      "detail": "() => Video",
+      "info": "Video object associated with this page. Can be used to control video recording with [video.start([options])](https://playwright.dev/docs/api/class-video#video-start) and [video.stop([options])](https://playwright.dev/docs/api/class-video#video-stop), or to access the video file when using the `recor"
+    },
+    {
+      "label": "viewportSize",
+      "type": "method",
+      "detail": "() => { width: number; height: number; }"
+    },
+    {
+      "label": "waitForEvent",
+      "type": "method",
+      "detail": "(event: \"close\", optionsOrPredicate: { predicate?: (page: Page) => boolean | Promise<boolean>; timeout?: number; } | ((p…",
+      "info": "Emitted when the page closes."
+    },
+    {
+      "label": "waitForLoadState",
+      "type": "method",
+      "detail": "(state: \"load\" | \"domcontentloaded\" | \"networkidle\", options: { timeout?: number; }) => Promise<void>",
+      "info": "Returns when the required load state has been reached. This resolves when the page reaches a required load state, `load` by default. The navigation must have been committed when this method is called. If current document has already reached the required state, resolves immediately. **NOTE** Most of"
+    },
+    {
+      "label": "waitForRequest",
+      "type": "method",
+      "detail": "(urlOrPredicate: string | RegExp | ((request: Request) => boolean | Promise<boolean>), options: { timeout?: number; }) =…",
+      "info": "Waits for the matching request and returns it. See [waiting for event](https://playwright.dev/docs/events#waiting-for-event) for more details about events. **Usage** // Start waiting for request before clicking. Note no await. const requestPromise = page.waitForRequest('https://example.com/resource'"
+    },
+    {
+      "label": "waitForResponse",
+      "type": "method",
+      "detail": "(urlOrPredicate: string | RegExp | ((response: Response) => boolean | Promise<boolean>), options: { timeout?: number; })…",
+      "info": "Returns the matched response. See [waiting for event](https://playwright.dev/docs/events#waiting-for-event) for more details about events. **Usage** // Start waiting for response before clicking. Note no await. const responsePromise = page.waitForResponse('https://example.com/resource'); await page."
+    },
+    {
+      "label": "waitForURL",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Waits for the main frame to navigate to the given URL. **Usage** await page.click('a.delayed-navigation'); // Clicking the link will indirectly cause a navigation await page.waitForURL('**\\/target.html'); Note that if the parameter is a string without wildcard characters, the method will wait for na"
+    },
+    {
+      "label": "workers",
+      "type": "method",
+      "detail": "() => Worker[]",
+      "info": "This method returns all of the dedicated [WebWorkers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) associated with the page. **NOTE** This does not contain ServiceWorkers"
+    },
+    {
+      "label": "clock",
+      "type": "property",
+      "detail": "Clock",
+      "info": "Playwright has ability to mock clock and passage of time."
+    },
+    {
+      "label": "coverage",
+      "type": "property",
+      "detail": "Coverage",
+      "info": "**NOTE** Only available for Chromium atm. Browser-specific Coverage implementation. See [Coverage](https://playwright.dev/docs/api/class-coverage) for more details."
+    },
+    {
+      "label": "keyboard",
+      "type": "property",
+      "detail": "Keyboard"
+    },
+    {
+      "label": "mouse",
+      "type": "property",
+      "detail": "Mouse"
+    },
+    {
+      "label": "request",
+      "type": "property",
+      "detail": "APIRequestContext",
+      "info": "API testing helper associated with this page. This method returns the same instance as [browserContext.request](https://playwright.dev/docs/api/class-browsercontext#browser-context-request) on the page's context. See [browserContext.request](https://playwright.dev/docs/api/class-browsercontext#brows"
+    },
+    {
+      "label": "touchscreen",
+      "type": "property",
+      "detail": "Touchscreen"
+    },
+    {
+      "label": "[Symbol.asyncDispose]",
+      "type": "method",
+      "detail": "() => Promise<void>"
+    }
+  ],
+  "Frame": [
+    {
+      "label": "evaluate",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg) => Promise<R>",
+      "info": "Returns the return value of [`pageFunction`](https://playwright.dev/docs/api/class-frame#frame-evaluate-option-expression). If the function passed to the [frame.evaluate(pageFunction[, arg])](https://playwright.dev/docs/api/class-frame#frame-evaluate) returns a [Promise], then [frame.evaluate(pageFu"
+    },
+    {
+      "label": "evaluateHandle",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg) => Promise<SmartHandle<R>>",
+      "info": "Returns the return value of [`pageFunction`](https://playwright.dev/docs/api/class-frame#frame-evaluate-handle-option-expression) as a [JSHandle](https://playwright.dev/docs/api/class-jshandle). The only difference between [frame.evaluate(pageFunction[, arg])](https://playwright.dev/docs/api/class-f"
+    },
+    {
+      "label": "waitForFunction",
+      "type": "method",
+      "detail": "(pageFunction: PageFunction<Arg, R>, arg: Arg, options: PageWaitForFunctionOptions) => Promise<SmartHandle<R>>",
+      "info": "Returns when the [`pageFunction`](https://playwright.dev/docs/api/class-frame#frame-wait-for-function-option-expression) returns a truthy value, returns that value. **Usage** The [frame.waitForFunction(pageFunction[, arg, options])](https://playwright.dev/docs/api/class-frame#frame-wait-for-function"
+    },
+    {
+      "label": "addScriptTag",
+      "type": "method",
+      "detail": "(options: { content?: string; path?: string; type?: string; url?: string; }) => Promise<ElementHandle<Node>>",
+      "info": "Returns the added tag when the script's onload fires or when the script content was injected into frame. Adds a `<script>` tag into the page with the desired url or content."
+    },
+    {
+      "label": "addStyleTag",
+      "type": "method",
+      "detail": "(options: { content?: string; path?: string; url?: string; }) => Promise<ElementHandle<Node>>",
+      "info": "Returns the added tag when the stylesheet's onload fires or when the CSS content was injected into frame. Adds a `<link rel=\"stylesheet\">` tag into the page with the desired url or a `<style type=\"text/css\">` tag with the content."
+    },
+    {
+      "label": "check",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; strict?: boo…",
+      "info": "**NOTE** Use locator-based [locator.check([options])](https://playwright.dev/docs/api/class-locator#locator-check) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-check-op"
+    },
+    {
+      "label": "childFrames",
+      "type": "method",
+      "detail": "() => Frame[]"
+    },
+    {
+      "label": "click",
+      "type": "method",
+      "detail": "(selector: string, options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; delay?: number; force?: boolean…",
+      "info": "**NOTE** Use locator-based [locator.click([options])](https://playwright.dev/docs/api/class-locator#locator-click) instead. Read more about [locators](https://playwright.dev/docs/locators). This method clicks an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-click-op"
+    },
+    {
+      "label": "content",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Gets the full HTML contents of the frame, including the doctype."
+    },
+    {
+      "label": "dblclick",
+      "type": "method",
+      "detail": "(selector: string, options: { button?: \"left\" | \"right\" | \"middle\"; delay?: number; force?: boolean; modifiers?: (\"Alt\" …",
+      "info": "**NOTE** Use locator-based [locator.dblclick([options])](https://playwright.dev/docs/api/class-locator#locator-dblclick) instead. Read more about [locators](https://playwright.dev/docs/locators). This method double clicks an element matching [`selector`](https://playwright.dev/docs/api/class-frame#f"
+    },
+    {
+      "label": "dispatchEvent",
+      "type": "method",
+      "detail": "(selector: string, type: string, eventInit: EvaluationArgument, options: { strict?: boolean; timeout?: number; }) => Pro…",
+      "info": "**NOTE** Use locator-based [locator.dispatchEvent(type[, eventInit, options])](https://playwright.dev/docs/api/class-locator#locator-dispatch-event) instead. Read more about [locators](https://playwright.dev/docs/locators). The snippet below dispatches the `click` event on the element. Regardless of"
+    },
+    {
+      "label": "dragAndDrop",
+      "type": "method",
+      "detail": "(source: string, target: string, options: { force?: boolean; noWaitAfter?: boolean; sourcePosition?: { x: number; y: num…",
+      "info": "be used. will be used."
+    },
+    {
+      "label": "fill",
+      "type": "method",
+      "detail": "(selector: string, value: string, options: { force?: boolean; noWaitAfter?: boolean; strict?: boolean; timeout?: number;…",
+      "info": "**NOTE** Use locator-based [locator.fill(value[, options])](https://playwright.dev/docs/api/class-locator#locator-fill) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-"
+    },
+    {
+      "label": "focus",
+      "type": "method",
+      "detail": "(selector: string, options: { strict?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.focus([options])](https://playwright.dev/docs/api/class-locator#locator-focus) instead. Read more about [locators](https://playwright.dev/docs/locators). This method fetches an element with [`selector`](https://playwright.dev/docs/api/class-frame#frame-focus-optio"
+    },
+    {
+      "label": "frameElement",
+      "type": "method",
+      "detail": "() => Promise<ElementHandle<Node>>",
+      "info": "Returns the `frame` or `iframe` element handle which corresponds to this frame. This is an inverse of [elementHandle.contentFrame()](https://playwright.dev/docs/api/class-elementhandle#element-handle-content-frame). Note that returned handle actually belongs to the parent frame. This method throws a"
+    },
+    {
+      "label": "frameLocator",
+      "type": "method",
+      "detail": "(selector: string) => FrameLocator",
+      "info": "When working with iframes, you can create a frame locator that will enter the iframe and allow selecting elements in that iframe. **Usage** Following snippet locates element with text \"Submit\" in the iframe with id `my-frame`, like `<iframe id=\"my-frame\">`: const locator = frame.frameLocator('#my-if"
+    },
+    {
+      "label": "getByAltText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their alt text. **Usage** For example, this method will find the image by alt text \"Playwright logo\": <img alt='Playwright logo'> await page.getByAltText('Playwright logo').click();"
+    },
+    {
+      "label": "getByLabel",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the text of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute. **Usage** For example, this method will find inputs by label \"Username\" and \"Password\" in the following DOM: <input aria-label=\"Username\"> <label for=\"password-input"
+    },
+    {
+      "label": "getByPlaceholder",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the placeholder text. **Usage** For example, consider the following DOM structure. <input type=\"email\" placeholder=\"name@example.com\" /> You can fill the input after locating it by the placeholder text: await page .getByPlaceholder('name@example.com') .fill('playwri"
+    },
+    {
+      "label": "getByRole",
+      "type": "method",
+      "detail": "(role: \"none\" | \"alert\" | \"alertdialog\" | \"application\" | \"article\" | \"banner\" | \"blockquote\" | \"button\" | \"caption\" | \"…",
+      "info": "Allows locating elements by their [ARIA role](https://www.w3.org/TR/wai-aria-1.2/#roles), [ARIA attributes](https://www.w3.org/TR/wai-aria-1.2/#aria-attributes) and [accessible name](https://w3c.github.io/accname/#dfn-accessible-name). **Usage** Consider the following DOM structure. <h3>Sign up</h3>"
+    },
+    {
+      "label": "getByTestId",
+      "type": "method",
+      "detail": "(testId: string | RegExp) => Locator",
+      "info": "Locate element by the test id. **Usage** Consider the following DOM structure. <button data-testid=\"directions\">Itinéraire</button> You can locate the element by its test id: await page.getByTestId('directions').click(); **Details** By default, the `data-testid` attribute is used as a test id. Use ["
+    },
+    {
+      "label": "getByText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements that contain given text. See also [locator.filter([options])](https://playwright.dev/docs/api/class-locator#locator-filter) that allows to match by another criteria, like an accessible role, and then filter by the text content. **Usage** Consider the following DOM structure:"
+    },
+    {
+      "label": "getByTitle",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their title attribute. **Usage** Consider the following DOM structure. <span title='Issues count'>25 issues</span> You can check the issues count after locating it by the title text: await expect(page.getByTitle('Issues count')).toHaveText('25 issues');"
+    },
+    {
+      "label": "goto",
+      "type": "method",
+      "detail": "(url: string, options: { referer?: string; timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"…",
+      "info": "Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect. The method will throw an error if: - there's an SSL error (e.g. in case of self-signed certificates). - target URL is invalid. - the [`timeout`](https://playwright.d"
+    },
+    {
+      "label": "hover",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; n…",
+      "info": "**NOTE** Use locator-based [locator.hover([options])](https://playwright.dev/docs/api/class-locator#locator-hover) instead. Read more about [locators](https://playwright.dev/docs/locators). This method hovers over an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-hov"
+    },
+    {
+      "label": "isDetached",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Returns `true` if the frame has been detached, or `false` otherwise."
+    },
+    {
+      "label": "locator",
+      "type": "method",
+      "detail": "(selector: string, options: { has?: Locator; hasNot?: Locator; hasNotText?: string | RegExp; hasText?: string | RegExp; …",
+      "info": "The method returns an element locator that can be used to perform actions on this page / frame. Locator is resolved to the element immediately before performing an action, so a series of actions on the same locator can in fact be performed on different DOM elements. That would happen if the DOM stru"
+    },
+    {
+      "label": "name",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns frame's name attribute as specified in the tag. If the name is empty, returns the id attribute instead. **NOTE** This value is calculated once when the frame is created, and will not update if the attribute is changed later."
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "Returns the page containing this frame."
+    },
+    {
+      "label": "parentFrame",
+      "type": "method",
+      "detail": "() => Frame",
+      "info": "Parent frame, if any. Detached frames and main frames return `null`."
+    },
+    {
+      "label": "press",
+      "type": "method",
+      "detail": "(selector: string, key: string, options: { delay?: number; noWaitAfter?: boolean; strict?: boolean; timeout?: number; })…",
+      "info": "**NOTE** Use locator-based [locator.press(key[, options])](https://playwright.dev/docs/api/class-locator#locator-press) instead. Read more about [locators](https://playwright.dev/docs/locators). [`key`](https://playwright.dev/docs/api/class-frame#frame-press-option-key) can specify the intended [key"
+    },
+    {
+      "label": "selectOption",
+      "type": "method",
+      "detail": "(selector: string, values: string | ElementHandle<Node> | readonly string[] | readonly ElementHandle<Node>[] | { value?:…",
+      "info": "**NOTE** Use locator-based [locator.selectOption(values[, options])](https://playwright.dev/docs/api/class-locator#locator-select-option) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for an element matching [`selector`](https://playwright.dev/docs/api/"
+    },
+    {
+      "label": "setChecked",
+      "type": "method",
+      "detail": "(selector: string, checked: boolean, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: numbe…",
+      "info": "**NOTE** Use locator-based [locator.setChecked(checked[, options])](https://playwright.dev/docs/api/class-locator#locator-set-checked) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks or unchecks an element matching [`selector`](https://playwright.dev/doc"
+    },
+    {
+      "label": "setContent",
+      "type": "method",
+      "detail": "(html: string, options: { timeout?: number; waitUntil?: \"load\" | \"domcontentloaded\" | \"networkidle\" | \"commit\"; }) => Pr…",
+      "info": "This method internally calls [document.write()](https://developer.mozilla.org/en-US/docs/Web/API/Document/write), inheriting all its specific characteristics and behaviors."
+    },
+    {
+      "label": "setInputFiles",
+      "type": "method",
+      "detail": "(selector: string, files: string | readonly string[] | { name: string; mimeType: string; buffer: Buffer<ArrayBufferLike>…",
+      "info": "**NOTE** Use locator-based [locator.setInputFiles(files[, options])](https://playwright.dev/docs/api/class-locator#locator-set-input-files) instead. Read more about [locators](https://playwright.dev/docs/locators). Sets the value of the file input to these file paths or files. If some of the `filePa"
+    },
+    {
+      "label": "tap",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; n…",
+      "info": "**NOTE** Use locator-based [locator.tap([options])](https://playwright.dev/docs/api/class-locator#locator-tap) instead. Read more about [locators](https://playwright.dev/docs/locators). This method taps an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-tap-option-sel"
+    },
+    {
+      "label": "title",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns the page title."
+    },
+    {
+      "label": "uncheck",
+      "type": "method",
+      "detail": "(selector: string, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; strict?: boo…",
+      "info": "**NOTE** Use locator-based [locator.uncheck([options])](https://playwright.dev/docs/api/class-locator#locator-uncheck) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks an element matching [`selector`](https://playwright.dev/docs/api/class-frame#frame-unch"
+    },
+    {
+      "label": "url",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns frame's url."
+    },
+    {
+      "label": "waitForLoadState",
+      "type": "method",
+      "detail": "(state: \"load\" | \"domcontentloaded\" | \"networkidle\", options: { timeout?: number; }) => Promise<void>",
+      "info": "Waits for the required load state to be reached. This returns when the frame reaches a required load state, `load` by default. The navigation must have been committed when this method is called. If current document has already reached the required state, resolves immediately. **NOTE** Most of the ti"
+    },
+    {
+      "label": "waitForURL",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Waits for the frame to navigate to the given URL. **Usage** await frame.click('a.delayed-navigation'); // Clicking the link will indirectly cause a navigation await frame.waitForURL('**\\/target.html'); Note that if the parameter is a string without wildcard characters, the method will wait for navig"
+    }
+  ],
+  "BrowserContext": [
+    {
+      "label": "exposeBinding",
+      "type": "method",
+      "detail": "(name: string, playwrightBinding: (source: BindingSource, arg: JSHandle<any>) => any, options: { handle: true; }) => Pro…",
+      "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-binding-option-name) on the `window` object of every frame in every page in the context. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-browse"
+    },
+    {
+      "label": "addInitScript",
+      "type": "method",
+      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<void>",
+      "info": "Adds a script which would be evaluated in one of the following scenarios: - Whenever a page is created in the browser context or is navigated. - Whenever a child frame is attached or navigated in any page in the browser context. In this case, the script is evaluated in the context of the newly attac"
+    },
+    {
+      "label": "removeAllListeners",
+      "type": "method",
+      "detail": "(type: string) => this",
+      "info": "Removes all the listeners of the given type (or all registered listeners if no type given). Allows to wait for async listeners to complete or to ignore subsequent errors from these listeners."
+    },
+    {
+      "label": "on",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "This event is not emitted."
+    },
+    {
+      "label": "once",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "Adds an event listener that will be automatically removed after it is triggered once. See `addListener` for more information about this event."
+    },
+    {
+      "label": "addListener",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "This event is not emitted."
+    },
+    {
+      "label": "removeListener",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "off",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "prependListener",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", listener: (page: Page) => any) => this",
+      "info": "This event is not emitted."
+    },
+    {
+      "label": "addCookies",
+      "type": "method",
+      "detail": "(cookies: readonly { name: string; value: string; url?: string; domain?: string; path?: string; expires?: number; httpOn…",
+      "info": "Adds cookies into this browser context. All pages within this context will have these cookies installed. Cookies can be obtained via [browserContext.cookies([urls])](https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies). **Usage** await browserContext.addCookies([cookieObject"
+    },
+    {
+      "label": "browser",
+      "type": "method",
+      "detail": "() => Browser",
+      "info": "Gets the browser instance that owns the context. Returns `null` if the context is created outside of normal browser, e.g. Android or Electron."
+    },
+    {
+      "label": "clearCookies",
+      "type": "method",
+      "detail": "(options: { domain?: string | RegExp; name?: string | RegExp; path?: string | RegExp; }) => Promise<void>",
+      "info": "Removes cookies from context. Accepts optional filter. **Usage** await context.clearCookies(); await context.clearCookies({ name: 'session-id' }); await context.clearCookies({ domain: 'my-origin.com' }); await context.clearCookies({ domain: /.*my-origin\\.com/ }); await context.clearCookies({ path: '"
+    },
+    {
+      "label": "clearPermissions",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Clears all permission overrides for the browser context. **Usage** const context = await browser.newContext(); await context.grantPermissions(['clipboard-read']); // do stuff .. context.clearPermissions();"
+    },
+    {
+      "label": "close",
+      "type": "method",
+      "detail": "(options: { reason?: string; }) => Promise<void>",
+      "info": "Closes the browser context. All the pages that belong to the browser context will be closed. **NOTE** The default browser context cannot be closed."
+    },
+    {
+      "label": "cookies",
+      "type": "method",
+      "detail": "(urls: string | readonly string[]) => Promise<Cookie[]>",
+      "info": "If no URLs are specified, this method returns all cookies. If URLs are specified, only cookies that affect those URLs are returned."
+    },
+    {
+      "label": "exposeFunction",
+      "type": "method",
+      "detail": "(name: string, callback: Function) => Promise<void>",
+      "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-function-option-name) on the `window` object of every frame in every page in the context. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-brows"
+    },
+    {
+      "label": "grantPermissions",
+      "type": "method",
+      "detail": "(permissions: readonly string[], options: { origin?: string; }) => Promise<void>",
+      "info": "Grants specified permissions to the browser context. Only grants corresponding permissions to the given origin if specified. **NOTE** Supported permissions differ between browsers, and even between different versions of the same browser. Any permission may stop working after an update. Here are some"
+    },
+    {
+      "label": "newCDPSession",
+      "type": "method",
+      "detail": "(page: Page | Frame) => Promise<CDPSession>",
+      "info": "**NOTE** CDP sessions are only supported on Chromium-based browsers. Returns the newly created session. `Page` or `Frame` type."
+    },
+    {
+      "label": "newPage",
+      "type": "method",
+      "detail": "() => Promise<Page>",
+      "info": "Creates a new page in the browser context."
+    },
+    {
+      "label": "pages",
+      "type": "method",
+      "detail": "() => Page[]",
+      "info": "Returns all open pages in the context."
+    },
+    {
+      "label": "route",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Routing provides the capability to modify network requests that are made by any page in the browser context. Once route is enabled, every request matching the url pattern will stall unless it's continued, fulfilled or aborted. **NOTE** [browserContext.route(url, handler[, options])](https://playwrig"
+    },
+    {
+      "label": "routeFromHAR",
+      "type": "method",
+      "detail": "(har: string, options: { notFound?: \"abort\" | \"fallback\"; update?: boolean; updateContent?: \"embed\" | \"attach\"; updateMo…",
+      "info": "If specified the network requests that are made in the context will be served from the HAR file. Read more about [Replaying from HAR](https://playwright.dev/docs/mock#replaying-from-har). Playwright will not serve requests intercepted by Service Worker from the HAR file. See [this](https://github.co"
+    },
+    {
+      "label": "routeWebSocket",
+      "type": "method",
+      "detail": "(url: string | RegExp | ((url: URL) => boolean), handler: (websocketroute: WebSocketRoute) => any) => Promise<void>",
+      "info": "This method allows to modify websocket connections that are made by any page in the browser context. Note that only `WebSocket`s created after this method was called will be routed. It is recommended to call this method before creating any pages. **Usage** Below is an example of a simple handler tha"
+    },
+    {
+      "label": "serviceWorkers",
+      "type": "method",
+      "detail": "() => Worker[]",
+      "info": "**NOTE** Service workers are only supported on Chromium-based browsers. All existing service workers in the context."
+    },
+    {
+      "label": "setDefaultNavigationTimeout",
+      "type": "method",
+      "detail": "(timeout: number) => void",
+      "info": "This setting will change the default maximum navigation time for the following methods and related shortcuts: - [page.goBack([options])](https://playwright.dev/docs/api/class-page#page-go-back) - [page.goForward([options])](https://playwright.dev/docs/api/class-page#page-go-forward) - [page.goto(url"
+    },
+    {
+      "label": "setDefaultTimeout",
+      "type": "method",
+      "detail": "(timeout: number) => void",
+      "info": "This setting will change the default maximum time for all the methods accepting [`timeout`](https://playwright.dev/docs/api/class-browsercontext#browser-context-set-default-timeout-option-timeout) option. **NOTE** [page.setDefaultNavigationTimeout(timeout)](https://playwright.dev/docs/api/class-page"
+    },
+    {
+      "label": "setExtraHTTPHeaders",
+      "type": "method",
+      "detail": "(headers: { [key: string]: string; }) => Promise<void>",
+      "info": "The extra HTTP headers will be sent with every request initiated by any page in the context. These headers are merged with page-specific extra HTTP headers set with [page.setExtraHTTPHeaders(headers)](https://playwright.dev/docs/api/class-page#page-set-extra-http-headers). If page overrides a partic"
+    },
+    {
+      "label": "setGeolocation",
+      "type": "method",
+      "detail": "(geolocation: { latitude: number; longitude: number; accuracy?: number; }) => Promise<void>",
+      "info": "Sets the context's geolocation. Passing `null` or `undefined` emulates position unavailable. **Usage** await browserContext.setGeolocation({ latitude: 59.95, longitude: 30.31667 }); **NOTE** Consider using [browserContext.grantPermissions(permissions[, options])](https://playwright.dev/docs/api/clas"
+    },
+    {
+      "label": "setOffline",
+      "type": "method",
+      "detail": "(offline: boolean) => Promise<void>"
+    },
+    {
+      "label": "setStorageState",
+      "type": "method",
+      "detail": "(storageState: string | { cookies: { name: string; value: string; domain: string; path: string; expires: number; httpOnl…",
+      "info": "Clears the existing cookies, local storage and IndexedDB entries for all origins and sets the new storage state. **Usage** // Load storage state from a file and apply it to the context. await context.setStorageState('state.json'); Populates context with given storage state. This option can be used t"
+    },
+    {
+      "label": "storageState",
+      "type": "method",
+      "detail": "(options: { indexedDB?: boolean; path?: string; }) => Promise<{ cookies: { name: string; value: string; domain: string; …",
+      "info": "Returns storage state for this browser context, contains current cookies, local storage snapshot and IndexedDB snapshot."
+    },
+    {
+      "label": "unroute",
+      "type": "method",
+      "detail": "(url: string | RegExp | { new (input: URLPatternInput, baseURL: string | URL, options?: URLPatternOptions): URLPattern; …",
+      "info": "Removes a route created with [browserContext.route(url, handler[, options])](https://playwright.dev/docs/api/class-browsercontext#browser-context-route). When [`handler`](https://playwright.dev/docs/api/class-browsercontext#browser-context-unroute-option-handler) is not specified, removes all routes"
+    },
+    {
+      "label": "unrouteAll",
+      "type": "method",
+      "detail": "(options: { behavior?: \"wait\" | \"ignoreErrors\" | \"default\"; }) => Promise<void>",
+      "info": "Removes all routes created with [browserContext.route(url, handler[, options])](https://playwright.dev/docs/api/class-browsercontext#browser-context-route) and [browserContext.routeFromHAR(har[, options])](https://playwright.dev/docs/api/class-browsercontext#browser-context-route-from-har)."
+    },
+    {
+      "label": "waitForEvent",
+      "type": "method",
+      "detail": "(event: \"backgroundpage\", optionsOrPredicate: { predicate?: (page: Page) => boolean | Promise<boolean>; timeout?: number…",
+      "info": "This event is not emitted."
+    },
+    {
+      "label": "clock",
+      "type": "property",
+      "detail": "Clock",
+      "info": "Playwright has ability to mock clock and passage of time."
+    },
+    {
+      "label": "request",
+      "type": "property",
+      "detail": "APIRequestContext",
+      "info": "API testing helper associated with this context. Requests made with this API will use context cookies."
+    },
+    {
+      "label": "tracing",
+      "type": "property",
+      "detail": "Tracing"
+    },
+    {
+      "label": "[Symbol.asyncDispose]",
+      "type": "method",
+      "detail": "() => Promise<void>"
+    }
+  ],
+  "Browser": [
+    {
+      "label": "removeAllListeners",
+      "type": "method",
+      "detail": "(type: string) => this",
+      "info": "Removes all the listeners of the given type (or all registered listeners if no type given). Allows to wait for async listeners to complete or to ignore subsequent errors from these listeners."
+    },
+    {
+      "label": "on",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Emitted when Browser gets disconnected from the browser application. This might happen because of one of the following: - Browser application is closed or crashed. - The [browser.close([options])](https://playwright.dev/docs/api/class-browser#browser-close) method was called."
+    },
+    {
+      "label": "once",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Adds an event listener that will be automatically removed after it is triggered once. See `addListener` for more information about this event."
+    },
+    {
+      "label": "addListener",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Emitted when Browser gets disconnected from the browser application. This might happen because of one of the following: - Browser application is closed or crashed. - The [browser.close([options])](https://playwright.dev/docs/api/class-browser#browser-close) method was called."
+    },
+    {
+      "label": "removeListener",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "off",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Removes an event listener added by `on` or `addListener`."
+    },
+    {
+      "label": "prependListener",
+      "type": "method",
+      "detail": "(event: \"disconnected\", listener: (browser: Browser) => any) => this",
+      "info": "Emitted when Browser gets disconnected from the browser application. This might happen because of one of the following: - Browser application is closed or crashed. - The [browser.close([options])](https://playwright.dev/docs/api/class-browser#browser-close) method was called."
+    },
+    {
+      "label": "browserType",
+      "type": "method",
+      "detail": "() => BrowserType<{}>",
+      "info": "Get the browser type (chromium, firefox or webkit) that the browser belongs to."
+    },
+    {
+      "label": "close",
+      "type": "method",
+      "detail": "(options: { reason?: string; }) => Promise<void>",
+      "info": "In case this browser is obtained using [browserType.launch([options])](https://playwright.dev/docs/api/class-browsertype#browser-type-launch), closes the browser and all of its pages (if any were opened). In case this browser is connected to, clears all created contexts belonging to this browser and"
+    },
+    {
+      "label": "contexts",
+      "type": "method",
+      "detail": "() => BrowserContext[]",
+      "info": "Returns an array of all open browser contexts. In a newly created browser, this will return zero browser contexts. **Usage** const browser = await pw.webkit.launch(); console.log(browser.contexts().length); // prints `0` const context = await browser.newContext(); console.log(browser.contexts().leng"
+    },
+    {
+      "label": "isConnected",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Indicates that the browser is connected."
+    },
+    {
+      "label": "newBrowserCDPSession",
+      "type": "method",
+      "detail": "() => Promise<CDPSession>",
+      "info": "**NOTE** CDP Sessions are only supported on Chromium-based browsers. Returns the newly created browser session."
+    },
+    {
+      "label": "newContext",
+      "type": "method",
+      "detail": "(options: BrowserContextOptions) => Promise<BrowserContext>",
+      "info": "Creates a new browser context. It won't share cookies/cache with other browser contexts. **NOTE** If directly using this method to create [BrowserContext](https://playwright.dev/docs/api/class-browsercontext)s, it is best practice to explicitly close the returned context via [browserContext.close([o"
+    },
+    {
+      "label": "newPage",
+      "type": "method",
+      "detail": "(options: { acceptDownloads?: boolean; baseURL?: string; bypassCSP?: boolean; clientCertificates?: { origin: string; cer…",
+      "info": "Creates a new page in a new browser context. Closing this page will close the context as well. This is a convenience API that should only be used for the single-page scenarios and short snippets. Production code and testing frameworks should explicitly create [browser.newContext([options])](https://"
+    },
+    {
+      "label": "startTracing",
+      "type": "method",
+      "detail": "(page: Page, options: { categories?: string[]; path?: string; screenshots?: boolean; }) => Promise<void>",
+      "info": "**NOTE** This API controls [Chromium Tracing](https://www.chromium.org/developers/how-tos/trace-event-profiling-tool) which is a low-level chromium-specific debugging tool. API to control [Playwright Tracing](https://playwright.dev/docs/trace-viewer) could be found [here](https://playwright.dev/docs"
+    },
+    {
+      "label": "stopTracing",
+      "type": "method",
+      "detail": "() => Promise<Buffer<ArrayBufferLike>>",
+      "info": "**NOTE** This API controls [Chromium Tracing](https://www.chromium.org/developers/how-tos/trace-event-profiling-tool) which is a low-level chromium-specific debugging tool. API to control [Playwright Tracing](https://playwright.dev/docs/trace-viewer) could be found [here](https://playwright.dev/docs"
+    },
+    {
+      "label": "version",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns the browser version."
+    },
+    {
+      "label": "[Symbol.asyncDispose]",
+      "type": "method",
+      "detail": "() => Promise<void>"
+    }
+  ],
+  "ElementHandle": [
+    {
+      "label": "boundingBox",
+      "type": "method",
+      "detail": "() => Promise<{ x: number; y: number; width: number; height: number; }>",
+      "info": "This method returns the bounding box of the element, or `null` if the element is not visible. The bounding box is calculated relative to the main frame viewport - which is usually the same as the browser window. Scrolling affects the returned bounding box, similarly to [Element.getBoundingClientRect"
+    },
+    {
+      "label": "check",
+      "type": "method",
+      "detail": "(options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: number; trial?: bool…",
+      "info": "**NOTE** Use locator-based [locator.check([options])](https://playwright.dev/docs/api/class-locator#locator-check) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks the element by performing the following steps: 1. Ensure that element is a checkbox or a ra"
+    },
+    {
+      "label": "click",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; delay?: number; force?: boolean; modifiers?: (\"Al…",
+      "info": "**NOTE** Use locator-based [locator.click([options])](https://playwright.dev/docs/api/class-locator#locator-click) instead. Read more about [locators](https://playwright.dev/docs/locators). This method clicks the element by performing the following steps: 1. Wait for [actionability](https://playwrig"
+    },
+    {
+      "label": "contentFrame",
+      "type": "method",
+      "detail": "() => Promise<Frame>",
+      "info": "Returns the content frame for element handles referencing iframe nodes, or `null` otherwise"
+    },
+    {
+      "label": "dblclick",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; delay?: number; force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"Con…",
+      "info": "**NOTE** Use locator-based [locator.dblclick([options])](https://playwright.dev/docs/api/class-locator#locator-dblclick) instead. Read more about [locators](https://playwright.dev/docs/locators). This method double clicks the element by performing the following steps: 1. Wait for [actionability](htt"
+    },
+    {
+      "label": "dispatchEvent",
+      "type": "method",
+      "detail": "(type: string, eventInit: EvaluationArgument) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.dispatchEvent(type[, eventInit, options])](https://playwright.dev/docs/api/class-locator#locator-dispatch-event) instead. Read more about [locators](https://playwright.dev/docs/locators). The snippet below dispatches the `click` event on the element. Regardless of"
+    },
+    {
+      "label": "fill",
+      "type": "method",
+      "detail": "(value: string, options: { force?: boolean; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.fill(value[, options])](https://playwright.dev/docs/api/class-locator#locator-fill) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for [actionability](https://playwright.dev/docs/actionability) checks, focuses the elem"
+    },
+    {
+      "label": "focus",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.focus([options])](https://playwright.dev/docs/api/class-locator#locator-focus) instead. Read more about [locators](https://playwright.dev/docs/locators). Calls [focus](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus) on the element."
+    },
+    {
+      "label": "getAttribute",
+      "type": "method",
+      "detail": "(name: string) => Promise<string>",
+      "info": "**NOTE** Use locator-based [locator.getAttribute(name[, options])](https://playwright.dev/docs/api/class-locator#locator-get-attribute) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns element attribute value."
+    },
+    {
+      "label": "hover",
+      "type": "method",
+      "detail": "(options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; noWaitAfter?: boole…",
+      "info": "**NOTE** Use locator-based [locator.hover([options])](https://playwright.dev/docs/api/class-locator#locator-hover) instead. Read more about [locators](https://playwright.dev/docs/locators). This method hovers over the element by performing the following steps: 1. Wait for [actionability](https://pla"
+    },
+    {
+      "label": "innerHTML",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "**NOTE** Use locator-based [locator.innerHTML([options])](https://playwright.dev/docs/api/class-locator#locator-inner-html) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns the `element.innerHTML`."
+    },
+    {
+      "label": "innerText",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "**NOTE** Use locator-based [locator.innerText([options])](https://playwright.dev/docs/api/class-locator#locator-inner-text) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns the `element.innerText`."
+    },
+    {
+      "label": "inputValue",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "**NOTE** Use locator-based [locator.inputValue([options])](https://playwright.dev/docs/api/class-locator#locator-input-value) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns `input.value` for the selected `<input>` or `<textarea>` or `<select>` element. Throws for"
+    },
+    {
+      "label": "isChecked",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isChecked([options])](https://playwright.dev/docs/api/class-locator#locator-is-checked) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is checked. Throws if the element is not a checkbox or radio input."
+    },
+    {
+      "label": "isDisabled",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isDisabled([options])](https://playwright.dev/docs/api/class-locator#locator-is-disabled) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is disabled, the opposite of [enabled](https://playwright.dev/docs/acti"
+    },
+    {
+      "label": "isEditable",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isEditable([options])](https://playwright.dev/docs/api/class-locator#locator-is-editable) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is [editable](https://playwright.dev/docs/actionability#editable)."
+    },
+    {
+      "label": "isEnabled",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isEnabled([options])](https://playwright.dev/docs/api/class-locator#locator-is-enabled) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is [enabled](https://playwright.dev/docs/actionability#enabled)."
+    },
+    {
+      "label": "isHidden",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isHidden([options])](https://playwright.dev/docs/api/class-locator#locator-is-hidden) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is hidden, the opposite of [visible](https://playwright.dev/docs/actionabil"
+    },
+    {
+      "label": "isVisible",
+      "type": "method",
+      "detail": "() => Promise<boolean>",
+      "info": "**NOTE** Use locator-based [locator.isVisible([options])](https://playwright.dev/docs/api/class-locator#locator-is-visible) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns whether the element is [visible](https://playwright.dev/docs/actionability#visible)."
+    },
+    {
+      "label": "ownerFrame",
+      "type": "method",
+      "detail": "() => Promise<Frame>",
+      "info": "Returns the frame containing the given element."
+    },
+    {
+      "label": "press",
+      "type": "method",
+      "detail": "(key: string, options: { delay?: number; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.press(key[, options])](https://playwright.dev/docs/api/class-locator#locator-press) instead. Read more about [locators](https://playwright.dev/docs/locators). Focuses the element, and then uses [keyboard.down(key)](https://playwright.dev/docs/api/class-keyboard#ke"
+    },
+    {
+      "label": "screenshot",
+      "type": "method",
+      "detail": "(options: { animations?: \"disabled\" | \"allow\"; caret?: \"hide\" | \"initial\"; mask?: Locator[]; maskColor?: string; omitBac…",
+      "info": "**NOTE** Use locator-based [locator.screenshot([options])](https://playwright.dev/docs/api/class-locator#locator-screenshot) instead. Read more about [locators](https://playwright.dev/docs/locators). This method captures a screenshot of the page, clipped to the size and position of this particular e"
+    },
+    {
+      "label": "scrollIntoViewIfNeeded",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.scrollIntoViewIfNeeded([options])](https://playwright.dev/docs/api/class-locator#locator-scroll-into-view-if-needed) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for [actionability](https://playwright.dev/docs/action"
+    },
+    {
+      "label": "selectOption",
+      "type": "method",
+      "detail": "(values: string | ElementHandle<Node> | readonly string[] | readonly ElementHandle<Node>[] | { value?: string; label?: s…",
+      "info": "**NOTE** Use locator-based [locator.selectOption(values[, options])](https://playwright.dev/docs/api/class-locator#locator-select-option) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for [actionability](https://playwright.dev/docs/actionability) checks"
+    },
+    {
+      "label": "selectText",
+      "type": "method",
+      "detail": "(options: { force?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** Use locator-based [locator.selectText([options])](https://playwright.dev/docs/api/class-locator#locator-select-text) instead. Read more about [locators](https://playwright.dev/docs/locators). This method waits for [actionability](https://playwright.dev/docs/actionability) checks, then focus"
+    },
+    {
+      "label": "setChecked",
+      "type": "method",
+      "detail": "(checked: boolean, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: nu…",
+      "info": "**NOTE** Use locator-based [locator.setChecked(checked[, options])](https://playwright.dev/docs/api/class-locator#locator-set-checked) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks or unchecks an element by performing the following steps: 1. Ensure tha"
+    },
+    {
+      "label": "setInputFiles",
+      "type": "method",
+      "detail": "(files: string | readonly string[] | { name: string; mimeType: string; buffer: Buffer<ArrayBufferLike>; } | readonly { n…",
+      "info": "**NOTE** Use locator-based [locator.setInputFiles(files[, options])](https://playwright.dev/docs/api/class-locator#locator-set-input-files) instead. Read more about [locators](https://playwright.dev/docs/locators). Sets the value of the file input to these file paths or files. If some of the `filePa"
+    },
+    {
+      "label": "tap",
+      "type": "method",
+      "detail": "(options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; noWaitAfter?: boole…",
+      "info": "**NOTE** Use locator-based [locator.tap([options])](https://playwright.dev/docs/api/class-locator#locator-tap) instead. Read more about [locators](https://playwright.dev/docs/locators). This method taps the element by performing the following steps: 1. Wait for [actionability](https://playwright.dev"
+    },
+    {
+      "label": "textContent",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "**NOTE** Use locator-based [locator.textContent([options])](https://playwright.dev/docs/api/class-locator#locator-text-content) instead. Read more about [locators](https://playwright.dev/docs/locators). Returns the `node.textContent`."
+    },
+    {
+      "label": "uncheck",
+      "type": "method",
+      "detail": "(options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: number; trial?: bool…",
+      "info": "**NOTE** Use locator-based [locator.uncheck([options])](https://playwright.dev/docs/api/class-locator#locator-uncheck) instead. Read more about [locators](https://playwright.dev/docs/locators). This method checks the element by performing the following steps: 1. Ensure that element is a checkbox or"
+    },
+    {
+      "label": "waitForElementState",
+      "type": "method",
+      "detail": "(state: \"disabled\" | \"visible\" | \"hidden\" | \"stable\" | \"enabled\" | \"editable\", options: { timeout?: number; }) => Promis…",
+      "info": "Returns when the element satisfies the [`state`](https://playwright.dev/docs/api/class-elementhandle#element-handle-wait-for-element-state-option-state). Depending on the [`state`](https://playwright.dev/docs/api/class-elementhandle#element-handle-wait-for-element-state-option-state) parameter, this"
+    }
+  ],
+  "Locator": [
+    {
+      "label": "evaluate",
+      "type": "method",
+      "detail": "(pageFunction: PageFunctionOn<E, Arg, R>, arg: Arg, options: { timeout?: number; }) => Promise<R>",
+      "info": "Execute JavaScript code in the page, taking the matching element as an argument. **Details** Returns the return value of [`pageFunction`](https://playwright.dev/docs/api/class-locator#locator-evaluate-option-expression), called with the matching element as a first argument, and [`arg`](https://playw"
+    },
+    {
+      "label": "evaluateHandle",
+      "type": "method",
+      "detail": "(pageFunction: PageFunctionOn<E, Arg, R>, arg: Arg) => Promise<SmartHandle<R>>",
+      "info": "Execute JavaScript code in the page, taking the matching element as an argument, and return a [JSHandle](https://playwright.dev/docs/api/class-jshandle) with the result. **Details** Returns the return value of [`pageFunction`](https://playwright.dev/docs/api/class-locator#locator-evaluate-handle-opt"
+    },
+    {
+      "label": "evaluateAll",
+      "type": "method",
+      "detail": "(pageFunction: PageFunctionOn<E[], Arg, R>, arg: Arg) => Promise<R>",
+      "info": "Execute JavaScript code in the page, taking all matching elements as an argument. **Details** Returns the return value of [`pageFunction`](https://playwright.dev/docs/api/class-locator#locator-evaluate-all-option-expression), called with an array of all matching elements as a first argument, and [`a"
+    },
+    {
+      "label": "elementHandle",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<ElementHandle<SVGElement | HTMLElement>>",
+      "info": "**NOTE** Always prefer using [Locator](https://playwright.dev/docs/api/class-locator)s and web assertions over [ElementHandle](https://playwright.dev/docs/api/class-elementhandle)s because latter are inherently racy. Resolves given locator to the first matching DOM element. If there are no matching"
+    },
+    {
+      "label": "toString",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns a human-readable representation of the locator, using the [locator.description()](https://playwright.dev/docs/api/class-locator#locator-description) if one exists; otherwise, it generates a string based on the locator's selector."
+    },
+    {
+      "label": "all",
+      "type": "method",
+      "detail": "() => Promise<Locator[]>",
+      "info": "When the locator points to a list of elements, this returns an array of locators, pointing to their respective elements. **NOTE** [locator.all()](https://playwright.dev/docs/api/class-locator#locator-all) does not wait for elements to match the locator, and instead immediately returns whatever is pr"
+    },
+    {
+      "label": "allInnerTexts",
+      "type": "method",
+      "detail": "() => Promise<string[]>",
+      "info": "Returns an array of `node.innerText` values for all matching nodes. **NOTE** If you need to assert text on the page, prefer [expect(locator).toHaveText(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-text) with [`useInnerText`](https://playwri"
+    },
+    {
+      "label": "allTextContents",
+      "type": "method",
+      "detail": "() => Promise<string[]>",
+      "info": "Returns an array of `node.textContent` values for all matching nodes. **NOTE** If you need to assert text on the page, prefer [expect(locator).toHaveText(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-text) to avoid flakiness. See [assertions"
+    },
+    {
+      "label": "and",
+      "type": "method",
+      "detail": "(locator: Locator) => Locator",
+      "info": "Creates a locator that matches both this locator and the argument locator. **Usage** The following example finds a button with a specific title. const button = page.getByRole('button').and(page.getByTitle('Subscribe'));"
+    },
+    {
+      "label": "ariaSnapshot",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "Captures the aria snapshot of the given element. Read more about [aria snapshots](https://playwright.dev/docs/aria-snapshots) and [expect(locator).toMatchAriaSnapshot(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-match-aria-snapshot) for the corr"
+    },
+    {
+      "label": "blur",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<void>",
+      "info": "Calls [blur](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/blur) on the element."
+    },
+    {
+      "label": "boundingBox",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<{ x: number; y: number; width: number; height: number; }>",
+      "info": "This method returns the bounding box of the element matching the locator, or `null` if the element is not visible. The bounding box is calculated relative to the main frame viewport - which is usually the same as the browser window. **Details** Scrolling affects the returned bounding box, similarly"
+    },
+    {
+      "label": "check",
+      "type": "method",
+      "detail": "(options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: number; trial?: bool…",
+      "info": "Ensure that checkbox or radio element is checked. **Details** Performs the following steps: 1. Ensure that element is a checkbox or a radio input. If not, this method throws. If the element is already checked, this method returns immediately. 1. Wait for [actionability](https://playwright.dev/docs/a"
+    },
+    {
+      "label": "clear",
+      "type": "method",
+      "detail": "(options: { force?: boolean; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "Clear the input field. **Details** This method waits for [actionability](https://playwright.dev/docs/actionability) checks, focuses the element, clears it and triggers an `input` event after clearing. If the target element is not an `<input>`, `<textarea>` or `[contenteditable]` element, this method"
+    },
+    {
+      "label": "click",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; delay?: number; force?: boolean; modifiers?: (\"Al…",
+      "info": "Click an element. **Details** This method clicks the element by performing the following steps: 1. Wait for [actionability](https://playwright.dev/docs/actionability) checks on the element, unless [`force`](https://playwright.dev/docs/api/class-locator#locator-click-option-force) option is set. 1. S"
+    },
+    {
+      "label": "contentFrame",
+      "type": "method",
+      "detail": "() => FrameLocator",
+      "info": "Returns a [FrameLocator](https://playwright.dev/docs/api/class-framelocator) object pointing to the same `iframe` as this locator. Useful when you have a [Locator](https://playwright.dev/docs/api/class-locator) object obtained somewhere, and later on would like to interact with the content inside th"
+    },
+    {
+      "label": "count",
+      "type": "method",
+      "detail": "() => Promise<number>",
+      "info": "Returns the number of elements matching the locator. **NOTE** If you need to assert the number of elements on the page, prefer [expect(locator).toHaveCount(count[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-count) to avoid flakiness. See [assertions"
+    },
+    {
+      "label": "dblclick",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; delay?: number; force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"Con…",
+      "info": "Double-click an element. **Details** This method double clicks the element by performing the following steps: 1. Wait for [actionability](https://playwright.dev/docs/actionability) checks on the element, unless [`force`](https://playwright.dev/docs/api/class-locator#locator-dblclick-option-force) op"
+    },
+    {
+      "label": "describe",
+      "type": "method",
+      "detail": "(description: string) => Locator",
+      "info": "Describes the locator, description is used in the trace viewer and reports. Returns the locator pointing to the same element. **Usage** const button = page.getByTestId('btn-sub').describe('Subscribe button'); await button.click();"
+    },
+    {
+      "label": "description",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns locator description previously set with [locator.describe(description)](https://playwright.dev/docs/api/class-locator#locator-describe). Returns `null` if no custom description has been set. Prefer [locator.toString()](https://playwright.dev/docs/api/class-locator#locator-to-string) for a hu"
+    },
+    {
+      "label": "dispatchEvent",
+      "type": "method",
+      "detail": "(type: string, eventInit: EvaluationArgument, options: { timeout?: number; }) => Promise<void>",
+      "info": "Programmatically dispatch an event on the matching element. **Usage** await locator.dispatchEvent('click'); **Details** The snippet above dispatches the `click` event on the element. Regardless of the visibility state of the element, `click` is dispatched. This is equivalent to calling [element.clic"
+    },
+    {
+      "label": "dragTo",
+      "type": "method",
+      "detail": "(target: Locator, options: { force?: boolean; noWaitAfter?: boolean; sourcePosition?: { x: number; y: number; }; steps?:…",
+      "info": "Drag the source element towards the target element and drop it. **Details** This method drags the locator to another target locator or target position. It will first move to the source element, perform a `mousedown`, then move to the target element or position and perform a `mouseup`. **Usage** cons"
+    },
+    {
+      "label": "elementHandles",
+      "type": "method",
+      "detail": "() => Promise<ElementHandle<Node>[]>",
+      "info": "**NOTE** Always prefer using [Locator](https://playwright.dev/docs/api/class-locator)s and web assertions over [ElementHandle](https://playwright.dev/docs/api/class-elementhandle)s because latter are inherently racy. Resolves given locator to all matching DOM elements. If there are no matching eleme"
+    },
+    {
+      "label": "fill",
+      "type": "method",
+      "detail": "(value: string, options: { force?: boolean; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "Set a value to the input field. **Usage** await page.getByRole('textbox').fill('example value'); **Details** This method waits for [actionability](https://playwright.dev/docs/actionability) checks, focuses the element, fills it and triggers an `input` event after filling. Note that you can pass an e"
+    },
+    {
+      "label": "filter",
+      "type": "method",
+      "detail": "(options: { has?: Locator; hasNot?: Locator; hasNotText?: string | RegExp; hasText?: string | RegExp; visible?: boolean;…",
+      "info": "This method narrows existing locator according to the options, for example filters by text. It can be chained to filter multiple times. **Usage** const rowLocator = page.locator('tr'); // ... await rowLocator .filter({ hasText: 'text in column 1' }) .filter({ has: page.getByRole('button', { name: 'c"
+    },
+    {
+      "label": "first",
+      "type": "method",
+      "detail": "() => Locator",
+      "info": "Returns locator to the first matching element."
+    },
+    {
+      "label": "focus",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<void>",
+      "info": "Calls [focus](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus) on the matching element."
+    },
+    {
+      "label": "frameLocator",
+      "type": "method",
+      "detail": "(selector: string) => FrameLocator",
+      "info": "When working with iframes, you can create a frame locator that will enter the iframe and allow locating elements in that iframe: **Usage** const locator = page.frameLocator('iframe').getByText('Submit'); await locator.click();"
+    },
+    {
+      "label": "getAttribute",
+      "type": "method",
+      "detail": "(name: string, options: { timeout?: number; }) => Promise<string>",
+      "info": "Returns the matching element's attribute value. **NOTE** If you need to assert an element's attribute, prefer [expect(locator).toHaveAttribute(name, value[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-attribute) to avoid flakiness. See [assertions gu"
+    },
+    {
+      "label": "getByAltText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their alt text. **Usage** For example, this method will find the image by alt text \"Playwright logo\": <img alt='Playwright logo'> await page.getByAltText('Playwright logo').click();"
+    },
+    {
+      "label": "getByLabel",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the text of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute. **Usage** For example, this method will find inputs by label \"Username\" and \"Password\" in the following DOM: <input aria-label=\"Username\"> <label for=\"password-input"
+    },
+    {
+      "label": "getByPlaceholder",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating input elements by the placeholder text. **Usage** For example, consider the following DOM structure. <input type=\"email\" placeholder=\"name@example.com\" /> You can fill the input after locating it by the placeholder text: await page .getByPlaceholder('name@example.com') .fill('playwri"
+    },
+    {
+      "label": "getByRole",
+      "type": "method",
+      "detail": "(role: \"none\" | \"alert\" | \"alertdialog\" | \"application\" | \"article\" | \"banner\" | \"blockquote\" | \"button\" | \"caption\" | \"…",
+      "info": "Allows locating elements by their [ARIA role](https://www.w3.org/TR/wai-aria-1.2/#roles), [ARIA attributes](https://www.w3.org/TR/wai-aria-1.2/#aria-attributes) and [accessible name](https://w3c.github.io/accname/#dfn-accessible-name). **Usage** Consider the following DOM structure. <h3>Sign up</h3>"
+    },
+    {
+      "label": "getByTestId",
+      "type": "method",
+      "detail": "(testId: string | RegExp) => Locator",
+      "info": "Locate element by the test id. **Usage** Consider the following DOM structure. <button data-testid=\"directions\">Itinéraire</button> You can locate the element by its test id: await page.getByTestId('directions').click(); **Details** By default, the `data-testid` attribute is used as a test id. Use ["
+    },
+    {
+      "label": "getByText",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements that contain given text. See also [locator.filter([options])](https://playwright.dev/docs/api/class-locator#locator-filter) that allows to match by another criteria, like an accessible role, and then filter by the text content. **Usage** Consider the following DOM structure:"
+    },
+    {
+      "label": "getByTitle",
+      "type": "method",
+      "detail": "(text: string | RegExp, options: { exact?: boolean; }) => Locator",
+      "info": "Allows locating elements by their title attribute. **Usage** Consider the following DOM structure. <span title='Issues count'>25 issues</span> You can check the issues count after locating it by the title text: await expect(page.getByTitle('Issues count')).toHaveText('25 issues');"
+    },
+    {
+      "label": "highlight",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Highlight the corresponding element(s) on the screen. Useful for debugging, don't commit the code that uses [locator.highlight()](https://playwright.dev/docs/api/class-locator#locator-highlight)."
+    },
+    {
+      "label": "hover",
+      "type": "method",
+      "detail": "(options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; noWaitAfter?: boole…",
+      "info": "Hover over the matching element. **Usage** await page.getByRole('link').hover(); **Details** This method hovers over the element by performing the following steps: 1. Wait for [actionability](https://playwright.dev/docs/actionability) checks on the element, unless [`force`](https://playwright.dev/do"
+    },
+    {
+      "label": "innerHTML",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "Returns the [`element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML)."
+    },
+    {
+      "label": "innerText",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "Returns the [`element.innerText`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/innerText). **NOTE** If you need to assert text on the page, prefer [expect(locator).toHaveText(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-text"
+    },
+    {
+      "label": "inputValue",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "Returns the value for the matching `<input>` or `<textarea>` or `<select>` element. **NOTE** If you need to assert input value, prefer [expect(locator).toHaveValue(value[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-value) to avoid flakiness. See [as"
+    },
+    {
+      "label": "isChecked",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is checked. Throws if the element is not a checkbox or radio input. **NOTE** If you need to assert that checkbox is checked, prefer [expect(locator).toBeChecked([options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-checked) to avoid"
+    },
+    {
+      "label": "isDisabled",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is disabled, the opposite of [enabled](https://playwright.dev/docs/actionability#enabled). **NOTE** If you need to assert that an element is disabled, prefer [expect(locator).toBeDisabled([options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertio"
+    },
+    {
+      "label": "isEditable",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is [editable](https://playwright.dev/docs/actionability#editable). If the target element is not an `<input>`, `<textarea>`, `<select>`, `[contenteditable]` and does not have a role allowing `[aria-readonly]`, this method throws an error. **NOTE** If you need to assert tha"
+    },
+    {
+      "label": "isEnabled",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is [enabled](https://playwright.dev/docs/actionability#enabled). **NOTE** If you need to assert that an element is enabled, prefer [expect(locator).toBeEnabled([options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-enabled) to avoid f"
+    },
+    {
+      "label": "isHidden",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is hidden, the opposite of [visible](https://playwright.dev/docs/actionability#visible). **NOTE** If you need to assert that element is hidden, prefer [expect(locator).toBeHidden([options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-"
+    },
+    {
+      "label": "isVisible",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<boolean>",
+      "info": "Returns whether the element is [visible](https://playwright.dev/docs/actionability#visible). **NOTE** If you need to assert that element is visible, prefer [expect(locator).toBeVisible([options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-visible) to avoid flak"
+    },
+    {
+      "label": "last",
+      "type": "method",
+      "detail": "() => Locator",
+      "info": "Returns locator to the last matching element. **Usage** const banana = await page.getByRole('listitem').last();"
+    },
+    {
+      "label": "locator",
+      "type": "method",
+      "detail": "(selectorOrLocator: string | Locator, options: { has?: Locator; hasNot?: Locator; hasNotText?: string | RegExp; hasText?…",
+      "info": "The method finds an element matching the specified selector in the locator's subtree. It also accepts filter options, similar to [locator.filter([options])](https://playwright.dev/docs/api/class-locator#locator-filter) method. [Learn more about locators](https://playwright.dev/docs/locators)."
+    },
+    {
+      "label": "nth",
+      "type": "method",
+      "detail": "(index: number) => Locator",
+      "info": "Returns locator to the n-th matching element. It's zero based, `nth(0)` selects the first element. **Usage** const banana = await page.getByRole('listitem').nth(2);"
+    },
+    {
+      "label": "or",
+      "type": "method",
+      "detail": "(locator: Locator) => Locator",
+      "info": "Creates a locator matching all elements that match one or both of the two locators. Note that when both locators match something, the resulting locator will have multiple matches, potentially causing a [locator strictness](https://playwright.dev/docs/locators#strictness) violation. **Usage** Conside"
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "A page this locator belongs to."
+    },
+    {
+      "label": "press",
+      "type": "method",
+      "detail": "(key: string, options: { delay?: number; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "Focuses the matching element and presses a combination of the keys. **Usage** await page.getByRole('textbox').press('Backspace'); **Details** Focuses the element, and then uses [keyboard.down(key)](https://playwright.dev/docs/api/class-keyboard#keyboard-down) and [keyboard.up(key)](https://playwrigh"
+    },
+    {
+      "label": "pressSequentially",
+      "type": "method",
+      "detail": "(text: string, options: { delay?: number; noWaitAfter?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "**NOTE** In most cases, you should use [locator.fill(value[, options])](https://playwright.dev/docs/api/class-locator#locator-fill) instead. You only need to press keys one by one if there is special keyboard handling on the page. Focuses the element, and then sends a `keydown`, `keypress`/`input`,"
+    },
+    {
+      "label": "screenshot",
+      "type": "method",
+      "detail": "(options: LocatorScreenshotOptions) => Promise<Buffer<ArrayBufferLike>>",
+      "info": "Take a screenshot of the element matching the locator. **Usage** await page.getByRole('link').screenshot(); Disable animations and save screenshot to a file: await page.getByRole('link').screenshot({ animations: 'disabled', path: 'link.png' }); **Details** This method captures a screenshot of the pa"
+    },
+    {
+      "label": "scrollIntoViewIfNeeded",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<void>",
+      "info": "This method waits for [actionability](https://playwright.dev/docs/actionability) checks, then tries to scroll element into view, unless it is completely visible as defined by [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API)'s `ratio`. See [scrolling]"
+    },
+    {
+      "label": "selectOption",
+      "type": "method",
+      "detail": "(values: string | ElementHandle<Node> | readonly string[] | readonly ElementHandle<Node>[] | { value?: string; label?: s…",
+      "info": "Selects option or options in `<select>`. **Details** This method waits for [actionability](https://playwright.dev/docs/actionability) checks, waits until all specified options are present in the `<select>` element and selects these options. If the target element is not a `<select>` element, this met"
+    },
+    {
+      "label": "selectText",
+      "type": "method",
+      "detail": "(options: { force?: boolean; timeout?: number; }) => Promise<void>",
+      "info": "This method waits for [actionability](https://playwright.dev/docs/actionability) checks, then focuses the element and selects all its text content. If the element is inside the `<label>` element that has an associated [control](https://developer.mozilla.org/en-US/docs/Web/API/HTMLLabelElement/contro"
+    },
+    {
+      "label": "setChecked",
+      "type": "method",
+      "detail": "(checked: boolean, options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: nu…",
+      "info": "Set the state of a checkbox or a radio element. **Usage** await page.getByRole('checkbox').setChecked(true); **Details** This method checks or unchecks an element by performing the following steps: 1. Ensure that matched element is a checkbox or a radio input. If not, this method throws. 1. If the e"
+    },
+    {
+      "label": "setInputFiles",
+      "type": "method",
+      "detail": "(files: string | readonly string[] | { name: string; mimeType: string; buffer: Buffer<ArrayBufferLike>; } | readonly { n…",
+      "info": "Upload file or multiple files into `<input type=file>`. For inputs with a `[webkitdirectory]` attribute, only a single directory path is supported. **Usage** // Select one file await page.getByLabel('Upload file').setInputFiles(path.join(__dirname, 'myfile.pdf')); // Select multiple files await page"
+    },
+    {
+      "label": "tap",
+      "type": "method",
+      "detail": "(options: { force?: boolean; modifiers?: (\"Alt\" | \"Control\" | \"ControlOrMeta\" | \"Meta\" | \"Shift\")[]; noWaitAfter?: boole…",
+      "info": "Perform a tap gesture on the element matching the locator. For examples of emulating other gestures by manually dispatching touch events, see the [emulating legacy touch events](https://playwright.dev/docs/touch-events) page. **Details** This method taps the element by performing the following steps"
+    },
+    {
+      "label": "textContent",
+      "type": "method",
+      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "info": "Returns the [`node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent). **NOTE** If you need to assert text on the page, prefer [expect(locator).toHaveText(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-text) to a"
+    },
+    {
+      "label": "uncheck",
+      "type": "method",
+      "detail": "(options: { force?: boolean; noWaitAfter?: boolean; position?: { x: number; y: number; }; timeout?: number; trial?: bool…",
+      "info": "Ensure that checkbox or radio element is unchecked. **Usage** await page.getByRole('checkbox').uncheck(); **Details** This method unchecks the element by performing the following steps: 1. Ensure that element is a checkbox or a radio input. If not, this method throws. If the element is already unche"
+    },
+    {
+      "label": "waitFor",
+      "type": "method",
+      "detail": "(options: { state?: \"visible\" | \"hidden\" | \"attached\" | \"detached\"; timeout?: number; }) => Promise<void>",
+      "info": "Returns when element specified by locator satisfies the [`state`](https://playwright.dev/docs/api/class-locator#locator-wait-for-option-state) option. If target element already satisfies the condition, the method returns immediately. Otherwise, waits for up to [`timeout`](https://playwright.dev/docs"
+    }
+  ],
+  "ConsoleMessage": [
+    {
+      "label": "args",
+      "type": "method",
+      "detail": "() => JSHandle<any>[]",
+      "info": "List of arguments passed to a `console` function call. See also [page.on('console')](https://playwright.dev/docs/api/class-page#page-event-console)."
+    },
+    {
+      "label": "location",
+      "type": "method",
+      "detail": "() => { url: string; lineNumber: number; columnNumber: number; }"
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "The page that produced this console message, if any."
+    },
+    {
+      "label": "text",
+      "type": "method",
+      "detail": "() => string",
+      "info": "The text of the console message."
+    },
+    {
+      "label": "timestamp",
+      "type": "method",
+      "detail": "() => number",
+      "info": "The timestamp of the console message in milliseconds since the Unix epoch."
+    },
+    {
+      "label": "type",
+      "type": "method",
+      "detail": "() => \"log\" | \"table\" | \"time\" | \"debug\" | \"info\" | \"error\" | \"warning\" | \"dir\" | \"dirxml\" | \"trace\" | \"clear\" | \"startG…"
+    },
+    {
+      "label": "worker",
+      "type": "method",
+      "detail": "() => Worker",
+      "info": "The web worker or service worker that produced this console message, if any. Note that console messages from web workers also have non-null [consoleMessage.page()](https://playwright.dev/docs/api/class-consolemessage#console-message-page)."
+    }
+  ],
+  "Dialog": [
+    {
+      "label": "accept",
+      "type": "method",
+      "detail": "(promptText: string) => Promise<void>",
+      "info": "Returns when the dialog has been accepted."
+    },
+    {
+      "label": "defaultValue",
+      "type": "method",
+      "detail": "() => string",
+      "info": "If dialog is prompt, returns default prompt value. Otherwise, returns empty string."
+    },
+    {
+      "label": "dismiss",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Returns when the dialog has been dismissed."
+    },
+    {
+      "label": "message",
+      "type": "method",
+      "detail": "() => string",
+      "info": "A message displayed in the dialog."
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "The page that initiated this dialog, if available."
+    },
+    {
+      "label": "type",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns dialog's type, can be one of `alert`, `beforeunload`, `confirm` or `prompt`."
+    }
+  ],
+  "Download": [
+    {
+      "label": "cancel",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Cancels a download. Will not fail if the download is already finished or canceled. Upon successful cancellations, `download.failure()` would resolve to `'canceled'`."
+    },
+    {
+      "label": "createReadStream",
+      "type": "method",
+      "detail": "() => Promise<Readable>",
+      "info": "Returns a readable stream for a successful download, or throws for a failed/canceled download. **NOTE** If you don't need a readable stream, it's usually simpler to read the file from disk after the download completed. See [download.path()](https://playwright.dev/docs/api/class-download#download-pat"
+    },
+    {
+      "label": "delete",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Deletes the downloaded file. Will wait for the download to finish if necessary."
+    },
+    {
+      "label": "failure",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns download error if any. Will wait for the download to finish if necessary."
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "Get the page that the download belongs to."
+    },
+    {
+      "label": "path",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns path to the downloaded file for a successful download, or throws for a failed/canceled download. The method will wait for the download to finish if necessary. The method throws when connected remotely. Note that the download's file name is a random GUID, use [download.suggestedFilename()](ht"
+    },
+    {
+      "label": "saveAs",
+      "type": "method",
+      "detail": "(path: string) => Promise<void>",
+      "info": "Copy the download to a user-specified path. It is safe to call this method while the download is still in progress. Will wait for the download to finish if necessary. **Usage** await download.saveAs('/path/to/save/at/' + download.suggestedFilename());"
+    },
+    {
+      "label": "suggestedFilename",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns suggested filename for this download. It is typically computed by the browser from the [`Content-Disposition`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition) response header or the `download` attribute. See the spec on [whatwg](https://html.spec.whatwg.org/#do"
+    },
+    {
+      "label": "url",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Returns downloaded url."
+    }
+  ],
+  "FileChooser": [
+    {
+      "label": "element",
+      "type": "method",
+      "detail": "() => ElementHandle<Node>",
+      "info": "Returns input element associated with this file chooser."
+    },
+    {
+      "label": "isMultiple",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Returns whether this file chooser accepts multiple files."
+    },
+    {
+      "label": "page",
+      "type": "method",
+      "detail": "() => Page",
+      "info": "Returns page this file chooser belongs to."
+    },
+    {
+      "label": "setFiles",
+      "type": "method",
+      "detail": "(files: string | readonly string[] | { name: string; mimeType: string; buffer: Buffer<ArrayBufferLike>; } | readonly { n…",
+      "info": "Sets the value of the file input this chooser is associated with. If some of the `filePaths` are relative paths, then they are resolved relative to the current working directory. For empty array, clears the selected files."
+    }
+  ],
+  "Keyboard": [
+    {
+      "label": "down",
+      "type": "method",
+      "detail": "(key: string) => Promise<void>",
+      "info": "Dispatches a `keydown` event. [`key`](https://playwright.dev/docs/api/class-keyboard#keyboard-down-option-key) can specify the intended [keyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key) value or a single character to generate the text for. A superset of the [`ke"
+    },
+    {
+      "label": "insertText",
+      "type": "method",
+      "detail": "(text: string) => Promise<void>",
+      "info": "Dispatches only `input` event, does not emit the `keydown`, `keyup` or `keypress` events. **Usage** page.keyboard.insertText('嗨'); **NOTE** Modifier keys DO NOT effect `keyboard.insertText`. Holding down `Shift` will not type the text in upper case."
+    },
+    {
+      "label": "press",
+      "type": "method",
+      "detail": "(key: string, options: { delay?: number; }) => Promise<void>",
+      "info": "**NOTE** In most cases, you should use [locator.press(key[, options])](https://playwright.dev/docs/api/class-locator#locator-press) instead. [`key`](https://playwright.dev/docs/api/class-keyboard#keyboard-press-option-key) can specify the intended [keyboardEvent.key](https://developer.mozilla.org/en"
+    },
+    {
+      "label": "type",
+      "type": "method",
+      "detail": "(text: string, options: { delay?: number; }) => Promise<void>",
+      "info": "**NOTE** In most cases, you should use [locator.fill(value[, options])](https://playwright.dev/docs/api/class-locator#locator-fill) instead. You only need to press keys one by one if there is special keyboard handling on the page - in this case use [locator.pressSequentially(text[, options])](https:"
+    },
+    {
+      "label": "up",
+      "type": "method",
+      "detail": "(key: string) => Promise<void>",
+      "info": "Dispatches a `keyup` event."
+    }
+  ],
+  "Mouse": [
+    {
+      "label": "click",
+      "type": "method",
+      "detail": "(x: number, y: number, options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; delay?: number; }) => Promi…",
+      "info": "Shortcut for [mouse.move(x, y[, options])](https://playwright.dev/docs/api/class-mouse#mouse-move), [mouse.down([options])](https://playwright.dev/docs/api/class-mouse#mouse-down), [mouse.up([options])](https://playwright.dev/docs/api/class-mouse#mouse-up)."
+    },
+    {
+      "label": "dblclick",
+      "type": "method",
+      "detail": "(x: number, y: number, options: { button?: \"left\" | \"right\" | \"middle\"; delay?: number; }) => Promise<void>",
+      "info": "Shortcut for [mouse.move(x, y[, options])](https://playwright.dev/docs/api/class-mouse#mouse-move), [mouse.down([options])](https://playwright.dev/docs/api/class-mouse#mouse-down), [mouse.up([options])](https://playwright.dev/docs/api/class-mouse#mouse-up), [mouse.down([options])](https://playwright"
+    },
+    {
+      "label": "down",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; }) => Promise<void>",
+      "info": "Dispatches a `mousedown` event."
+    },
+    {
+      "label": "move",
+      "type": "method",
+      "detail": "(x: number, y: number, options: { steps?: number; }) => Promise<void>",
+      "info": "Dispatches a `mousemove` event."
+    },
+    {
+      "label": "up",
+      "type": "method",
+      "detail": "(options: { button?: \"left\" | \"right\" | \"middle\"; clickCount?: number; }) => Promise<void>",
+      "info": "Dispatches a `mouseup` event."
+    },
+    {
+      "label": "wheel",
+      "type": "method",
+      "detail": "(deltaX: number, deltaY: number) => Promise<void>",
+      "info": "Dispatches a `wheel` event. This method is usually used to manually scroll the page. See [scrolling](https://playwright.dev/docs/input#scrolling) for alternative ways to scroll. **NOTE** Wheel events may cause scrolling if they are not handled, and this method does not wait for the scrolling to fini"
+    }
+  ],
+  "Request": [
+    {
+      "label": "allHeaders",
+      "type": "method",
+      "detail": "() => Promise<{ [key: string]: string; }>",
+      "info": "An object with all the request HTTP headers associated with this request. The header names are lower-cased."
+    },
+    {
+      "label": "existingResponse",
+      "type": "method",
+      "detail": "() => Response",
+      "info": "Returns the [Response](https://playwright.dev/docs/api/class-response) object if the response has already been received, `null` otherwise. Unlike [request.response()](https://playwright.dev/docs/api/class-request#request-response), this method does not wait for the response to arrive. It returns imm"
+    },
+    {
+      "label": "failure",
+      "type": "method",
+      "detail": "() => { errorText: string; }",
+      "info": "The method returns `null` unless this request has failed, as reported by `requestfailed` event. **Usage** Example of logging of all the failed requests: page.on('requestfailed', request => { console.log(request.url() + ' ' + request.failure().errorText); });"
+    },
+    {
+      "label": "frame",
+      "type": "method",
+      "detail": "() => Frame",
+      "info": "Returns the [Frame](https://playwright.dev/docs/api/class-frame) that initiated this request. **Usage** const frameUrl = request.frame().url(); **Details** Note that in some cases the frame is not available, and this method will throw. - When request originates in the Service Worker. You can use `re"
+    },
+    {
+      "label": "headers",
+      "type": "method",
+      "detail": "() => { [key: string]: string; }",
+      "info": "An object with the request HTTP headers. The header names are lower-cased. Note that this method does not return security-related headers, including cookie-related ones. You can use [request.allHeaders()](https://playwright.dev/docs/api/class-request#request-all-headers) for complete list of headers"
+    },
+    {
+      "label": "headersArray",
+      "type": "method",
+      "detail": "() => Promise<{ name: string; value: string; }[]>",
+      "info": "An array with all the request HTTP headers associated with this request. Unlike [request.allHeaders()](https://playwright.dev/docs/api/class-request#request-all-headers), header names are NOT lower-cased. Headers with multiple entries, such as `Set-Cookie`, appear in the array multiple times."
+    },
+    {
+      "label": "headerValue",
+      "type": "method",
+      "detail": "(name: string) => Promise<string>",
+      "info": "Returns the value of the header matching the name. The name is case-insensitive."
+    },
+    {
+      "label": "isNavigationRequest",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Whether this request is driving frame's navigation. Some navigation requests are issued before the corresponding frame is created, and therefore do not have [request.frame()](https://playwright.dev/docs/api/class-request#request-frame) available."
+    },
+    {
+      "label": "method",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Request's method (GET, POST, etc.)"
+    },
+    {
+      "label": "postData",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Request's post body, if any."
+    },
+    {
+      "label": "postDataBuffer",
+      "type": "method",
+      "detail": "() => Buffer<ArrayBufferLike>",
+      "info": "Request's post body in a binary form, if any."
+    },
+    {
+      "label": "postDataJSON",
+      "type": "method",
+      "detail": "() => any",
+      "info": "Returns parsed request's body for `form-urlencoded` and JSON as a fallback if any. When the response is `application/x-www-form-urlencoded` then a key/value object of the values will be returned. Otherwise it will be parsed as JSON."
+    },
+    {
+      "label": "redirectedFrom",
+      "type": "method",
+      "detail": "() => Request",
+      "info": "Request that was redirected by the server to this one, if any. When the server responds with a redirect, Playwright creates a new [Request](https://playwright.dev/docs/api/class-request) object. The two requests are connected by `redirectedFrom()` and `redirectedTo()` methods. When multiple server r"
+    },
+    {
+      "label": "redirectedTo",
+      "type": "method",
+      "detail": "() => Request",
+      "info": "New request issued by the browser if the server responded with redirect. **Usage** This method is the opposite of [request.redirectedFrom()](https://playwright.dev/docs/api/class-request#request-redirected-from): console.log(request.redirectedFrom().redirectedTo() === request); // true"
+    },
+    {
+      "label": "resourceType",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Contains the request's resource type as it was perceived by the rendering engine. ResourceType will be one of the following: `document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`, `websocket`, `manifest`, `other`."
+    },
+    {
+      "label": "response",
+      "type": "method",
+      "detail": "() => Promise<Response>",
+      "info": "Returns the matching [Response](https://playwright.dev/docs/api/class-response) object, or `null` if the response was not received due to error."
+    },
+    {
+      "label": "serviceWorker",
+      "type": "method",
+      "detail": "() => Worker",
+      "info": "The Service [Worker](https://playwright.dev/docs/api/class-worker) that is performing the request. **Details** This method is Chromium only. It's safe to call when using other browsers, but it will always be `null`. Requests originated in a Service Worker do not have a [request.frame()](https://play"
+    },
+    {
+      "label": "sizes",
+      "type": "method",
+      "detail": "() => Promise<{ requestBodySize: number; requestHeadersSize: number; responseBodySize: number; responseHeadersSize: numb…",
+      "info": "Returns resource size information for given request."
+    },
+    {
+      "label": "timing",
+      "type": "method",
+      "detail": "() => { startTime: number; domainLookupStart: number; domainLookupEnd: number; connectStart: number; secureConnectionSta…",
+      "info": "Returns resource timing information for given request. Most of the timing values become available upon the response, `responseEnd` becomes available when request finishes. Find more information at [Resource Timing API](https://developer.mozilla.org/en-US/docs/Web/API/PerformanceResourceTiming). **Us"
+    },
+    {
+      "label": "url",
+      "type": "method",
+      "detail": "() => string",
+      "info": "URL of the request."
+    }
+  ],
+  "Response": [
+    {
+      "label": "allHeaders",
+      "type": "method",
+      "detail": "() => Promise<{ [key: string]: string; }>",
+      "info": "An object with all the response HTTP headers associated with this response."
+    },
+    {
+      "label": "body",
+      "type": "method",
+      "detail": "() => Promise<Buffer<ArrayBufferLike>>",
+      "info": "Returns the buffer with response body."
+    },
+    {
+      "label": "finished",
+      "type": "method",
+      "detail": "() => Promise<Error>",
+      "info": "Waits for this response to finish, returns always `null`."
+    },
+    {
+      "label": "frame",
+      "type": "method",
+      "detail": "() => Frame",
+      "info": "Returns the [Frame](https://playwright.dev/docs/api/class-frame) that initiated this response."
+    },
+    {
+      "label": "fromServiceWorker",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Indicates whether this Response was fulfilled by a Service Worker's Fetch Handler (i.e. via [FetchEvent.respondWith](https://developer.mozilla.org/en-US/docs/Web/API/FetchEvent/respondWith))."
+    },
+    {
+      "label": "headers",
+      "type": "method",
+      "detail": "() => { [key: string]: string; }",
+      "info": "An object with the response HTTP headers. The header names are lower-cased. Note that this method does not return security-related headers, including cookie-related ones. You can use [response.allHeaders()](https://playwright.dev/docs/api/class-response#response-all-headers) for complete list of hea"
+    },
+    {
+      "label": "headersArray",
+      "type": "method",
+      "detail": "() => Promise<{ name: string; value: string; }[]>",
+      "info": "An array with all the request HTTP headers associated with this response. Unlike [response.allHeaders()](https://playwright.dev/docs/api/class-response#response-all-headers), header names are NOT lower-cased. Headers with multiple entries, such as `Set-Cookie`, appear in the array multiple times."
+    },
+    {
+      "label": "headerValue",
+      "type": "method",
+      "detail": "(name: string) => Promise<string>",
+      "info": "Returns the value of the header matching the name. The name is case-insensitive. If multiple headers have the same name (except `set-cookie`), they are returned as a list separated by `, `. For `set-cookie`, the `\\n` separator is used. If no headers are found, `null` is returned."
+    },
+    {
+      "label": "headerValues",
+      "type": "method",
+      "detail": "(name: string) => Promise<string[]>",
+      "info": "Returns all values of the headers matching the name, for example `set-cookie`. The name is case-insensitive."
+    },
+    {
+      "label": "json",
+      "type": "method",
+      "detail": "() => Promise<any>",
+      "info": "Returns the JSON representation of response body. This method will throw if the response body is not parsable via `JSON.parse`."
+    },
+    {
+      "label": "ok",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Contains a boolean stating whether the response was successful (status in the range 200-299) or not."
+    },
+    {
+      "label": "request",
+      "type": "method",
+      "detail": "() => Request",
+      "info": "Returns the matching [Request](https://playwright.dev/docs/api/class-request) object."
+    },
+    {
+      "label": "securityDetails",
+      "type": "method",
+      "detail": "() => Promise<{ issuer?: string; protocol?: string; subjectName?: string; validFrom?: number; validTo?: number; }>",
+      "info": "Returns SSL and other security information."
+    },
+    {
+      "label": "serverAddr",
+      "type": "method",
+      "detail": "() => Promise<{ ipAddress: string; port: number; }>",
+      "info": "Returns the IP address and port of the server."
+    },
+    {
+      "label": "status",
+      "type": "method",
+      "detail": "() => number",
+      "info": "Contains the status code of the response (e.g., 200 for a success)."
+    },
+    {
+      "label": "statusText",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Contains the status text of the response (e.g. usually an \"OK\" for a success)."
+    },
+    {
+      "label": "text",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns the text representation of response body."
+    },
+    {
+      "label": "url",
+      "type": "method",
+      "detail": "() => string",
+      "info": "Contains the URL of the response."
+    }
+  ],
+  "Route": [
+    {
+      "label": "abort",
+      "type": "method",
+      "detail": "(errorCode: string) => Promise<void>",
+      "info": "Aborts the route's request. - `'aborted'` - An operation was aborted (due to user action) - `'accessdenied'` - Permission to access a resource, other than the network, was denied - `'addressunreachable'` - The IP address is unreachable. This usually means that there is no route to the specified host"
+    },
+    {
+      "label": "continue",
+      "type": "method",
+      "detail": "(options: { headers?: { [key: string]: string; }; method?: string; postData?: any; url?: string; }) => Promise<void>",
+      "info": "Sends route's request to the network with optional overrides. **Usage** await page.route('**\\/*', async (route, request) => { // Override headers const headers = { ...request.headers(), foo: 'foo-value', // set \"foo\" header bar: undefined, // remove \"bar\" header }; await route.continue({ headers });"
+    },
+    {
+      "label": "fallback",
+      "type": "method",
+      "detail": "(options: { headers?: { [key: string]: string; }; method?: string; postData?: any; url?: string; }) => Promise<void>",
+      "info": "Continues route's request with optional overrides. The method is similar to [route.continue([options])](https://playwright.dev/docs/api/class-route#route-continue) with the difference that other matching handlers will be invoked before sending the request. **Usage** When several routes match the giv"
+    },
+    {
+      "label": "fetch",
+      "type": "method",
+      "detail": "(options: { headers?: { [key: string]: string; }; maxRedirects?: number; maxRetries?: number; method?: string; postData?…",
+      "info": "Performs the request and fetches result without fulfilling it, so that the response could be modified and then fulfilled. **Usage** await page.route('https://dog.ceo/api/breeds/list/all', async route => { const response = await route.fetch(); const json = await response.json(); json.message['big_red"
+    },
+    {
+      "label": "fulfill",
+      "type": "method",
+      "detail": "(options: { body?: string | Buffer<ArrayBufferLike>; contentType?: string; headers?: { [key: string]: string; }; json?: …",
+      "info": "Fulfills route's request with given response. **Usage** An example of fulfilling all requests with 404 responses: await page.route('**\\/*', async route => { await route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found!' }); }); An example of serving static file: await page.route('*"
+    },
+    {
+      "label": "request",
+      "type": "method",
+      "detail": "() => Request",
+      "info": "A request to be routed."
+    }
+  ],
+  "Touchscreen": [
+    {
+      "label": "tap",
+      "type": "method",
+      "detail": "(x: number, y: number) => Promise<void>",
+      "info": "Dispatches a `touchstart` and `touchend` event with a single touch at the position ([`x`](https://playwright.dev/docs/api/class-touchscreen#touchscreen-tap-option-x),[`y`](https://playwright.dev/docs/api/class-touchscreen#touchscreen-tap-option-y)). **NOTE** [page.tap(selector[, options])](https://p"
+    }
+  ]
+}
