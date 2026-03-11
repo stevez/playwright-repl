@@ -13,7 +13,7 @@ import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  Engine, BridgeServer,
+  Engine, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -65,19 +65,17 @@ export function filterResponse(text: string, cmdName?: string): string | null {
 
 // ─── Meta-command handlers ──────────────────────────────────────────────────
 
-export function showHelp(): void {
+export function showHelp(bridge = false): void {
   console.log(`\n${c.bold}Available commands:${c.reset}`);
-  const categories: Record<string, string[]> = {
-    'Navigation': ['open', 'goto', 'go-back', 'go-forward', 'reload'],
-    'Interaction': ['click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag'],
-    'Inspection': ['snapshot', 'screenshot', 'eval', 'console', 'network', 'run-code'],
-    'Tabs': ['tab-list', 'tab-new', 'tab-close', 'tab-select'],
-    'Storage': ['cookie-list', 'cookie-get', 'localstorage-list', 'localstorage-get', 'state-save', 'state-load'],
-  };
-  for (const [cat, cmds] of Object.entries(categories)) {
+  for (const [cat, cmds] of Object.entries(CATEGORIES)) {
     console.log(`  ${c.bold}${cat}:${c.reset} ${cmds.join(', ')}`);
   }
-  console.log(`\n  ${c.dim}Use .aliases for shortcuts, or type any command with --help${c.reset}`);
+  if (bridge) {
+    console.log(`\n${c.bold}JavaScript mode:${c.reset}`);
+    console.log(`  ${c.dim}Use Playwright API directly: await page.title(), page.locator('h1').click(), ...${c.reset}`);
+    console.log(`  ${c.dim}Type .help js for available Playwright methods${c.reset}`);
+  }
+  console.log(`\n  ${c.dim}Type .help <command> for details, or .aliases for shortcuts${c.reset}`);
   console.log(`\n${c.bold}REPL meta-commands:${c.reset}`);
   console.log(`  .aliases              Show command aliases`);
   console.log(`  .status               Show connection status`);
@@ -91,6 +89,42 @@ export function showHelp(): void {
   console.log(`  .history              Show command history`);
   console.log(`  .history clear        Clear command history`);
   console.log(`  .exit                 Exit REPL\n`);
+}
+
+export function showCommandHelp(cmd: string, bridge = false): void {
+  if (cmd === 'js' || cmd === 'javascript') {
+    if (!bridge) {
+      console.log(`\n${c.dim}JavaScript mode is only available in bridge mode (--bridge).${c.reset}\n`);
+      return;
+    }
+    console.log(`\n${c.bold}JavaScript mode — Playwright API:${c.reset}`);
+    console.log(`  ${c.dim}Prefix with ${c.reset}await${c.dim} for async methods${c.reset}\n`);
+    console.log(`  ${c.bold}Available globals:${c.reset}`);
+    console.log(`    ${c.bold}page${c.reset}      ${c.dim}— Playwright Page object (active browser tab)${c.reset}`);
+    console.log(`    ${c.bold}context${c.reset}   ${c.dim}— Playwright BrowserContext (cookies, pages, routes)${c.reset}`);
+    console.log(`    ${c.bold}expect${c.reset}    ${c.dim}— Playwright assertion (expect(locator).toBeVisible())${c.reset}`);
+    console.log(`    ${c.bold}document${c.reset}  ${c.dim}— DOM document (inside page.evaluate())${c.reset}`);
+    console.log(`    ${c.bold}window${c.reset}    ${c.dim}— Browser window (inside page.evaluate())${c.reset}`);
+    console.log();
+    for (const [cat, methods] of Object.entries(JS_CATEGORIES)) {
+      console.log(`  ${c.bold}${cat}:${c.reset} ${methods.join(', ')}`);
+    }
+    console.log();
+    return;
+  }
+  const info = COMMANDS[cmd];
+  if (!info) {
+    console.log(`\n${c.dim}Unknown command: "${cmd}". Type .help for available commands.${c.reset}\n`);
+    return;
+  }
+  console.log(`\n${c.bold}${cmd}${c.reset} — ${info.desc}`);
+  if (info.usage) console.log(`\n  ${c.dim}Usage:${c.reset} ${info.usage}`);
+  if (info.options.length) console.log(`  ${c.dim}Options:${c.reset} ${info.options.join(', ')}`);
+  if (info.examples?.length) {
+    console.log(`  ${c.dim}Examples:${c.reset}`);
+    for (const ex of info.examples) console.log(`    ${ex}`);
+  }
+  console.log();
 }
 
 export function showAliases(): void {
@@ -181,6 +215,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   // ── Meta-commands ────────────────────────────────────────────────
 
   if (line === '.help' || line === '?') return showHelp();
+  if (line.startsWith('.help ')) return showCommandHelp(line.slice(6).trim());
   if (line === '.aliases') return showAliases();
   if (line === '.status') return showStatus(ctx);
 
@@ -921,7 +956,8 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     if (command === '.clear') { console.clear(); return; }
     if (command === '.history clear') { sessionHistory.length = 0; log('History cleared.'); return; }
     if (command === '.history') { log(sessionHistory.length ? sessionHistory.join('\n') : '(no history)'); return; }
-    if (command === '.help' || command === '?') { showHelp(); return; }
+    if (command === '.help' || command === '?') { showHelp(true); return; }
+    if (command.startsWith('.help ')) { showCommandHelp(command.slice(6).trim(), true); return; }
     if (command === '.aliases') { showAliases(); return; }
 
     // Record to history

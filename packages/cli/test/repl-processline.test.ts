@@ -6,6 +6,7 @@ import {
   processLine,
   handleSessionCommand,
   showHelp,
+  showCommandHelp,
   showAliases,
   showStatus,
   promptStr,
@@ -83,6 +84,29 @@ describe('showHelp', () => {
     expect(text).toContain('Inspection');
     expect(text).toContain('.record');
     expect(text).toContain('.replay');
+    spy.mockRestore();
+  });
+});
+
+describe('showCommandHelp', () => {
+  it('prints usage and examples for known command', () => {
+    const output = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => output.push(args.join(' ')));
+    showCommandHelp('click');
+    const text = output.join('\n');
+    expect(text).toContain('click');
+    expect(text).toContain('Click an element');
+    expect(text).toContain('Usage:');
+    expect(text).toContain('Examples:');
+    spy.mockRestore();
+  });
+
+  it('prints error for unknown command', () => {
+    const output = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => output.push(args.join(' ')));
+    showCommandHelp('nonexistent_xyz');
+    const text = output.join('\n');
+    expect(text).toContain('Unknown command');
     spy.mockRestore();
   });
 });
@@ -229,6 +253,14 @@ describe('processLine', () => {
     const ctx = makeCtx();
     await processLine(ctx, '?');
     expect(logSpy).toHaveBeenCalled();
+  });
+
+  it('.help click prints command details', async () => {
+    const ctx = makeCtx();
+    await processLine(ctx, '.help click');
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('Click an element');
+    expect(output).toContain('Usage:');
   });
 
   it('.aliases prints aliases', async () => {

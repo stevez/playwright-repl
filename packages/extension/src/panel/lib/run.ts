@@ -1,6 +1,6 @@
 import { executeCommand } from '@/lib/bridge';
 import { filterResponse } from '@/lib/filter';
-import { COMMANDS } from '@/lib/commands';
+import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
@@ -22,11 +22,45 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
         dispatch({ type: 'CLEAR_CONSOLE' });
         return true;
     }
-    if (command.trim().toLowerCase() === 'help') {
-        const lines = Object.entries(COMMANDS)
-            .map(([name, info]) => `  ${name.padEnd(22)} ${info.desc}`)
+    const trimmed = command.trim().toLowerCase();
+    if (trimmed === 'help') {
+        const pwLines = Object.entries(CATEGORIES)
+            .map(([cat, cmds]) => `  ${cat}: ${cmds.join(', ')}`)
             .join('\n');
-        dispatch({ type: 'ADD_LINE', line: { text: `Available commands:\n${lines}`, type: 'info' } });
+        const text = `Keyword commands (.pw mode):\n${pwLines}\n\nJavaScript mode:\n  Use Playwright API directly: await page.title(), page.locator('h1').click(), ...\n  Type "help js" for available Playwright methods\n\n  Type "help <command>" for details.`;
+        dispatch({ type: 'ADD_LINE', line: { text, type: 'info' } });
+        return true;
+    }
+    if (trimmed.startsWith('help ')) {
+        const cmd = trimmed.slice(5).trim();
+        if (cmd === 'js' || cmd === 'javascript') {
+            const jsLines = Object.entries(JS_CATEGORIES)
+                .map(([cat, methods]) => `  ${cat}: ${methods.join(', ')}`)
+                .join('\n');
+            const globals = [
+                '  Available globals:',
+                '    page      — Playwright Page object (active browser tab)',
+                '    context   — Playwright BrowserContext (cookies, pages, routes)',
+                '    expect    — Playwright assertion (expect(locator).toBeVisible())',
+                '    document  — DOM document (inside page.evaluate())',
+                '    window    — Browser window (inside page.evaluate())',
+            ].join('\n');
+            const text = `JavaScript mode — Playwright API:\n  Prefix with await for async methods\n\n${globals}\n\n${jsLines}`;
+            dispatch({ type: 'ADD_LINE', line: { text, type: 'info' } });
+            return true;
+        }
+        const info = COMMANDS[cmd];
+        if (!info) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Unknown command: "${cmd}". Type "help" for available commands.`, type: 'error' } });
+            return true;
+        }
+        const parts = [`${cmd} — ${info.desc}`];
+        if (info.usage) parts.push(`\n  Usage: ${info.usage}`);
+        if (info.examples?.length) {
+            parts.push(`  Examples:`);
+            for (const ex of info.examples) parts.push(`    ${ex}`);
+        }
+        dispatch({ type: 'ADD_LINE', line: { text: parts.join('\n'), type: 'info' } });
         return true;
     }
     if (command.trim().toLowerCase() === 'history clear') {
