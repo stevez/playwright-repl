@@ -6,6 +6,7 @@ import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { asLocator } from '@/lib/locator/locatorGenerators';
+import { loadSettings, storeSettings } from '@/lib/settings'
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
     dispatch: React.Dispatch<Action>,
@@ -369,12 +370,18 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 <div data-testid="mode-toggle" className="inline-flex rounded border border-(--border-button) overflow-hidden">
                     <button
                         data-active={editorMode === 'pw' ? '' : undefined}
-                        onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'pw' })}
+                        onClick={() => {
+                            dispatch({ type: 'SET_EDITOR_MODE', mode: 'pw' });
+                            loadSettings().then(s => storeSettings({ ...s, languageMode: 'pw' }));
+                        }}
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >.pw</button>
                     <button
                         data-active={editorMode === 'js' ? '' : undefined}
-                        onClick={() => dispatch({ type: 'SET_EDITOR_MODE', mode: 'js' })}
+                        onClick={() => {
+                            dispatch({ type: 'SET_EDITOR_MODE', mode: 'js' });
+                            loadSettings().then(s => storeSettings({ ...s, languageMode: 'js' }));
+                        }}
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >JS</button>
                 </div>

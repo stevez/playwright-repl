@@ -23,6 +23,11 @@ vi.mock('@/lib/sw-debugger', () => ({
   swGetProperties: vi.fn().mockResolvedValue({ result: [] }),
 }));
 
+vi.mock('@/lib/settings', () => ({
+  loadSettings: vi.fn().mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' }),
+  storeSettings: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { executeCommand, cdpEvaluate, attachToTab, connectWithRetry } from '@/lib/bridge';
 import { swDebugEval } from '@/lib/sw-debugger';
 

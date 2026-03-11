@@ -6,6 +6,7 @@ import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
 import { Console } from './components/Console';
 import { onConsoleEvent } from '@/lib/sw-debugger';
+import { loadSettings } from './lib/settings';
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
@@ -23,6 +24,11 @@ function App() {
     return () => onConsoleEvent(null);
   }, [dispatch]);
 
+  useEffect(() => {
+    loadSettings().then(s => {
+      dispatch({ type: 'SET_EDITOR_MODE', mode: s.languageMode });
+    });
+  }, []);
 
   async function doAttach(tabId: number) {
     dispatch({ type: 'ATTACH_START' });

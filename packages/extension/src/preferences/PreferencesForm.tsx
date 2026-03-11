@@ -3,7 +3,7 @@ import { loadSettings, storeSettings } from '../panel/lib/settings';
 import type { PwReplSettings } from '../panel/lib/settings';
 
 export default function PreferencesForm() {
-  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876 });
+  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
 
   useEffect(() => {
     loadSettings().then(setSettings);
@@ -15,6 +15,11 @@ export default function PreferencesForm() {
     storeSettings(next);
   }
 
+  function handleChangeLanguageMode(languageMode: PwReplSettings['languageMode']) {
+    const next = { ...settings, languageMode };
+    setSettings(next);
+    storeSettings(next);
+  }
   return (
     <form style={{ fontFamily: 'system-ui, sans-serif', padding: '24px', maxWidth: '400px' }}>
       <h2 style={{ marginTop: 0 }}>Playwright REPL Preferences</h2>
@@ -56,6 +61,29 @@ export default function PreferencesForm() {
         <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#888' }}>
           Port the MCP server listens on (default: 9876). Reopen the panel after changing.
         </p>
+      </fieldset>
+      <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>
+        <legend style={{ fontWeight: 600, marginBottom: '12px' }}>Language Mode:</legend>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="languageMode"
+            value="pw"
+            checked={settings.languageMode === 'pw'}
+            onChange={() => handleChangeLanguageMode('pw')}
+          />
+          pw (default)
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="languageMode"
+            value="js"
+            checked={settings.languageMode === 'js'}
+            onChange={() => handleChangeLanguageMode('js')}
+          />
+          js
+        </label>
       </fieldset>
       <p style={{ marginTop: '16px', fontSize: '12px', color: '#888' }}>Saved automatically.</p>
     </form>
