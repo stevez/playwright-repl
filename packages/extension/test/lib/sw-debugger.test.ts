@@ -340,10 +340,8 @@ describe('swCallFunctionOn', () => {
     it('rejects when lastError is set', async () => {
         mockGetTargets([SW_TARGET]);
         mockAttachSuccess();
-        let callCount = 0;
         (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
             (_target: any, method: string, _params: any, cb: (r: any) => void) => {
-                callCount++;
                 if (method === 'Runtime.callFunctionOn') {
                     Object.defineProperty(chrome.runtime, 'lastError', {
                         get: () => ({ message: 'Function call failed' }),
