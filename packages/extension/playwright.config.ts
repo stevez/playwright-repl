@@ -12,6 +12,7 @@ export const nextcov: NextcovConfig = {
     'src/**/__tests__/**',
     'src/**/*.test.{ts,tsx}',
     'src/**/*.spec.{ts,tsx}',
+    'src/panel/lib/locator/**',
   ],
   reporters: ['html', 'lcov', 'json', 'text-summary'],
 }

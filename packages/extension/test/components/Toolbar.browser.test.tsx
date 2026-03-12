@@ -671,7 +671,10 @@ describe('Toolbar component tests', () => {
       const jsButton = Array.from(buttons).find(b => b.textContent === 'JS') as HTMLButtonElement;
       jsButton.click();
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'js' });
+      // dispatch happens after storeSettings resolves (async)
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'js' });
+      });
     });
 
     it('should dispatch SET_EDITOR_MODE pw when .pw button clicked', async () => {
@@ -682,7 +685,10 @@ describe('Toolbar component tests', () => {
       const pwButton = Array.from(buttons).find(b => b.textContent === '.pw') as HTMLButtonElement;
       pwButton.click();
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'pw' });
+      // dispatch happens after storeSettings resolves (async)
+      await vi.waitFor(() => {
+        expect(dispatch).toHaveBeenCalledWith({ type: 'SET_EDITOR_MODE', mode: 'pw' });
+      });
     });
 
     it('step button is enabled in JS mode (starts debug session)', async () => {

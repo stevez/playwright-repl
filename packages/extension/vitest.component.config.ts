@@ -24,7 +24,7 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: './coverage/component',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: [],
+      exclude: ['src/panel/lib/locator/**'],
       reporter: ['text', 'json', 'lcov', 'html'],
     },
     browser: {

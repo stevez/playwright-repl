@@ -55,3 +55,7 @@ jobs:
       - name: Run extension E2E tests
         run: pnpm exec playwright test
         working-directory: packages/extension
+
+      - name: Merge extension coverage
+        run: pnpm run coverage:merge
+        working-directory: packages/extension
