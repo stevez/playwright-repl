@@ -1040,8 +1040,6 @@ describe('cookies', () => {
 // ─── Tab operations ───────────────────────────────────────────────────────
 
 describe('tab operations', () => {
-    const origGlobalThis = { ...globalThis };
-
     beforeEach(() => {
         (globalThis as any).activeTabId = 1;
         (globalThis as any).chrome = {

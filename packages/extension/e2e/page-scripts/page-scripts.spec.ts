@@ -173,14 +173,13 @@ test.describe('verifyInputValue', () => {
 
 test.describe('actionByText', () => {
     test('clicks a button by text', async ({ page }) => {
-        let clicked = false;
         await page.evaluate(() => {
             document.querySelector('button')!.addEventListener('click', () => {
                 (window as any).__clicked = true;
             });
         });
         await actionByText(page, 'Submit', 'click', undefined);
-        clicked = await page.evaluate(() => (window as any).__clicked);
+        const clicked = await page.evaluate(() => (window as any).__clicked);
         expect(clicked).toBe(true);
     });
 });
