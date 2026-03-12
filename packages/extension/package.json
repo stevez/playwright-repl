@@ -17,7 +17,7 @@
     "test:component:ui": "vitest --config vitest.component.config.ts --browser.headless=false --ui --api.port 9527",
     "lint": "eslint .",
     "coverage:merge": "nextcov merge coverage/unit coverage/component coverage/e2e -o coverage/merged",
-    "coverage:all": "vitest run && vitest run --config vitest.component.config.ts && npx playwright test && nextcov merge coverage/unit coverage/component coverage/e2e -o coverage/merged"
+    "coverage:all": "vitest run && vitest run --config vitest.component.config.ts && npx playwright test && npm run coverage:merge"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,7 +33,7 @@
     "@vitest/ui": "^4.0.18",
     "eslint": "^10.0.1",
     "happy-dom": "^20.6.1",
-    "nextcov": "^1.2.0",
+    "nextcov": "^1.2.1",
     "playwright": "1.59.0-alpha-2026-02-21",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.7.3",

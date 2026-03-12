@@ -25,6 +25,15 @@ if (!globalThis.chrome.action) {
   };
 }
 
+// vitest-chrome doesn't include chrome.offscreen — add it manually
+if (!globalThis.chrome.offscreen) {
+  (globalThis.chrome as any).offscreen = {
+    hasDocument: async () => false,
+    createDocument: async () => {},
+    Reason: { BLOBS: 'BLOBS' },
+  };
+}
+
 // vitest-chrome doesn't include chrome.webNavigation — add it manually
 if (!globalThis.chrome.webNavigation) {
   (globalThis.chrome as any).webNavigation = {

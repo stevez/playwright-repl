@@ -229,7 +229,7 @@ export async function evalCode(page, code) {
 // ─── Run Code ────────────────────────────────────────────────────────────────
 
 export async function runCode(page, code) {
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const AsyncFunction = runCode.constructor;
   const trimmed = code.trim();
   // If code is a function expression, call it with page; otherwise treat as function body
   const isFnExpr = /^(async\s*)?\(|^(async\s+)?function\b/.test(trimmed);

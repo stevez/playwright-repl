@@ -55,7 +55,7 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'bridge-port-changed') {
         if (reconnectTimer) clearTimeout(reconnectTimer);
-        ws?.close();
+        if (ws) { ws.onclose = null; ws.close(); }
         connect(msg.port as number);
     }
 });

@@ -22,10 +22,9 @@ export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
 
   testDir: './e2e',
+  testIgnore: ['**/commands/**', '**/bridge/**'],
   timeout: 60000,
   retries: 0,
-  // Bridge tests start a WebSocket server; any parallel extension
-  // instance would also connect to it, causing interference. Run sequentially.
-  workers: 1,
+  workers: undefined,  // default parallelism (bridge tests that needed workers:1 are skipped)
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
 });

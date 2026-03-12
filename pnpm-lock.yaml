@@ -144,8 +144,8 @@ importers:
         specifier: ^20.6.1
         version: 20.8.3
       nextcov:
-        specifier: ^1.2.0
-        version: 1.2.0(@playwright/test@1.59.0-alpha-2026-02-21)(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)
+        specifier: ^1.2.1
+        version: 1.2.1(@playwright/test@1.59.0-alpha-2026-02-21)(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)
       playwright:
         specifier: 1.59.0-alpha-2026-02-21
         version: 1.59.0-alpha-2026-02-21
@@ -1967,8 +1967,8 @@ packages:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
 
-  nextcov@1.2.0:
-    resolution: {integrity: sha512-CZdDRJmdCqWvHBVwNrifyMuQ7gR4zKIwNLHEaKuogGJCMe4msok55i+rbK2BI2/88z/F6uRBc9S/zea75wy05A==}
+  nextcov@1.2.1:
+    resolution: {integrity: sha512-hqGnqOS4fDdcfiXWvx3lhJJ0EFOVmwwalDYeudYwz5skUFCmsXXOa3YmYFOpfjjnp0Q11sptd3Uk8kF64D1gFg==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -4161,7 +4161,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  nextcov@1.2.0(@playwright/test@1.59.0-alpha-2026-02-21)(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1):
+  nextcov@1.2.1(@playwright/test@1.59.0-alpha-2026-02-21)(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1):
     dependencies:
       '@babel/parser': 7.29.0
       '@babel/traverse': 7.29.0

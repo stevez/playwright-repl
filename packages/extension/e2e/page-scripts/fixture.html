@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Page Scripts Test Fixture</title>
+</head>
+<body>
+  <h1>Test Page</h1>
+  <p>Welcome to the test page</p>
+  <p>Hidden text is not here</p>
+
+  <!-- Ref-based elements (for verifyValue / verifyList) -->
+  <input aria-ref="e1" type="text" value="hello">
+  <ul aria-ref="e2">
+    <li>Apple</li>
+    <li>Banana</li>
+    <li>Cherry</li>
+  </ul>
+
+  <!-- Buttons & Links -->
+  <button>Submit</button>
+  <button>Delete</button>
+  <a href="#">Get started</a>
+
+  <!-- Text inputs -->
+  <label for="name-input">Name</label>
+  <input id="name-input" type="text" placeholder="Enter name" value="">
+
+  <label for="email-input">Email</label>
+  <input id="email-input" type="text" placeholder="Enter email" value="">
+
+  <label for="age-input">Age</label>
+  <input id="age-input" type="number" value="25">
+
+  <!-- Checkbox -->
+  <label for="accept-cb">Accept terms</label>
+  <input id="accept-cb" type="checkbox">
+
+  <!-- Radio group -->
+  <fieldset>
+    <legend>Color</legend>
+    <input type="radio" id="color-red" name="color" value="red">
+    <label for="color-red">Red</label>
+    <input type="radio" id="color-blue" name="color" value="blue">
+    <label for="color-blue">Blue</label>
+  </fieldset>
+
+  <!-- Select -->
+  <label for="size-select">Size</label>
+  <select id="size-select">
+    <option value="s">Small</option>
+    <option value="m">Medium</option>
+    <option value="l">Large</option>
+  </select>
+
+  <!-- List with checkboxes (for checkByText listitem path) -->
+  <ul>
+    <li>Buy milk <input type="checkbox" aria-label="Buy milk"></li>
+    <li>Clean house <input type="checkbox" aria-label="Clean house"></li>
+  </ul>
+</body>
+</html>
