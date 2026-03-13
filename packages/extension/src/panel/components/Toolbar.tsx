@@ -21,6 +21,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     const pendingFillRef = useRef<{ text: string; jsonl: string } | null>(null);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [isPicking, setIsPicking] = useState(false);
+    const pickerPortRef = useRef<chrome.runtime.Port | null>(null);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
     const [canAttach, setCanAttach] = useState(true);
@@ -408,6 +410,63 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         });
     }
 
+    // ─── Pick element ───
+
+    async function handlePick() {
+        if (!chrome.tabs?.query) return;
+
+        if (isPicking) {
+            const port = pickerPortRef.current;
+            pickerPortRef.current = null;
+            setIsPicking(false);
+            chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
+            port?.disconnect();
+            return;
+        }
+
+        let result: { ok: boolean; error?: string } | undefined;
+        try {
+            result = await chrome.runtime.sendMessage({ type: 'pick-start' });
+        } catch (e) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${String(e)}`, type: 'error' } });
+            return;
+        }
+        if (!result?.ok) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${result?.error ?? 'unknown error'}`, type: 'error' } });
+            return;
+        }
+
+        try {
+            pickerPortRef.current = await connectWithRetry();
+        } catch {
+            dispatch({ type: 'ADD_LINE', line: { text: 'Pick failed: could not connect to recorder.', type: 'error' } });
+            return;
+        }
+
+        setIsPicking(true);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pickerPortRef.current!.onMessage.addListener((msg: any) => {
+            if (msg.type === 'recorder' && msg.method === 'elementPicked') {
+                const selector = msg.elementInfo?.selector;
+                if (selector) {
+                    const locator = asLocator(selector);
+                    dispatch({ type: 'ADD_LINE', line: { text: `[Pick] ${locator}`, type: 'info' } });
+                }
+                // Auto-stop after picking one element
+                pickerPortRef.current?.disconnect();
+                pickerPortRef.current = null;
+                setIsPicking(false);
+                chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
+            }
+        });
+
+        pickerPortRef.current!.onDisconnect.addListener(() => {
+            pickerPortRef.current = null;
+            setIsPicking(false);
+        });
+    }
+
     // ─── Theme toggle ───
 
     useEffect(() => {
@@ -433,10 +492,18 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     data-testid="record-btn"
                     className={isRecording ? 'recording' : ''}
                     title={isRecording ? "Stop recording" : "Start Recording"}
+                    disabled={isPicking}
                     onClick={handleRecord}
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
+                <button
+                    data-testid="pick-btn"
+                    className={isPicking ? 'picking' : ''}
+                    title={isPicking ? "Stop picking" : "Pick element"}
+                    disabled={isRecording}
+                    onClick={handlePick}
+                >⊕</button>
                 {(isRunning || stepLine !== -1)
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title={isStepDebugging ? "Abort" : "Stop"} onClick={handleStop}>{isStepDebugging ? <AbortIcon /> : <StopIcon />}</button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>

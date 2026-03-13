@@ -133,34 +133,144 @@ async function stopRecording(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-// ─── CDP Evaluate ────────────────────────────────────────────────────────────
+// ─── Pick Element (experimental) ─────────────────────────────────────────────
+
+async function startPicking(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (!crxApp) crxApp = await crx.start();
+
+    const tabId = await getActiveTabId();
+    if (tabId && crxApp.context().pages().length === 0) await attachToTab(tabId);
+
+    crxApp.recorder.show({
+      mode: 'inspecting',
+      language: 'javascript',
+      window: { type: 'sidepanel', url: 'panel/panel.html' },
+    }).catch((e: unknown) => console.error('[pick] recorder.show error:', e));
+
+    // Disable overlay toolbar buttons (runs in background, don't block response)
+    disableOverlayToolbar().catch(() => {});
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+async function stopPicking(): Promise<{ ok: boolean }> {
+  // Remove injected style before hiding recorder (so recording still shows overlay)
+  if (activeTabId) {
+    removeOverlayHide(activeTabId).catch(() => {});
+  }
+  await crxApp?.recorder.hide().catch(() => {});
+  return { ok: true };
+}
+
+async function removeOverlayHide(tabId: number): Promise<void> {
+  try {
+    const doc = await cdpCommand(tabId, 'DOM.getDocument', { depth: 0 });
+    const { nodeId: glassId } = await cdpCommand(tabId, 'DOM.querySelector', {
+      nodeId: doc.root.nodeId, selector: 'x-pw-glass',
+    });
+    if (!glassId) return;
+    const desc = await cdpCommand(tabId, 'DOM.describeNode', {
+      nodeId: glassId, depth: 1, pierce: true,
+    });
+    const shadowId = desc?.node?.shadowRoots?.[0]?.nodeId;
+    if (!shadowId) return;
+    const { object } = await cdpCommand(tabId, 'DOM.resolveNode', { nodeId: shadowId });
+    if (!object?.objectId) return;
+    await cdpCommand(tabId, 'Runtime.callFunctionOn', {
+      objectId: object.objectId,
+      functionDeclaration: `function() {
+        var s = this.querySelector('#pw-repl-hide-overlay');
+        if (s) s.remove();
+      }`,
+    });
+  } catch { /* best-effort cleanup */ }
+}
+
+// ─── CDP Helpers ─────────────────────────────────────────────────────────────
+
+function cdpCommand(tabId: number, method: string, params: Record<string, unknown> = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message ?? ''));
+      else resolve(result);
+    });
+  });
+}
 
 function cdpEvaluate(tabId: number, expression: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    chrome.debugger.sendCommand(
-      { tabId },
-      'Runtime.evaluate',
-      { expression, objectGroup: 'console', returnByValue: false, generatePreview: true, awaitPromise: true },
-      (result) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve(result);
-      }
-    );
+  return cdpCommand(tabId, 'Runtime.evaluate', {
+    expression, objectGroup: 'console', returnByValue: false, generatePreview: true, awaitPromise: true,
   });
 }
 
 function cdpGetProperties(tabId: number, objectId: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    chrome.debugger.sendCommand(
-      { tabId },
-      'Runtime.getProperties',
-      { objectId, ownProperties: true, generatePreview: true },
-      (result) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve(result);
-      }
-    );
+  return cdpCommand(tabId, 'Runtime.getProperties', {
+    objectId, ownProperties: true, generatePreview: true,
   });
+}
+
+/**
+ * Hide the recorder's overlay toolbar via CDP.
+ *
+ * The overlay (x-pw-overlay) lives inside x-pw-glass's CLOSED shadow root,
+ * so normal CSS/JS can't reach it. We use CDP DOM domain to pierce the
+ * shadow boundary, resolve the shadow root to a JS reference, and inject
+ * a <style> with !important — this beats the recorder's inline style
+ * updates (e.g. `element.style.display = 'flex'` from _showOverlay).
+ */
+async function disableOverlayToolbar(): Promise<void> {
+  if (!activeTabId) return;
+  const tabId = activeTabId;
+
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      const doc = await cdpCommand(tabId, 'DOM.getDocument', { depth: 0 });
+      const { nodeId: glassId } = await cdpCommand(tabId, 'DOM.querySelector', {
+        nodeId: doc.root.nodeId, selector: 'x-pw-glass',
+      });
+      if (!glassId) continue;
+
+      const desc = await cdpCommand(tabId, 'DOM.describeNode', {
+        nodeId: glassId, depth: 1, pierce: true,
+      });
+      const shadowId = desc?.node?.shadowRoots?.[0]?.nodeId;
+      if (!shadowId) continue;
+
+      // Verify overlay exists before injecting
+      const { nodeId: overlayId } = await cdpCommand(tabId, 'DOM.querySelector', {
+        nodeId: shadowId, selector: 'x-pw-overlay',
+      });
+      if (!overlayId) continue;
+
+      // Resolve shadow root to JS reference and inject a <style> tag
+      // CSS !important in stylesheet beats inline styles without !important,
+      // so this persists even when recorder JS sets element.style.display = 'flex'
+      const { object } = await cdpCommand(tabId, 'DOM.resolveNode', { nodeId: shadowId });
+      if (!object?.objectId) continue;
+
+      await cdpCommand(tabId, 'Runtime.callFunctionOn', {
+        objectId: object.objectId,
+        functionDeclaration: `function() {
+          if (this.querySelector('#pw-repl-hide-overlay')) return;
+          var s = document.createElement('style');
+          s.id = 'pw-repl-hide-overlay';
+          s.textContent = 'x-pw-overlay { display: none !important; }';
+          this.appendChild(s);
+        }`,
+      });
+
+      console.log('[pick] Overlay toolbar hidden');
+      return;
+    } catch (e) {
+      console.error('[pick] attempt', i, e);
+    }
+  }
+  console.warn('[pick] Failed to hide overlay after 15 attempts');
 }
 
 // ─── Bridge Command Execution ────────────────────────────────────────────────
@@ -359,6 +469,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'health')        { sendResponse({ ok: !!crxApp }); return false; }
   if (msg.type === 'record-start')  { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
+  if (msg.type === 'pick-start')    { startPicking().then(sendResponse); return true; }
+  if (msg.type === 'pick-stop')     { stopPicking().then(sendResponse); return true; }
   if (msg.type === 'cdp-evaluate')  {
     if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
     cdpEvaluate(activeTabId, msg.expression).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
