@@ -73,9 +73,14 @@
             if (label) return label;
         }
 
-        // For buttons, links: text content
+        // For roles that get name from content (ARIA "name from content" roles)
         const role = getImplicitRole(el);
-        if (role === 'button' || role === 'link' || role === 'heading') {
+        const NAME_FROM_CONTENT = new Set([
+            'button', 'link', 'heading', 'tab', 'menuitem', 'menuitemcheckbox',
+            'menuitemradio', 'option', 'radio', 'checkbox', 'switch', 'cell',
+            'columnheader', 'rowheader', 'tooltip', 'treeitem',
+        ]);
+        if (role && NAME_FROM_CONTENT.has(role)) {
             const text = (el.textContent || '').trim();
             if (text && text.length <= 80) return text;
         }

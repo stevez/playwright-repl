@@ -2,45 +2,64 @@ import { swDebugEval } from '@/lib/sw-debugger';
 import type { ElementPickInfo, PickResultData } from '@/types';
 
 /**
+ * Extract --nth flag from a JS locator chain (.first(), .last(), .nth(N)).
+ */
+function extractNth(locator: string): string {
+    if (/\.first\(\)/.test(locator)) return ' --nth 0';
+    if (/\.last\(\)/.test(locator)) return ' --nth -1';
+    const nthMatch = locator.match(/\.nth\((\d+)\)/);
+    if (nthMatch) return ` --nth ${nthMatch[1]}`;
+    return '';
+}
+
+/**
  * Derive a .pw keyword command from element info.
  * Returns null if no suitable name/text can be extracted.
  */
-function derivePwCommand(info: ElementPickInfo): string | null {
-    // Try accessible name from role-based locator: getByRole('button', { name: 'Submit' })
-    const roleMatch = info.locator.match(/getByRole\([^,]+,\s*\{\s*name:\s*['"](.+?)['"]\s*\}/);
-    if (roleMatch) return `highlight "${roleMatch[1]}"`;
+function derivePwCommand(info: ElementPickInfo, jsLocator?: string): string | null {
+    // Extract nth from JS locator (has .first()/.nth()) not content script's locator
+    const nth = extractNth(jsLocator ?? info.locator);
+
+    // Try role + name: getByRole('button', { name: 'Submit' }) → highlight button "Submit"
+    const roleNameMatch = info.locator.match(/getByRole\(['"](.+?)['"],\s*\{\s*name:\s*['"](.+?)['"]\s*\}/);
+    if (roleNameMatch) return `highlight ${roleNameMatch[1]} "${roleNameMatch[2]}"${nth}`;
+
+    // Try bare role: getByRole('tab') → highlight tab
+    const roleMatch = info.locator.match(/getByRole\(['"](.+?)['"]\)/);
+    if (roleMatch) return `highlight ${roleMatch[1]}${nth}`;
 
     // Try test ID: getByTestId('submit')
     const testIdMatch = info.locator.match(/getByTestId\(['"](.+?)['"]\)/);
-    if (testIdMatch) return `highlight "${testIdMatch[1]}"`;
+    if (testIdMatch) return `highlight "${testIdMatch[1]}"${nth}`;
 
     // Try label: getByLabel('Email')
     const labelMatch = info.locator.match(/getByLabel\(['"](.+?)['"]\)/);
-    if (labelMatch) return `highlight "${labelMatch[1]}"`;
+    if (labelMatch) return `highlight "${labelMatch[1]}"${nth}`;
 
     // Try text: getByText('Submit')
     const textMatch = info.locator.match(/getByText\(['"](.+?)['"]\)/);
-    if (textMatch) return `highlight "${textMatch[1]}"`;
+    if (textMatch) return `highlight "${textMatch[1]}"${nth}`;
 
     // Try placeholder: getByPlaceholder('Enter email')
     const placeholderMatch = info.locator.match(/getByPlaceholder\(['"](.+?)['"]\)/);
-    if (placeholderMatch) return `highlight "${placeholderMatch[1]}"`;
+    if (placeholderMatch) return `highlight "${placeholderMatch[1]}"${nth}`;
 
     // Fallback: use element text content
-    if (info.text && info.text.length <= 80) return `highlight "${info.text}"`;
+    if (info.text && info.text.length <= 80) return `highlight "${info.text}"${nth}`;
 
     return null;
 }
 
 /**
  * Build a PickResultData from element info gathered by the content script.
- * Uses Playwright's locator when available, falls back to content script's own.
+ * Playwright's locator for JS/locator display (more precise chaining).
+ * Content script's locator for pw command (simpler, role-aware).
  */
 export function buildPickResult(info: ElementPickInfo): PickResultData {
-    const locatorExpr = info.pwLocator ?? info.locator;
-    const locator = `page.${locatorExpr}`;
-    const jsExpression = `await page.${locatorExpr}.highlight();`;
-    const pwCommand = derivePwCommand({ ...info, locator: locatorExpr });
+    const jsLocator = info.pwLocator ?? info.locator;
+    const locator = `page.${jsLocator}`;
+    const jsExpression = `await page.${jsLocator}.highlight();`;
+    const pwCommand = derivePwCommand(info, jsLocator);
 
     return {
         locator,

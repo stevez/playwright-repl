@@ -120,9 +120,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBeNull();
   });
 
-  it("converts click with role locator but no name", () => {
-    const action = jsonl({ name: "click", selector: "button", locator: { kind: "role", body: "navigation" } });
-    expect(jsonlToRepl(action, false)).toBe("click navigation");
+  it("converts click with role locator but no name to CSS selector", () => {
+    const action = jsonl({ name: "click", selector: "nav.main", locator: { kind: "role", body: "navigation" } });
+    expect(jsonlToRepl(action, false)).toBe('click "nav.main"');
   });
 
   it("converts click with default locator and CSS selector", () => {
@@ -147,9 +147,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('fill "Name" "Alice"');
   });
 
-  it("converts fill with role locator (no name)", () => {
-    const action = jsonl({ name: "fill", text: "test", locator: { kind: "role", body: "textbox" } });
-    expect(jsonlToRepl(action, false)).toBe('fill textbox "test"');
+  it("converts fill with role locator (no name) to CSS selector", () => {
+    const action = jsonl({ name: "fill", text: "test", selector: "input.email", locator: { kind: "role", body: "textbox" } });
+    expect(jsonlToRepl(action, false)).toBe('fill "input.email" "test"');
   });
 
   it("converts fill with default locator", () => {
@@ -169,9 +169,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('press "Search" Enter');
   });
 
-  it("converts press with role locator (no name)", () => {
+  it("converts press with role locator (no name) to global key press", () => {
     const action = jsonl({ name: "press", key: "Tab", locator: { kind: "role", body: "textbox" } });
-    expect(jsonlToRepl(action, false)).toBe("press textbox Tab");
+    expect(jsonlToRepl(action, false)).toBe("press Tab");
   });
 
   it("converts global key press (no locator)", () => {
@@ -191,9 +191,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('hover "Menu"');
   });
 
-  it("converts hover with role locator (no name)", () => {
-    const action = jsonl({ name: "hover", locator: { kind: "role", body: "link" } });
-    expect(jsonlToRepl(action, false)).toBe("hover link");
+  it("converts hover with role locator (no name) to CSS selector", () => {
+    const action = jsonl({ name: "hover", selector: "a.nav-link", locator: { kind: "role", body: "link" } });
+    expect(jsonlToRepl(action, false)).toBe('hover "a.nav-link"');
   });
 
   it("converts hover with default locator", () => {
@@ -213,9 +213,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('check "Accept terms"');
   });
 
-  it("converts check with role locator (no name)", () => {
-    const action = jsonl({ name: "check", locator: { kind: "role", body: "checkbox" } });
-    expect(jsonlToRepl(action, false)).toBe("check checkbox");
+  it("converts check with role locator (no name) to selector", () => {
+    const action = jsonl({ name: "check", selector: "input[type=checkbox]", locator: { kind: "role", body: "checkbox" } });
+    expect(jsonlToRepl(action, false)).toBe('check "input[type=checkbox]"');
   });
 
   it("converts check with selector fallback", () => {
@@ -233,9 +233,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('uncheck "Newsletter"');
   });
 
-  it("converts uncheck with role locator (no name)", () => {
-    const action = jsonl({ name: "uncheck", locator: { kind: "role", body: "checkbox" } });
-    expect(jsonlToRepl(action, false)).toBe("uncheck checkbox");
+  it("converts uncheck with role locator (no name) to selector", () => {
+    const action = jsonl({ name: "uncheck", selector: "input[type=checkbox]", locator: { kind: "role", body: "checkbox" } });
+    expect(jsonlToRepl(action, false)).toBe('uncheck "input[type=checkbox]"');
   });
 
   it("converts uncheck with selector fallback", () => {
@@ -255,9 +255,9 @@ describe("jsonlToRepl", () => {
     expect(jsonlToRepl(action, false)).toBe('select "Color" "red"');
   });
 
-  it("converts select with role locator (no name)", () => {
-    const action = jsonl({ name: "select", options: ["sm"], locator: { kind: "role", body: "combobox" } });
-    expect(jsonlToRepl(action, false)).toBe('select combobox "sm"');
+  it("converts select with role locator (no name) to selector", () => {
+    const action = jsonl({ name: "select", options: ["sm"], selector: "select.size", locator: { kind: "role", body: "combobox" } });
+    expect(jsonlToRepl(action, false)).toBe('select "select.size" "sm"');
   });
 
   it("converts selectOption with selector fallback", () => {

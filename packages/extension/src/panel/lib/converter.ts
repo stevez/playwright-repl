@@ -96,45 +96,38 @@ export function jsonlToRepl(jsonStr: string, isFirst: boolean): string | null {
         // Skip focus-clicks on text inputs — noise before fill
         if (kind === 'role' && body === 'textbox') return null;
         if (text) return `click ${q(text)}${nth}`;
-        if (kind === 'role' && body) return `click ${body}${nth}`;
-        if (kind === 'default' && a.selector && !['html', 'body'].includes(a.selector.trim()))
+        if ((kind === 'role' || kind === 'default') && a.selector && !['html', 'body'].includes(a.selector.trim()))
           return `click ${q(a.selector)}`;
         return null;
 
       case 'fill':
         if (text) return `fill ${q(text)} ${q(a.text ?? '')}${nth}`;
-        if (kind === 'role' && body) return `fill ${body} ${q(a.text ?? '')}${nth}`;
-        if (kind === 'default' && a.selector) return `fill ${q(a.selector)} ${q(a.text ?? '')}`;
+        if ((kind === 'role' || kind === 'default') && a.selector) return `fill ${q(a.selector)} ${q(a.text ?? '')}`;
         return null;
 
       case 'press':
         if (text) return `press ${q(text)} ${a.key ?? ''}${nth}`;
-        if (kind === 'role' && body) return `press ${body} ${a.key ?? ''}${nth}`;
         // Global key press (no locator)
         return a.key ? `press ${a.key}` : null;
 
       case 'hover':
         if (text) return `hover ${q(text)}${nth}`;
-        if (kind === 'role' && body) return `hover ${body}${nth}`;
-        if (kind === 'default' && a.selector) return `hover ${q(a.selector)}`;
+        if ((kind === 'role' || kind === 'default') && a.selector) return `hover ${q(a.selector)}`;
         return null;
 
       case 'check':
         if (text) return `check ${q(text)}${nth}`;
-        if (kind === 'role' && body) return `check ${body}${nth}`;
         if (a.selector) return `check ${q(a.selector)}`;
         return null;
 
       case 'uncheck':
         if (text) return `uncheck ${q(text)}${nth}`;
-        if (kind === 'role' && body) return `uncheck ${body}${nth}`;
         if (a.selector) return `uncheck ${q(a.selector)}`;
         return null;
 
       case 'selectOption':
       case 'select':
         if (text) return `select ${q(text)} ${q(a.options?.[0] ?? '')}${nth}`;
-        if (kind === 'role' && body) return `select ${body} ${q(a.options?.[0] ?? '')}${nth}`;
         if (a.selector) return `select ${q(a.selector)} ${q(a.options?.[0] ?? '')}`;
         return null;
 
