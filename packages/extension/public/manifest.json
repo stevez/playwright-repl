@@ -16,9 +16,6 @@
     "page": "preferences/preferences.html",
     "open_in_tab": false
   },
-  "host_permissions": [
-    "<all_urls>"
-  ],
   "action": {
     "default_title": "Dramaturg",
     "default_icon": {
