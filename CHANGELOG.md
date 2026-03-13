@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.16.1 — Exact Match & Highlight Improvements
+
+**2026-03-13**
+
+### Features
+
+- **`--exact` flag**: All text locator commands (`click`, `fill`, `hover`, `check`, `uncheck`, `select`, `highlight`) now support `--exact` to skip the fallback chain and use only the primary locator match. ([#156](https://github.com/stevez/playwright-repl/issues/156), [#165](https://github.com/stevez/playwright-repl/pull/165))
+- **Highlight match count**: `highlight` now returns the number of matched elements (e.g. `Highlighted 5 elements`, `Highlighted 1 of 24`). ([#165](https://github.com/stevez/playwright-repl/pull/165))
+- **`highlight --clear`**: Dismiss Playwright's highlight overlay with `highlight --clear`. ([#165](https://github.com/stevez/playwright-repl/pull/165))
+- **`highlight --nth`**: Highlight a single element by index using CSS outline (Playwright's `.highlight()` ignores `.nth()`). ([#165](https://github.com/stevez/playwright-repl/pull/165))
+
+### Fixes
+
+- **Bare `document`/`window` in console**: Fixed mode detection so `document` and `window` are correctly routed to JS mode instead of being treated as `.pw` keywords. ([#168](https://github.com/stevez/playwright-repl/pull/168))
+- **Remove `host_permissions`**: Removed unnecessary `<all_urls>` host permission from the extension manifest — the `debugger` and `activeTab` permissions are sufficient. ([#169](https://github.com/stevez/playwright-repl/issues/169), [#170](https://github.com/stevez/playwright-repl/pull/170))
+
+---
+
 ## v0.16.0 — Autocompletion, Snapshot Tree & Recording Fixes
 
 **2026-03-12**
