@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.16.0 — Autocompletion, Snapshot Tree & Recording Fixes
+
+**2026-03-12**
+
+### Features
+
+- **Playwright API autocompletion**: JS mode now offers ghost-text autocompletion for Playwright API methods (`page.goto()`, `page.locator()`, `expect()`, etc.). ([#137](https://github.com/stevez/playwright-repl/issues/137), [#147](https://github.com/stevez/playwright-repl/pull/147))
+- **Snapshot tree view**: `snapshot` output now renders as an expandable accessibility tree in the console — click to expand/collapse nodes instead of scrolling through raw text. ([#88](https://github.com/stevez/playwright-repl/issues/88), [#151](https://github.com/stevez/playwright-repl/pull/151))
+- **Categorized help**: `help` command groups commands by category (navigation, interaction, assertion, etc.) with per-command help (`help click`, `help fill`) and `help js` for Playwright API reference. ([#146](https://github.com/stevez/playwright-repl/pull/146))
+- **Language mode preference**: Choose default language mode (`.pw` or JS) in the Options page. Persisted via `chrome.storage`. ([#149](https://github.com/stevez/playwright-repl/pull/149))
+- **Segmented control**: Replaced the pw/js toggle button with a segmented control for clearer mode switching. ([#145](https://github.com/stevez/playwright-repl/pull/145))
+- **Auto-closing brackets**: Editor and console input now auto-close parentheses, brackets, and quotes. ([#150](https://github.com/stevez/playwright-repl/pull/150))
+
+### Fixes
+
+- **Recording captures full fill text**: Fill commands now record the complete input text instead of only the first character. ([#154](https://github.com/stevez/playwright-repl/pull/154))
+- **Recorder merges fill + Enter**: Sequential `fill` followed by `Enter` is merged into a single command; noise clicks on already-focused inputs are filtered. ([#154](https://github.com/stevez/playwright-repl/pull/154))
+- **Recording noise removed from console**: Duplicate and internal recorder output no longer appears in the console. ([#144](https://github.com/stevez/playwright-repl/pull/144))
+- **Failed commands recorded in history**: Commands that error are now saved to session history so you can arrow-up to fix and retry. ([#163](https://github.com/stevez/playwright-repl/pull/163))
+
+### Tests
+
+- Extension test coverage increased to 90%+ with new unit, component, and E2E tests. ([#157](https://github.com/stevez/playwright-repl/pull/157)–[#162](https://github.com/stevez/playwright-repl/pull/162))
+- E2E coverage collection via nextcov — merged unit + component + E2E coverage reports. ([#148](https://github.com/stevez/playwright-repl/issues/148), [#157](https://github.com/stevez/playwright-repl/pull/157))
+- Bridge E2E tests verify all commands return meaningful results via WebSocket.
+- E2E recording flow tests added. ([#160](https://github.com/stevez/playwright-repl/pull/160))
+
+---
+
 ## v0.15.1 — WebSocket Origin Check
 
 **2026-03-09**
