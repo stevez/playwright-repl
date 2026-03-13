@@ -50,6 +50,11 @@ describe('detectMode', () => {
 
     // ─── JS (page) context ────────────────────────────────────────────────────
 
+    it('returns js for bare document and window', () => {
+        expect(detectMode('document')).toBe('js');
+        expect(detectMode('window')).toBe('js');
+    });
+
     it('returns js for property access on globals', () => {
         expect(detectMode('document.title')).toBe('js');
         expect(detectMode('window.location.href')).toBe('js');

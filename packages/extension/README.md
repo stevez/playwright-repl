@@ -12,7 +12,10 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 | 🗂 **Tab Switcher** | Switch the active browser target to any open tab from the toolbar dropdown |
 | 🌳 **Object Tree** | Console results render as an expandable CDP object tree with lazy property loading |
 | 🖼 **Screenshot Preview** | Screenshot commands display the image inline; click to expand full-size |
-| ✨ **Autocomplete** | `.pw` keyword suggestions with descriptions as you type in both console and editor |
+| 🌳 **Snapshot Tree** | `snapshot` renders as an expandable accessibility tree — click nodes to expand/collapse |
+| ✨ **Autocomplete** | `.pw` keyword and Playwright API (`page.*`, `expect()`) ghost-text suggestions in both console and editor |
+| 📖 **Help** | `help` shows categorized commands; `help click` for per-command help; `help js` for Playwright API reference |
+| ⚙️ **Preferences** | Default language mode (`.pw` or JS), bridge port, and open mode — configurable in Options |
 | 🌗 **Light / Dark Mode** | Toggle between light and dark themes from the toolbar, persisted across sessions |
 | 🪟 **Side Panel & Popup** | Opens as a Chrome side panel by default; switch to a standalone popup window in Options |
 | ⚡ **Fast** | Commands execute directly via CDP in the service worker — no Node.js roundtrip, near-instant response |
@@ -52,15 +55,17 @@ The Console tab auto-detects what you type and routes it to the right executor:
 Results are rendered as an **expandable CDP object tree** — click any object to lazily fetch its properties, just like Chrome DevTools.
 
 - **Command history** — Up/Down arrows cycle through previous commands
-- **Autocomplete** — keyword suggestions as you type
+- **Autocomplete** — `.pw` keyword and Playwright API (`page.*`, `expect()`) ghost-text suggestions
 - **Screenshot preview** — inline image with click-to-expand lightbox
 - **Ctrl+L / `.clear`** — clear console output
 
 ### Script Editor
 
-Write and run multi-line `.pw` scripts or JavaScript directly in the panel:
+Write and run multi-line `.pw` scripts or JavaScript (Playwright API, DOM) directly in the panel:
 
 - **Syntax highlighting** — `.pw` keywords, strings, comments; full JS highlighting in JS mode
+- **Autocomplete** — Playwright API ghost-text suggestions in JS mode; `.pw` keyword suggestions in keyword mode
+- **Auto-closing brackets** — parentheses, brackets, and quotes close automatically
 - **Pass/fail gutter** — ✓/✗ markers per line after execution
 - **Run / Step / Stop** — run all lines, step through one at a time, or abort
 - **JS step debugger** — pauses at each line, resumes on Step
