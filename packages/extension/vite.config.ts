@@ -23,6 +23,7 @@ export default defineConfig({
 "panel/panel": resolve(__dirname, "src/panel/panel.html"),
         "preferences/preferences": resolve(__dirname, "src/preferences/preferences.html"),
         "offscreen/offscreen": resolve(__dirname, "src/offscreen/offscreen.html"),
+        "content/picker": resolve(__dirname, "src/content/picker.ts"),
       },
       output: {
         entryFileNames: "[name].js",

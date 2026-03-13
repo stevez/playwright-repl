@@ -181,6 +181,17 @@ html, body {
   border-color: var(--color-recording-border) !important;
 }
 
+[data-testid="pick-btn"].picking {
+  background: #e3f2fd !important;
+  color: #1565c0 !important;
+  border-color: #1565c0 !important;
+}
+
+.theme-dark [data-testid="pick-btn"].picking {
+  background: #1a3a5c !important;
+  color: #64b5f6 !important;
+  border-color: #64b5f6 !important;
+}
 
 /* === Splitter === */
 

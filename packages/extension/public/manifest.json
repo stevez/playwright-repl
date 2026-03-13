@@ -10,7 +10,8 @@
     "debugger",
     "storage",
     "windows",
-    "offscreen"
+    "offscreen",
+    "scripting"
   ],
   "options_ui": {
     "page": "preferences/preferences.html",

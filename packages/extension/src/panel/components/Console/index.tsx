@@ -39,7 +39,8 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
             i++;
         } else if (line.type === 'info') {
             const entry: ConsoleEntry = { id, input: '', status: 'done' };
-            if (line.value !== undefined) entry.value = line.value as SerializedValue;
+            if (line.pickResult) entry.pickResult = line.pickResult;
+            else if (line.value !== undefined) entry.value = line.value as SerializedValue;
             else entry.text = line.text;
             entries.push(entry);
             i++;

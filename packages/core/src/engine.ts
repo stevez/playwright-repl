@@ -214,7 +214,7 @@ export class Engine {
     // ── highlight → run-code translation ──
     if (args._[0] === 'highlight') {
       if (args.clear) {
-        args = { _: ['run-code', `async (page) => { await page.evaluate(() => { document.querySelectorAll('x-pw-glass, x-pw-highlight').forEach(el => el.remove()); }); return "Cleared"; }`] };
+        args = { _: ['run-code', `async (page) => { await page.locator('#__pw_clear__').highlight().catch(() => {}); return "Cleared"; }`] };
       } else {
         const loc = args._.slice(1).join(' ');
         if (!loc) return { text: 'Usage: highlight <locator>', isError: true };

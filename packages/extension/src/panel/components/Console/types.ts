@@ -1,6 +1,6 @@
 import type { Dispatch } from 'react';
 import type { Action } from '@/reducer';
-import type { OutputLine } from '@/types';
+import type { OutputLine, PickResultData } from '@/types';
 
 export type SerializedValue =
   | { __type: 'null' }
@@ -25,6 +25,7 @@ export interface ConsoleEntry {
   codeBlock?: string;
   errorText?: string;
   getProperties?: (objectId: string) => Promise<unknown>;
+  pickResult?: PickResultData;
 }
 
 export interface ConsoleHandle {

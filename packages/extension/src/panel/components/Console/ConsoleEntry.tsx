@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ObjectTree } from './ObjectTree';
 import { SnapshotTree } from './SnapshotTree';
+import { PickResult } from './PickResult';
 import { parseSnapshot } from '@/lib/snapshot-parser';
 import Lightbox from '../Lightbox';
 import type { ConsoleEntry as Entry } from './types';
@@ -20,7 +21,9 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                 )}
                 {entry.status === 'done' && (
                     <div className="pt-0.5">
-                        {entry.value !== undefined ? (
+                        {entry.pickResult !== undefined ? (
+                            <PickResult data={entry.pickResult} />
+                        ) : entry.value !== undefined ? (
                             <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (
                             <SnapshotCodeBlock codeBlock={entry.codeBlock} />

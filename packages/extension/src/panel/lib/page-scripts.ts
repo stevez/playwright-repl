@@ -178,41 +178,27 @@ export async function uncheckByText(page, text, nth, exact) {
 export async function highlightByText(page, text, nth, exact) {
   let loc = exact ? page.getByText(text, { exact: true }) : page.getByText(text);
   const count = await loc.count();
-  if (nth !== undefined) {
-    loc = loc.filter({ visible: true }).nth(nth);
-    await loc.scrollIntoViewIfNeeded();
-    await loc.evaluate(el => {
-      el.style.outline = '2px solid #9747ff';
-      el.style.outlineOffset = '2px';
-      setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 5000);
-    });
-    return 'Highlighted 1 of ' + count;
-  }
+  if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.highlight();
-  return 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
+  return nth !== undefined
+    ? 'Highlighted 1 of ' + count
+    : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
 export async function highlightBySelector(page, selector, nth) {
   let loc = page.locator(selector);
   const count = await loc.count();
-  if (nth !== undefined) {
-    loc = loc.filter({ visible: true }).nth(nth);
-    await loc.scrollIntoViewIfNeeded();
-    await loc.evaluate(el => {
-      el.style.outline = '2px solid #9747ff';
-      el.style.outlineOffset = '2px';
-      setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 5000);
-    });
-    return 'Highlighted 1 of ' + count;
-  }
+  if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.highlight();
-  return 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
+  return nth !== undefined
+    ? 'Highlighted 1 of ' + count
+    : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
 export async function clearHighlight(page) {
-  await page.evaluate(() => {
-    document.querySelectorAll('x-pw-glass, x-pw-highlight').forEach(el => el.remove());
-  });
+  // Highlight a non-matching locator — Playwright replaces the current highlight
+  // with nothing (0 elements), clearing it visually while keeping internal state valid.
+  await page.locator('#__pw_clear__').highlight().catch(() => {});
   return 'Cleared';
 }
 

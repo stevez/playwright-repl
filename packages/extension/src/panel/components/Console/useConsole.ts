@@ -39,7 +39,6 @@ const executors = {
 };
 
 export function useConsole(dispatch: React.Dispatch<Action>) {
-
     async function execute(input: string) {
         const trimmed = input.trim();
         if (!trimmed) return;

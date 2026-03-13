@@ -112,16 +112,15 @@ export async function swCallFunctionOn(objectId: string, functionDeclaration: st
 
 export async function swDebugEval(expression: string): Promise<unknown> {
     const targetId = await ensureAttached();
-    const isMultiLine = expression.includes('\n');
-    // Statement form (ends with ';') can't be used in `return (...)`.
-    // Use AsyncFunction constructor so that:
+    // Always use AsyncFunction constructor so that:
     //   (1) await is valid (proper async function scope),
     //   (2) const/let are scoped per call and don't leak between runs,
-    //   (3) last expression value is captured via tryReturnLastExpr.
+    //   (3) last expression value is captured via tryReturnLastExpr,
+    //   (4) side-effects like locator.highlight() work correctly (arrow functions don't).
+    const isMultiLine = expression.includes('\n');
     const isStatement = isMultiLine || expression.trimEnd().endsWith(';');
-    const wrapped = isStatement
-        ? `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(tryReturnLastExpr(expression))}))()`
-        : `(async () => { return (${expression}) })()`;
+    const body = isStatement ? tryReturnLastExpr(expression) : `return (${expression})`;
+    const wrapped = `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(body)}))()`;
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand(
             { targetId },

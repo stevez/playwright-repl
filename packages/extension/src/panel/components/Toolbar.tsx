@@ -3,9 +3,10 @@ import type { PanelState, Action } from "@/reducer";
 import { jsonlToRepl } from '@/lib/converter';
 import { connectWithRetry, attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { asLocator } from '@/lib/locator/locatorGenerators';
+import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
@@ -22,7 +23,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isPicking, setIsPicking] = useState(false);
-    const pickerPortRef = useRef<chrome.runtime.Port | null>(null);
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === 'dark');
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
     const [canAttach, setCanAttach] = useState(true);
@@ -412,15 +412,31 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     // ─── Pick element ───
 
+    useEffect(() => {
+        if (!chrome.runtime?.onMessage) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listener = (msg: any) => {
+            if (msg.type === 'element-picked-raw') {
+                setIsPicking(false);
+                resolvePlaywrightLocator(msg.pickId).then(pwLocator => {
+                    const pickResult = buildPickResult({ ...msg.info, pwLocator });
+                    dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
+                });
+            }
+            if (msg.type === 'pick-cancelled') {
+                setIsPicking(false);
+            }
+        };
+        chrome.runtime.onMessage.addListener(listener);
+        return () => chrome.runtime.onMessage.removeListener(listener);
+    }, [dispatch]);
+
     async function handlePick() {
         if (!chrome.tabs?.query) return;
 
         if (isPicking) {
-            const port = pickerPortRef.current;
-            pickerPortRef.current = null;
             setIsPicking(false);
-            chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
-            port?.disconnect();
+            await chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
             return;
         }
 
@@ -435,36 +451,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${result?.error ?? 'unknown error'}`, type: 'error' } });
             return;
         }
-
-        try {
-            pickerPortRef.current = await connectWithRetry();
-        } catch {
-            dispatch({ type: 'ADD_LINE', line: { text: 'Pick failed: could not connect to recorder.', type: 'error' } });
-            return;
-        }
-
         setIsPicking(true);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        pickerPortRef.current!.onMessage.addListener((msg: any) => {
-            if (msg.type === 'recorder' && msg.method === 'elementPicked') {
-                const selector = msg.elementInfo?.selector;
-                if (selector) {
-                    const locator = asLocator(selector);
-                    dispatch({ type: 'ADD_LINE', line: { text: `[Pick] ${locator}`, type: 'info' } });
-                }
-                // Auto-stop after picking one element
-                pickerPortRef.current?.disconnect();
-                pickerPortRef.current = null;
-                setIsPicking(false);
-                chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(() => {});
-            }
-        });
-
-        pickerPortRef.current!.onDisconnect.addListener(() => {
-            pickerPortRef.current = null;
-            setIsPicking(false);
-        });
     }
 
     // ─── Theme toggle ───
@@ -484,9 +471,15 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     style={{ display: 'none' }}
                     onChange={handleFileChange}
                 />
-                <button id="open-btn" title="Open .pw file" onClick={handleFileOpen}><FolderOpenIcon /></button>
-                <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}><SaveIcon /></button>
-                <span className="w-[1px] h-[18px] bg-(--color-toolbar-sep) mx-1"></span>
+                <button
+                    data-testid="pick-btn"
+                    className={isPicking ? 'picking' : ''}
+                    title={isPicking ? "Stop picking" : "Pick element"}
+                    disabled={isRecording}
+                    onClick={handlePick}
+                >
+                    <CrosshairIcon />
+                </button>
                 <button
                     id="record-btn"
                     data-testid="record-btn"
@@ -497,13 +490,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
-                <button
-                    data-testid="pick-btn"
-                    className={isPicking ? 'picking' : ''}
-                    title={isPicking ? "Stop picking" : "Pick element"}
-                    disabled={isRecording}
-                    onClick={handlePick}
-                >⊕</button>
                 {(isRunning || stepLine !== -1)
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title={isStepDebugging ? "Abort" : "Stop"} onClick={handleStop}>{isStepDebugging ? <AbortIcon /> : <StopIcon />}</button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim()} onClick={handleRun}>&#9654;</button>
@@ -530,6 +516,8 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >JS</button>
                 </div>
+                <button id="open-btn" title="Open .pw file" onClick={handleFileOpen}><FolderOpenIcon /></button>
+                <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}><SaveIcon /></button>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                     {isDarkMode ? <SunIcon /> : <MoonIcon />}
                 </button>
