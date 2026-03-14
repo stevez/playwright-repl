@@ -56,24 +56,6 @@ export function StopIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function BugIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="12" cy="15" rx="4" ry="5" />
-      <circle cx="12" cy="7.5" r="2.5" />
-      <line x1="10.5" y1="5.5" x2="8" y2="3" />
-      <line x1="13.5" y1="5.5" x2="16" y2="3" />
-      <line x1="8" y1="13" x2="4" y2="12" />
-      <line x1="8" y1="15" x2="4" y2="15" />
-      <line x1="8" y1="17" x2="4" y2="18" />
-      <line x1="16" y1="13" x2="20" y2="12" />
-      <line x1="16" y1="15" x2="20" y2="15" />
-      <line x1="16" y1="17" x2="20" y2="18" />
-      <line x1="12" y1="10" x2="12" y2="20" />
-    </svg>
-  );
-}
-
 export function StepForwardIcon({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -107,12 +89,3 @@ export function CrosshairIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function TabsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="1" y="4" width="14" height="10" rx="1.5"/>
-      <path d="M1 7h14"/>
-      <rect x="3" y="1" width="6" height="4" rx="1"/>
-    </svg>
-  );
-}

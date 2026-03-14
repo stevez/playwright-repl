@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
     SPECIAL_KEYS,
-    pendingFill,
     flushPendingFill,
     onClickCapture,
     onInputCapture,
