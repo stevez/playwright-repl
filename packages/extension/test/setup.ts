@@ -1,7 +1,13 @@
+import { vi } from "vitest";
 import * as chrome from "vitest-chrome/lib/index.esm.js";
 
 // Add chrome object to global scope so imported modules can use it
 Object.assign(global, chrome);
+
+// vitest-chrome doesn't include chrome.tabs.update — add it manually
+if (!globalThis.chrome.tabs?.update) {
+  (globalThis.chrome.tabs as any).update = vi.fn().mockResolvedValue({});
+}
 
 // vitest-chrome doesn't include chrome.scripting — add it manually
 if (!globalThis.chrome.scripting) {

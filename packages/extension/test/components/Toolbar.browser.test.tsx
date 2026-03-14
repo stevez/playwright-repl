@@ -51,6 +51,7 @@ describe('Toolbar component tests', () => {
       chrome: {
         tabs: {
           query: vi.fn().mockResolvedValue([{ id: 1, url: 'https://example.com' }]),
+          update: vi.fn().mockResolvedValue({}),
         },
         runtime: {
           sendMessage: vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' }),
