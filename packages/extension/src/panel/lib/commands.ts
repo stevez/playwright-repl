@@ -129,6 +129,7 @@ import {
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
+  actionByRole, fillByRole, selectByRole,
   highlightByText, highlightByRole, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
   evalCode, runCode, takeScreenshot, takeSnapshot,
@@ -411,6 +412,26 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     const rest = positional.slice(selectorEnd + 1).join(' ');
 
     return { jsExpr: call(chainAction, selector, action, rest || undefined) };
+  }
+
+  // ── Role-based locators (e.g. click tab "npm" --nth 0) ─────
+  const ROLE_ACTIONS: Record<string, string> = {
+    click: 'click', dblclick: 'dblclick', hover: 'hover',
+    check: 'check', uncheck: 'uncheck',
+  };
+  if (args._.length >= 3 && args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
+    const role = args._[1];
+    const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    if (ROLE_ACTIONS[cmdName]) {
+      const name = args._.slice(2).join(' ');
+      return { jsExpr: call(actionByRole, role, name, ROLE_ACTIONS[cmdName], nth) };
+    }
+    if (cmdName === 'fill') {
+      return { jsExpr: call(fillByRole, role, args._[2], args._.slice(3).join(' ') || '', nth) };
+    }
+    if (cmdName === 'select') {
+      return { jsExpr: call(selectByRole, role, args._[2], args._.slice(3).join(' ') || '', nth) };
+    }
   }
 
   // ── Text locators ───────────────────────────────────────────

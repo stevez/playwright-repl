@@ -173,6 +173,26 @@ export async function uncheckByText(page, text, nth, exact) {
   await loc.uncheck();
 }
 
+// ─── Role-based actions (used by recorder output) ──────────────────────────
+
+export async function actionByRole(page, role, name, action, nth) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc[action]();
+}
+
+export async function fillByRole(page, role, name, value, nth) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.fill(value);
+}
+
+export async function selectByRole(page, role, name, value, nth) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.selectOption(value);
+}
+
 // ─── Highlight ──────────────────────────────────────────────────────────────
 
 export async function highlightByText(page, text, nth, exact) {

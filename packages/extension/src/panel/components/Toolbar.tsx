@@ -1,11 +1,9 @@
-import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
-import { jsonlToRepl } from '@/lib/converter';
-import { connectWithRetry, attachToTab } from '@/lib/bridge';
+import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, AbortIcon, CrosshairIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
-import { asLocator } from '@/lib/locator/locatorGenerators';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
@@ -16,10 +14,6 @@ interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' |
 
 function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, dispatch, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const recorderPortRef = useRef<chrome.runtime.Port | null>(null);
-    const prevActionsRef = useRef<string[]>([]);
-    // State machine for fill sequence: click → fill → Enter → release as single command
-    const pendingFillRef = useRef<{ text: string; jsonl: string } | null>(null);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isPicking, setIsPicking] = useState(false);
@@ -226,141 +220,29 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         dispatch({ type: 'STEP_ADVANCE', stepLine: nextStepLine });
     }
 
-    // ─── Recording (crx port-based) ───
+    // ─── Recording (content script-based) ───
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleRecordedSources = useCallback((sources: any[]) => {
-        const jsonlSource = sources.find(s => s.id === 'jsonl') || sources[0];
-        if (!jsonlSource?.actions?.length) return;
-        const actions = jsonlSource.actions as string[];
-        const prev = prevActionsRef.current;
-
-        // Detect new actions (appended) vs updated actions (in-place edit, e.g. fill text changing)
-        const newActions = actions.slice(prev.length);
-        const lastUpdated = prev.length > 0 && actions.length === prev.length &&
-            actions[actions.length - 1] !== prev[prev.length - 1];
-
-        prevActionsRef.current = [...actions];
-
-        // ─── JSONL-level helpers (mode-independent) ───
-        const parseAction = (jsonl: string) => { try { return JSON.parse(jsonl); } catch { return null; } };
-        const isOpenPage = (jsonl: string) => parseAction(jsonl)?.name === 'openPage';
-        const isFocusClick = (jsonl: string) => {
-            const a = parseAction(jsonl);
-            if (a?.name !== 'click') return false;
-            let loc = a.locator;
-            while (loc) {
-                if (loc.kind === 'role' && loc.body === 'textbox') return true;
-                loc = loc.next;
+    useEffect(() => {
+        if (!chrome.runtime?.onMessage) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listener = (msg: any) => {
+            if (msg.type === 'recorded-action') {
+                editorRef.current?.insertAtCursor(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
-            return false;
-        };
-        // Click immediately followed by check/uncheck/select → redundant (recorder artifact)
-        const isClickBeforeToggle = (jsonl: string, nextJsonl: string | undefined) => {
-            if (!nextJsonl) return false;
-            const a = parseAction(jsonl);
-            if (a?.name !== 'click') return false;
-            const next = parseAction(nextJsonl);
-            return ['check', 'uncheck', 'select', 'selectOption'].includes(next?.name);
-        };
-        const isFill = (jsonl: string) => parseAction(jsonl)?.name === 'fill';
-        const isBareEnter = (jsonl: string) => {
-            const a = parseAction(jsonl);
-            return a?.name === 'press' && a?.key === 'Enter';
-        };
-
-        // Helper: convert a single action to editor text
-        const actionToEditorText = (jsonl: string, idx: number): string | null => {
-            if (isOpenPage(jsonl)) return null;
-            if (editorMode === 'js') {
-                const jsSource = sources.find(s => s.id === 'javascript');
-                const jsAction = (jsSource?.actions as string[] | undefined)?.[idx];
-                if (!jsAction) return null;
-                return jsAction.split('\n')
-                    .map((line: string) => line.replace(/^ {2}/, ''))
-                    .map((line: string) => line.replace(/^\/\/ (await expect\()/, '$1'))
-                    .filter((line: string) => !line.startsWith('const page ='))
-                    .join('\n') || null;
-            } else {
-                return jsonlToRepl(jsonl, false) || null;
+            if (msg.type === 'recorded-fill-update' || msg.type === 'recorded-fill-submit') {
+                editorRef.current?.replaceLastInsert(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
         };
-
-        // In-place update: replace the last inserted line in the editor + console
-        if (lastUpdated) {
-            const lastAction = actions[actions.length - 1];
-            // Update pending fill text if it's being edited (user still typing)
-            if (pendingFillRef.current && isFill(lastAction)) {
-                const text = actionToEditorText(lastAction, actions.length - 1);
-                if (text) pendingFillRef.current = { text, jsonl: lastAction };
-                return;
-            }
-            const text = actionToEditorText(lastAction, actions.length - 1);
-            if (text) editorRef.current?.replaceLastInsert(text);
-            return;
-        }
-
-        // ─── State machine: buffer click→fill→Enter, release as single command ───
-        if (newActions.length) {
-            const flush = () => {
-                if (pendingFillRef.current) {
-                    editorRef.current?.insertAtCursor(pendingFillRef.current.text);
-                    pendingFillRef.current = null;
-                }
-            };
-
-            for (let i = 0; i < newActions.length; i++) {
-                const jsonl = newActions[i];
-                const idx = prev.length + i;
-
-                // Deduplicate consecutive identical actions (recorder artifact: emits same action twice)
-                const prevJsonl = i > 0 ? newActions[i - 1] : (prev.length > 0 ? prev[prev.length - 1] : null);
-                if (prevJsonl && jsonl === prevJsonl) continue;
-
-                // Click on input → skip (noise before fill)
-                if (isFocusClick(jsonl)) continue;
-
-                // Click followed by check/uncheck/select → skip (keep the semantic action)
-                if (isClickBeforeToggle(jsonl, newActions[i + 1])) continue;
-
-                // Fill → buffer (wait for Enter)
-                if (isFill(jsonl)) {
-                    flush(); // release any previous pending fill
-                    const text = actionToEditorText(jsonl, idx);
-                    if (text) pendingFillRef.current = { text, jsonl };
-                    continue;
-                }
-
-                // Press Enter after fill → release as fill --submit
-                if (isBareEnter(jsonl) && pendingFillRef.current) {
-                    if (editorMode === 'pw') {
-                        editorRef.current?.insertAtCursor(pendingFillRef.current.text + ' --submit');
-                    } else {
-                        // JS mode: emit fill, skip Enter (form submit is implicit)
-                        editorRef.current?.insertAtCursor(pendingFillRef.current.text);
-                    }
-                    pendingFillRef.current = null;
-                    continue;
-                }
-
-                // Any other action → flush pending fill, emit this action
-                flush();
-                const text = actionToEditorText(jsonl, idx);
-                if (text) editorRef.current?.insertAtCursor(text);
-            }
-            // Don't flush at end — keep pending fill buffered for cross-batch Enter
-        }
-    }, [dispatch, editorMode]);
+        chrome.runtime.onMessage.addListener(listener);
+        return () => chrome.runtime.onMessage.removeListener(listener);
+    }, [editorMode]);
 
     async function handleRecord() {
         if (!chrome.tabs?.query) return;
 
         if (isRecording) {
-            const port = recorderPortRef.current;
-            recorderPortRef.current = null;
             setIsRecording(false);
             chrome.runtime.sendMessage({ type: 'record-stop' }).catch(() => {});
-            port?.disconnect();
             return;
         }
 
@@ -376,41 +258,14 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             return;
         }
 
-        try {
-            recorderPortRef.current = await connectWithRetry();
-        } catch {
-            dispatch({ type: 'ADD_LINE', line: { text: 'Recording failed: could not connect to recorder.', type: 'error' } });
-            return;
-        }
-
         setIsRecording(true);
-        prevActionsRef.current = [];
 
-        if (result.url && result.url !== 'about:blank') {
+        if (result.url && result.url !== 'about:blank' && !result.url.startsWith('chrome://')) {
             const gotoCmd = editorMode === 'js'
                 ? `await page.goto(${JSON.stringify(result.url)});`
                 : `goto "${result.url}"`;
             editorRef.current?.insertAtCursor(gotoCmd);
         }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        recorderPortRef.current!.onMessage.addListener((msg: any) => {
-            if (msg.type === 'recorder' && msg.method === 'setSources') {
-                handleRecordedSources(msg.sources);
-            }
-            if (msg.type === 'recorder' && msg.method === 'elementPicked') {
-                const selector = msg.elementInfo?.selector;
-                if (selector) {
-                    const locator = asLocator(selector);
-                    dispatch({ type: 'ADD_LINE', line: { text: locator, type: 'info' } });
-                }
-            }
-        });
-
-        recorderPortRef.current!.onDisconnect.addListener(() => {
-            recorderPortRef.current = null;
-            setIsRecording(false);
-        });
     }
 
     // ─── Pick element ───

@@ -2,8 +2,8 @@
  * Recording E2E test fixtures.
  *
  * Launches Chromium with the real extension loaded. Tests exercise the full
- * recording flow: panel → record-start → background (recorder.show) →
- * recorder port → setSources → editor.
+ * recording flow: panel → record-start → background (executeScript recorder.js) →
+ * content script captures events → chrome.runtime.sendMessage → editor.
  */
 
 import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';

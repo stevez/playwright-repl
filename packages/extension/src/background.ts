@@ -106,34 +106,35 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
 
 // ─── Recording ───────────────────────────────────────────────────────────────
 
+let recordingTabId: number | null = null;
+
 async function startRecording(): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
-    if (!crxApp) crxApp = await crx.start();
-
     const tabId = await getActiveTabId();
-    if (tabId && crxApp.context().pages().length === 0) await attachToTab(tabId);
-
-    const url = crxApp.context().pages()[0]?.url();
-
-    // Fire without await — recorder.show() waits for the panel to connect back via port,
-    // but the panel only calls connectWithRetry() after receiving { ok: true } here.
-    // Awaiting would create a deadlock.
-    crxApp.recorder.show({
-      mode: 'recording',
-      language: 'javascript',
-      window: { type: 'sidepanel', url: 'panel/panel.html' },
-    }).catch((e: unknown) => console.error('[record] recorder.show error:', e));
-
-    return { ok: true, url };
+    if (!tabId) return { ok: false, error: 'No active tab' };
+    const tab = await chrome.tabs.get(tabId);
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] });
+    recordingTabId = tabId;
+    return { ok: true, url: tab.url ?? '' };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
 }
 
 async function stopRecording(): Promise<{ ok: boolean }> {
-  await crxApp?.recorder.hide().catch(() => {});
+  if (recordingTabId) {
+    await chrome.tabs.sendMessage(recordingTabId, { type: 'record-stop' }).catch(() => {});
+    recordingTabId = null;
+  }
   return { ok: true };
 }
+
+// Re-inject recorder after navigation (page reload / SPA navigation)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (tabId === recordingTabId && changeInfo.status === 'complete') {
+    chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] }).catch(() => {});
+  }
+});
 
 // ─── Pick Element ────────────────────────────────────────────────────────────
 

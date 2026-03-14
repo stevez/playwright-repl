@@ -18,10 +18,6 @@ vi.mock('@playwright-repl/playwright-crx', () => {
     attach: vi.fn().mockResolvedValue(mockPage),
     detach: vi.fn().mockResolvedValue(undefined),
     context: vi.fn().mockReturnValue(mockContext),
-    recorder: {
-      show: vi.fn().mockResolvedValue(undefined),
-      hide: vi.fn().mockResolvedValue(undefined),
-    },
   };
   return { crx: { start: vi.fn().mockResolvedValue(mockCrxApp) } };
 });
@@ -75,6 +71,9 @@ describe("background.ts message handlers", () => {
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 42, url: 'https://example.com' });
     (chrome.tabs as any).query = vi.fn().mockResolvedValue([{ id: 42, url: 'https://example.com' }]);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
+    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
+    (chrome.scripting as any).executeScript = vi.fn().mockResolvedValue([]);
 
     // Capture chrome event listeners
     const messageListeners: typeof onMessageListener[] = [];
@@ -179,26 +178,25 @@ describe("background.ts message handlers", () => {
 
   // ─── record-start / record-stop ───────────────────────────────────────────
 
-  it("record-start starts crxApp and calls recorder.show", async () => {
+  it("record-start injects recorder content script and returns url", async () => {
     const result = await sendMessage({ type: 'record-start' });
-    expect(mockCrxApp.recorder.show).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'recording', language: 'javascript' })
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { tabId: 42 }, files: ['content/recorder.js'] })
     );
-    expect(result).toEqual({ ok: true, url: expect.any(String) });
+    expect(result).toEqual({ ok: true, url: 'https://example.com' });
   });
 
-  it("record-start returns ok:false when crx.start throws", async () => {
-    const { crx } = await import('@playwright-repl/playwright-crx');
-    (crx.start as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('crx init failed'));
+  it("record-start returns ok:false when executeScript throws", async () => {
+    (chrome.scripting.executeScript as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('injection failed'));
     const result = await sendMessage({ type: 'record-start' });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('crx init failed');
+    expect(result.error).toContain('injection failed');
   });
 
-  it("record-stop calls recorder.hide and returns ok:true", async () => {
+  it("record-stop sends record-stop message to tab and returns ok:true", async () => {
     await sendMessage({ type: 'record-start' });
     const result = await sendMessage({ type: 'record-stop' });
-    expect(mockCrxApp.recorder.hide).toHaveBeenCalled();
+    expect((chrome.tabs as any).sendMessage).toHaveBeenCalledWith(42, { type: 'record-stop' });
     expect(result).toEqual({ ok: true });
   });
 
@@ -562,6 +560,8 @@ describe("background.ts message handlers", () => {
     (chrome.debugger as any).onDetach = { addListener: vi.fn() };
     (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
+    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     // Wait for the async ensureOffscreen call
@@ -577,18 +577,13 @@ describe("background.ts message handlers", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  // ─── startRecording auto-attach ────────────────────────────────────────────
+  // ─── startRecording without active tab ─────────────────────────────────────
 
-  it("record-start auto-attaches when no pages exist", async () => {
-    mockCrxApp.context.mockReturnValue({ pages: vi.fn().mockReturnValue([]) });
-    // After attachToTab, pages returns one page
-    mockCrxApp.attach.mockImplementation(() => {
-      mockCrxApp.context.mockReturnValue({ pages: vi.fn().mockReturnValue([mockPage]) });
-      return Promise.resolve(mockPage);
-    });
+  it("record-start returns ok:false when no active tab", async () => {
+    (chrome.tabs as any).query = vi.fn().mockResolvedValue([]);
     const result = await sendMessage({ type: 'record-start' });
-    expect(result.ok).toBe(true);
-    expect(mockCrxApp.attach).toHaveBeenCalledWith(42);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('No active tab');
   });
 
   // ─── ensureSelfAttached edge cases ─────────────────────────────────────────
@@ -1071,6 +1066,8 @@ describe("background.ts message handlers", () => {
     (chrome.debugger as any).onDetach = { addListener: vi.fn() };
     (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
+    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     await new Promise(r => setTimeout(r, 20));
@@ -1088,6 +1085,8 @@ describe("background.ts message handlers", () => {
     (chrome.action as any).onClicked = { addListener: vi.fn() };
     (chrome.debugger as any).onDetach = { addListener: vi.fn() };
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
+    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     await new Promise(r => setTimeout(r, 20));
@@ -1132,19 +1131,15 @@ describe("background.ts message handlers", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("recorder.show catch is exercised when show rejects", async () => {
-    mockCrxApp.recorder.show.mockRejectedValue(new Error('show failed'));
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const result = await sendMessage({ type: 'record-start' });
-    expect(result.ok).toBe(true);
-    await new Promise(r => setTimeout(r, 10));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('[record]'), expect.any(Error));
-    spy.mockRestore();
+  it("record-stop is safe when no recording is active", async () => {
+    const result = await sendMessage({ type: 'record-stop' });
+    expect((chrome.tabs as any).sendMessage).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true });
   });
 
-  it("recorder.hide catch is exercised when hide rejects", async () => {
+  it("record-stop swallows sendMessage errors", async () => {
     await sendMessage({ type: 'record-start' });
-    mockCrxApp.recorder.hide.mockRejectedValue(new Error('hide failed'));
+    (chrome.tabs as any).sendMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
     const result = await sendMessage({ type: 'record-stop' });
     expect(result).toEqual({ ok: true });
   });

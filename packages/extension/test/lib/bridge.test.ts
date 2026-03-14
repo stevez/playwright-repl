@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { attachToTab, connectWithRetry, executeCommand, executeCommandForConsole, cdpEvaluate, cdpGetProperties } from '@/lib/bridge';
+import { attachToTab, executeCommand, executeCommandForConsole, cdpEvaluate, cdpGetProperties } from '@/lib/bridge';
 
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: vi.fn(),
@@ -51,82 +51,6 @@ describe('bridge', () => {
     expect(result.error).toContain('Cannot attach');
   });
 
-  // ─── connectWithRetry ─────────────────────────────────────────────────────
-
-  it('connectWithRetry resolves immediately when port stays connected', async () => {
-    const port = {
-      onDisconnect: { addListener: vi.fn() },
-    };
-    (chrome.runtime.connect as ReturnType<typeof vi.fn>).mockReturnValue(port);
-
-    const promise = connectWithRetry();
-    await vi.advanceTimersByTimeAsync(150);
-
-    const result = await promise;
-    expect(result).toBe(port);
-  });
-
-  it('connectWithRetry retries after immediate disconnect', async () => {
-    const disconnectListeners: ((...args: unknown[]) => unknown)[] = [];
-    const badPort = {
-      onDisconnect: {
-        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => {
-          disconnectListeners.push(fn);
-          // Simulate immediate disconnect
-          setTimeout(() => fn(), 0);
-        }),
-      },
-    };
-    const goodPort = {
-      onDisconnect: { addListener: vi.fn() },
-    };
-
-    (chrome.runtime.connect as ReturnType<typeof vi.fn>)
-      .mockReturnValueOnce(badPort)
-      .mockReturnValue(goodPort);
-
-    // Suppress lastError access
-    Object.defineProperty(chrome.runtime, 'lastError', { get: () => undefined, configurable: true });
-
-    const promise = connectWithRetry();
-
-    // First attempt: bad port disconnects
-    await vi.advanceTimersByTimeAsync(10);
-    // Retry delay passes
-    await vi.advanceTimersByTimeAsync(200);
-    // Settle timeout for good port
-    await vi.advanceTimersByTimeAsync(150);
-
-    const result = await promise;
-    expect(result).toBe(goodPort);
-    expect(chrome.runtime.connect).toHaveBeenCalledTimes(2);
-  });
-
-  it('connectWithRetry rejects after max retries', async () => {
-    const disconnectListeners: ((...args: unknown[]) => unknown)[] = [];
-    const badPort = {
-      onDisconnect: {
-        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => {
-          disconnectListeners.push(fn);
-          setTimeout(() => fn(), 0);
-        }),
-      },
-    };
-
-    (chrome.runtime.connect as ReturnType<typeof vi.fn>).mockReturnValue(badPort);
-    Object.defineProperty(chrome.runtime, 'lastError', { get: () => undefined, configurable: true });
-
-    const promise = connectWithRetry(3, 50);
-    // Attach rejection handler immediately to avoid unhandled rejection warning
-    const expectation = expect(promise).rejects.toThrow('Could not connect to recorder after retries');
-
-    // Advance through all retries
-    for (let i = 0; i < 5; i++) {
-      await vi.advanceTimersByTimeAsync(200);
-    }
-
-    await expectation;
-  });
 });
 
 // ─── cdpEvaluate / cdpGetProperties ─────────────────────────────────────────

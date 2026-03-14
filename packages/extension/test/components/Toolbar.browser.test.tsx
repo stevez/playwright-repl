@@ -11,11 +11,6 @@ vi.mock('@/lib/bridge', () => ({
   executeCommand: vi.fn(),
   cdpEvaluate: vi.fn().mockResolvedValue(undefined),
   attachToTab: vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' }),
-  connectWithRetry: vi.fn().mockResolvedValue({
-    onMessage: { addListener: vi.fn() },
-    onDisconnect: { addListener: vi.fn() },
-    disconnect: vi.fn(),
-  }),
 }));
 
 vi.mock('@/lib/sw-debugger', () => ({
@@ -28,7 +23,7 @@ vi.mock('@/lib/settings', () => ({
   storeSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { executeCommand, cdpEvaluate, attachToTab, connectWithRetry } from '@/lib/bridge';
+import { executeCommand, cdpEvaluate, attachToTab } from '@/lib/bridge';
 import { swDebugEval } from '@/lib/sw-debugger';
 
 // ─── Helper to render Toolbar with default required props ─────────────────────
@@ -69,11 +64,6 @@ describe('Toolbar component tests', () => {
     });
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
     vi.mocked(attachToTab).mockResolvedValue({ ok: true, url: 'https://example.com' });
-    vi.mocked(connectWithRetry).mockResolvedValue({
-      onMessage: { addListener: vi.fn() },
-      onDisconnect: { addListener: vi.fn() },
-      disconnect: vi.fn(),
-    } as unknown as chrome.runtime.Port);
     vi.mocked(swDebugEval).mockResolvedValue(undefined);
     vi.mocked(cdpEvaluate).mockResolvedValue(undefined);
   });
@@ -405,18 +395,10 @@ describe('Toolbar component tests', () => {
     });
   });
 
-  it('should send record-stop and disconnect port when stop clicked', async () => {
-    const mockPort = {
-      onMessage: { addListener: vi.fn() },
-      onDisconnect: { addListener: vi.fn() },
-      disconnect: vi.fn(),
-    } as unknown as chrome.runtime.Port;
-    vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
-
+  it('should send record-stop when stop clicked', async () => {
     const screen = await renderToolbar();
 
     await screen.getByRole('button', { name: 'Record' }).click();
-    await vi.waitFor(() => expect(connectWithRetry).toHaveBeenCalled());
 
     await screen.getByRole('button', { name: 'Stop' }).click();
     await vi.waitFor(() => {
@@ -451,54 +433,26 @@ describe('Toolbar component tests', () => {
     });
   });
 
-  it('should dispatch error when connectWithRetry fails', async () => {
-    vi.mocked(connectWithRetry).mockRejectedValue(new Error('port error'));
-
-    const dispatch = vi.fn();
-    const screen = await renderToolbar({ dispatch });
-
-    await screen.getByRole('button', { name: 'Record' }).click();
-
-    await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'ADD_LINE',
-        line: { text: 'Recording failed: could not connect to recorder.', type: 'error' }
-      });
-    });
-  });
-
-  it('should call insertAtCursor when port receives setSources', async () => {
-    let portMessageListener: ((...args: unknown[]) => unknown) | null = null;
-    const mockPort = {
-      onMessage: {
-        addListener: vi.fn((fn: (...args: unknown[]) => unknown) => { portMessageListener = fn; }),
-      },
-      onDisconnect: { addListener: vi.fn() },
-      disconnect: vi.fn(),
-    } as unknown as chrome.runtime.Port;
-    vi.mocked(connectWithRetry).mockResolvedValue(mockPort);
-
+  it('should call insertAtCursor when recorder sends recorded-action', async () => {
     const insertAtCursor = vi.fn();
-    const editorRef = { current: { insertAtCursor } };
+    const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
+
+    // Set up chrome.runtime.onMessage to capture the listener
+    const listeners: ((msg: any) => void)[] = [];
+    window.chrome.runtime.onMessage = {
+      addListener: vi.fn((fn: any) => listeners.push(fn)),
+      removeListener: vi.fn(),
+    } as any;
+
     const screen = await renderToolbar({ editorRef: editorRef as any });
 
-    await screen.getByRole('button', { name: 'Record' }).click();
-    await vi.waitFor(() => expect(portMessageListener).not.toBeNull());
-
-    // Simulate JSONL source message from playwright-crx recorder
-    portMessageListener!({
-      type: 'recorder',
-      method: 'setSources',
-      sources: [{
-        id: 'jsonl',
-        actions: [
-          JSON.stringify({ name: 'click', locator: { kind: 'text', body: 'Submit' } }),
-        ],
-      }],
-    });
+    // Simulate a recorded-action message from content script
+    for (const listener of listeners) {
+      listener({ type: 'recorded-action', action: { pw: 'click "Submit"', js: "await page.getByRole('button', { name: 'Submit' }).click();" } });
+    }
 
     await vi.waitFor(() => {
-      expect(insertAtCursor).toHaveBeenCalledWith(expect.stringContaining('click'));
+      expect(insertAtCursor).toHaveBeenCalledWith('click "Submit"');
     });
   });
 
