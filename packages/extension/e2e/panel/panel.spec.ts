@@ -25,6 +25,18 @@ test.describe("Panel page test", () => {
   test.beforeEach(async ({ panelPage, extensionId }) => {
     // Clear storage before page load so App.tsx useEffect reads defaults
     await panelPage.addInitScript(() => chrome.storage.local.clear());
+    // Intercept onMessage.addListener before React mounts so recording tests
+    // can dispatch recorded-action messages to the Toolbar listener
+    await panelPage.addInitScript(() => {
+      const listeners: any[] = [];
+      const origAdd = chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);
+      const origRemove = chrome.runtime.onMessage.removeListener.bind(chrome.runtime.onMessage);
+      chrome.runtime.onMessage.addListener = ((fn: any) => { listeners.push(fn); return origAdd(fn); }) as any;
+      chrome.runtime.onMessage.removeListener = ((fn: any) => {
+        const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); return origRemove(fn);
+      }) as any;
+      (window as any).__fireRecorderMsg = (msg: any) => { for (const fn of listeners) fn(msg, {}, () => {}); };
+    });
     await panelPage.goto(`chrome-extension://${extensionId}/panel/panel.html`);
 
     // Stub health + attach — App.tsx sends these on mount
@@ -170,11 +182,6 @@ test.describe("Panel page test", () => {
         if (msg.type === 'record-stop') return { ok: true };
         return orig(msg);
       };
-      (chrome.runtime as any).connect = () => ({
-        onMessage: { addListener: () => {} },
-        onDisconnect: { addListener: () => {} },
-        disconnect: () => {},
-      });
     });
   }
 
@@ -216,38 +223,13 @@ test.describe("Panel page test", () => {
 
   // ─── Recording content insertion ──────────────────────────────────────────
 
-  /**
-   * Override chrome.runtime.connect() so the port's onMessage listener is captured.
-   * Returns a helper that fires a setSources message into the panel.
-   * Must be called BEFORE clicking the record button.
-   */
-  async function setupRecorderPort(page: Page): Promise<(sources: any[]) => Promise<void>> {
-    await mockRecordingApis(page);
-    await page.evaluate(() => {
-      let msgListener: ((msg: any) => void) | null = null;
-      (window as any).__fireRecorderSources = (sources: any[]) =>
-        msgListener?.({ type: 'recorder', method: 'setSources', sources });
-      (chrome.runtime as any).connect = () => ({
-        onMessage: { addListener: (fn: any) => { msgListener = fn; } },
-        onDisconnect: { addListener: () => { } },
-        disconnect: () => { },
-      });
-    });
-    return async (sources: any[]) => {
-      await page.evaluate((s) => (window as any).__fireRecorderSources(s), sources);
-    };
-  }
-
-  /** Build a sources payload with jsonl + optional javascript actions. */
-  function recorderSources(jsonlActions: object[], jsActions?: string[]) {
-    return [
-      { id: 'jsonl', actions: jsonlActions.map((a) => JSON.stringify(a)) },
-      ...(jsActions ? [{ id: 'javascript', actions: jsActions }] : []),
-    ];
+  /** Fire a recorded-action message to the Toolbar's onMessage listener. */
+  async function fireRecordedAction(page: Page, action: { pw: string; js: string }) {
+    await page.evaluate((a) => (window as any).__fireRecorderMsg({ type: 'recorded-action', action: a }), action);
   }
 
   test('recording inserts goto in pw mode', async ({ panelPage }) => {
-    await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
@@ -258,7 +240,7 @@ test.describe("Panel page test", () => {
   test('recording inserts goto in JS syntax in JS mode', async ({ panelPage }) => {
     await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
     await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
-    await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
@@ -267,13 +249,11 @@ test.describe("Panel page test", () => {
   });
 
   test('recorded pw action appears after goto', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'text', body: 'Submit' } },
-    ]));
+    await fireRecordedAction(panelPage, { pw: 'click "Submit"', js: "await page.getByText('Submit').click();" });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
     await expect(editor).toContainText('click "Submit"');
@@ -286,70 +266,40 @@ test.describe("Panel page test", () => {
   test('recorded JS action appears after goto in JS mode', async ({ panelPage }) => {
     await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
     await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
-    const fireSources = await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    await fireSources(recorderSources(
-      [{ name: 'click', locator: { kind: 'text', body: 'Submit' } }],
-      ['  await page.click("text=Submit");'],
-    ));
+    await fireRecordedAction(panelPage, { pw: 'click "Submit"', js: "await page.getByText('Submit').click();" });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('page.click("text=Submit")');
+    await expect(editor).toContainText("page.getByText('Submit').click()");
 
     const text = await editor.textContent();
     expect(text!.indexOf('page.goto')).toBeGreaterThanOrEqual(0);
-    expect(text!.indexOf('page.click')).toBeGreaterThan(text!.indexOf('page.goto'));
+    expect(text!.indexOf('getByText')).toBeGreaterThan(text!.indexOf('page.goto'));
   });
 
-  test('openPage action is skipped in pw mode', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
+  test('multiple recorded actions appear in order', async ({ panelPage }) => {
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    await fireSources(recorderSources([
-      { name: 'openPage', url: 'https://example.com' },
-      { name: 'click', locator: { kind: 'text', body: 'Login' } },
-    ]));
+    await fireRecordedAction(panelPage, { pw: 'click "First"', js: "await page.getByText('First').click();" });
+    await fireRecordedAction(panelPage, { pw: 'click "Second"', js: "await page.getByText('Second').click();" });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('click "Login"');
-    expect(await editor.textContent()).not.toContain('openPage');
-  });
-
-  test('incremental setSources calls append only new actions', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
-    await panelPage.getByTestId('record-btn').click();
-    await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
-
-    // First setSources: one action
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'text', body: 'First' } },
-    ]));
-
-    const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('click "First"');
-
-    // Second setSources: cumulative list, only Second is new
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'text', body: 'First' } },
-      { name: 'click', locator: { kind: 'text', body: 'Second' } },
-    ]));
-
     await expect(editor).toContainText('click "Second"');
 
     const text = await editor.textContent();
-    // First appears only once (not duplicated)
     expect(text!.split('First').length - 1).toBe(1);
-    // Second comes after First
     expect(text!.indexOf('First')).toBeLessThan(text!.indexOf('Second'));
   });
 
   test('recording into existing content inserts goto after cursor', async ({ panelPage }) => {
     // Type existing content — cursor ends up at the end
     await fillEditor(panelPage, '# existing script\n');
-    await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
@@ -360,153 +310,81 @@ test.describe("Panel page test", () => {
     expect(text!.indexOf('# existing script')).toBeLessThan(text!.indexOf('goto'));
   });
 
-  test('checkbox click + check deduplicates to single check in pw mode', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
+  test('check action appears in pw mode', async ({ panelPage }) => {
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    // Recorder emits both click and check for a single checkbox interaction
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
-      { name: 'check', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
-    ]));
+    await fireRecordedAction(panelPage, {
+      pw: 'check checkbox "Remember me"',
+      js: "await page.getByRole('checkbox', { name: 'Remember me' }).check();",
+    });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('check "Remember me"');
-
-    const text = await editor.textContent();
-    // click should be filtered — only check appears
-    expect(text!.match(/check/g)?.length).toBe(1);
-    expect(text).not.toContain('click');
+    await expect(editor).toContainText('check checkbox "Remember me"');
+    expect(await editor.textContent()).not.toContain('click');
   });
 
-  test('checkbox click + check deduplicates to single check in JS mode', async ({ panelPage }) => {
+  test('check action appears in JS mode', async ({ panelPage }) => {
     await panelPage.getByTestId('mode-toggle').getByText('JS').click();
     await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
-    const fireSources = await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    // Recorder emits both click and check — JS source has .check() for both
-    await fireSources(recorderSources(
-      [
-        { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
-        { name: 'check', locator: { kind: 'role', body: 'checkbox', options: { name: 'Remember me' } } },
-      ],
-      [
-        "  await page.getByRole('checkbox', { name: 'Remember me' }).check();",
-        "  await page.getByRole('checkbox', { name: 'Remember me' }).check();",
-      ],
-    ));
+    await fireRecordedAction(panelPage, {
+      pw: 'check checkbox "Remember me"',
+      js: "await page.getByRole('checkbox', { name: 'Remember me' }).check();",
+    });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
     await expect(editor).toContainText('.check()');
-
-    const text = await editor.textContent();
-    // Only one .check() should appear (click is deduplicated)
-    expect(text!.match(/\.check\(\)/g)?.length).toBe(1);
   });
 
-  test('uncheck deduplication works the same as check', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
+  test('uncheck action appears in pw mode', async ({ panelPage }) => {
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'role', body: 'checkbox', options: { name: 'Accept terms' } } },
-      { name: 'uncheck', locator: { kind: 'role', body: 'checkbox', options: { name: 'Accept terms' } } },
-    ]));
+    await fireRecordedAction(panelPage, {
+      pw: 'uncheck checkbox "Accept terms"',
+      js: "await page.getByRole('checkbox', { name: 'Accept terms' }).uncheck();",
+    });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('uncheck "Accept terms"');
-
-    const text = await editor.textContent();
-    expect(text).not.toContain('click');
+    await expect(editor).toContainText('uncheck checkbox "Accept terms"');
+    expect(await editor.textContent()).not.toContain('click');
   });
 
-  test('click + selectOption deduplicates to single select in pw mode', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
+  test('select action appears in pw mode', async ({ panelPage }) => {
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    // Recorder emits click + selectOption for dropdown selection
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } } },
-      { name: 'selectOption', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } }, options: ['US'] },
-    ]));
+    await fireRecordedAction(panelPage, {
+      pw: 'select combobox "Country" "US"',
+      js: "await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
+    });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('select "Country" "US"');
-
-    const text = await editor.textContent();
-    expect(text).not.toContain('click');
+    await expect(editor).toContainText('select combobox "Country" "US"');
+    expect(await editor.textContent()).not.toContain('click');
   });
 
-  test('click + selectOption deduplicates in JS mode', async ({ panelPage }) => {
+  test('select action appears in JS mode', async ({ panelPage }) => {
     await panelPage.getByTestId('mode-toggle').getByText('JS').click();
     await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
-    const fireSources = await setupRecorderPort(panelPage);
+    await mockRecordingApis(panelPage);
     await panelPage.getByTestId('record-btn').click();
     await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
 
-    await fireSources(recorderSources(
-      [
-        { name: 'click', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } } },
-        { name: 'selectOption', locator: { kind: 'role', body: 'combobox', options: { name: 'Country' } }, options: ['US'] },
-      ],
-      [
-        "  await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
-        "  await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
-      ],
-    ));
+    await fireRecordedAction(panelPage, {
+      pw: 'select combobox "Country" "US"',
+      js: "await page.getByRole('combobox', { name: 'Country' }).selectOption('US');",
+    });
 
     const editor = panelPage.getByTestId('editor').getByRole('textbox');
     await expect(editor).toContainText("selectOption('US')");
-
-    const text = await editor.textContent();
-    expect(text!.match(/selectOption/g)?.length).toBe(1);
-  });
-
-  test('click + check deduplicates for radio buttons in pw mode', async ({ panelPage }) => {
-    const fireSources = await setupRecorderPort(panelPage);
-    await panelPage.getByTestId('record-btn').click();
-    await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
-
-    await fireSources(recorderSources([
-      { name: 'click', locator: { kind: 'role', body: 'radio', options: { name: 'Option A' } } },
-      { name: 'check', locator: { kind: 'role', body: 'radio', options: { name: 'Option A' } } },
-    ]));
-
-    const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('check "Option A"');
-
-    const text = await editor.textContent();
-    expect(text).not.toContain('click');
-  });
-
-  test('click + check deduplicates for switch in JS mode', async ({ panelPage }) => {
-    await panelPage.getByTestId('mode-toggle').getByText('JS').click();
-    await expect(panelPage.getByTestId('mode-toggle').getByText('JS')).toHaveAttribute('data-active', '');
-    const fireSources = await setupRecorderPort(panelPage);
-    await panelPage.getByTestId('record-btn').click();
-    await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/);
-
-    await fireSources(recorderSources(
-      [
-        { name: 'click', locator: { kind: 'role', body: 'switch', options: { name: 'Dark mode' } } },
-        { name: 'check', locator: { kind: 'role', body: 'switch', options: { name: 'Dark mode' } } },
-      ],
-      [
-        "  await page.getByRole('switch', { name: 'Dark mode' }).check();",
-        "  await page.getByRole('switch', { name: 'Dark mode' }).check();",
-      ],
-    ));
-
-    const editor = panelPage.getByTestId('editor').getByRole('textbox');
-    await expect(editor).toContainText('.check()');
-
-    const text = await editor.textContent();
-    expect(text!.match(/\.check\(\)/g)?.length).toBe(1);
   });
 
   // ─── Editor mode toggle ─────────────────────────────────────────────────────

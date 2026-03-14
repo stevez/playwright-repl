@@ -57,7 +57,7 @@ test.describe('Recording flow', () => {
       // No bringToFront — waitForFunction works via CDP regardless of which tab
       // is active, and keeping the test page in front avoids Chrome throttling
       // the recorder's JS in the background tab.
-      await waitForEditorText(panelPage, 'click "Submit"');
+      await waitForEditorText(panelPage, 'click button "Submit"');
     });
 
     test('filling a text input records a fill action', async ({ panelPage, testPage }) => {
