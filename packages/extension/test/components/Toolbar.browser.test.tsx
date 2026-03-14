@@ -444,7 +444,7 @@ describe('Toolbar component tests', () => {
       removeListener: vi.fn(),
     } as any;
 
-    const screen = await renderToolbar({ editorRef: editorRef as any });
+    await renderToolbar({ editorRef: editorRef as any });
 
     // Simulate a recorded-action message from content script
     for (const listener of listeners) {
