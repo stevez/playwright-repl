@@ -82,6 +82,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     async function handleTabChange(tabId: number) {
         const tab = availableTabs.find(t => t.id === tabId);
         setSelectedTabId(tabId); // show in dropdown immediately
+        chrome.tabs.update(tabId, { active: true }).catch(() => {});
         if (tab && isInternalUrl(tab.url)) {
             dispatch({ type: 'DETACH' });
             return;
