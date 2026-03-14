@@ -185,6 +185,16 @@ export async function highlightByText(page, text, nth, exact) {
     : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
+export async function highlightByRole(page, role, name, nth) {
+  let loc = page.getByRole(role, { name, exact: true });
+  const count = await loc.count();
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.highlight();
+  return nth !== undefined
+    ? 'Highlighted 1 of ' + count
+    : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
+}
+
 export async function highlightBySelector(page, selector, nth) {
   let loc = page.locator(selector);
   const count = await loc.count();

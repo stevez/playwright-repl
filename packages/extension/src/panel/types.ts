@@ -9,8 +9,10 @@ export type OutputLine = {
 
 export type PickResultData = {
     locator: string;           // "page.getByRole('button', { name: 'Submit' })"
-    pwCommand: string | null;  // 'click "Submit"' or null if not expressible
-    jsExpression: string;      // "await page.getByRole('button', { name: 'Submit' }).click()"
+    pwCommand: string | null;  // 'highlight "Submit"' or null if not expressible
+    jsExpression: string;      // "await page.getByRole('button', { name: 'Submit' }).highlight()"
+    assertJs?: string;         // "await expect(page.getByRole('button', { name: 'Submit' })).toContainText('Submit')"
+    assertPw?: string;         // 'verify-text "Submit"'
     details?: {
         tag: string;
         text: string;
@@ -20,6 +22,8 @@ export type PickResultData = {
         count: number;
         attributes: Record<string, string>;
         box?: { x: number; y: number; width: number; height: number };
+        value?: string;
+        checked?: boolean;
     };
 }
 
@@ -33,6 +37,8 @@ export type ElementPickInfo = {
     visible: boolean;
     enabled: boolean;
     box: { x: number; y: number; width: number; height: number };
+    value?: string;
+    checked?: boolean;
 }
 
 export type CommandResult = {

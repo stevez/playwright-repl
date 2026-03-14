@@ -112,6 +112,17 @@
         return '';
     }
 
+    // ─── Locator disambiguation ─────────────────────────────────────────────
+
+    function findByRoleAndName(role: string, name: string): Element[] {
+        const matches: Element[] = [];
+        for (const el of document.querySelectorAll('*')) {
+            if (getImplicitRole(el) === role && getAccessibleName(el) === name)
+                matches.push(el);
+        }
+        return matches;
+    }
+
     // ─── Locator generation ──────────────────────────────────────────────────
 
     function escapeString(s: string): string {
@@ -128,7 +139,17 @@
         // 2. Role + accessible name
         const role = getImplicitRole(el);
         const name = getAccessibleName(el);
-        if (role && name) return `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+        if (role && name) {
+            // Disambiguate when multiple elements share same role + name
+            const matches = findByRoleAndName(role, name);
+            if (matches.length > 1) {
+                // exact: true so Playwright matches same elements as our exact comparison
+                const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
+                const idx = matches.indexOf(el);
+                return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
+            }
+            return `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+        }
 
         // 3. Label (for form elements)
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
@@ -191,6 +212,10 @@
             visible: rect.width > 0 && rect.height > 0,
             enabled: !(el as HTMLButtonElement).disabled,
             box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            value: (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)
+                ? el.value : undefined,
+            checked: (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio'))
+                ? el.checked : undefined,
         };
     }
 

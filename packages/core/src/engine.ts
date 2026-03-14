@@ -216,13 +216,22 @@ export class Engine {
       if (args.clear) {
         args = { _: ['run-code', `async (page) => { await page.locator('#__pw_clear__').highlight().catch(() => {}); return "Cleared"; }`] };
       } else {
-        const loc = args._.slice(1).join(' ');
-        if (!loc) return { text: 'Usage: highlight <locator>', isError: true };
+        const parts = args._.slice(1);
+        if (!parts.length) return { text: 'Usage: highlight <locator>', isError: true };
         const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
-        const isSelector = /[.#\[\]>:=]/.test(loc);
-        let locExpr = isSelector
-          ? `page.locator(${JSON.stringify(loc)})`
-          : `page.getByText(${JSON.stringify(loc)})`;
+        let locExpr: string;
+        // highlight <role> "<name>" → getByRole(role, { name })
+        if (parts.length >= 2 && /^[a-z]+$/.test(parts[0])) {
+          const role = parts[0];
+          const name = parts.slice(1).join(' ');
+          locExpr = `page.getByRole(${JSON.stringify(role)}, { name: ${JSON.stringify(name)}, exact: true })`;
+        } else {
+          const loc = parts.join(' ');
+          const isSelector = /[.#\[\]>:=]/.test(loc);
+          locExpr = isSelector
+            ? `page.locator(${JSON.stringify(loc)})`
+            : `page.getByText(${JSON.stringify(loc)})`;
+        }
         if (nth !== undefined) locExpr += `.nth(${nth})`;
         args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
       }

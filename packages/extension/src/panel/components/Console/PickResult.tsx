@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { PickResultData } from '@/types';
 
-function Row({ label, value }: { label: string; value: string }) {
+function SubRow({ label, value }: { label: string; value: string }) {
     return (
-        <div className="ot-row">
+        <div className="ot-row" style={{ paddingLeft: '1.2em' }}>
             <span className="ot-key">{label}</span>
             <span className="ot-colon">:&nbsp;</span>
             <span className="ot-string min-w-0 truncate">{value}</span>
@@ -17,10 +17,21 @@ export function PickResult({ data }: { data: PickResultData }) {
 
     return (
         <div data-type="pick-result">
-            <Row label="locator" value={data.locator} />
-            <Row label="js" value={data.jsExpression} />
-            {data.pwCommand && <Row label="pw" value={data.pwCommand} />}
+            {/* ─── locator section ───────────────────────────────────── */}
+            <div className="ot-row"><span className="ot-key">locator</span></div>
+            <SubRow label="js" value={data.jsExpression} />
+            {data.pwCommand && <SubRow label="pw" value={data.pwCommand} />}
 
+            {/* ─── assert section ────────────────────────────────────── */}
+            {data.assertJs && (
+                <>
+                    <div className="ot-row"><span className="ot-key">assert</span></div>
+                    <SubRow label="js" value={data.assertJs} />
+                    {data.assertPw && <SubRow label="pw" value={data.assertPw} />}
+                </>
+            )}
+
+            {/* ─── element details (expandable) ──────────────────────── */}
             {d && (
                 <div>
                     <span className="ot-toggle" onClick={() => setShowDetails(!showDetails)}>

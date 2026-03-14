@@ -129,7 +129,7 @@ import {
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  highlightByText, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
+  highlightByText, highlightByRole, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
   evalCode, runCode, takeScreenshot, takeSnapshot,
   refAction, pressKey, typeText,
@@ -379,6 +379,11 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
       const exact = args.exact ? true : undefined;
       const isSelector = /[.#[\]>:=]/.test(loc);
+      // highlight <role> "<name>" → getByRole(role, { name })
+      if (!isSelector && args._.length >= 3 && /^[a-z]+$/.test(loc)) {
+        const name = args._.slice(2).join(' ');
+        return { jsExpr: call(highlightByRole, loc, name, nth) };
+      }
       return isSelector
         ? { jsExpr: call(highlightBySelector, loc, nth) }
         : { jsExpr: call(highlightByText, loc, nth, exact) };
