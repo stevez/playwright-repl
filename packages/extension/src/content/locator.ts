@@ -110,6 +110,43 @@ export function findByRoleAndName(role: string, name: string): Element[] {
     return matches;
 }
 
+// ─── Locator string conversion ──────────────────────────────────────────
+
+/**
+ * Parse a JS locator string into PW keyword args.
+ * e.g. `getByRole('tab', { name: 'npm', exact: true }).nth(1)` → `tab "npm" --nth 1`
+ */
+export function locatorToPwArgs(locator: string): string {
+    const q = (s: string) => `"${s}"`;
+
+    // Extract nth modifier
+    let nth = '';
+    if (/\.first\(\)/.test(locator)) nth = ' --nth 0';
+    else if (/\.last\(\)/.test(locator)) nth = ' --nth -1';
+    else {
+        const nthMatch = locator.match(/\.nth\((\d+)\)/);
+        if (nthMatch) nth = ` --nth ${nthMatch[1]}`;
+    }
+
+    // getByRole with name
+    const roleNameMatch = locator.match(/getByRole\(['"](.+?)['"],\s*\{[^}]*name:\s*['"](.+?)['"]/);
+    if (roleNameMatch) return `${roleNameMatch[1]} ${q(roleNameMatch[2])}${nth}`;
+
+    // getByRole without name
+    const roleMatch = locator.match(/getByRole\(['"](.+?)['"]\)/);
+    if (roleMatch) return `${roleMatch[1]}${nth}`;
+
+    // getByTestId / getByLabel / getByText / getByPlaceholder / getByTitle / getByAltText
+    const getByMatch = locator.match(/getBy\w+\(['"](.+?)['"]\)/);
+    if (getByMatch) return `${q(getByMatch[1])}${nth}`;
+
+    // locator('css') fallback
+    const locatorMatch = locator.match(/locator\(['"](.+?)['"]\)/);
+    if (locatorMatch) return `${q(locatorMatch[1])}${nth}`;
+
+    return q(locator);
+}
+
 // ─── Locator generation ──────────────────────────────────────────────────
 
 export function escapeString(s: string): string {
@@ -167,6 +204,98 @@ export function generateLocator(el: Element): string {
     // 9. CSS fallback
     return `locator(${escapeString(buildCssSelector(el))})`;
 }
+
+// ─── Element classification ─────────────────────────────────────────────
+
+/** Check if element is a text-entry field */
+export function isTextField(el: Element): boolean {
+    if (el instanceof HTMLTextAreaElement) return true;
+    if (el instanceof HTMLInputElement) {
+        const type = el.type.toLowerCase();
+        return !['checkbox', 'radio', 'submit', 'reset', 'button', 'hidden', 'file', 'image', 'range', 'color'].includes(type);
+    }
+    // contenteditable
+    if (el.getAttribute('contenteditable') === 'true') return true;
+    return false;
+}
+
+/** Check if element is a checkbox or radio */
+export function isCheckable(el: Element): boolean {
+    return el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio');
+}
+
+// ─── Command building ───────────────────────────────────────────────────
+
+/** Build both PW and JS command strings for a recorder action */
+export function buildCommands(action: string, el: Element, opts?: {
+    value?: string;
+    key?: string;
+    checked?: boolean;
+    option?: string;
+    submit?: boolean;
+}): { pw: string; js: string } | null {
+    const locator = generateLocator(el);
+    const jsLoc = `page.${locator}`;
+    const pwArgs = locatorToPwArgs(locator);
+    const q = (s: string) => `"${s}"`;
+
+    switch (action) {
+        case 'click':
+            return {
+                pw: `click ${pwArgs}`,
+                js: `await ${jsLoc}.click();`,
+            };
+
+        case 'fill': {
+            const val = opts?.value ?? '';
+            const submitFlag = opts?.submit ? ' --submit' : '';
+            return {
+                pw: `fill ${pwArgs} ${q(val)}${submitFlag}`,
+                js: `await ${jsLoc}.fill(${escapeString(val)});`,
+            };
+        }
+
+        case 'check':
+            return {
+                pw: `check ${pwArgs}`,
+                js: `await ${jsLoc}.check();`,
+            };
+
+        case 'uncheck':
+            return {
+                pw: `uncheck ${pwArgs}`,
+                js: `await ${jsLoc}.uncheck();`,
+            };
+
+        case 'select': {
+            const optVal = opts?.option ?? '';
+            return {
+                pw: `select ${pwArgs} ${q(optVal)}`,
+                js: `await ${jsLoc}.selectOption(${escapeString(optVal)});`,
+            };
+        }
+
+        case 'press': {
+            const key = opts?.key ?? '';
+            if (pwArgs) {
+                return {
+                    pw: `press ${pwArgs} ${key}`,
+                    js: `await ${jsLoc}.press(${escapeString(key)});`,
+                };
+            }
+            // Global key press (no locator context)
+            return {
+                pw: `press ${key}`,
+                js: `await page.keyboard.press(${escapeString(key)});`,
+            };
+        }
+
+        default:
+            return null;
+    }
+}
+
+// ─── CSS selector ───────────────────────────────────────────────────────
 
 export function buildCssSelector(el: Element): string {
     const tag = el.tagName.toLowerCase();
