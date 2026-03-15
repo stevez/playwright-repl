@@ -118,7 +118,8 @@ export async function swDebugEval(expression: string): Promise<unknown> {
     //   (3) last expression value is captured via tryReturnLastExpr,
     //   (4) side-effects like locator.highlight() work correctly (arrow functions don't).
     const isMultiLine = expression.includes('\n');
-    const isStatement = isMultiLine || expression.trimEnd().endsWith(';');
+    const isStatement = isMultiLine || expression.trimEnd().endsWith(';')
+        || /^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(expression.trimStart());
     const body = isStatement ? tryReturnLastExpr(expression) : `return (${expression})`;
     const wrapped = `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(body)}))()`;
     return new Promise((resolve, reject) => {

@@ -7,12 +7,18 @@ interface CdpPropertyPreview {
     value?: string;
 }
 
+interface CdpEntryPreview {
+    key?: { type: string; subtype?: string; value?: string; description?: string };
+    value: { type: string; subtype?: string; value?: string; description?: string };
+}
+
 interface CdpPreview {
     type: string;
     description?: string;
     overflow?: boolean;
     subtype?: string;
     properties?: CdpPropertyPreview[];
+    entries?: CdpEntryPreview[];
 }
 
 export interface CdpRemoteObject {
@@ -52,6 +58,25 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
     if (type === 'boolean')  return { __type: 'boolean', v: value as boolean };
     if (type === 'function') return { __type: 'function', name: description ?? '(anonymous)' };
     if (type === 'object') {
+        // Special subtypes — use description string directly
+        if (subtype === 'date' || subtype === 'regexp') {
+            return { __type: 'string', v: description ?? String(value ?? '') };
+        }
+        if (subtype === 'error') return { __type: 'string', v: description ?? '[Error]' };
+        // Map / Set — entries live in preview.entries, not preview.properties
+        if (subtype === 'map' || subtype === 'set') {
+            const props: Record<string, SerializedValue> = {};
+            if (preview?.entries) {
+                for (let i = 0; i < preview.entries.length; i++) {
+                    const entry: CdpEntryPreview = preview.entries[i];
+                    const key = subtype === 'map'
+                        ? String(entry.key?.value ?? entry.key?.description ?? i)
+                        : String(i);
+                    props[key] = fromPreviewProperty({ name: key, type: entry.value.type, subtype: entry.value.subtype, value: entry.value.value });
+                }
+            }
+            return { __type: 'object', cls: description ?? className ?? (subtype === 'map' ? 'Map' : 'Set'), props, objectId };
+        }
         const cls = className ?? 'Object';
         const isArray = subtype === 'array';
         // Use preview properties as initial display; objectId enables lazy full expansion

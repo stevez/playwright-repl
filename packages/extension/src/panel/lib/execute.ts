@@ -2,25 +2,18 @@ import { COMMAND_NAMES } from '@/lib/commands';
 
 const PW_COMMANDS = new Set(COMMAND_NAMES);
 
-/** Playwright globals available in the SW context — bare words that should evaluate, not parse as commands. */
-const PW_GLOBALS = new Set(['page', 'context', 'expect', 'crxApp', 'activeTabId']);
-
 /**
  * Resolve the execution mode for console input.
- * Multi-line input always runs in the SW context (AsyncFunction supports await).
+ * Multi-line input always runs as JS (AsyncFunction supports await).
  */
 export function resolveConsoleMode(input: string): 'js' | 'pw' {
     if (input.includes('\n')) return 'js';
     return detectMode(input);
 }
 
+/** Only known PW commands run in pw mode; everything else is JS. */
 export function detectMode(input: string): 'js' | 'pw' {
-    const t = input.trim();
-    const firstToken = t.split(/\s+/)[0];
+    const firstToken = input.trim().split(/\s+/)[0];
     if (PW_COMMANDS.has(firstToken.toLowerCase())) return 'pw';
-    // Playwright globals (page, context, expect, etc.) → evaluate in SW context
-    if (PW_GLOBALS.has(firstToken)) return 'js';
-    // Bare words that look like commands → 'pw' so unknown ones show parse errors
-    if (/^[a-z][\w-]*$/.test(firstToken) && !/[.()[\]=+`$;{}"']/.test(t)) return 'pw';
     return 'js';
 }

@@ -99,6 +99,72 @@ describe('fromCdpRemoteObject', () => {
         expect(result).toMatchObject({ __type: 'array', len: 2 });
     });
 
+    // ─── Special subtypes ──────────────────────────────────────────────────
+
+    it('returns date description for subtype === "date"', () => {
+        expect(fromCdpRemoteObject({ type: 'object', subtype: 'date', className: 'Date', description: 'Fri Mar 14 2026 10:30:00 GMT+0000' }))
+            .toEqual({ __type: 'string', v: 'Fri Mar 14 2026 10:30:00 GMT+0000' });
+    });
+
+    it('returns regexp description for subtype === "regexp"', () => {
+        expect(fromCdpRemoteObject({ type: 'object', subtype: 'regexp', className: 'RegExp', description: '/test/gi' }))
+            .toEqual({ __type: 'string', v: '/test/gi' });
+    });
+
+    it('returns error description for subtype === "error"', () => {
+        expect(fromCdpRemoteObject({ type: 'object', subtype: 'error', className: 'Error', description: 'Error: something went wrong' }))
+            .toEqual({ __type: 'string', v: 'Error: something went wrong' });
+    });
+
+    it('falls back for date with no description', () => {
+        expect(fromCdpRemoteObject({ type: 'object', subtype: 'date', className: 'Date' }))
+            .toEqual({ __type: 'string', v: '' });
+    });
+
+    it('falls back for error with no description', () => {
+        expect(fromCdpRemoteObject({ type: 'object', subtype: 'error', className: 'Error' }))
+            .toEqual({ __type: 'string', v: '[Error]' });
+    });
+
+    it('returns Map entries from preview', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'map', className: 'Map', description: 'Map(2)',
+            preview: {
+                type: 'object', subtype: 'map',
+                entries: [
+                    { key: { type: 'string', value: 'a' }, value: { type: 'number', value: '1' } },
+                    { key: { type: 'string', value: 'b' }, value: { type: 'number', value: '2' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Map(2)',
+            props: { a: { __type: 'number', v: 1 }, b: { __type: 'number', v: 2 } },
+        });
+    });
+
+    it('returns Set entries from preview', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'set', className: 'Set', description: 'Set(3)',
+            preview: {
+                type: 'object', subtype: 'set',
+                entries: [
+                    { value: { type: 'number', value: '1' } },
+                    { value: { type: 'number', value: '2' } },
+                    { value: { type: 'number', value: '3' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Set(3)',
+            props: { 0: { __type: 'number', v: 1 }, 1: { __type: 'number', v: 2 }, 2: { __type: 'number', v: 3 } },
+        });
+    });
+
+    // ─── Fallback types ──────────────────────────────────────────────────
+
     it('falls back to string for unknown types', () => {
         expect(fromCdpRemoteObject({ type: 'symbol', value: 'Symbol(x)', description: 'Symbol(x)' }))
             .toEqual({ __type: 'string', v: 'Symbol(x)' });

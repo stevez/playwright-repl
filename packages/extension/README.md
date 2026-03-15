@@ -10,7 +10,7 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 | 📂 **Load / Save** | Open `.pw` or `.js` files from disk; save editor content with one click |
 | 🔗 **Auto-attach** | Automatically attaches to the active tab when the panel opens |
 | 🗂 **Tab Switcher** | Switch the active browser target to any open tab from the toolbar dropdown |
-| 🌳 **Object Tree** | Console results render as an expandable CDP object tree with lazy property loading |
+| 🌳 **Object Tree** | Console results render as an expandable object tree with lazy property loading |
 | 🖼 **Screenshot Preview** | Screenshot commands display the image inline; click to expand full-size |
 | 🌳 **Snapshot Tree** | `snapshot` renders as an expandable accessibility tree — click nodes to expand/collapse |
 | ✨ **Autocomplete** | `.pw` keyword and Playwright API (`page.*`, `expect()`) ghost-text suggestions in both console and editor |
@@ -51,7 +51,33 @@ The Console tab auto-detects what you type and routes it to the right executor:
 → "Playwright"
 ```
 
-Results are rendered as an **expandable CDP object tree** — click any object to lazily fetch its properties, just like Chrome DevTools.
+JS mode runs in an async context, so top-level `await` works naturally — along with promises, template literals, variables, and more:
+
+```
+> const title = await page.title()               ← top-level await + const
+→ "Playwright"
+
+> `The title is: ${title}`                        ← template literals
+→ "The title is: Playwright"
+
+> await fetch('https://api.example.com').then(r => r.json())   ← promises
+→ { status: "ok" }
+
+> let items = await page.locator('li').all()      ← let (scoped per input)
+> items.length
+→ 5
+
+> (() => { let sum = 0; for (let i = 0; i < 10; i++) sum += i; return sum })()   ← IIFE
+→ 45
+
+> (async () => {                                  ← async IIFE (multi-line)
+    const el = await page.locator('h1');
+    return (await el.textContent()).toUpperCase();
+  })()
+→ "PLAYWRIGHT"
+```
+
+Results are rendered as an **expandable object tree** — click any object to lazily fetch its properties, just like Chrome DevTools.
 
 - **Command history** — Up/Down arrows cycle through previous commands
 - **Autocomplete** — `.pw` keyword and Playwright API (`page.*`, `expect()`) ghost-text suggestions
@@ -175,8 +201,6 @@ Side Panel (React)
 | `record-start` | Injects recorder into the active tab |
 | `record-stop` | Disconnects recorder port |
 | `health` | Returns `{ ok: !!crxApp }` |
-| `cdp-evaluate` | Raw CDP `Runtime.evaluate` for the Console object tree |
-| `cdp-get-properties` | Raw CDP `Runtime.getProperties` for the Console object tree |
 | `get-bridge-port` | Returns bridge port from `chrome.storage` (for offscreen doc) |
 
 ### File Structure
@@ -196,7 +220,7 @@ src/
     │   ├── CommandInput.tsx # CodeMirror 6 REPL input with autocomplete + history
     │   ├── ConsolePane.tsx  # Output lines
     │   ├── EditorPane.tsx   # Multi-line script editor
-    │   └── Console/        # CDP object tree renderer
+    │   └── Console/        # Object tree renderer
     └── lib/
         ├── bridge.ts       # executeCommand — parses + calls swDebugEval
         ├── run.ts          # runAndDispatch — local commands + bridge + dispatch

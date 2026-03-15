@@ -111,6 +111,7 @@ describe('tryReturnLastExpr', () => {
     it('returns empty string unchanged', () => {
         expect(tryReturnLastExpr('')).toBe('');
     });
+
 });
 
 // ─── swDebugTargets ──────────────────────────────────────────────────────────
@@ -175,6 +176,24 @@ describe('swDebugEval', () => {
             expect.objectContaining({ expression: expect.stringContaining('Object.getPrototypeOf') }),
             expect.any(Function),
         );
+    });
+
+    it('treats const/let/var declarations as statements (not wrapped with return)', async () => {
+        mockGetTargets([SW_TARGET]);
+        mockAttachSuccess();
+        mockSendCommand({ result: { type: 'undefined' } });
+
+        await swDebugEval('const x = 42');
+        expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
+            { targetId: 'target-1' },
+            'Runtime.evaluate',
+            expect.objectContaining({ expression: expect.stringContaining('const x = 42') }),
+            expect.any(Function),
+        );
+        // Should NOT contain 'return (const' — that's a SyntaxError
+        const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
+            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+        expect(expr).not.toContain('return (const');
     });
 
     it('rejects with exceptionDetails message', async () => {
