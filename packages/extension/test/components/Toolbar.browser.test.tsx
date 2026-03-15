@@ -9,7 +9,6 @@ import Toolbar from '@/components/Toolbar';
 
 vi.mock('@/lib/bridge', () => ({
   executeCommand: vi.fn(),
-  cdpEvaluate: vi.fn().mockResolvedValue(undefined),
   attachToTab: vi.fn().mockResolvedValue({ ok: true, url: 'https://example.com' }),
 }));
 
@@ -23,7 +22,7 @@ vi.mock('@/lib/settings', () => ({
   storeSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { executeCommand, cdpEvaluate, attachToTab } from '@/lib/bridge';
+import { executeCommand, attachToTab } from '@/lib/bridge';
 import { swDebugEval } from '@/lib/sw-debugger';
 
 // ─── Helper to render Toolbar with default required props ─────────────────────
@@ -66,7 +65,6 @@ describe('Toolbar component tests', () => {
     vi.mocked(executeCommand).mockResolvedValue({ text: 'Done', isError: false });
     vi.mocked(attachToTab).mockResolvedValue({ ok: true, url: 'https://example.com' });
     vi.mocked(swDebugEval).mockResolvedValue(undefined);
-    vi.mocked(cdpEvaluate).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -744,7 +742,6 @@ describe('Toolbar component tests', () => {
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
         expect(swDebugEval).toHaveBeenCalledWith('document.title');
-        expect(cdpEvaluate).not.toHaveBeenCalled();
         expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
         expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
