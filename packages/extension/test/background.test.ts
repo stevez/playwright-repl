@@ -586,17 +586,17 @@ describe("background.ts message handlers", () => {
 
   // ─── executeBridgeExpr branches ────────────────────────────────────────────
 
-  it("bridge-command wraps multi-line code as AsyncFunction", async () => {
+  it("bridge-command passes expression directly with replMode", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     setupDebuggerMocks('sw-1');
 
-    // Return multi-line jsExpr to trigger isStatement/AsyncFunction path
-    mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1\nreturn x' });
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1\nx' });
     const result = await sendMessage({ type: 'bridge-command', command: 'const x = 1\nx' });
     expect(result.isError).toBe(false);
     const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
     const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    expect(evalCall[2].expression).toContain('Object.getPrototypeOf');
+    expect(evalCall[2].expression).toBe('const x = 1\nx');
+    expect(evalCall[2].replMode).toBe(true);
   });
 
   it("bridge-command handles lastError in sendCommand (clears selfTargetId)", async () => {
@@ -782,67 +782,33 @@ describe("background.ts message handlers", () => {
     await expect(bpPromise).rejects.toThrow('__debug_stopped__');
   });
 
-  // ─── tryReturnLastExpr branches ────────────────────────────────────────────
+  // ─── replMode expression handling ──────────────────────────────────────────
 
-  it("bridge-command tryReturnLastExpr adds return before last expression", async () => {
+  it("bridge-command wraps object literal in parens", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     setupDebuggerMocks('sw-1');
 
-    mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1\nx' });
-    await sendMessage({ type: 'bridge-command', command: 'multi' });
-
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    // The code should have "return x" inserted
-    expect(evalCall[2].expression).toContain('return x');
-  });
-
-  it("bridge-command tryReturnLastExpr preserves statement keywords", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    setupDebuggerMocks('sw-1');
-
-    mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1\nconst y = 2' });
-    await sendMessage({ type: 'bridge-command', command: 'multi' });
-
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    // Should NOT insert return before 'const'
-    expect(evalCall[2].expression).not.toContain('return const');
-  });
-
-  it("bridge-command tryReturnLastExpr handles empty/whitespace code", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    setupDebuggerMocks('sw-1');
-
-    mockParseReplCommand.mockReturnValue({ jsExpr: '\n  \n' });
-    const result = await sendMessage({ type: 'bridge-command', command: 'empty' });
-    expect(result.isError).toBe(false);
-  });
-
-  // ─── statement ending with semicolon (single-line isStatement) ─────────────
-
-  it("bridge-command treats single-line ending with semicolon as statement", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    setupDebuggerMocks('sw-1');
-
-    mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1;' });
-    await sendMessage({ type: 'bridge-command', command: 'const x = 1;' });
-
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    expect(evalCall[2].expression).toContain('Object.getPrototypeOf');
-  });
-
-  // ─── playwright mode multi-line statement ──────────────────────────────────
-
-  it("bridge-command playwright mode uses tryReturnLastExpr for statements", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    setupDebuggerMocks('sw-1');
     mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
     mockDetectMode.mockReturnValue('js');
+    await sendMessage({ type: 'bridge-command', command: '{a: 1}' });
 
-    const result = await sendMessage({ type: 'bridge-command', command: 'page.title();' });
-    expect(result.isError).toBe(false);
+    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
+    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
+    expect(evalCall[2].expression).toBe('({a: 1})');
+  });
+
+  it("bridge-command passes non-brace expression directly", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
+
+    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
+    mockDetectMode.mockReturnValue('js');
+    await sendMessage({ type: 'bridge-command', command: 'page.title();' });
+
+    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
+    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
+    expect(evalCall[2].expression).toBe('page.title();');
+    expect(evalCall[2].replMode).toBe(true);
   });
 
   // ─── Fire-and-forget .catch() callbacks ────────────────────────────────────

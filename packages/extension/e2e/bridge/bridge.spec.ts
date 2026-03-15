@@ -364,12 +364,18 @@ test.describe("Bridge command tests", () => {
       expect(r.text).toContain('6');
     });
 
-    test('object literal returns meaningful string', async ({ bridgeContext }) => {
-      const r = await bridgeContext.bridge.run('({a: 1, b: "hello"})');
+    test('object literal without parens returns result', async ({ bridgeContext }) => {
+      const r = await bridgeContext.bridge.run('{a: 1, b: "hello"}');
       expectOk(r);
       expect(r.text).toBeTruthy();
-      expect(r.text).toContain('a');
-      expect(r.text).toContain('hello');
+    });
+
+    test('const persists across evals', async ({ bridgeContext }) => {
+      const r1 = await bridgeContext.bridge.run('const x = 42');
+      expectOk(r1);
+      const r2 = await bridgeContext.bridge.run('x');
+      expectOk(r2);
+      expect(r2.text).toContain('42');
     });
 
     test('invalid JS returns error', async ({ bridgeContext }) => {

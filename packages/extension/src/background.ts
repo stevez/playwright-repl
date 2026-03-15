@@ -157,19 +157,6 @@ async function stopPicking(): Promise<{ ok: boolean }> {
 
 // ─── Bridge Command Execution ────────────────────────────────────────────────
 
-/** Attempt to insert `return` before the last expression line so the caller gets the value. */
-function tryReturnLastExpr(code: string): string {
-  const lines = code.split('\n');
-  let i = lines.length - 1;
-  while (i >= 0 && !lines[i].trim()) i--;
-  if (i < 0) return code;
-  const trimmed = lines[i].trimStart();
-  if (/^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(trimmed)) return code;
-  const leading = lines[i].slice(0, lines[i].length - trimmed.length);
-  lines[i] = leading + 'return ' + trimmed;
-  return lines.join('\n');
-}
-
 // ─── Self-debug eval (chrome.debugger → own SW target, bypasses MV3 CSP) ────
 
 let selfTargetId: string | null = null;
@@ -201,20 +188,83 @@ chrome.debugger.onDetach.addListener((source) => {
   if (source.targetId === selfTargetId) selfTargetId = null;
 });
 
+/** Format a CDP ObjectPreview into a readable string (similar to Node.js REPL output). */
+function formatCdpPreview(preview: any, depth = 0): string {
+  if (!preview || !preview.properties) return preview?.description ?? '';
+  const isArray = preview.subtype === 'array';
+  const props: any[] = preview.properties;
+
+  // Promise: show "Promise" for pending, "Promise {<fulfilled>: value}" for resolved
+  if (preview.description === 'Promise') {
+    const stateP = props.find((p: any) => p.name === '[[PromiseState]]');
+    const state = stateP?.value ?? 'pending';
+    if (state === 'pending') return 'Promise';
+    const resultP = props.find((p: any) => p.name === '[[PromiseResult]]');
+    const val = resultP?.type === 'string' ? `'${resultP.value}'`
+      : resultP?.value !== undefined ? resultP.value : resultP?.type ?? '';
+    return val ? `Promise {<${state}>: ${val}}` : `Promise {<${state}>}`;
+  }
+
+  // Map/Set: use entries field (key=>value for Map, value for Set)
+  const cdpEntries: any[] = preview.entries;
+  if (cdpEntries && cdpEntries.length > 0) {
+    const isMap = preview.subtype === 'map';
+    const items = cdpEntries.map((e: any) => {
+      const val = e.value?.description ?? e.value?.value ?? e.value?.type ?? '';
+      if (isMap) {
+        const key = e.key?.description ?? e.key?.value ?? e.key?.type ?? '';
+        return `${key} => ${val}`;
+      }
+      return val;
+    });
+    const suffix = preview.overflow ? ', …' : '';
+    return `${preview.description} {${items.join(', ')}${suffix}}`;
+  }
+
+  if (props.length === 0) {
+    if (isArray) return '[]';
+    return preview.description ?? '';
+  }
+
+  const entries = props.map((p: any) => {
+    let val: string;
+    if (p.type === 'string') val = `'${p.value}'`;
+    else if (p.valuePreview && depth < 2) val = formatCdpPreview(p.valuePreview, depth + 1);
+    else if (p.value !== undefined) val = p.value;
+    else val = p.subtype ?? p.type;
+    return isArray ? val : `${p.name}: ${val}`;
+  });
+
+  const suffix = preview.overflow ? ', …' : '';
+  const inner = entries.join(', ') + suffix;
+  if (isArray) return `[${inner}]`;
+  if (preview.description && preview.description !== 'Object') return `${preview.description} {${inner}}`;
+  return `{${inner}}`;
+}
+
+/** Call a function on a remote object and return the string result. */
+function callFunctionOn(targetId: string, objectId: string, fn: string): Promise<string | null> {
+  return new Promise(resolve => {
+    chrome.debugger.sendCommand(
+      { targetId },
+      'Runtime.callFunctionOn',
+      { objectId, functionDeclaration: fn, returnByValue: true },
+      (res: any) => resolve(res?.result?.value ?? null)
+    );
+  });
+}
+
 async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isError: boolean; image?: string }> {
   try {
     const targetId = await ensureSelfAttached();
-    const isMultiLine = jsExpr.includes('\n');
-    const isStatement = isMultiLine || jsExpr.trimEnd().endsWith(';');
-    const wrapped = isStatement
-      ? `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(tryReturnLastExpr(jsExpr))}))()`
-      : `(async () => { ${jsExpr} })()`;
+    // Wrap {…} in parens so V8 parses it as an object literal, not a block statement.
+    const expr = jsExpr.trimStart().startsWith('{') ? `(${jsExpr})` : jsExpr;
 
-    const result = await new Promise<any>((resolve, reject) => {
+    const rawResult = await new Promise<any>((resolve, reject) => {
       chrome.debugger.sendCommand(
         { targetId },
         'Runtime.evaluate',
-        { expression: wrapped, awaitPromise: true, returnByValue: false, generatePreview: false, objectGroup: 'bridge' },
+        { expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'bridge', replMode: true },
         (res: any) => {
           if (chrome.runtime.lastError) {
             selfTargetId = null;
@@ -224,16 +274,36 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
               ?? res.exceptionDetails.text ?? 'Unknown error';
             reject(new Error(msg));
           } else {
-            const r = res?.result;
-            if (!r || r.type === 'undefined') resolve(undefined);
-            else if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') resolve(r.value);
-            else resolve(r.description ?? 'Done');
+            resolve(res?.result);
           }
         }
       );
     });
 
-    return formatBridgeResult(result);
+    const r = rawResult;
+    if (!r || r.type === 'undefined') return formatBridgeResult(undefined);
+    if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') return formatBridgeResult(r.value);
+
+    // Map/Set: use callFunctionOn to get entries since preview doesn't include them
+    if (r.objectId && /^(Map|Set)\(\d+\)$/.test(r.description ?? '')) {
+      const isMap = r.description!.startsWith('Map');
+      const fn = isMap
+        ? 'function(){return [...this].map(([k,v])=>JSON.stringify(k)+" => "+JSON.stringify(v)).join(", ")}'
+        : 'function(){return [...this].map(v=>JSON.stringify(v)).join(", ")}';
+      const inner = await callFunctionOn(targetId, r.objectId, fn);
+      if (inner !== null) return formatBridgeResult(`${r.description} {${inner}}`);
+    }
+
+    // Plain objects/arrays: use JSON.stringify for full nested representation
+    if (r.objectId && (r.description === 'Object' || /^Array\(\d+\)$/.test(r.description ?? ''))) {
+      const json = await callFunctionOn(targetId, r.objectId,
+        'function(){try{return JSON.stringify(this)}catch{return null}}');
+      if (json) return formatBridgeResult(json);
+    }
+
+    // Other objects (Date, RegExp, Promise, etc.): use description directly
+    if (r.preview) return formatBridgeResult(formatCdpPreview(r.preview));
+    return formatBridgeResult(r.description ?? 'Done');
   } catch (e: any) {
     return { text: e?.message ?? String(e), isError: true };
   }
@@ -272,10 +342,7 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
     const mode = detectMode(command.trim());
 
     if (mode === 'js' || command.includes('\n')) {
-      const isMultiLine = command.includes('\n');
-      const isStatement = isMultiLine || command.trimEnd().endsWith(';');
-      const body = isStatement ? tryReturnLastExpr(command.trim()) : `return (${command.trim()})`;
-      return executeBridgeExpr(body);
+      return executeBridgeExpr(command.trim());
     }
 
     // mode === 'pw' — bare word that looks like a command but isn't recognized
