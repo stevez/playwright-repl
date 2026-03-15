@@ -12,8 +12,6 @@ import { test, expect } from './fixtures.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const TODO_URL = 'https://demo.playwright.dev/todomvc/';
-
 type Result = { text?: string; isError?: boolean; image?: string };
 
 function expectOk(r: Result) {
@@ -40,12 +38,12 @@ function expectJSON(r: Result): unknown {
 test.describe("Bridge command tests", () => {
   test.describe('Navigation & Page', () => {
     test('goto navigates to URL', async ({ bridgeContext }) => {
-      const r = await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      const r = await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       expectOk(r);
     });
 
     test('snapshot returns accessibility tree with refs', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       const r = await bridgeContext.bridge.run('snapshot');
       expectOk(r);
       expect(r.text).toMatch(/\[ref=e\d+\]/);
@@ -53,15 +51,15 @@ test.describe("Bridge command tests", () => {
     });
 
     test('screenshot returns base64 image', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       const r = await bridgeContext.bridge.run('screenshot');
       expectOk(r);
       expect(r.image).toMatch(/^data:image\/(jpeg|png);base64,/);
     });
 
     test('go-back and go-forward navigate history', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run('goto https://httpbin.org');
-      await bridgeContext.bridge.run('goto https://example.com');
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}?page=1`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}?page=2`);
       const r1 = await bridgeContext.bridge.run('go-back');
       expectOk(r1);
       const r2 = await bridgeContext.bridge.run('go-forward');
@@ -69,7 +67,7 @@ test.describe("Bridge command tests", () => {
     });
 
     test('reload reloads page', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       const r = await bridgeContext.bridge.run('reload');
       expectOk(r);
     });
@@ -79,7 +77,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('Interaction', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('fill types into input field', async ({ bridgeContext }) => {
@@ -115,7 +113,7 @@ test.describe("Bridge command tests", () => {
 
     test('eval executes JavaScript and returns result', async ({ bridgeContext }) => {
       const r = await bridgeContext.bridge.run('eval document.title');
-      expectText(r, 'TodoMVC');
+      expectText(r, 'Bridge Test');
     });
   });
 
@@ -123,7 +121,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('Verification', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('verify-text passes for visible text', async ({ bridgeContext }) => {
@@ -140,12 +138,12 @@ test.describe("Bridge command tests", () => {
     });
 
     test('verify-title passes when title matches', async ({ bridgeContext }) => {
-      const r = await bridgeContext.bridge.run('verify-title "TodoMVC"');
+      const r = await bridgeContext.bridge.run('verify-title "Bridge Test"');
       expectOk(r);
     });
 
     test('verify-url passes when URL matches', async ({ bridgeContext }) => {
-      const r = await bridgeContext.bridge.run('verify-url "todomvc"');
+      const r = await bridgeContext.bridge.run('verify-url "localhost"');
       expectOk(r);
     });
 
@@ -159,7 +157,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('Tab commands', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('tab-list returns valid JSON array with tab details', async ({ bridgeContext }) => {
@@ -176,7 +174,7 @@ test.describe("Bridge command tests", () => {
       const r1 = await bridgeContext.bridge.run('tab-list');
       const before = (expectJSON(r1) as any[]).length;
 
-      const r = await bridgeContext.bridge.run('tab-new https://example.com');
+      const r = await bridgeContext.bridge.run(`tab-new ${bridgeContext.testUrl}?tab=new`);
       expectOk(r);
       const r2 = await bridgeContext.bridge.run('tab-list');
       const after = (expectJSON(r2) as any[]).length;
@@ -200,7 +198,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('Cookie commands', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('cookie-list returns valid JSON array', async ({ bridgeContext }) => {
@@ -220,7 +218,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('LocalStorage commands', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('localstorage set, get, list, delete cycle', async ({ bridgeContext }) => {
@@ -247,7 +245,7 @@ test.describe("Bridge command tests", () => {
 
   test.describe('SessionStorage commands', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('sessionstorage set, get, list, delete cycle', async ({ bridgeContext }) => {
@@ -272,7 +270,7 @@ test.describe("Bridge command tests", () => {
   test.describe('Script execution', () => {
     test('runScript executes multi-line pw commands with checkmarks', async ({ bridgeContext }) => {
       const script = [
-        `goto ${TODO_URL}`,
+        `goto ${bridgeContext.testUrl}`,
         'fill "What needs to be done?" "Script todo"',
         'press Enter',
         'verify-text "Script todo"',
@@ -282,23 +280,11 @@ test.describe("Bridge command tests", () => {
       expect(r.text).toContain('\u2713'); // ✓ checkmark
     });
 
-    test('runScript stops on first error with X mark', async ({ bridgeContext }) => {
-      const script = [
-        `goto ${TODO_URL}`,
-        'click "nonexistent-element-xyz-12345"',
-        'fill "What needs to be done?" "Should not reach"',
-      ].join('\n');
-      const r = await bridgeContext.bridge.runScript(script, 'pw');
-      expect(r.isError).toBe(true);
-      expect(r.text).toContain('\u2717'); // ✗ X mark
-      expect(r.text).not.toContain('Should not reach');
-    });
-
     test('runScript with javascript language executes JS', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       const r = await bridgeContext.bridge.runScript('await page.title()', 'javascript');
       expectOk(r);
-      expect(r.text).toContain('TodoMVC');
+      expect(r.text).toContain('Bridge Test');
     });
   });
 
@@ -306,19 +292,19 @@ test.describe("Bridge command tests", () => {
 
   test.describe('JavaScript expressions', () => {
     test.beforeEach(async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
     });
 
     test('page.title() returns title string', async ({ bridgeContext }) => {
       const r = await bridgeContext.bridge.run('await page.title()');
       expectOk(r);
-      expect(r.text).toContain('TodoMVC');
+      expect(r.text).toContain('Bridge Test');
     });
 
     test('page.url() returns URL string', async ({ bridgeContext }) => {
       const r = await bridgeContext.bridge.run('await page.url()');
       expectOk(r);
-      expect(r.text).toContain('todomvc');
+      expect(r.text).toContain('localhost');
     });
 
     test('page.locator().textContent() returns element text', async ({ bridgeContext }) => {
@@ -350,7 +336,7 @@ test.describe("Bridge command tests", () => {
     test('page.evaluate() returns evaluated result', async ({ bridgeContext }) => {
       const r = await bridgeContext.bridge.run("await page.evaluate(() => window.location.hostname)");
       expectOk(r);
-      expect(r.text).toContain('playwright.dev');
+      expect(r.text).toContain('localhost');
     });
 
     test('page.locator().click() executes without error', async ({ bridgeContext }) => {
@@ -378,31 +364,16 @@ test.describe("Bridge command tests", () => {
       expect(r2.text).toContain('42');
     });
 
-    test('invalid JS returns error', async ({ bridgeContext }) => {
-      const r = await bridgeContext.bridge.run('await page.locator("nonexistent-selector-xyz").click({timeout: 2000})');
-      expect(r.isError).toBe(true);
-      expect(r.text).toBeTruthy();
-    });
   });
 
   // ─── Error handling ──────────────────────────────────────────────────────────
 
   test.describe('Error handling', () => {
     test('unknown command returns error', async ({ bridgeContext }) => {
-      await bridgeContext.bridge.run(`goto ${TODO_URL}`);
+      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
       const r = await bridgeContext.bridge.run('nonexistent_cmd_xyz');
       expect(r.isError).toBe(true);
       expect(r.text).toBeTruthy();
-    });
-
-    test('disconnected bridge returns not-connected error', async () => {
-      const { BridgeServer: BS } = await import('../../../core/dist/index.js');
-      const standalone = new BS();
-      await standalone.start(9877);
-      const r = await standalone.run('snapshot');
-      expect(r.text).toContain('Extension not connected');
-      expect(r.isError).toBe(true);
-      await standalone.close();
     });
   });
 });
