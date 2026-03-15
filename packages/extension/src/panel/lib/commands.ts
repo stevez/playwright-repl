@@ -171,7 +171,7 @@ function ser(v: unknown): string {
 
 /** Build a JS expression that calls a page-script function in the SW context (where `page` is global) */
 function call(fn: any, ...args: unknown[]): string {
-  return `return await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
+  return `await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
 }
 
 // ─── Known boolean options ───────────────────────────────────────────────────
@@ -366,7 +366,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   // ── Screenshot ──────────────────────────────────────────────
   // Wrapped in JSON.stringify so bridge.ts can detect the __image result
   if (cmdName === 'screenshot')
-    return { jsExpr: `return JSON.stringify(await (${takeScreenshot.toString()})(page, ${!!(args.fullPage)}))` };
+    return { jsExpr: `JSON.stringify(await (${takeScreenshot.toString()})(page, ${!!(args.fullPage)}))` };
 
   // ── Snapshot ────────────────────────────────────────────────
   if (cmdName === 'snapshot')

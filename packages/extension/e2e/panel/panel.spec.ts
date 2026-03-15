@@ -89,7 +89,7 @@ test.describe("Panel page test", () => {
     await panelPage.keyboard.press('Escape');
     await panelPage.keyboard.press('Enter');
 
-    await expect(panelPage.locator('[data-type="error"]')).toContainText('Unknown command');
+    await expect(panelPage.locator('[data-type="error"]')).toContainText('ReferenceError');
   });
 
   // ─── Command History ───────────────────────────────────────────────────────

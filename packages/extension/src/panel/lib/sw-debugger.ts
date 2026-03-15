@@ -78,20 +78,6 @@ export async function swGetProperties(objectId: string): Promise<unknown> {
     });
 }
 
-/** Attempt to insert `return` before the last expression line so the caller gets the value. */
-export function tryReturnLastExpr(code: string): string {
-    const lines = code.split('\n');
-    let i = lines.length - 1;
-    while (i >= 0 && !lines[i].trim()) i--;
-    if (i < 0) return code;
-    const trimmed = lines[i].trimStart();
-    // Skip lines that are statements, not expressions
-    if (/^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(trimmed)) return code;
-    const leading = lines[i].slice(0, lines[i].length - trimmed.length);
-    lines[i] = leading + 'return ' + trimmed;
-    return lines.join('\n');
-}
-
 export async function swCallFunctionOn(objectId: string, functionDeclaration: string): Promise<unknown> {
     const targetId = await ensureAttached();
     return new Promise((resolve, reject) => {
@@ -112,21 +98,14 @@ export async function swCallFunctionOn(objectId: string, functionDeclaration: st
 
 export async function swDebugEval(expression: string): Promise<unknown> {
     const targetId = await ensureAttached();
-    // Always use AsyncFunction constructor so that:
-    //   (1) await is valid (proper async function scope),
-    //   (2) const/let are scoped per call and don't leak between runs,
-    //   (3) last expression value is captured via tryReturnLastExpr,
-    //   (4) side-effects like locator.highlight() work correctly (arrow functions don't).
-    const isMultiLine = expression.includes('\n');
-    const isStatement = isMultiLine || expression.trimEnd().endsWith(';')
-        || /^(const |let |var |function |class |if |for |while |do |switch |try |throw |import |export |return |})/.test(expression.trimStart());
-    const body = isStatement ? tryReturnLastExpr(expression) : `return (${expression})`;
-    const wrapped = `(new (Object.getPrototypeOf(async function(){}).constructor)(${JSON.stringify(body)}))()`;
+    // replMode: true enables top-level await and returns completion values automatically.
+    // { } block wrapping keeps const/let scoped per call (isolated, no leaking).
+    const wrapped = '{\n' + expression + '\n}';
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand(
             { targetId },
             'Runtime.evaluate',
-            { expression: wrapped, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console' },
+            { expression: wrapped, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console', replMode: true },
             (result: any) => {
                 if (chrome.runtime.lastError) {
                     swTargetId = null;
