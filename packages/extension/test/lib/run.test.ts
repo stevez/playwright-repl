@@ -35,8 +35,7 @@ const mockSwDebugEvalRaw = vi.fn();
 const mockSwGetProperties = vi.fn();
 const mockSwDebuggerEnable = vi.fn().mockResolvedValue(undefined);
 const mockSwDebuggerDisable = vi.fn().mockResolvedValue(undefined);
-const mockSwSetBreakpointByUrl = vi.fn().mockResolvedValue('bp-1');
-const mockSwRemoveBreakpoint = vi.fn().mockResolvedValue(undefined);
+const mockSwDebugPause = vi.fn().mockResolvedValue(undefined);
 const mockOnDebugPaused = vi.fn();
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: (...args: any[]) => mockSwDebugEval(...args),
@@ -44,9 +43,11 @@ vi.mock('@/lib/sw-debugger', () => ({
     swGetProperties: (...args: any[]) => mockSwGetProperties(...args),
     swDebuggerEnable: (...args: any[]) => mockSwDebuggerEnable(...args),
     swDebuggerDisable: (...args: any[]) => mockSwDebuggerDisable(...args),
-    swSetBreakpointByUrl: (...args: any[]) => mockSwSetBreakpointByUrl(...args),
-    swRemoveBreakpoint: (...args: any[]) => mockSwRemoveBreakpoint(...args),
+    swDebugPause: (...args: any[]) => mockSwDebugPause(...args),
     onDebugPaused: (...args: any[]) => mockOnDebugPaused(...args),
+    swDebugStepOver: vi.fn().mockResolvedValue(undefined),
+    swDebugStepInto: vi.fn().mockResolvedValue(undefined),
+    swDebugStepOut: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as any);
@@ -382,8 +383,7 @@ describe('runJsScriptStep', () => {
         mockSwDebuggerEnable.mockResolvedValue(undefined);
         mockSwDebuggerDisable.mockResolvedValue(undefined);
         mockSwDebugEvalRaw.mockResolvedValue({ result: { type: 'undefined' } });
-        mockSwSetBreakpointByUrl.mockResolvedValue('bp-1');
-        mockSwRemoveBreakpoint.mockResolvedValue(undefined);
+        mockSwDebugPause.mockResolvedValue(undefined);
     });
 
     it('dispatches debug script label', async () => {
@@ -404,20 +404,15 @@ describe('runJsScriptStep', () => {
         });
     });
 
-    it('sets breakpoints by URL for each non-empty line', async () => {
+    it('calls Debugger.pause before evaluating code', async () => {
         const dispatch = createDispatch();
-        await runJsScriptStep('line1\nline2\n\nline4', dispatch);
-        // 3 non-empty lines (0, 1, 3) — line 2 is blank
-        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledTimes(3);
-        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 0);
-        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 1);
-        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledWith('pw-repl-debug.js', 3);
-    });
-
-    it('skips blank lines when setting breakpoints', async () => {
-        const dispatch = createDispatch();
-        await runJsScriptStep('code\n\n\nmore', dispatch);
-        expect(mockSwSetBreakpointByUrl).toHaveBeenCalledTimes(2);
+        await runJsScriptStep('code', dispatch);
+        expect(mockSwDebugPause).toHaveBeenCalledTimes(1);
+        expect(mockSwDebuggerEnable).toHaveBeenCalled();
+        // pause should be called after enable
+        const enableOrder = mockSwDebuggerEnable.mock.invocationCallOrder[0];
+        const pauseOrder = mockSwDebugPause.mock.invocationCallOrder[0];
+        expect(pauseOrder).toBeGreaterThan(enableOrder);
     });
 
     it('evaluates code with sourceURL suffix', async () => {
@@ -450,11 +445,9 @@ describe('runJsScriptStep', () => {
         });
     });
 
-    it('cleans up breakpoints and disables debugger on completion', async () => {
-        mockSwSetBreakpointByUrl.mockResolvedValue('bp-42');
+    it('disables debugger and clears pause handler on completion', async () => {
         const dispatch = createDispatch();
         await runJsScriptStep('code', dispatch);
-        expect(mockSwRemoveBreakpoint).toHaveBeenCalledWith('bp-42');
         expect(mockSwDebuggerDisable).toHaveBeenCalled();
         expect(mockOnDebugPaused).toHaveBeenLastCalledWith(null);
     });

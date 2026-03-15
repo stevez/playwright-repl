@@ -5,6 +5,7 @@ import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
 import { Console } from './components/Console';
+import DebugBar from './components/DebugBar';
 import { onConsoleEvent } from '@/lib/sw-debugger';
 import { loadSettings } from './lib/settings';
 
@@ -104,7 +105,7 @@ function App() {
 
   return (
     <>
-      {/* Toolbar */}
+      {/* Toolbar + floating debug bar */}
       <Toolbar
         editorContent={state.editorContent}
         editorMode={state.editorMode}
@@ -117,17 +118,19 @@ function App() {
         dispatch={dispatch}
         editorRef={editorRef}
       />
+      {state.isStepDebugging && <DebugBar dispatch={dispatch} />}
 
       {/* Editor pane */}
-      <CodeMirrorEditorPane
-        ref={editorRef}
-        containerRef={editorPaneRef}
-        editorContent={state.editorContent}
-        editorMode={state.editorMode}
-        currentRunLine={state.currentRunLine}
-        lineResults={state.lineResults}
-        dispatch={dispatch}
-      />
+      <div ref={editorPaneRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 80, overflow: 'hidden' }}>
+        <CodeMirrorEditorPane
+          ref={editorRef}
+          editorContent={state.editorContent}
+          editorMode={state.editorMode}
+          currentRunLine={state.currentRunLine}
+          lineResults={state.lineResults}
+          dispatch={dispatch}
+        />
+      </div>
 
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef} />

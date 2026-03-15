@@ -208,6 +208,17 @@ export async function swDebugEvalRaw(expression: string): Promise<{ result?: any
     });
 }
 
+const activeBreakpointIds: string[] = [];
+
+export function swTrackBreakpoint(breakpointId: string) {
+    activeBreakpointIds.push(breakpointId);
+}
+
+export async function swRemoveAllBreakpoints(): Promise<void> {
+    const ids = activeBreakpointIds.splice(0);
+    for (const id of ids) await swRemoveBreakpoint(id).catch(() => {});
+}
+
 export async function swRemoveBreakpoint(breakpointId: string): Promise<void> {
     const targetId = await ensureAttached();
     return new Promise((resolve, reject) => {
@@ -227,6 +238,46 @@ export async function swDebugResume(): Promise<void> {
     const targetId = await ensureAttached();
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand({ targetId }, 'Debugger.resume', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swDebugPause(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.pause', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swDebugStepOver(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepOver', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swDebugStepInto(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepInto', {}, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
+}
+
+export async function swDebugStepOut(): Promise<void> {
+    const targetId = await ensureAttached();
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepOut', {}, () => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else resolve();
         });

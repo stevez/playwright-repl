@@ -19,9 +19,12 @@ vi.mock('@/lib/sw-debugger', () => ({
     swGetProperties: vi.fn(),
     swDebuggerEnable: vi.fn().mockResolvedValue(undefined),
     swDebuggerDisable: vi.fn().mockResolvedValue(undefined),
-    swSetBreakpointByUrl: vi.fn().mockResolvedValue('bp-1'),
+    swDebugPause: vi.fn().mockResolvedValue(undefined),
     swRemoveBreakpoint: vi.fn().mockResolvedValue(undefined),
     swDebugResume: vi.fn().mockResolvedValue(undefined),
+    swDebugStepOver: vi.fn().mockResolvedValue(undefined),
+    swDebugStepInto: vi.fn().mockResolvedValue(undefined),
+    swDebugStepOut: vi.fn().mockResolvedValue(undefined),
     swTerminateExecution: vi.fn().mockResolvedValue(undefined),
     onDebugPaused: vi.fn(),
 }));

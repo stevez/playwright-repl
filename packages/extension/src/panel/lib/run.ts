@@ -4,7 +4,7 @@ import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
-import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swSetBreakpointByUrl, swRemoveBreakpoint, onDebugPaused } from '@/lib/sw-debugger';
+import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 
@@ -101,7 +101,6 @@ export async function runJsScript(code: string, dispatch: React.Dispatch<Action>
 export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
 
-    const breakpointIds: string[] = [];
     const lines = code.split('\n');
     const lineCount = lines.length;
     const sourceURL = 'pw-repl-debug.js';
@@ -109,15 +108,21 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
     try {
         await swDebuggerEnable();
 
-        for (let i = 0; i < lineCount; i++) {
-            if (!lines[i].trim()) continue;
-            const bpId = await swSetBreakpointByUrl(sourceURL, i);
-            if (bpId) breakpointIds.push(bpId);
-        }
+        // Pause before the first executed statement (skips hoisted declarations)
+        await swDebugPause();
 
+        let lastPausedLine = -1;
         onDebugPaused((line: number) => {
             if (line >= 0 && line < lineCount) {
+                lastPausedLine = line;
                 dispatch({ type: 'SET_RUN_LINE', currentRunLine: line });
+            } else if (lastPausedLine < lineCount - 1) {
+                // Jumped past user code (e.g. step-out) — show last user line
+                lastPausedLine = lineCount - 1;
+                dispatch({ type: 'SET_RUN_LINE', currentRunLine: lineCount - 1 });
+            } else {
+                // Already at last line, stepped past — finish
+                swDebugResume().catch(() => {});
             }
         });
 
@@ -150,7 +155,6 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
         dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(e?.message ?? String(e)), type: 'error' } });
     } finally {
         onDebugPaused(null);
-        for (const id of breakpointIds) await swRemoveBreakpoint(id).catch(() => {});
         await swDebuggerDisable().catch(() => {});
     }
 }

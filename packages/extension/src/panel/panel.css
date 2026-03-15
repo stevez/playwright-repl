@@ -221,6 +221,7 @@ html, body {
   background: var(--bg-scrollbar-thumb-hover);
 }
 
+
 /* === ObjectTree === */
 
 .ot-key    { color: var(--color-flag); }
@@ -244,6 +245,48 @@ html, body {
 
 .ot-row { display: flex; align-items: baseline; }
 
+
+/* === Debug floating bar === */
+
+#debug-bar {
+  position: fixed;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+#debug-bar button {
+  background: transparent;
+  color: var(--text-default);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#debug-bar button:hover {
+  background: var(--bg-button-hover);
+  border-color: var(--border-button);
+}
+
+.debug-bar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--color-toolbar-sep);
+  margin: 0 2px;
+}
 
 .console-clear-btn {
   background: transparent;

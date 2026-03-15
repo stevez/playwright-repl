@@ -18,9 +18,12 @@ vi.mock('@/lib/sw-debugger', () => ({
   swGetProperties: vi.fn().mockResolvedValue({ result: [] }),
   swDebuggerEnable: vi.fn().mockResolvedValue(undefined),
   swDebuggerDisable: vi.fn().mockResolvedValue(undefined),
-  swSetBreakpointByUrl: vi.fn().mockResolvedValue('bp-1'),
+  swDebugPause: vi.fn().mockResolvedValue(undefined),
   swRemoveBreakpoint: vi.fn().mockResolvedValue(undefined),
   swDebugResume: vi.fn().mockResolvedValue(undefined),
+  swDebugStepOver: vi.fn().mockResolvedValue(undefined),
+  swDebugStepInto: vi.fn().mockResolvedValue(undefined),
+  swDebugStepOut: vi.fn().mockResolvedValue(undefined),
   swTerminateExecution: vi.fn().mockResolvedValue(undefined),
   onDebugPaused: vi.fn(),
 }));
@@ -716,14 +719,14 @@ describe('Toolbar component tests', () => {
       });
     });
 
-    it('step button is disabled in JS mode when not debugging', async () => {
+    it('step button is hidden in JS mode', async () => {
       const screen = await renderToolbar({
         editorContent: 'goto https://example.com',
         editorMode: 'js',
       });
 
-      const stepBtn = screen.container.querySelector('#step-btn') as HTMLButtonElement;
-      expect(stepBtn.disabled).toBe(true);
+      const stepBtn = screen.container.querySelector('#step-btn');
+      expect(stepBtn).toBeNull();
     });
 
     it('debug button is visible in JS mode', async () => {
