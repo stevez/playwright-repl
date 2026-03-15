@@ -32,10 +32,12 @@ type BridgeContext = {
   testUrl: string;
 };
 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export const test = base.extend<
   {},
   { bridgeContext: BridgeContext }
 >({
+/* eslint-enable @typescript-eslint/no-empty-object-type */
   // Worker-scoped: BridgeServer + browser + HTTP server, reused across all tests in a worker
   bridgeContext: [async ({}, use) => {
     // 1. Start local HTTP server for test pages
