@@ -129,15 +129,15 @@ describe('executeCommand', () => {
 
   // ─── Non-keyword commands (detectMode routing) ──────────────────────────
 
-  it('evaluates playwright mode via swDebugEval', async () => {
-    vi.mocked(detectMode).mockReturnValue('playwright');
+  it('evaluates js mode via swDebugEval', async () => {
+    vi.mocked(detectMode).mockReturnValue('js');
     vi.mocked(swDebugEval).mockResolvedValue({ result: { type: 'string', value: 'ok' } });
     const result = await executeCommand('page.title()');
     expect(result).toEqual({ text: 'ok', isError: false });
   });
 
-  it('returns error when playwright mode throws', async () => {
-    vi.mocked(detectMode).mockReturnValue('playwright');
+  it('returns error when js mode throws', async () => {
+    vi.mocked(detectMode).mockReturnValue('js');
     vi.mocked(swDebugEval).mockRejectedValue(new Error('page crashed'));
     const result = await executeCommand('page.title()');
     expect(result).toEqual({ text: 'page crashed', isError: true });

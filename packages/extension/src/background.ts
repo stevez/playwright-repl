@@ -271,7 +271,7 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
   if ('error' in parsed) {
     const mode = detectMode(command.trim());
 
-    if (mode === 'playwright' || command.includes('\n')) {
+    if (mode === 'js' || command.includes('\n')) {
       const isMultiLine = command.includes('\n');
       const isStatement = isMultiLine || command.trimEnd().endsWith(';');
       const body = isStatement ? tryReturnLastExpr(command.trim()) : `return (${command.trim()})`;

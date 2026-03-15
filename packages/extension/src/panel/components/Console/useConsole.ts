@@ -12,7 +12,7 @@ import type React from 'react';
 const SNAPSHOT_CMDS = new Set(['snapshot', 'snap', 's']);
 
 const executors = {
-    playwright: async (expr: string) => {
+    js: async (expr: string) => {
         const raw = await swDebugEval(expr) as { result?: CdpRemoteObject; error?: string };
         if (raw?.error) throw new Error(raw.error);
         if (!raw?.result) throw new Error('No result from service worker');
@@ -98,7 +98,7 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: trimmed, type: 'command' } });
 
         try {
-            const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.playwright(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
+            const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.js(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
             if (result.value !== undefined) {
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value: result.value, getProperties: result.getProperties } });
             } else if (result.image !== undefined) {

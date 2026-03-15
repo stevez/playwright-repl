@@ -52,7 +52,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
     const expr = command.trim();
     const mode = detectMode(expr);
 
-    if (mode === 'playwright' || expr.includes('\n')) {
+    if (mode === 'js' || expr.includes('\n')) {
       // Evaluate in SW context (page, crxApp globals available, await supported)
       try {
         const raw = await withTimeout(swDebugEval(expr)) as { result?: CdpResult };

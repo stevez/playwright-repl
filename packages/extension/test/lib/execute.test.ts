@@ -20,63 +20,63 @@ describe('detectMode', () => {
         expect(detectMode('void 0')).toBe('pw');
     });
 
-    // ─── Playwright (service worker) context ─────────────────────────────────
+    // ─── JS (service worker) context ───────────────────────────────────────
 
-    it('returns playwright for page expressions', () => {
-        expect(detectMode('page')).toBe('playwright');
-        expect(detectMode('page.title()')).toBe('playwright');
-        expect(detectMode('page.url()')).toBe('playwright');
-        expect(detectMode('page[0]')).toBe('playwright');
-        expect(detectMode('await page.goto("https://example.com")')).toBe('playwright');
+    it('returns js for page expressions', () => {
+        expect(detectMode('page')).toBe('js');
+        expect(detectMode('page.title()')).toBe('js');
+        expect(detectMode('page.url()')).toBe('js');
+        expect(detectMode('page[0]')).toBe('js');
+        expect(detectMode('await page.goto("https://example.com")')).toBe('js');
     });
 
-    it('returns playwright for context expressions', () => {
-        expect(detectMode('context')).toBe('playwright');
-        expect(detectMode('context.cookies()')).toBe('playwright');
-        expect(detectMode('await context.clearCookies()')).toBe('playwright');
+    it('returns js for context expressions', () => {
+        expect(detectMode('context')).toBe('js');
+        expect(detectMode('context.cookies()')).toBe('js');
+        expect(detectMode('await context.clearCookies()')).toBe('js');
     });
 
-    it('returns playwright for expect expressions', () => {
-        expect(detectMode('expect')).toBe('playwright');
-        expect(detectMode('expect(page).toBeTruthy()')).toBe('playwright');
-        expect(detectMode('await expect(locator).toBeVisible()')).toBe('playwright');
+    it('returns js for expect expressions', () => {
+        expect(detectMode('expect')).toBe('js');
+        expect(detectMode('expect(page).toBeTruthy()')).toBe('js');
+        expect(detectMode('await expect(locator).toBeVisible()')).toBe('js');
     });
 
-    it('returns playwright for crxApp and activeTabId', () => {
-        expect(detectMode('crxApp')).toBe('playwright');
-        expect(detectMode('crxApp.context()')).toBe('playwright');
-        expect(detectMode('activeTabId')).toBe('playwright');
+    it('returns js for crxApp and activeTabId', () => {
+        expect(detectMode('crxApp')).toBe('js');
+        expect(detectMode('crxApp.context()')).toBe('js');
+        expect(detectMode('activeTabId')).toBe('js');
     });
 
-    // ─── Playwright (fallback) — everything else evaluates in SW context ─────
+    // ─── JS (fallback) — everything else evaluates in SW context ──────────
 
-    it('returns playwright for document and window (evaluated via page.evaluate)', () => {
-        expect(detectMode('document.title')).toBe('playwright');
-        expect(detectMode('window.location.href')).toBe('playwright');
-        expect(detectMode('JSON.stringify({})')).toBe('playwright');
+    it('returns js for document and window (evaluated via page.evaluate)', () => {
+        expect(detectMode('document.title')).toBe('js');
+        expect(detectMode('window.location.href')).toBe('js');
+        expect(detectMode('JSON.stringify({})')).toBe('js');
     });
 
-    it('returns playwright for numeric and parenthesized expressions', () => {
-        expect(detectMode('1 + 1')).toBe('playwright');
-        expect(detectMode('6')).toBe('playwright');
-        expect(detectMode('({})')).toBe('playwright');
+    it('returns js for numeric and parenthesized expressions', () => {
+        expect(detectMode('1 + 1')).toBe('js');
+        expect(detectMode('6')).toBe('js');
+        expect(detectMode('({})')).toBe('js');
     });
 
-    it('returns playwright for assignment expressions', () => {
-        expect(detectMode('a = [1, 2, 3]')).toBe('playwright');
-        expect(detectMode('x = {}')).toBe('playwright');
-        expect(detectMode('let n = 42')).toBe('playwright');
+    it('returns js for assignment expressions', () => {
+        expect(detectMode('a = [1, 2, 3]')).toBe('js');
+        expect(detectMode('x = {}')).toBe('js');
+        expect(detectMode('let n = 42')).toBe('js');
     });
 
-    it('returns playwright for function calls', () => {
-        expect(detectMode('invalid()')).toBe('playwright');
-        expect(detectMode('fetch("https://api.example.com")')).toBe('playwright');
-        expect(detectMode('await fetch("https://api.example.com")')).toBe('playwright');
+    it('returns js for function calls', () => {
+        expect(detectMode('invalid()')).toBe('js');
+        expect(detectMode('fetch("https://api.example.com")')).toBe('js');
+        expect(detectMode('await fetch("https://api.example.com")')).toBe('js');
     });
 
-    it('returns playwright for template literals and string operations', () => {
-        expect(detectMode('`hello`')).toBe('playwright');
-        expect(detectMode('"hello"')).toBe('playwright');
+    it('returns js for template literals and string operations', () => {
+        expect(detectMode('`hello`')).toBe('js');
+        expect(detectMode('"hello"')).toBe('js');
     });
 
     it('returns pw for bare document/window (treated as unknown commands)', () => {
@@ -88,17 +88,17 @@ describe('detectMode', () => {
 
 describe('resolveConsoleMode', () => {
 
-    it('returns playwright for multi-line input', () => {
-        expect(resolveConsoleMode('const el = await page.$(\'a\');\nawait el._generateLocatorString()')).toBe('playwright');
+    it('returns js for multi-line input', () => {
+        expect(resolveConsoleMode('const el = await page.$(\'a\');\nawait el._generateLocatorString()')).toBe('js');
     });
 
-    it('returns playwright for multi-line input even without playwright globals', () => {
-        expect(resolveConsoleMode('const x = 1;\nconsole.log(x)')).toBe('playwright');
+    it('returns js for multi-line input even without playwright globals', () => {
+        expect(resolveConsoleMode('const x = 1;\nconsole.log(x)')).toBe('js');
     });
 
     it('delegates to detectMode for single-line input', () => {
-        expect(resolveConsoleMode('page.title()')).toBe('playwright');
+        expect(resolveConsoleMode('page.title()')).toBe('js');
         expect(resolveConsoleMode('click e5')).toBe('pw');
-        expect(resolveConsoleMode('document.title')).toBe('playwright');
+        expect(resolveConsoleMode('document.title')).toBe('js');
     });
 });

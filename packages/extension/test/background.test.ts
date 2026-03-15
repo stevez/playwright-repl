@@ -48,7 +48,7 @@ describe("background.ts message handlers", () => {
 
     // Default mock implementations
     mockParseReplCommand = vi.fn().mockReturnValue({ jsExpr: 'page.title()' });
-    mockDetectMode = vi.fn().mockReturnValue('playwright');
+    mockDetectMode = vi.fn().mockReturnValue('js');
 
     // Reset playwright-crx mocks
     mockPage = { url: vi.fn().mockReturnValue('https://example.com') };
@@ -690,7 +690,7 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     setupDebuggerMocks('sw-1');
     mockParseReplCommand.mockReturnValue({ error: 'Unknown command' });
-    mockDetectMode.mockReturnValue('playwright');
+    mockDetectMode.mockReturnValue('js');
 
     const result = await sendMessage({ type: 'bridge-command', command: 'page.title()' });
     expect(result.isError).toBe(false);
@@ -839,7 +839,7 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     setupDebuggerMocks('sw-1');
     mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('playwright');
+    mockDetectMode.mockReturnValue('js');
 
     const result = await sendMessage({ type: 'bridge-command', command: 'page.title();' });
     expect(result.isError).toBe(false);
