@@ -27,11 +27,39 @@ function inlineSummary(data: SerializedValue): string {
         return `[${items}${Object.keys(data.props).length > 3 ? ', …' : ''}]`;
     }
     if (data.__type === 'object') {
+        if (data.cls === 'Promise') {
+            const stateVal = data.props['[[PromiseState]]'];
+            const state = stateVal?.__type === 'string' ? stateVal.v : 'pending';
+            if (state === 'pending') return '';
+            const result = data.props['[[PromiseResult]]'];
+            if (result && result.__type !== 'undefined') return `{<${state}>: ${inlineSummary(result)}}`;
+            return `{<${state}>}`;
+        }
+        if (/^Map\(\d+\)$/.test(data.cls)) {
+            const keys = Object.keys(data.props).slice(0, 3);
+            const items = keys.map(k => `${k} => ${inlineSummary(data.props[k])}`).join(', ');
+            return `{${items}${Object.keys(data.props).length > 3 ? ', …' : ''}}`;
+        }
+        if (/^Set\(\d+\)$/.test(data.cls)) {
+            const keys = Object.keys(data.props).slice(0, 3);
+            const items = keys.map(k => inlineSummary(data.props[k])).join(', ');
+            return `{${items}${Object.keys(data.props).length > 3 ? ', …' : ''}}`;
+        }
         const keys = Object.keys(data.props).slice(0, 3);
         const items = keys.map(k => `${k}: ${inlineSummary(data.props[k])}`).join(', ');
         return `{${items}${Object.keys(data.props).length > 3 ? ', …' : ''}}`;
     }
     return '';
+}
+
+/** For Map/Set expansion: keep original flattened entries, merge metadata, drop [[Entries]]. */
+function mergeMapSetProps(original: Record<string, SerializedValue>, fetched: Record<string, SerializedValue>): Record<string, SerializedValue> {
+    const merged: Record<string, SerializedValue> = { ...original };
+    for (const [k, v] of Object.entries(fetched)) {
+        if (k === '[[Entries]]') continue;
+        merged[k] = v;
+    }
+    return merged;
 }
 
 export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
@@ -99,7 +127,10 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
 
     // Object / Array
     const isArray = data.__type === 'array';
-    const propsToShow = childProps ?? data.props;
+    const isMapOrSet = !isArray && /^(Map|Set)\(\d+\)$/.test(data.cls);
+    const propsToShow = childProps
+        ? (isMapOrSet ? mergeMapSetProps(data.props, childProps) : childProps)
+        : data.props;
     const keys = Object.keys(propsToShow);
     const header = isArray ? `Array(${data.len})` : data.cls;
 
@@ -120,11 +151,22 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
                 <div className="ot-children">
                     {loading
                         ? <div className="ot-row"><span className="ot-empty">Loading…</span></div>
-                        : keys.map(k => (
-                            <div key={k} className="ot-row">
-                                <ObjectTree data={propsToShow[k]} label={k} depth={depth + 1} getProperties={getProperties} />
-                            </div>
-                        ))
+                        : keys.map(k => {
+                            const isMapEntry = isMapOrSet && /^Map\(/.test(data.cls) && k in data.props;
+                            return (
+                                <div key={k} className="ot-row">
+                                    {isMapEntry ? (
+                                        <span>
+                                            <span className="ot-key">{k}</span>
+                                            <span className="ot-colon">{' => '}</span>
+                                            <ObjectTree data={propsToShow[k]} depth={depth + 1} getProperties={getProperties} />
+                                        </span>
+                                    ) : (
+                                        <ObjectTree data={propsToShow[k]} label={k} depth={depth + 1} getProperties={getProperties} />
+                                    )}
+                                </div>
+                            );
+                        })
                     }
                 </div>
             )}

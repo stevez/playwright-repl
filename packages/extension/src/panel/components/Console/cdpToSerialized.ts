@@ -36,6 +36,13 @@ export interface CdpPropertyDescriptor {
     value?: CdpRemoteObject;
 }
 
+/** Parse array length from CDP description string like "Array(2)" */
+function parseArrayLength(description?: string): number | undefined {
+    if (!description) return undefined;
+    const m = description.match(/^Array\((\d+)\)$/);
+    return m ? Number(m[1]) : undefined;
+}
+
 function fromPreviewProperty(prop: CdpPropertyPreview): SerializedValue {
     const { type, subtype, value, name } = prop;
     if (type === 'undefined') return { __type: 'undefined' };
@@ -77,6 +84,22 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
             }
             return { __type: 'object', cls: description ?? className ?? (subtype === 'map' ? 'Map' : 'Set'), props, objectId };
         }
+        // Promise — extract state + result from preview internal properties
+        if (subtype === 'promise') {
+            const props: Record<string, SerializedValue> = {};
+            let state = 'pending';
+            if (preview?.properties) {
+                for (const prop of preview.properties) {
+                    if (prop.name === '[[PromiseState]]') {
+                        state = prop.value ?? 'pending';
+                    } else if (prop.name === '[[PromiseResult]]') {
+                        props['[[PromiseResult]]'] = fromPreviewProperty(prop);
+                    }
+                }
+            }
+            props['[[PromiseState]]'] = { __type: 'string', v: state };
+            return { __type: 'object', cls: 'Promise', props, objectId };
+        }
         const cls = className ?? 'Object';
         const isArray = subtype === 'array';
         // Use preview properties as initial display; objectId enables lazy full expansion
@@ -87,7 +110,7 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
             }
         }
         if (isArray) {
-            const len = preview?.properties?.length ?? 0;
+            const len = parseArrayLength(description) ?? preview?.properties?.length ?? 0;
             return { __type: 'array', cls, len, props, objectId };
         }
         return { __type: 'object', cls, props, objectId };
@@ -112,7 +135,7 @@ export function fromCdpGetProperties(raw: unknown): Record<string, SerializedVal
         const entries = internals.find(d => d.name === '[[Entries]]');
         if (entries?.value) props[entries.name] = fromCdpRemoteObject(entries.value);
         for (const desc of internals) {
-            if (desc.name === '[[Entries]]') continue;
+            if (desc.name === '[[Entries]]' || desc.name === '[[Prototype]]') continue;
             if (desc.value) props[desc.name] = fromCdpRemoteObject(desc.value);
         }
     }

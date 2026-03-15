@@ -99,6 +99,42 @@ describe('fromCdpRemoteObject', () => {
         expect(result).toMatchObject({ __type: 'array', len: 2 });
     });
 
+    // ─── Array length from description ────────────────────────────────────
+
+    it('parses array length from description when preview is truncated', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'array', className: 'Array',
+            description: 'Array(5)',
+            preview: { type: 'object', subtype: 'array', properties: [
+                { name: '0', type: 'number', value: '1' },
+                { name: '1', type: 'number', value: '2' },
+            ]},
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({ __type: 'array', len: 5 });
+    });
+
+    it('falls back to preview length when description is missing', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'array', className: 'Array',
+            preview: { type: 'object', subtype: 'array', properties: [
+                { name: '0', type: 'number', value: '1' },
+            ]},
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({ __type: 'array', len: 1 });
+    });
+
+    it('parses length from description for [[Entries]] array with empty preview', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'array', className: 'Array',
+            description: 'Array(3)',
+            preview: { type: 'object', subtype: 'array', properties: [] },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({ __type: 'array', len: 3 });
+    });
+
     // ─── Special subtypes ──────────────────────────────────────────────────
 
     it('returns date description for subtype === "date"', () => {
@@ -274,6 +310,70 @@ describe('fromCdpRemoteObject', () => {
         };
         const result = fromCdpRemoteObject(obj);
         expect(result).toMatchObject({ __type: 'object', cls: 'Set(0)', props: {} });
+    });
+
+    // ─── Promise ─────────────────────────────────────────────────────────
+
+    it('serializes fulfilled promise', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'promise', className: 'Promise',
+            description: 'Promise',
+            preview: {
+                type: 'object', subtype: 'promise', description: 'Promise',
+                properties: [
+                    { name: '[[PromiseState]]', type: 'string', value: 'fulfilled' },
+                    { name: '[[PromiseResult]]', type: 'number', value: '42' },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Promise',
+            props: {
+                '[[PromiseState]]': { __type: 'string', v: 'fulfilled' },
+                '[[PromiseResult]]': { __type: 'number', v: 42 },
+            },
+        });
+    });
+
+    it('serializes pending promise', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'promise', className: 'Promise',
+            description: 'Promise',
+            preview: {
+                type: 'object', subtype: 'promise', description: 'Promise',
+                properties: [
+                    { name: '[[PromiseState]]', type: 'string', value: 'pending' },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Promise',
+            props: { '[[PromiseState]]': { __type: 'string', v: 'pending' } },
+        });
+    });
+
+    it('serializes rejected promise', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'promise', className: 'Promise',
+            description: 'Promise',
+            preview: {
+                type: 'object', subtype: 'promise', description: 'Promise',
+                properties: [
+                    { name: '[[PromiseState]]', type: 'string', value: 'rejected' },
+                    { name: '[[PromiseResult]]', type: 'string', value: 'Error: fail' },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Promise',
+            props: {
+                '[[PromiseState]]': { __type: 'string', v: 'rejected' },
+                '[[PromiseResult]]': { __type: 'string', v: 'Error: fail' },
+            },
+        });
     });
 
     // ─── Fallback types ──────────────────────────────────────────────────

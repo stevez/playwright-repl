@@ -134,6 +134,54 @@ describe('ObjectTree refs', () => {
     });
 });
 
+// ─── Promises ──────────────────────────────────────────────────────────────
+
+describe('ObjectTree promises', () => {
+    it('renders pending promise without state in title', async () => {
+        const data: SerializedValue = {
+            __type: 'object', cls: 'Promise',
+            props: { '[[PromiseState]]': { __type: 'string', v: 'pending' } },
+        };
+        const screen = await render(<ObjectTree data={data} depth={1} />);
+        await expect.element(screen.getByText(/Promise/)).toBeInTheDocument();
+    });
+
+    it('renders fulfilled promise with value', async () => {
+        const data: SerializedValue = {
+            __type: 'object', cls: 'Promise',
+            props: {
+                '[[PromiseState]]': { __type: 'string', v: 'fulfilled' },
+                '[[PromiseResult]]': { __type: 'number', v: 42 },
+            },
+        };
+        const screen = await render(<ObjectTree data={data} depth={1} />);
+        await expect.element(screen.getByText(/Promise/)).toBeInTheDocument();
+        await expect.element(screen.getByText(/\{<fulfilled>: 42\}/)).toBeInTheDocument();
+    });
+});
+
+// ─── Map / Set ─────────────────────────────────────────────────────────────
+
+describe('ObjectTree Map/Set', () => {
+    it('renders Map with arrow notation in summary', async () => {
+        const data: SerializedValue = {
+            __type: 'object', cls: 'Map(2)',
+            props: { a: { __type: 'number', v: 1 }, b: { __type: 'number', v: 2 } },
+        };
+        const screen = await render(<ObjectTree data={data} depth={1} />);
+        await expect.element(screen.getByText(/a => 1/)).toBeInTheDocument();
+    });
+
+    it('renders Set with values only in summary', async () => {
+        const data: SerializedValue = {
+            __type: 'object', cls: 'Set(2)',
+            props: { 0: { __type: 'number', v: 1 }, 1: { __type: 'number', v: 2 } },
+        };
+        const screen = await render(<ObjectTree data={data} depth={1} />);
+        await expect.element(screen.getByText(/\{1, 2\}/)).toBeInTheDocument();
+    });
+});
+
 // ─── Lazy loading ───────────────────────────────────────────────────────────
 
 describe('ObjectTree lazy loading', () => {

@@ -63,7 +63,7 @@ describe('swDebugEval', () => {
         (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     });
 
-    it('evaluates expression with replMode and block wrapping', async () => {
+    it('evaluates expression with replMode', async () => {
         mockGetTargets([SW_TARGET]);
         mockAttachSuccess();
         mockSendCommand({ result: { type: 'number', value: 42 } });
@@ -74,7 +74,7 @@ describe('swDebugEval', () => {
             { targetId: 'target-1' },
             'Runtime.evaluate',
             expect.objectContaining({
-                expression: '{\n1 + 1\n}',
+                expression: '1 + 1',
                 replMode: true,
                 awaitPromise: true,
             }),
@@ -82,24 +82,7 @@ describe('swDebugEval', () => {
         );
     });
 
-    it('wraps multi-line code in a block', async () => {
-        mockGetTargets([SW_TARGET]);
-        mockAttachSuccess();
-        mockSendCommand({ result: { type: 'undefined' } });
-
-        await swDebugEval('const x = 1\nx + 1');
-        expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-            { targetId: 'target-1' },
-            'Runtime.evaluate',
-            expect.objectContaining({
-                expression: '{\nconst x = 1\nx + 1\n}',
-                replMode: true,
-            }),
-            expect.any(Function),
-        );
-    });
-
-    it('does not use AsyncFunction wrapper', async () => {
+    it('passes expression directly without wrapping', async () => {
         mockGetTargets([SW_TARGET]);
         mockAttachSuccess();
         mockSendCommand({ result: { type: 'undefined' } });
@@ -107,9 +90,29 @@ describe('swDebugEval', () => {
         await swDebugEval('const x = 42');
         const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
             .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
-        expect(expr).not.toContain('Object.getPrototypeOf');
-        expect(expr).not.toContain('return (const');
-        expect(expr).toBe('{\nconst x = 42\n}');
+        expect(expr).toBe('const x = 42');
+    });
+
+    it('wraps object literal in parens to avoid block parse', async () => {
+        mockGetTargets([SW_TARGET]);
+        mockAttachSuccess();
+        mockSendCommand({ result: { type: 'object', value: { a: 1, b: 2 } } });
+
+        await swDebugEval('{a:1, b:2}');
+        const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
+            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+        expect(expr).toBe('({a:1, b:2})');
+    });
+
+    it('does not wrap non-brace expressions', async () => {
+        mockGetTargets([SW_TARGET]);
+        mockAttachSuccess();
+        mockSendCommand({ result: { type: 'undefined' } });
+
+        await swDebugEval('const x = {a:1}');
+        const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
+            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+        expect(expr).toBe('const x = {a:1}');
     });
 
     it('rejects with exceptionDetails message', async () => {

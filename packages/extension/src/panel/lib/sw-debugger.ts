@@ -98,14 +98,15 @@ export async function swCallFunctionOn(objectId: string, functionDeclaration: st
 
 export async function swDebugEval(expression: string): Promise<unknown> {
     const targetId = await ensureAttached();
+    // Wrap {…} in parens so V8 parses it as an object literal, not a block statement.
+    // This is the same approach Chrome DevTools and Node REPL use.
+    const expr = expression.trimStart().startsWith('{') ? `(${expression})` : expression;
     // replMode: true enables top-level await and returns completion values automatically.
-    // { } block wrapping keeps const/let scoped per call (isolated, no leaking).
-    const wrapped = '{\n' + expression + '\n}';
     return new Promise((resolve, reject) => {
         chrome.debugger.sendCommand(
             { targetId },
             'Runtime.evaluate',
-            { expression: wrapped, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console', replMode: true },
+            { expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console', replMode: true },
             (result: any) => {
                 if (chrome.runtime.lastError) {
                     swTargetId = null;
