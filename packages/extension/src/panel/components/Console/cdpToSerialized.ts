@@ -72,7 +72,7 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
                     const key = subtype === 'map'
                         ? String(entry.key?.value ?? entry.key?.description ?? i)
                         : String(i);
-                    props[key] = fromPreviewProperty({ name: key, type: entry.value.type, subtype: entry.value.subtype, value: entry.value.value });
+                    props[key] = fromPreviewProperty({ name: key, type: entry.value.type, subtype: entry.value.subtype, value: entry.value.value ?? entry.value.description });
                 }
             }
             return { __type: 'object', cls: description ?? className ?? (subtype === 'map' ? 'Map' : 'Set'), props, objectId };
@@ -97,11 +97,24 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
 
 /** Convert Runtime.getProperties response into SerializedValue props map. */
 export function fromCdpGetProperties(raw: unknown): Record<string, SerializedValue> {
-    const result = (raw as any)?.result as CdpPropertyDescriptor[] | undefined;
-    if (!result) return {};
+    const data = raw as any;
+    const result = data?.result as CdpPropertyDescriptor[] | undefined;
     const props: Record<string, SerializedValue> = {};
-    for (const desc of result) {
-        if (desc.value) props[desc.name] = fromCdpRemoteObject(desc.value);
+    if (result) {
+        for (const desc of result) {
+            if (desc.value) props[desc.name] = fromCdpRemoteObject(desc.value);
+        }
+    }
+    // Internal properties (e.g. [[Entries]] for Map/Set, [[Prototype]])
+    // Show [[Entries]] first for Maps/Sets
+    const internals = data?.internalProperties as CdpPropertyDescriptor[] | undefined;
+    if (internals) {
+        const entries = internals.find(d => d.name === '[[Entries]]');
+        if (entries?.value) props[entries.name] = fromCdpRemoteObject(entries.value);
+        for (const desc of internals) {
+            if (desc.name === '[[Entries]]') continue;
+            if (desc.value) props[desc.name] = fromCdpRemoteObject(desc.value);
+        }
     }
     return props;
 }

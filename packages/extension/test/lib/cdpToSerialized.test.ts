@@ -144,6 +144,74 @@ describe('fromCdpRemoteObject', () => {
         });
     });
 
+    it('returns Map entries with description-only values (real CDP format)', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'map', className: 'Map', description: 'Map(2)',
+            preview: {
+                type: 'object', subtype: 'map',
+                entries: [
+                    { key: { type: 'string', value: 'a' }, value: { type: 'number', description: '1' } },
+                    { key: { type: 'string', value: 'b' }, value: { type: 'number', description: '2' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Map(2)',
+            props: { a: { __type: 'number', v: 1 }, b: { __type: 'number', v: 2 } },
+        });
+    });
+
+    it('returns Map with mixed value types', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'map', className: 'Map', description: 'Map(3)',
+            preview: {
+                type: 'object', subtype: 'map',
+                entries: [
+                    { key: { type: 'string', value: 'str' }, value: { type: 'string', value: 'hello' } },
+                    { key: { type: 'string', value: 'num' }, value: { type: 'number', description: '42' } },
+                    { key: { type: 'string', value: 'bool' }, value: { type: 'boolean', value: 'true' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Map(3)',
+            props: {
+                str: { __type: 'string', v: 'hello' },
+                num: { __type: 'number', v: 42 },
+                bool: { __type: 'boolean', v: true },
+            },
+        });
+    });
+
+    it('returns Map with numeric keys', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'map', className: 'Map', description: 'Map(2)',
+            preview: {
+                type: 'object', subtype: 'map',
+                entries: [
+                    { key: { type: 'number', description: '1' }, value: { type: 'string', value: 'one' } },
+                    { key: { type: 'number', description: '2' }, value: { type: 'string', value: 'two' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Map(2)',
+            props: { 1: { __type: 'string', v: 'one' }, 2: { __type: 'string', v: 'two' } },
+        });
+    });
+
+    it('returns empty Map', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'map', className: 'Map', description: 'Map(0)',
+            preview: { type: 'object', subtype: 'map', entries: [] },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({ __type: 'object', cls: 'Map(0)', props: {} });
+    });
+
     it('returns Set entries from preview', () => {
         const obj: CdpRemoteObject = {
             type: 'object', subtype: 'set', className: 'Set', description: 'Set(3)',
@@ -161,6 +229,51 @@ describe('fromCdpRemoteObject', () => {
             __type: 'object', cls: 'Set(3)',
             props: { 0: { __type: 'number', v: 1 }, 1: { __type: 'number', v: 2 }, 2: { __type: 'number', v: 3 } },
         });
+    });
+
+    it('returns Set entries with description-only values', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'set', className: 'Set', description: 'Set(2)',
+            preview: {
+                type: 'object', subtype: 'set',
+                entries: [
+                    { value: { type: 'number', description: '10' } },
+                    { value: { type: 'number', description: '20' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Set(2)',
+            props: { 0: { __type: 'number', v: 10 }, 1: { __type: 'number', v: 20 } },
+        });
+    });
+
+    it('returns Set with string entries', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'set', className: 'Set', description: 'Set(2)',
+            preview: {
+                type: 'object', subtype: 'set',
+                entries: [
+                    { value: { type: 'string', value: 'hello' } },
+                    { value: { type: 'string', value: 'world' } },
+                ],
+            },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({
+            __type: 'object', cls: 'Set(2)',
+            props: { 0: { __type: 'string', v: 'hello' }, 1: { __type: 'string', v: 'world' } },
+        });
+    });
+
+    it('returns empty Set', () => {
+        const obj: CdpRemoteObject = {
+            type: 'object', subtype: 'set', className: 'Set', description: 'Set(0)',
+            preview: { type: 'object', subtype: 'set', entries: [] },
+        };
+        const result = fromCdpRemoteObject(obj);
+        expect(result).toMatchObject({ __type: 'object', cls: 'Set(0)', props: {} });
     });
 
     // ─── Fallback types ──────────────────────────────────────────────────
