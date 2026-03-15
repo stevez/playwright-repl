@@ -3,10 +3,6 @@ import { render } from 'vitest-browser-react';
 import { ObjectTree } from '@/components/Console/ObjectTree';
 import type { SerializedValue } from '@/components/Console/types';
 
-vi.mock('@/lib/bridge', () => ({
-    cdpGetProperties: vi.fn().mockResolvedValue({ result: [] }),
-}));
-
 // ─── Primitives ─────────────────────────────────────────────────────────────
 
 describe('ObjectTree primitives', () => {

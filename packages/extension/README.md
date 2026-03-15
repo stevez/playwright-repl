@@ -4,7 +4,7 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **Mode Detection** | Console auto-detects input type — `.pw` keyword, Playwright API (`await page.*`), or JavaScript (`document.*`) — no prefix needed |
+| 🧠 **Mode Detection** | Console auto-detects input type — `.pw` keyword or Playwright API / JavaScript (`await page.*`, `1 + 1`) — no prefix needed |
 | 🎬 **Record** | Capture clicks, fills, and navigations — generates `.pw` commands and JS Playwright code, inserted into the editor live |
 | ▶ **Run / Step Into** | Run scripts line-by-line with pass/fail gutter indicators; step debugger pauses at each line |
 | 📂 **Load / Save** | Open `.pw` or `.js` files from disk; save editor content with one click |
@@ -31,15 +31,14 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 
 ## Features
 
-### Console — three input modes, one input
+### Console — two input modes, one input
 
 The Console tab auto-detects what you type and routes it to the right executor:
 
 | What you type | Mode | Runs in |
 |---|---|---|
 | `goto`, `click`, `snapshot`, ... | **Keyword** | Playwright via service worker |
-| `await page.locator('h1').textContent()` | **Playwright API** | Service worker (live `page` object) |
-| `document.title`, `window.location.href` | **JavaScript** | Page context (CDP evaluate) |
+| `await page.title()`, `1 + 1`, `fetch(...)` | **Playwright API / JS** | Service worker (`page`, `context`, `expect` available) |
 
 ```
 > snapshot                                    ← keyword command
@@ -48,7 +47,7 @@ The Console tab auto-detects what you type and routes it to the right executor:
 > await page.locator('h1').textContent()      ← Playwright API
 → "Fast and reliable end-to-end testing"
 
-> document.title                              ← JavaScript / DOM
+> await page.evaluate(() => document.title)   ← DOM access via page.evaluate
 → "Playwright"
 ```
 

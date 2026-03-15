@@ -87,10 +87,9 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 | Mode | Standalone | Bridge |
 |------|:---:|:---:|
 | **Keyword** — `click "Sign in"`, `goto https://...` | ✅ | ✅ |
-| **JavaScript** — `document.title`, `window.location.href` | ❌ | ✅ auto-detected |
-| **Playwright API** — `await page.locator('button').count()` | ❌ | ✅ auto-detected |
+| **Playwright API / JS** — `await page.title()`, `1 + 1` | ❌ | ✅ auto-detected |
 
-Bridge mode auto-detects JavaScript and Playwright API expressions — just type them directly. For the full keyword command list, see [Command Reference](#command-reference).
+Bridge mode auto-detects Playwright API and JavaScript expressions — just type them directly. For DOM access use `await page.evaluate(() => document.title)`. For the full keyword command list, see [Command Reference](#command-reference).
 
 ## CLI Options
 

@@ -113,7 +113,7 @@ When the extension is connected, the MCP server logs `Extension connected` to st
 
 ## Tool: `run_command`
 
-One tool, three input modes:
+One tool, two input modes:
 
 ### Keyword commands (`.pw` syntax)
 
@@ -131,21 +131,15 @@ select "Country" "United States"     # select dropdown option
 localstorage-list                    # list localStorage
 ```
 
-### Playwright API
+### Playwright API / JavaScript
 
 ```
 await page.url()
 await page.title()
 await page.locator('button').count()
 await page.getByRole('link', { name: 'Get started', exact: true }).click()
-```
-
-### JavaScript / DOM
-
-```
-document.title
-window.location.href
-document.querySelectorAll('a').length
+await page.evaluate(() => document.title)
+await page.evaluate(() => document.querySelectorAll('a').length)
 ```
 
 ## Tool: `run_script`

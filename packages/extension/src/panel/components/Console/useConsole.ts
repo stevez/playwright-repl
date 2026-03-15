@@ -2,7 +2,7 @@ import type { ConsoleEntry } from './types';
 import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import { addCommand, getCommandHistory, clearHistory } from '@/lib/command-history';
 import { swDebugEval, swGetProperties } from '@/lib/sw-debugger';
-import { cdpEvaluate, executeCommandForConsole } from '@/lib/bridge';
+import { executeCommandForConsole } from '@/lib/bridge';
 import { fromCdpRemoteObject, type CdpRemoteObject } from './cdpToSerialized';
 import { resolveConsoleMode } from '@/lib/execute';
 import { runJsScript } from '@/lib/run';
@@ -19,12 +19,6 @@ const executors = {
         const result = raw.result as CdpRemoteObject;
         if (result.type === 'undefined') return { text: 'Done' as string };
         return { value: fromCdpRemoteObject(result), getProperties: swGetProperties };
-    },
-    js: async (expr: string) => {
-        const raw = await cdpEvaluate(expr) as { result?: CdpRemoteObject; error?: string };
-        if (raw?.error) throw new Error(raw.error);
-        if (!raw?.result) throw new Error('No result');
-        return { value: fromCdpRemoteObject(raw.result) };
     },
     pw: async (command: string) => {
         const result = await executeCommandForConsole(command);
@@ -66,8 +60,8 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
                     '    page      — Playwright Page object (active browser tab)',
                     '    context   — Playwright BrowserContext (cookies, pages, routes)',
                     '    expect    — Playwright assertion (expect(locator).toBeVisible())',
-                    '    document  — DOM document (inside page.evaluate())',
-                    '    window    — Browser window (inside page.evaluate())',
+                    '',
+                    '  For DOM access use: await page.evaluate(() => document.title)',
                 ].join('\n');
                 const text = `JavaScript mode — Playwright API:\n  Prefix with await for async methods\n\n${globals}\n\n${jsLines}`;
                 dispatch({ type: 'ADD_LINE', line: { text, type: 'info' } });
@@ -104,7 +98,7 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: trimmed, type: 'command' } });
 
         try {
-            const result = await (mode === 'playwright' ? executors.playwright(trimmed) : mode === 'pw' ? executors.pw(trimmed) : executors.js(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
+            const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.playwright(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
             if (result.value !== undefined) {
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value: result.value, getProperties: result.getProperties } });
             } else if (result.image !== undefined) {

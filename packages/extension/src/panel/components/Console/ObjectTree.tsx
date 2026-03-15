@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import type { SerializedValue } from './types';
-import { cdpGetProperties } from '@/lib/bridge';
 import { fromCdpGetProperties } from './cdpToSerialized';
 
 const MAX_DEPTH = 8;
@@ -46,13 +45,11 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
             ? data.objectId
             : undefined;
 
-    const resolveProperties = getProperties ?? cdpGetProperties;
-
     useEffect(() => {
-        if (open && objectId && !fetchedRef.current) {
+        if (open && objectId && getProperties && !fetchedRef.current) {
             fetchedRef.current = true;
             setLoading(true);
-            resolveProperties(objectId).then(raw => {
+            getProperties(objectId).then(raw => {
                 setChildProps(fromCdpGetProperties(raw));
                 setLoading(false);
             });

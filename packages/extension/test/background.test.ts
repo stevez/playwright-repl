@@ -221,69 +221,6 @@ describe("background.ts message handlers", () => {
     expect(result).toBe(9876);
   });
 
-  // ─── cdp-evaluate ─────────────────────────────────────────────────────────
-
-  it("cdp-evaluate returns error when not attached", async () => {
-    const result = await sendMessage({ type: 'cdp-evaluate', expression: '1+1' });
-    expect(result).toEqual({ error: 'Not attached to any tab.' });
-  });
-
-  it("cdp-evaluate sends command to active tab", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-
-    const mockResult = { result: { type: 'number', value: 2 } };
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, _method: string, _params: any, cb: any) => {
-      cb(mockResult);
-    });
-
-    const result = await sendMessage({ type: 'cdp-evaluate', expression: '1+1' });
-    expect(result).toEqual(mockResult);
-    expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-      { tabId: 42 },
-      'Runtime.evaluate',
-      expect.objectContaining({ expression: '1+1' }),
-      expect.any(Function),
-    );
-  });
-
-  it("cdp-evaluate returns error on debugger failure", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, _method: string, _params: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Debugger detached' };
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
-
-    const result = await sendMessage({ type: 'cdp-evaluate', expression: 'bad' });
-    // chrome.runtime.lastError is a plain object { message: ... }, String() gives [object Object]
-    expect(result).toHaveProperty('error');
-  });
-
-  // ─── cdp-get-properties ───────────────────────────────────────────────────
-
-  it("cdp-get-properties returns error when not attached", async () => {
-    const result = await sendMessage({ type: 'cdp-get-properties', objectId: 'obj-1' });
-    expect(result).toEqual({ error: 'Not attached to any tab.' });
-  });
-
-  it("cdp-get-properties sends command to active tab", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-
-    const mockResult = { result: [{ name: 'x', value: { type: 'number', value: 1 } }] };
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, _method: string, _params: any, cb: any) => {
-      cb(mockResult);
-    });
-
-    const result = await sendMessage({ type: 'cdp-get-properties', objectId: 'obj-1' });
-    expect(result).toEqual(mockResult);
-    expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-      { tabId: 42 },
-      'Runtime.getProperties',
-      expect.objectContaining({ objectId: 'obj-1', ownProperties: true }),
-      expect.any(Function),
-    );
-  });
-
   // ─── debug-resume / debug-stop ────────────────────────────────────────────
 
   it("debug-resume returns ok:true", async () => {
@@ -759,131 +696,15 @@ describe("background.ts message handlers", () => {
     expect(result.isError).toBe(false);
   });
 
-  it("bridge-command executes in js mode via cdpEvaluate", async () => {
+  it("bridge-command pw mode returns parsed.error for unknown bare word", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown command' });
-    mockDetectMode.mockReturnValue('js');
-
-    // cdpEvaluate sends via chrome.debugger.sendCommand on the TAB target
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'string', value: '"hello"' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'document.title' });
-    expect(result.isError).toBe(false);
-    expect(result.text).toBe('"hello"');
-  });
-
-  it("bridge-command js mode returns Done for undefined result", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'undefined' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'void 0' });
-    expect(result).toEqual({ text: 'Done', isError: false });
-  });
-
-  it("bridge-command js mode returns number as string", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'number', value: 99 } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: '99' });
-    expect(result).toEqual({ text: '99', isError: false });
-  });
-
-  it("bridge-command js mode returns boolean as string", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'boolean', value: false } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'false' });
-    expect(result).toEqual({ text: 'false', isError: false });
-  });
-
-  it("bridge-command js mode returns description fallback", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'object', description: 'HTMLElement' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'document.body' });
-    expect(result).toEqual({ text: 'HTMLElement', isError: false });
-  });
-
-  it("bridge-command js mode handles exceptionDetails", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ exceptionDetails: { exception: { description: 'TypeError: x is not defined' } } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'x' });
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('TypeError');
-  });
-
-  it("bridge-command js mode exceptionDetails with text fallback", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ exceptionDetails: { text: 'Compile error' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'bad syntax' });
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('Compile error');
-  });
-
-  it("bridge-command pw mode returns parsed.error on cdpEvaluate failure", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
     mockParseReplCommand.mockReturnValue({ error: 'Not a valid pw command' });
     mockDetectMode.mockReturnValue('pw');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Debugger detached' };
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
 
     const result = await sendMessage({ type: 'bridge-command', command: 'invalid' });
     expect(result.isError).toBe(true);
     expect(result.text).toBe('Not a valid pw command');
-  });
-
-  it("bridge-command js mode returns error message on cdpEvaluate throw", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Detached' };
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'x' });
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('Detached');
   });
 
   it("bridge-command returns parsed error for unrecognized mode", async () => {
@@ -996,34 +817,6 @@ describe("background.ts message handlers", () => {
     mockParseReplCommand.mockReturnValue({ jsExpr: '\n  \n' });
     const result = await sendMessage({ type: 'bridge-command', command: 'empty' });
     expect(result.isError).toBe(false);
-  });
-
-  // ─── cdp-evaluate catch path ───────────────────────────────────────────────
-
-  it("cdp-evaluate catch sends error on rejection", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Tab was closed' };
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
-
-    const result = await sendMessage({ type: 'cdp-evaluate', expression: 'test' });
-    expect(result).toHaveProperty('error');
-  });
-
-  // ─── cdp-get-properties catch path ─────────────────────────────────────────
-
-  it("cdp-get-properties catch sends error on rejection", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'No object' };
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
-
-    const result = await sendMessage({ type: 'cdp-get-properties', objectId: 'obj-1' });
-    expect(result).toHaveProperty('error');
   });
 
   // ─── statement ending with semicolon (single-line isStatement) ─────────────
@@ -1215,32 +1008,6 @@ describe("background.ts message handlers", () => {
     expect(result.isError).toBe(true);
   });
 
-  it("bridge-command js mode uses description fallback when type is not primitive", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'object', description: 'Promise { <pending> }' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'p' });
-    expect(result.text).toBe('Promise { <pending> }');
-  });
-
-  it("bridge-command js mode description fallback defaults to Done", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ result: { type: 'object' } });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'p' });
-    expect(result.text).toBe('Done');
-  });
-
   // ─── getActiveTabId early return (branch 7 arm 0) ──────────────────────────
 
   it("record-start uses cached activeTabId after attach", async () => {
@@ -1295,40 +1062,6 @@ describe("background.ts message handlers", () => {
     // The Error has a message, but let's also test String fallback
   });
 
-  // ─── js mode exceptionDetails 'Unknown error' fallback ─────────────────────
-
-  it("bridge-command js mode uses 'Unknown error' when exceptionDetails has no fields", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      cb({ exceptionDetails: {} });
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'x' });
-    expect(result.isError).toBe(true);
-    expect(result.text).toBe('Unknown error');
-  });
-
-  // ─── js mode catch: e?.message is falsy → uses String(e) ──────────────────
-
-  it("bridge-command js mode catch uses String(e) when error has no message", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    // Make cdpEvaluate reject with a non-standard error
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = 'plain string error';
-      cb(undefined);
-      delete (chrome.runtime as any).lastError;
-    });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'x' });
-    expect(result.isError).toBe(true);
-  });
-
   // ─── script mode: line with empty result text → no trailing text ───────────
 
   it("bridge-command script mode omits text when result text is empty", async () => {
@@ -1379,21 +1112,6 @@ describe("background.ts message handlers", () => {
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
     expect(result.text).toBe('raw string error');
-  });
-
-  // ─── js mode catch with String(e) fallback (branch 64) ─────────────────────
-
-  it("bridge-command js mode catch falls back to String(e) for non-Error rejection", async () => {
-    await sendMessage({ type: 'attach', tabId: 42 });
-    mockParseReplCommand.mockReturnValue({ error: 'Unknown' });
-    mockDetectMode.mockReturnValue('js');
-
-    // Make sendCommand throw synchronously (caught by Promise constructor)
-    (chrome.debugger as any).sendCommand = vi.fn(() => { throw 'raw throw'; });
-
-    const result = await sendMessage({ type: 'bridge-command', command: 'x' });
-    expect(result.isError).toBe(true);
-    expect(result.text).toBe('raw throw');
   });
 
   // ─── formatBridgeResult object branches (lines 267-270) ────────────────────

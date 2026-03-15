@@ -52,7 +52,7 @@ cd packages/extension && npm run build
 
 | Feature | |
 |---------|---|
-| Console with 3 input modes | `.pw` keywords, Playwright API, JavaScript — auto-detected |
+| Console with 2 input modes | `.pw` keywords, Playwright API / JavaScript — auto-detected |
 | Script editor | Syntax highlighting, pass/fail gutter, step debugger |
 | Recorder | Captures clicks/fills/navigations as `.pw` commands and JS Playwright code |
 | Object tree | Expandable CDP object tree, just like Chrome DevTools |
@@ -82,7 +82,7 @@ playwright-repl-mcp   # extension connects automatically — no side panel neede
 | Playwright runs inside browser | ✅ | ❌ | ❌ |
 | `expect()` assertions | ✅ | ❌ | ❌ |
 | Full Playwright API | ✅ | ✅ | ✅ |
-| JS/DOM eval | ✅ | ❌ | ✅ |
+| JS eval (`page.evaluate`) | ✅ | ❌ | ✅ |
 
 > Playwright MCP and Playwriter control Chrome from outside via CDP relay. `@playwright-repl/mcp` runs Playwright natively inside Chrome via `playwright-crx` — enabling `expect()`, recording, and a full DevTools panel alongside AI.
 

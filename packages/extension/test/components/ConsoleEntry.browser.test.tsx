@@ -8,10 +8,6 @@ vi.mock('@/lib/file-utils', () => ({
 }));
 import { saveImageToFile } from '@/lib/file-utils';
 
-vi.mock('@/lib/bridge', () => ({
-    cdpGetProperties: vi.fn().mockResolvedValue({ result: [] }),
-}));
-
 const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
 const codeBlock = `import { test, expect } from '@playwright/test';

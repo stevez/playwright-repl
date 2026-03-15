@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { attachToTab, executeCommand, executeCommandForConsole, cdpEvaluate, cdpGetProperties } from '@/lib/bridge';
+import { attachToTab, executeCommand, executeCommandForConsole } from '@/lib/bridge';
 
 vi.mock('@/lib/sw-debugger', () => ({
     swDebugEval: vi.fn(),
@@ -51,26 +51,6 @@ describe('bridge', () => {
     expect(result.error).toContain('Cannot attach');
   });
 
-});
-
-// ─── cdpEvaluate / cdpGetProperties ─────────────────────────────────────────
-
-describe('cdpEvaluate', () => {
-  it('sends cdp-evaluate message', async () => {
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ result: { type: 'number', value: 42 } });
-    const result = await cdpEvaluate('1 + 1');
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'cdp-evaluate', expression: '1 + 1' });
-    expect(result).toEqual({ result: { type: 'number', value: 42 } });
-  });
-});
-
-describe('cdpGetProperties', () => {
-  it('sends cdp-get-properties message', async () => {
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ result: [] });
-    const result = await cdpGetProperties('obj-1');
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'cdp-get-properties', objectId: 'obj-1' });
-    expect(result).toEqual({ result: [] });
-  });
 });
 
 // ─── executeCommand ──────────────────────────────────────────────────────────
@@ -163,45 +143,11 @@ describe('executeCommand', () => {
     expect(result).toEqual({ text: 'page crashed', isError: true });
   });
 
-  it('evaluates js mode via cdpEvaluate', async () => {
-    vi.mocked(detectMode).mockReturnValue('js');
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ result: { type: 'string', value: 'hello' } });
-    const result = await executeCommand('document.title');
-    expect(result).toEqual({ text: 'hello', isError: false });
-  });
-
-  it('returns error from cdpEvaluate exceptionDetails', async () => {
-    vi.mocked(detectMode).mockReturnValue('js');
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({
-      exceptionDetails: { exception: { description: 'ReferenceError: x is not defined' } },
-    });
-    const result = await executeCommand('x');
-    expect(result).toEqual({ text: 'ReferenceError: x is not defined', isError: true });
-  });
-
-  it('returns error when js mode cdpEvaluate throws', async () => {
-    vi.mocked(detectMode).mockReturnValue('js');
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('tab closed'));
-    const result = await executeCommand('document.title');
-    expect(result).toEqual({ text: 'tab closed', isError: true });
-  });
-
-  it('falls through to parse error for pw mode when cdpEvaluate throws', async () => {
+  it('returns parse error for pw mode (unknown bare word)', async () => {
     vi.mocked(detectMode).mockReturnValue('pw');
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('timeout'));
     const result = await executeCommand('unknowncmd foo');
     expect(result.isError).toBe(true);
-    // Falls through to parsed.error
     expect(result.text).toBeTruthy();
-  });
-
-  it('returns parse error for totally unknown command', async () => {
-    vi.mocked(detectMode).mockReturnValue('pw');
-    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ result: { type: 'string', value: 'ok' } });
-    // "unknowncmd" is not a known command, detectMode returns 'pw'
-    // but cdpEvaluate succeeds (it's evaluated in tab context)
-    const result = await executeCommand('unknowncmd');
-    expect(result.isError).toBe(false);
   });
 });
 

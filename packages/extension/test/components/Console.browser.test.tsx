@@ -11,8 +11,6 @@ vi.mock('@/lib/bridge', () => ({
     attachToTab: vi.fn(),
     executeCommand: vi.fn(),
     executeCommandForConsole: vi.fn(),
-    cdpEvaluate: vi.fn(),
-    cdpGetProperties: vi.fn(),
 }));
 
 vi.mock('@/lib/sw-debugger', () => ({

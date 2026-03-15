@@ -155,29 +155,6 @@ async function stopPicking(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-// ─── CDP Helpers ─────────────────────────────────────────────────────────────
-
-function cdpCommand(tabId: number, method: string, params: Record<string, unknown> = {}): Promise<any> {
-  return new Promise((resolve, reject) => {
-    chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message ?? ''));
-      else resolve(result);
-    });
-  });
-}
-
-function cdpEvaluate(tabId: number, expression: string): Promise<unknown> {
-  return cdpCommand(tabId, 'Runtime.evaluate', {
-    expression, objectGroup: 'console', returnByValue: false, generatePreview: true, awaitPromise: true,
-  });
-}
-
-function cdpGetProperties(tabId: number, objectId: string): Promise<unknown> {
-  return cdpCommand(tabId, 'Runtime.getProperties', {
-    objectId, ownProperties: true, generatePreview: true,
-  });
-}
-
 // ─── Bridge Command Execution ────────────────────────────────────────────────
 
 /** Attempt to insert `return` before the last expression line so the caller gets the value. */
@@ -294,36 +271,14 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
   if ('error' in parsed) {
     const mode = detectMode(command.trim());
 
-    if (mode === 'playwright') {
+    if (mode === 'playwright' || command.includes('\n')) {
       const isMultiLine = command.includes('\n');
       const isStatement = isMultiLine || command.trimEnd().endsWith(';');
       const body = isStatement ? tryReturnLastExpr(command.trim()) : `return (${command.trim()})`;
       return executeBridgeExpr(body);
     }
 
-    if (mode === 'js' || mode === 'pw') {
-      try {
-        const expr = command.trim();
-        const wrapped = `(function(){try{var __v=(${expr});`
-          + `if(__v===undefined)return undefined;`
-          + `try{return JSON.stringify(__v,null,2);}catch(_){return String(__v);}`
-          + `}catch(e){throw e;}})()`;
-        const raw = await cdpEvaluate(activeTabId!, wrapped) as any;
-        if (raw?.exceptionDetails) {
-          const errMsg = raw.exceptionDetails.exception?.description ?? raw.exceptionDetails.text ?? 'Unknown error';
-          return { text: errMsg, isError: true };
-        }
-        const r = raw?.result;
-        if (!r || r.type === 'undefined') return { text: 'Done', isError: false };
-        if (r.type === 'string') return { text: r.value as string, isError: false };
-        if (r.type === 'number' || r.type === 'boolean') return { text: String(r.value), isError: false };
-        return { text: r.description ?? 'Done', isError: false };
-      } catch (e: any) {
-        if (mode === 'pw') return { text: parsed.error, isError: true };
-        return { text: e?.message ?? String(e), isError: true };
-      }
-    }
-
+    // mode === 'pw' — bare word that looks like a command but isn't recognized
     return { text: parsed.error, isError: true };
   }
 
@@ -385,16 +340,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'pick-start')    { startPicking().then(sendResponse); return true; }
   if (msg.type === 'pick-stop')     { stopPicking().then(sendResponse); return true; }
-  if (msg.type === 'cdp-evaluate')  {
-    if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
-    cdpEvaluate(activeTabId, msg.expression).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
-    return true;
-  }
-  if (msg.type === 'cdp-get-properties') {
-    if (!activeTabId) { sendResponse({ error: 'Not attached to any tab.' }); return false; }
-    cdpGetProperties(activeTabId, msg.objectId).then(sendResponse).catch(e => sendResponse({ error: String(e) }));
-    return true;
-  }
   if (msg.type === 'get-bridge-port') {
     chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;

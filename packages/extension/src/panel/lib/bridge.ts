@@ -4,14 +4,6 @@ import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import { parseReplCommand } from './commands';
 export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: string; image?: string };
 
-export async function cdpEvaluate(expression: string): Promise<unknown> {
-  return chrome.runtime.sendMessage({ type: 'cdp-evaluate', expression });
-}
-
-export async function cdpGetProperties(objectId: string): Promise<unknown> {
-  return chrome.runtime.sendMessage({ type: 'cdp-get-properties', objectId });
-}
-
 type CdpResult = { type?: string; value?: unknown; description?: string; objectId?: string };
 
 export async function executeCommand(command: string): Promise<CommandResult> {
@@ -58,12 +50,10 @@ export async function executeCommand(command: string): Promise<CommandResult> {
     // Not a keyword command — check if it's a raw playwright/JS expression
     const { detectMode } = await import('@/lib/execute');
     const expr = command.trim();
-    const isMultiLine = expr.includes('\n');
     const mode = detectMode(expr);
 
-    // Multi-line input → evaluate in SW context (AsyncFunction supports await)
-    if (mode === 'playwright' || isMultiLine) {
-      // Evaluate in SW context (page, crxApp globals available)
+    if (mode === 'playwright' || expr.includes('\n')) {
+      // Evaluate in SW context (page, crxApp globals available, await supported)
       try {
         const raw = await withTimeout(swDebugEval(expr)) as { result?: CdpResult };
         return formatResult(raw?.result);
@@ -72,25 +62,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       }
     }
 
-    if (mode === 'js' || mode === 'pw') {
-      // Evaluate in tab context, serializing objects via JSON.stringify
-      try {
-        const wrapped = `(function(){try{var __v=(${expr});`
-          + `if(__v===undefined)return undefined;`
-          + `try{return JSON.stringify(__v,null,2);}catch(_){return String(__v);}`
-          + `}catch(e){throw e;}})()`;
-        const raw = await withTimeout(cdpEvaluate(wrapped)) as { result?: CdpResult; exceptionDetails?: any };
-        if (raw?.exceptionDetails) {
-          const msg = raw.exceptionDetails.exception?.description ?? raw.exceptionDetails.text ?? 'Unknown error';
-          return { text: msg, isError: true };
-        }
-        return formatResult(raw?.result);
-      } catch (e: any) {
-        if (mode === 'pw') { /* fall through to error */ }
-        else return { text: e?.message ?? String(e), isError: true };
-      }
-    }
-
+    // mode === 'pw' — bare word that looks like a command but isn't recognized
     return { text: parsed.error, isError: true };
   }
 
