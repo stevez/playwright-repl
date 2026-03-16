@@ -306,3 +306,12 @@ html, body {
   background: var(--bg-button);
 }
 
+[data-testid="bottom-pane"] > div:first-child button[data-active] {
+  opacity: 1;
+  border-bottom: 2px solid var(--color-run-bg);
+}
+
+[data-testid="bottom-pane"] > div:first-child button:not([data-active]) {
+  opacity: 0.6;
+  border-bottom: 2px solid transparent;
+}

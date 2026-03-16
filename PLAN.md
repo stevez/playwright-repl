@@ -1,113 +1,142 @@
-# #88 — Snapshot as expandable tree in console
+# Auto-display scope variables on debug pause (#223)
 
 ## Context
 
-The `snapshot` command returns a YAML accessibility tree (from Playwright's `_snapshotForAI()`). Currently rendered as a flat `<pre>` block in the console. Goal: parse the YAML into a tree and render it as a collapsible component, so users can expand/collapse nodes.
+The JS debugger pauses at breakpoints and supports stepping, but users can't see variable values without adding `console.log` statements. We want to show scope variables automatically when the debugger pauses, displayed in a "Variables" tab next to the Console.
 
-## Current flow
+## Design decisions
+
+- **Tab-based UI**: Add [Console] [Variables] tabs to the bottom pane. Only one tab visible at a time (full width for ~400px side panel).
+- **Auto-switch**: When debugger pauses → switch to Variables tab. When debugging ends → switch back to Console.
+- **Variables tab only visible during debugging** (`isStepDebugging === true`).
+- **Scope filtering**: Show `local`, `closure`, `script` scopes. Filter out `global` (too large).
+- **Lazy loading**: Top-level scope properties fetched on expand; nested objects use existing `ObjectTree` lazy expansion via `swGetProperties`.
+- **Local scope auto-expanded**, other scopes collapsed by default.
+
+## Data flow
 
 ```
-snapshot command
-  → useConsole.ts:36 — detects SNAPSHOT_CMDS, returns { codeBlock: result.text }
-  → useConsole.ts:114 — dispatches { type: 'COMMAND_SUCCESS', line: { text, type: 'snapshot' } }
-  → Console/index.tsx:29 — sets entry.codeBlock = next.text
-  → ConsoleEntry.tsx:23-30 — renders <pre> with Copy button
+Debugger.paused event (sw-debugger.ts)
+  → extract scopeChain from callFrames[0] (filter out 'global')
+  → pass ScopeInfo[] (type + objectId) through PauseCallback
+  → run.ts dispatches SET_SCOPE_DATA to reducer
+  → VariablesPane reads scopeData, calls swGetProperties(objectId)
+  → fromCdpGetProperties() → Record<string, SerializedValue>
+  → renders each variable with existing ObjectTree component
 ```
 
-## Approach
+## Changes
 
-### 0. Install js-yaml
+### 1. `sw-debugger.ts` — Export ScopeInfo type + extend PauseCallback
 
-```bash
-pnpm --filter @playwright-repl/extension add js-yaml
-pnpm --filter @playwright-repl/extension add -D @types/js-yaml
-```
-
-### 1. Create snapshot parser
-
-**New file:** [packages/extension/src/panel/lib/snapshot-parser.ts](packages/extension/src/panel/lib/snapshot-parser.ts)
-
-Use `js-yaml` to parse the YAML snapshot into a nested structure, then convert to our tree type.
-
-The snapshot YAML looks like:
-```
-- document [ref=e1]:
-  - navigation "Main" [ref=e2]:
-    - link "Home" [ref=e3]
-  - main [ref=e5]:
-    - heading "Welcome" [level=1] [ref=e6]
-```
-
-`yaml.load()` will parse this into nested arrays/objects. Define a `SnapshotNode` type and a conversion function:
-
+Add exported type:
 ```ts
-import yaml from 'js-yaml';
-
-export interface SnapshotNode {
-  text: string;        // e.g. 'navigation "Main"'
-  ref?: string;        // e.g. 'e2'
-  children: SnapshotNode[];
-}
-
-export function parseSnapshot(yamlText: string): SnapshotNode[]
+export type ScopeInfo = { type: string; name?: string; objectId: string };
 ```
 
-- Parse with `yaml.load(yamlText)`
-- Walk the resulting structure to build `SnapshotNode[]`
-- Extract `[ref=eN]` from the keys using regex
+Change callback type:
+```ts
+type PauseCallback = (lineNumber: number, scopes: ScopeInfo[]) => void;
+```
 
-### 2. Create SnapshotTree component
+In `Debugger.paused` handler (~line 326), extract scope chain and pass to callback:
+```ts
+const scopes: ScopeInfo[] = (params.callFrames[0].scopeChain ?? [])
+    .filter((s: any) => s.type !== 'global')
+    .map((s: any) => ({ type: s.type, name: s.name, objectId: s.object.objectId }));
+pauseCallback?.(params.callFrames[0].location.lineNumber, scopes);
+```
 
-**New file:** [packages/extension/src/panel/components/Console/SnapshotTree.tsx](packages/extension/src/panel/components/Console/SnapshotTree.tsx)
+### 2. `reducer.ts` — Add scopeData + bottomTab state
 
-Simpler than ObjectTree (no lazy loading, no CDP). Reuse existing `.ot-` CSS classes for consistent look.
+State additions:
+```ts
+scopeData: ScopeInfo[];                    // initial: []
+bottomTab: 'console' | 'variables';       // initial: 'console'
+```
 
+New actions:
+```ts
+| { type: 'SET_SCOPE_DATA', scopes: ScopeInfo[] }
+| { type: 'SET_BOTTOM_TAB', tab: 'console' | 'variables' }
+```
+
+Handlers:
+- `SET_SCOPE_DATA`: set `scopeData`, auto-switch `bottomTab` to `'variables'` when scopes non-empty
+- `SET_BOTTOM_TAB`: set `bottomTab`
+- `RUN_STOP`: also clear `scopeData: []` and reset `bottomTab: 'console'`
+
+### 3. `run.ts` — Dispatch scope data on pause
+
+Update `onDebugPaused` callback signature to `(line: number, scopes: ScopeInfo[])`. Dispatch `SET_SCOPE_DATA` alongside `SET_RUN_LINE` on each pause:
+```ts
+dispatch({ type: 'SET_SCOPE_DATA', scopes });
+```
+
+### 4. `VariablesPane.tsx` — New component
+
+Renders scope sections. Each `ScopeSection`:
+- Shows header (e.g. "Local", "Closure (greet)") — click to expand/collapse
+- On expand: calls `swGetProperties(scope.objectId)` → `fromCdpGetProperties()` → renders each variable with `ObjectTree`
+- Local scope auto-expanded; others collapsed
+- Re-fetches when `scope.objectId` changes (new pause event)
+- Empty state: "Not paused" message
+
+Reuses existing exports:
+- `ObjectTree` from `Console/ObjectTree.tsx` (named export)
+- `fromCdpGetProperties` from `Console/cdpToSerialized.ts`
+- `swGetProperties` from `sw-debugger.ts`
+
+### 5. `BottomPane.tsx` — New wrapper component
+
+Contains:
+- **Tab bar**: [Console] [Variables] buttons with `data-active` attribute pattern
+- Variables tab button only rendered when `isStepDebugging === true`
+- Conditionally renders `<Console>` or `<VariablesPane>` based on `bottomTab`
+
+### 6. `Console/index.tsx` — Remove header bar
+
+The Console currently renders its own header (`<span>Console</span>` at line 97-99). Remove this header since the tab bar in `BottomPane` replaces it. Keep the clear button row.
+
+### 7. `App.tsx` — Replace Console with BottomPane
+
+Replace `<Console outputLines={state.outputLines} dispatch={dispatch} />` with:
 ```tsx
-function SnapshotTree({ nodes }: { nodes: SnapshotNode[] }) {
-  // Render each node with ▶/▼ toggle if it has children
-  // Collapsed by default for depth > 1
-  // Show ref as a dimmed label: e.g. [e5]
-}
+<BottomPane
+    bottomTab={state.bottomTab}
+    outputLines={state.outputLines}
+    scopeData={state.scopeData}
+    isStepDebugging={state.isStepDebugging}
+    dispatch={dispatch}
+/>
 ```
 
-Keep the Copy button (copy original YAML text).
+### 8. `panel.css` — Tab styling
 
-### 3. Wire into ConsoleEntry
+Style active/inactive tabs using `data-active` attribute (same pattern as .pw/JS mode toggle).
 
-**Modify:** [packages/extension/src/panel/components/Console/ConsoleEntry.tsx](packages/extension/src/panel/components/Console/ConsoleEntry.tsx)
+## Files
 
-In the `codeBlock` rendering branch (line 23), check if the codeBlock looks like a snapshot (starts with `- `). If so, parse and render `<SnapshotTree>` instead of `<pre>`. Otherwise keep `<pre>` for other code blocks (like `export` output).
-
-```tsx
-entry.codeBlock !== undefined ? (
-  isSnapshotYaml(entry.codeBlock)
-    ? <SnapshotTreeBlock text={entry.codeBlock} />
-    : <div data-type="snapshot">...<pre>...</pre>...</div>
-)
-```
-
-No changes needed to types, reducer, useConsole, or Console/index.tsx.
-
-## Files to create/modify
-
-1. **Create** [packages/extension/src/panel/lib/snapshot-parser.ts](packages/extension/src/panel/lib/snapshot-parser.ts) — `SnapshotNode` type + `parseSnapshot()` function
-2. **Create** [packages/extension/src/panel/components/Console/SnapshotTree.tsx](packages/extension/src/panel/components/Console/SnapshotTree.tsx) — collapsible tree component
-3. **Modify** [packages/extension/src/panel/components/Console/ConsoleEntry.tsx](packages/extension/src/panel/components/Console/ConsoleEntry.tsx) — branch on snapshot vs code-block rendering
-
-## Styling notes
-
-- Reuse `.ot-toggle`, `.ot-children`, `.ot-row` classes from [panel.css](packages/extension/src/panel/panel.css) (lines 213-235)
-- Ref labels (`[e5]`) in dimmed color (`var(--text-dim)`)
-- Node role/name in default text color
-- Quoted text (like `"Main"`) in string color (`var(--color-string)`)
-- You may want to add a couple of `.st-` (snapshot-tree) classes if the existing `.ot-` classes don't fit perfectly
+| File | Change |
+|------|--------|
+| `src/panel/lib/sw-debugger.ts` | Export `ScopeInfo`, extend `PauseCallback`, extract scope chain |
+| `src/panel/reducer.ts` | Add `scopeData`, `bottomTab` state + actions, clear on `RUN_STOP` |
+| `src/panel/lib/run.ts` | Update `onDebugPaused` callback to accept + dispatch scopes |
+| `src/panel/components/VariablesPane.tsx` | **New** — scope sections with ObjectTree rendering |
+| `src/panel/components/BottomPane.tsx` | **New** — tab bar + conditional Console/Variables rendering |
+| `src/panel/components/Console/index.tsx` | Remove header bar (replaced by tab bar) |
+| `src/panel/App.tsx` | Replace `<Console>` with `<BottomPane>` |
+| `src/panel/panel.css` | Tab active/inactive styles |
 
 ## Verification
 
-1. `pnpm run build`
-2. Load extension, navigate to a page, type `snapshot` in console
-3. Verify tree renders with collapsible nodes
-4. Verify Copy button still copies the original YAML text
-5. Verify `export` command still renders as `<pre>` code block (not tree)
-6. Run component tests: `pnpm --filter @playwright-repl/extension run test`
-7. Run E2E tests: `pnpm --filter @playwright-repl/extension run test:e2e`
+1. Build: `cd packages/extension && pnpm build`
+2. Tests: `cd packages/extension && pnpm test && npm run test:component`
+3. Manual testing:
+   - Click Debug → Variables tab auto-appears with scope data
+   - Step Over → variables update in place
+   - Local scope shows variables; Closure scope collapsed
+   - Click Console tab → console output visible; click Variables → back to variables
+   - Click Stop → switches back to Console tab, Variables tab disappears
+   - Expand nested object → lazy loads properties
+   - When not debugging, only Console tab shown (no Variables tab)

@@ -5,6 +5,7 @@ import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
 import { Console } from './components/Console';
+import { BottomPane } from './components/BottomPane'
 import DebugBar from './components/DebugBar';
 import { onConsoleEvent } from '@/lib/sw-debugger';
 import { loadSettings } from './lib/settings';
@@ -136,7 +137,13 @@ function App() {
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef} />
 
-      <Console outputLines={state.outputLines} dispatch={dispatch} />
+      <BottomPane 
+          outputLines={state.outputLines} 
+          dispatch={dispatch}
+          bottomTab={state.bottomTab}
+          isStepDebugging={state.isStepDebugging}
+          scopeData={state.scopeData} 
+      />
     </>
   )
 }

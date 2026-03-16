@@ -1,4 +1,5 @@
 import type { OutputLine } from "@/types"
+import type { ScopeInfo } from "./lib/sw-debugger";
 
 export type PanelState = {
   outputLines: OutputLine[]
@@ -13,8 +14,10 @@ export type PanelState = {
   lineResults: ('pass' | 'fail' | null)[]
   attachedUrl: string | null
   attachedTabId: number | null
-  isAttaching: boolean,
-  breakPoints: Set<number>;
+  isAttaching: boolean
+  breakPoints: Set<number>
+  scopeData: ScopeInfo[]
+  bottomTab: 'console' | 'variables'
 }
 
 export type Action =
@@ -38,6 +41,8 @@ export type Action =
    | { type: 'UPDATE_URL', url: string }
    | { type: 'SET_EDITOR_MODE', mode: 'pw' | 'js' }
    | { type: 'SET_BREAKPOINTS', breakPoints: Set<number>}
+   | { type: 'SET_SCOPE_DATA', scopes: ScopeInfo[]}
+   | { type: 'SET_BOTTOM_TAB', tab: 'console' | 'variables'}
 
 export const initialState : PanelState = {
     outputLines: [],
@@ -54,6 +59,8 @@ export const initialState : PanelState = {
     attachedTabId: null,
     isAttaching: false,
     breakPoints: new Set(),
+    scopeData: [],
+    bottomTab: 'console'
 }
 
 export function panelReducer(state: PanelState, action: Action): PanelState {
@@ -93,7 +100,7 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             }
         }
         case 'RUN_STOP':
-            return { ...state, isRunning: false, isStepDebugging: false, currentRunLine: -1, stepLine: -1 }
+            return { ...state, isRunning: false, isStepDebugging: false, currentRunLine: -1, stepLine: -1, scopeData: [], bottomTab: 'console' }
         case 'SET_RUN_LINE':
             return { ...state, currentRunLine: action.currentRunLine}
         case 'STEP_INIT': {
@@ -129,6 +136,10 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, editorMode: action.mode }
         case 'SET_BREAKPOINTS': 
             return { ...state, breakPoints: action.breakPoints }
+        case 'SET_BOTTOM_TAB':
+            return { ...state, bottomTab: action.tab }
+        case 'SET_SCOPE_DATA':
+            return { ...state, scopeData: action.scopes, bottomTab: action.scopes.length > 0 ? 'variables' : state.bottomTab }
         default:
             return state
     }

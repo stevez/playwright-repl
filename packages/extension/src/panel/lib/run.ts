@@ -4,7 +4,7 @@ import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
-import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused, swTrackBreakpoint, swSetBreakpointByUrl, swRemoveAllBreakpoints } from '@/lib/sw-debugger';
+import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused, swTrackBreakpoint, swSetBreakpointByUrl, swRemoveAllBreakpoints, ScopeInfo } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 
@@ -118,14 +118,16 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
         await swDebugPause();
 
         let lastPausedLine = -1;
-        onDebugPaused((line: number) => {
+        onDebugPaused((line: number, scopes: ScopeInfo[]) => {
             if (line >= 0 && line < lineCount) {
                 lastPausedLine = line;
                 dispatch({ type: 'SET_RUN_LINE', currentRunLine: line });
+                dispatch({ type: 'SET_SCOPE_DATA', scopes});
             } else if (lastPausedLine < lineCount - 1) {
                 // Jumped past user code (e.g. step-out) — show last user line
                 lastPausedLine = lineCount - 1;
                 dispatch({ type: 'SET_RUN_LINE', currentRunLine: lineCount - 1 });
+                dispatch({ type: 'SET_SCOPE_DATA', scopes});
             } else {
                 // Already at last line, stepped past — finish
                 swDebugResume().catch(() => {});

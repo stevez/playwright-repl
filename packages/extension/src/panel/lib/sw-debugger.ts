@@ -4,6 +4,12 @@
 import { SerializedValue } from '@/components/Console/types';
 import { CdpRemoteObject, fromCdpRemoteObject, CdpPropertyDescriptor } from '@/components/Console/cdpToSerialized';
 
+export type ScopeInfo = {
+    type: string;
+    name?: string;
+    objectId: string
+}
+
 let swTargetId: string | null = null;
 
 if (typeof chrome !== 'undefined') {
@@ -148,7 +154,8 @@ export function onConsoleEvent(callback: ConsoleCallback | null) {
 
 // ─── CDP Debugger Domain ─────────────────────────────────────────────────────
 
-type PauseCallback = (lineNumber: number) => void;
+type PauseCallback = (lineNumber: number, scopes: ScopeInfo[]) => void;
+
 let pauseCallback: PauseCallback | null = null;
 let pausedCallFrameId: string | null = null;
 
@@ -326,7 +333,10 @@ chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
     if (method === 'Debugger.paused') {
         if (params.callFrames?.length > 0) {
             pausedCallFrameId = params.callFrames[0].callFrameId;
-            pauseCallback?.(params.callFrames[0].location.lineNumber);
+            const scopes: ScopeInfo[] = (params.callFrames[0].scopeChain ?? [])
+            .filter((s:any) => s.type !== 'global')
+            .map((s:any) => ({ type: s.type, name: s.name, objectId: s.object.objectId }));
+            pauseCallback?.(params.callFrames[0].location.lineNumber, scopes);
         }
         return;
     }

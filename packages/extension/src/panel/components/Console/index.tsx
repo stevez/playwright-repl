@@ -94,9 +94,6 @@ export function Console({ outputLines, dispatch, className, ref }: Props) {
 
     return (
         <div className={`flex flex-col flex-1 min-h-20 overflow-hidden ${className ?? ''}`} data-testid="console-pane">
-            <div className="flex items-center px-2 py-0.5 border-b border-(--border-primary) bg-(--bg-toolbar) shrink-0">
-                <span className="text-(--text-dim) font-medium">Console</span>
-            </div>
             <div className="flex items-center gap-1 px-1 py-0.5 border-b border-(--border-primary) shrink-0">
                 <button className="console-clear-btn" onClick={clearAll} title="Clear console (Ctrl+L)">⊘</button>
             </div>
