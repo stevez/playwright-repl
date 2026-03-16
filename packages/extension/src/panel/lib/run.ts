@@ -102,7 +102,9 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
 
     const lines = code.split('\n');
-    const lineCount = lines.length;
+    let lineCount = lines.length;
+    while (lineCount > 0 && lines[lineCount - 1].trim() === '') lineCount--;
+    if (lineCount === 0) lineCount = 1;
     const sourceURL = 'pw-repl-debug.js';
 
     try {
