@@ -4,7 +4,6 @@ import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirror
 import Splitter from './components/Splitter'
 import { panelReducer, initialState } from './reducer'
 import { attachToTab } from './lib/bridge'
-import { Console } from './components/Console';
 import { BottomPane } from './components/BottomPane'
 import DebugBar from './components/DebugBar';
 import { onConsoleEvent } from '@/lib/sw-debugger';
