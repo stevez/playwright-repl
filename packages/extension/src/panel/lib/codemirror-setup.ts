@@ -61,10 +61,14 @@ const pwTheme = EditorView.theme({
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
         backgroundColor: 'var(--bg-button)',
     },
+    '.cm-breakpoint-gutter': { width: '16px' },
+    '.cm-breakpoint-gutter .cm-gutterElement': { cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+
 });
 
 export const setRunLineEffect = StateEffect.define<number>();           // -1 = none
 export const setLineResultsEffect = StateEffect.define<(string | null)[]>();  // per-line
+export const toggleBreakpointEffect = StateEffect.define<number>();
 
 const runLineField = StateField.define<number>({
     create: () => -1,
@@ -83,6 +87,34 @@ const lineResultsField = StateField.define<(string | null)[]>({
             if (e.is(setLineResultsEffect)) return e.value;
         }
         return value;
+    },
+});
+
+export const breakpointField = StateField.define<Set<number>>({
+    create: () => new Set(),
+    update(value, tr) {
+        let set = value;
+        if (tr.docChanged) {
+            const newSet = new Set<number>();
+            for (const bp of set) {
+                if (bp >= tr.startState.doc.lines) continue;
+                const line = tr.startState.doc.line(bp + 1);
+                const mapped = tr.changes.mapPos(line.from, 1);
+                if (mapped <= tr.newDoc.length) {
+                    newSet.add(tr.newDoc.lineAt(mapped).number - 1);
+                }
+            }
+            set = newSet;
+        }
+        for (const e of tr.effects) {
+            if (e.is(toggleBreakpointEffect)) {
+                const next = new Set(set);
+                if (next.has(e.value)) next.delete(e.value);
+                else next.add(e.value);
+                set = next;
+            }
+        }
+        return set;
     },
 });
 
@@ -110,6 +142,15 @@ class ResultMarker extends GutterMarker {
     }
 }
 
+class BreakpointMarker extends GutterMarker {
+    toDOM() {
+        const dot = document.createElement('span');
+        dot.dataset.testid = 'breakpoint-marker';
+        dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:var(--color-breakpoint);display:inline-block;';
+        return dot;
+    }
+}
+
 const resultGutter = gutter({
     class: 'cm-result-gutter',
     markers(view) {
@@ -125,6 +166,27 @@ const resultGutter = gutter({
     },
 });
 
+const breakpointGutter = gutter({
+    class: 'cm-breakpoint-gutter',
+    markers(view) {
+        const bps = view.state.field(breakpointField);
+        const markers: any[] = [];
+        for (const lineNum of bps) {
+            if (lineNum < view.state.doc.lines) {
+                const line = view.state.doc.line(lineNum + 1);
+                markers.push(new BreakpointMarker().range(line.from));
+            }
+        }
+        return RangeSet.of(markers, true);
+    },
+    domEventHandlers: {
+        mousedown(view, line) {
+            const lineNum = view.state.doc.lineAt(line.from).number - 1;
+            view.dispatch({ effects: toggleBreakpointEffect.of(lineNum) });
+            return true;
+        },
+    },
+});
 export function dispatchRunState(
     view: EditorView,
     runLine: number,
@@ -167,6 +229,8 @@ export const jsModeExtension = [
 
 export const baseExtensions = [
     languageCompartment.of(pwModeExtension), // dynamic language compartment
+    breakpointField,                         // ← breakpoint state (must register before gutter)
+    breakpointGutter,                        // ← clickable breakpoint dots (leftmost gutter)
     lineNumbers(),                           // built-in line numbers
     highlightActiveLineGutter(),             // highlights gutter on cursor line
     highlightActiveLine(),                   // highlights content on cursor line

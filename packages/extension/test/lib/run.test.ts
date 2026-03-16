@@ -45,9 +45,13 @@ vi.mock('@/lib/sw-debugger', () => ({
     swDebuggerDisable: (...args: any[]) => mockSwDebuggerDisable(...args),
     swDebugPause: (...args: any[]) => mockSwDebugPause(...args),
     onDebugPaused: (...args: any[]) => mockOnDebugPaused(...args),
+    swDebugResume: vi.fn().mockResolvedValue(undefined),
     swDebugStepOver: vi.fn().mockResolvedValue(undefined),
     swDebugStepInto: vi.fn().mockResolvedValue(undefined),
     swDebugStepOut: vi.fn().mockResolvedValue(undefined),
+    swSetBreakpointByUrl: vi.fn().mockResolvedValue('bp-1'),
+    swTrackBreakpoint: vi.fn(),
+    swRemoveAllBreakpoints: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as any);

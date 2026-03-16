@@ -13,7 +13,8 @@ export type PanelState = {
   lineResults: ('pass' | 'fail' | null)[]
   attachedUrl: string | null
   attachedTabId: number | null
-  isAttaching: boolean
+  isAttaching: boolean,
+  breakPoints: Set<number>;
 }
 
 export type Action =
@@ -36,6 +37,7 @@ export type Action =
    | { type: 'DETACH' }
    | { type: 'UPDATE_URL', url: string }
    | { type: 'SET_EDITOR_MODE', mode: 'pw' | 'js' }
+   | { type: 'SET_BREAKPOINTS', breakPoints: Set<number>}
 
 export const initialState : PanelState = {
     outputLines: [],
@@ -51,6 +53,7 @@ export const initialState : PanelState = {
     attachedUrl: null,
     attachedTabId: null,
     isAttaching: false,
+    breakPoints: new Set(),
 }
 
 export function panelReducer(state: PanelState, action: Action): PanelState {
@@ -124,6 +127,8 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, attachedUrl: action.url }
         case 'SET_EDITOR_MODE':
             return { ...state, editorMode: action.mode }
+        case 'SET_BREAKPOINTS': 
+            return { ...state, breakPoints: action.breakPoints }
         default:
             return state
     }

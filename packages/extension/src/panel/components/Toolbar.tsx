@@ -8,12 +8,12 @@ import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
-interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging'> {
+interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging' | 'breakPoints'> {
     dispatch: React.Dispatch<Action>,
     editorRef: React.RefObject<EditorHandle | null>,
 };
 
-function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, dispatch, editorRef }: ToolbarProps) {
+function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, breakPoints, dispatch, editorRef }: ToolbarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -201,7 +201,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     async function handleDebug() {
         dispatch({ type: 'RUN_START', stepDebug: true });
-        await runJsScriptStep(editorContent, dispatch);
+        await runJsScriptStep(editorContent, dispatch, breakPoints);
         dispatch({ type: 'RUN_STOP' });
     }
 

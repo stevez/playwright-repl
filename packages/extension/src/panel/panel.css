@@ -47,6 +47,7 @@
   --color-splitter-handle-hover: #007acc;
   --color-toolbar-sep: #d4d4d4;
   --color-caret: #1e1e1e;
+  --color-breakpoint: #e51400;
 }
 
 .theme-dark {
@@ -93,6 +94,7 @@
   --color-splitter-handle-hover: #007acc;
   --color-toolbar-sep: #444444;
   --color-caret: #d4d4d4;
+  --color-breakpoint: #e51400;
 }
 
 /* === Reset === */

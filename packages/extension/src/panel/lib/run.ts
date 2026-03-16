@@ -4,7 +4,7 @@ import { COMMANDS, CATEGORIES, JS_CATEGORIES } from '@/lib/commands';
 import type { CommandResult } from '@/types';
 import type { Action } from '@/reducer';
 import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-history';
-import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused } from '@/lib/sw-debugger';
+import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused, swTrackBreakpoint, swSetBreakpointByUrl, swRemoveAllBreakpoints } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 
@@ -98,7 +98,7 @@ export async function runJsScript(code: string, dispatch: React.Dispatch<Action>
     }
 }
 
-export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
+export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Action>, breakPoints?: Set<number>): Promise<void> {
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(debug JS script)', type: 'command' } });
 
     const lines = code.split('\n');
@@ -107,6 +107,12 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
 
     try {
         await swDebuggerEnable();
+        if (breakPoints?.size) {
+            for (const line of breakPoints) {
+                const bpId = await swSetBreakpointByUrl(sourceURL, line);
+                if (bpId) swTrackBreakpoint(bpId);
+            }
+        }
 
         // Pause before the first executed statement (skips hoisted declarations)
         await swDebugPause();
@@ -156,6 +162,7 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
     } finally {
         onDebugPaused(null);
         await swDebuggerDisable().catch(() => {});
+        await swRemoveAllBreakpoints().catch(() => {})
     }
 }
 

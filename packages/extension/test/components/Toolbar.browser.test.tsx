@@ -25,6 +25,9 @@ vi.mock('@/lib/sw-debugger', () => ({
   swDebugStepInto: vi.fn().mockResolvedValue(undefined),
   swDebugStepOut: vi.fn().mockResolvedValue(undefined),
   swTerminateExecution: vi.fn().mockResolvedValue(undefined),
+  swSetBreakpointByUrl: vi.fn().mockResolvedValue('bp-1'),
+  swTrackBreakpoint: vi.fn(),
+  swRemoveAllBreakpoints: vi.fn().mockResolvedValue(undefined),
   onDebugPaused: vi.fn(),
 }));
 
@@ -49,6 +52,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     isAttaching={false}
     isRunning={false}
     isStepDebugging={false}
+    breakPoints={new Set()}
     dispatch={vi.fn()}
     editorRef={editorRef}
     {...overrides}

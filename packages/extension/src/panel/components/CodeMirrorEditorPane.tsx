@@ -2,6 +2,7 @@ import { useRef, useEffect, useImperativeHandle } from 'react';
 import { EditorView } from 'codemirror';
 import { baseExtensions, dispatchRunState, languageCompartment, pwModeExtension, jsModeExtension } from '@/lib/codemirror-setup';
 import type { PanelState, Action } from "@/reducer";
+import { breakpointField } from '@/lib/codemirror-setup';
 
 export interface EditorHandle {
     insertAtCursor: (text: string) => void;
@@ -61,6 +62,11 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
                 EditorView.updateListener.of((update) => {
                     if (update.docChanged && !externalUpdateRef.current) {
                         dispatch({ type: 'EDIT_EDITOR_CONTENT', content: update.state.doc.toString() });
+                    }
+                    const oldBps = update.startState.field(breakpointField);
+                    const newBps = update.state.field(breakpointField);
+                    if (oldBps !== newBps) {
+                        dispatch({ type: 'SET_BREAKPOINTS', breakPoints: newBps });
                     }
                 }),
             ],

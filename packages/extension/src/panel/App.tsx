@@ -117,6 +117,7 @@ function App() {
         isAttaching={state.isAttaching}
         dispatch={dispatch}
         editorRef={editorRef}
+        breakPoints={state.breakPoints}
       />
       {state.isStepDebugging && <DebugBar dispatch={dispatch} />}
 
