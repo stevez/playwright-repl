@@ -324,17 +324,31 @@ export function generateLocator(el: Element): string {
     return `locator(${escapeString(buildCssSelector(el))})`;
 }
 
+/** Shorthand mapping for PW --in flag (listitem → list for readability). */
+const ROLE_SHORTHANDS: Record<string, string> = { listitem: 'list' };
+
 /**
  * Generate separate JS and PW locators.
- * JS uses ancestor context when available; PW always uses .nth() (no --in flag yet).
+ * JS uses ancestor context (.filter chains); PW uses --in flag.
+ * Falls back to .nth() when ancestor context isn't available.
  */
-export function generateLocatorPair(el: Element): { js: string; pw: string } {
+export function generateLocatorPair(el: Element): { js: string; pw: string; ancestor?: { role: string; text: string } } {
     const jsLocator = generateLocator(el);
     if (!jsLocator.includes('.filter(')) return { js: jsLocator, pw: jsLocator };
 
-    // JS used ancestor context — generate a .nth() locator for PW
+    // JS used ancestor context — extract ancestor info for PW --in flag
     const role = getImplicitRole(el)!;
     const name = getAccessibleName(el);
+    const container = findContainerAncestor(el);
+    const contextText = container ? getContextText(container.ancestor, el) : '';
+
+    if (container && contextText) {
+        const pwLocator = `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+        const shortRole = ROLE_SHORTHANDS[container.role] ?? container.role;
+        return { js: jsLocator, pw: pwLocator, ancestor: { role: shortRole, text: contextText } };
+    }
+
+    // No ancestor context — fall back to .nth()
     const matches = findByRoleAndName(role, name);
     const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
     const idx = matches.indexOf(el);
@@ -370,48 +384,49 @@ export function buildCommands(action: string, el: Element, opts?: {
     checked?: boolean;
     option?: string;
 }): { pw: string; js: string } | null {
-    const { js: jsLocator, pw: pwLocator } = generateLocatorPair(el);
+    const { js: jsLocator, pw: pwLocator, ancestor } = generateLocatorPair(el);
     const jsLoc = `page.${jsLocator}`;
     const pwArgs = locatorToPwArgs(pwLocator);
     const q = (s: string) => `"${s}"`;
+    const inFlag = ancestor ? ` --in ${ancestor.role} ${q(ancestor.text)}` : '';
 
     switch (action) {
         case 'hover':
             return {
-                pw: `hover ${pwArgs}`,
+                pw: `hover ${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.hover();`,
             };
 
         case 'click':
             return {
-                pw: `click ${pwArgs}`,
+                pw: `click ${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.click();`,
             };
 
         case 'fill': {
             const val = opts?.value ?? '';
             return {
-                pw: `fill ${pwArgs} ${q(val)}`,
+                pw: `fill ${pwArgs} ${q(val)}${inFlag}`,
                 js: `await ${jsLoc}.fill(${escapeString(val)});`,
             };
         }
 
         case 'check':
             return {
-                pw: `check ${pwArgs}`,
+                pw: `check ${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.check();`,
             };
 
         case 'uncheck':
             return {
-                pw: `uncheck ${pwArgs}`,
+                pw: `uncheck ${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.uncheck();`,
             };
 
         case 'select': {
             const optVal = opts?.option ?? '';
             return {
-                pw: `select ${pwArgs} ${q(optVal)}`,
+                pw: `select ${pwArgs} ${q(optVal)}${inFlag}`,
                 js: `await ${jsLoc}.selectOption(${escapeString(optVal)});`,
             };
         }
@@ -420,7 +435,7 @@ export function buildCommands(action: string, el: Element, opts?: {
             const key = opts?.key ?? '';
             if (pwArgs) {
                 return {
-                    pw: `press ${pwArgs} ${key}`,
+                    pw: `press ${pwArgs} ${key}${inFlag}`,
                     js: `await ${jsLoc}.press(${escapeString(key)});`,
                 };
             }

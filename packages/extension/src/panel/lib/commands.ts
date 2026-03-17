@@ -247,6 +247,11 @@ function parseInput(line: string): ParsedArgs | null {
       if (BOOLEAN_OPTIONS.has(key)) {
         opts[key] = true;
         i++;
+      } else if (key === 'in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--')) {
+        // --in takes two values: container role and text
+        opts['in-role'] = tokens[i + 1];
+        opts['in-text'] = tokens[i + 2];
+        i += 3;
       } else if (i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) {
         opts[key] = tokens[i + 1];
         i += 2;
@@ -422,15 +427,17 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   if (args._.length >= 3 && args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
     const role = args._[1];
     const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
+    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
     if (ROLE_ACTIONS[cmdName]) {
       const name = args._.slice(2).join(' ');
-      return { jsExpr: call(actionByRole, role, name, ROLE_ACTIONS[cmdName], nth) };
+      return { jsExpr: call(actionByRole, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText) };
     }
     if (cmdName === 'fill') {
-      return { jsExpr: call(fillByRole, role, args._[2], args._.slice(3).join(' ') || '', nth) };
+      return { jsExpr: call(fillByRole, role, args._[2], args._.slice(3).join(' ') || '', nth, inRole, inText) };
     }
     if (cmdName === 'select') {
-      return { jsExpr: call(selectByRole, role, args._[2], args._.slice(3).join(' ') || '', nth) };
+      return { jsExpr: call(selectByRole, role, args._[2], args._.slice(3).join(' ') || '', nth, inRole, inText) };
     }
   }
 

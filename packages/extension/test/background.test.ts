@@ -161,11 +161,14 @@ describe("background.ts message handlers", () => {
     expect(result.error).toContain('Cannot attach to internal pages');
   });
 
-  it("attach returns error when crxApp.attach throws", async () => {
+  it("attach falls back to newPage+goto when crxApp.attach throws", async () => {
+    const newPage = { url: vi.fn().mockReturnValue('https://example.com'), goto: vi.fn().mockResolvedValue(undefined) };
     mockCrxApp.attach.mockRejectedValue(new Error('CDP failed'));
+    mockCrxApp.newPage = vi.fn().mockResolvedValue(newPage);
     const result = await sendMessage({ type: 'attach', tabId: 42 });
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('CDP failed');
+    expect(result.ok).toBe(true);
+    expect(mockCrxApp.newPage).toHaveBeenCalled();
+    expect(newPage.goto).toHaveBeenCalledWith('https://example.com');
   });
 
   it("attach detaches from previous tab before attaching to new one", async () => {
@@ -223,18 +226,15 @@ describe("background.ts message handlers", () => {
 
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
-  it("attach retries on 'Frame has been detached' error", async () => {
-    const retryPage = { url: vi.fn().mockReturnValue('https://example.com') };
-    let callCount = 0;
-    mockCrxApp.attach.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return Promise.reject(new Error('Frame has been detached'));
-      return Promise.resolve(retryPage);
-    });
+  it("attach falls back to newPage+goto on 'Frame has been detached' error", async () => {
+    const newPage = { url: vi.fn().mockReturnValue('https://example.com'), goto: vi.fn().mockResolvedValue(undefined) };
+    mockCrxApp.attach.mockRejectedValue(new Error('Frame has been detached'));
+    mockCrxApp.newPage = vi.fn().mockResolvedValue(newPage);
 
     const result = await sendMessage({ type: 'attach', tabId: 42 });
     expect(result.ok).toBe(true);
-    expect(mockCrxApp.attach).toHaveBeenCalledTimes(2);
+    expect(mockCrxApp.newPage).toHaveBeenCalled();
+    expect(newPage.goto).toHaveBeenCalledWith('https://example.com');
   });
 
   // ─── bridge-command ───────────────────────────────────────────────────────

@@ -522,7 +522,7 @@ describe('locator', () => {
             expect(pair.js).toBe("getByRole('button', { name: 'Submit' })");
         });
 
-        it('returns ancestor context for JS and .nth() for PW', () => {
+        it('returns ancestor context for JS and --in info for PW', () => {
             document.body.innerHTML = `
                 <ul>
                     <li><span>reading</span><button>Delete</button></li>
@@ -532,7 +532,15 @@ describe('locator', () => {
             const pair = generateLocatorPair(buttons[1]);
             expect(pair.js).toContain('.filter(');
             expect(pair.js).toContain('shopping');
-            expect(pair.pw).toContain('.nth(1)');
+            expect(pair.pw).toBe("getByRole('button', { name: 'Delete' })");
+            expect(pair.ancestor).toEqual({ role: 'list', text: 'shopping' });
+        });
+
+        it('returns no ancestor info when no disambiguation needed', () => {
+            document.body.innerHTML = '<button>Submit</button>';
+            const btn = document.querySelector('button')!;
+            const pair = generateLocatorPair(btn);
+            expect(pair.ancestor).toBeUndefined();
         });
     });
 
@@ -804,7 +812,7 @@ describe('locator', () => {
             expect(buildCommands('unknown', el)).toBeNull();
         });
 
-        it('uses ancestor context in JS and .nth() in PW for click', () => {
+        it('uses ancestor context in JS and --in in PW for click', () => {
             document.body.innerHTML = `
                 <ul>
                     <li><span>reading</span><button>Delete</button></li>
@@ -814,7 +822,18 @@ describe('locator', () => {
             const cmds = buildCommands('click', buttons[1]);
             expect(cmds!.js).toContain(".filter({ hasText: 'shopping' })");
             expect(cmds!.js).toContain('.click()');
-            expect(cmds!.pw).toContain('--nth 1');
+            expect(cmds!.pw).toBe('click button "Delete" --in list "shopping"');
+        });
+
+        it('uses --in with row role for table', () => {
+            document.body.innerHTML = `
+                <table>
+                    <tr><td>Alice</td><td>alice@example.com</td><td><button>Edit</button> <button>Delete</button></td></tr>
+                    <tr><td>Bob</td><td>bob@example.com</td><td><button>Edit</button> <button>Delete</button></td></tr>
+                </table>`;
+            const editButtons = [...document.querySelectorAll('button')].filter(b => b.textContent === 'Edit');
+            const cmds = buildCommands('click', editButtons[1]);
+            expect(cmds!.pw).toBe('click button "Edit" --in row "Bob"');
         });
     });
 
