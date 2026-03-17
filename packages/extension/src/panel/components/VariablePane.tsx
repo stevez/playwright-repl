@@ -11,13 +11,15 @@ import type { SerializedValue } from '@/components/Console/types';
 
 interface VariablePaneProps {
     scopeData: ScopeInfo[];
+    onLocalProps?: (props: Record<string, SerializedValue> | null) => void;
 }
 
 interface ScopeSectionProps {
     scope: ScopeInfo;
-    defaultOpen: boolean
+    defaultOpen: boolean,
+    onLocalProps?: (props: Record<string, SerializedValue> | null) => void;
 }
-function ScopeSection({ scope, defaultOpen }: ScopeSectionProps) {
+function ScopeSection({ scope, defaultOpen, onLocalProps }: ScopeSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
     const [props, setProps] = useState<Record<string, SerializedValue> | null>(null);
     const [loading, setLoading] = useState(false);
@@ -38,8 +40,10 @@ function ScopeSection({ scope, defaultOpen }: ScopeSectionProps) {
     function fetchProps() {
         setLoading(true);
         swGetProperties(scope.objectId).then(raw => {
-            setProps(fromCdpGetProperties(raw));
+            const parsed = fromCdpGetProperties(raw);
+            setProps(parsed);
             setLoading(false);
+            onLocalProps?.(parsed);
         });
     }
 
@@ -70,13 +74,17 @@ function ScopeSection({ scope, defaultOpen }: ScopeSectionProps) {
 }
 
 
-export function VariablePane({ scopeData }: VariablePaneProps) {
+export function VariablePane({ scopeData, onLocalProps }: VariablePaneProps) {
     return (
         <div className="overflow-auto flex-1 p-2">
             { scopeData.length === 0 
               ? <div className='ot-empty'>No local variables</div>
               : scopeData.map((scope) => (
-                <ScopeSection key={scope.objectId} scope={scope} defaultOpen={scope.type === 'local'} />
+                <ScopeSection 
+                        key={scope.objectId} 
+                        scope={scope} 
+                        defaultOpen={scope.type === 'local'} 
+                        onLocalProps={(scope.type === 'local' || scope.type === 'block') ? onLocalProps : undefined }/>
               ))
             }
         </div>

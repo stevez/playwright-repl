@@ -1,142 +1,243 @@
-# Auto-display scope variables on debug pause (#223)
+# Inline variable values in editor during debug pause (#224)
 
 ## Context
 
-The JS debugger pauses at breakpoints and supports stepping, but users can't see variable values without adding `console.log` statements. We want to show scope variables automatically when the debugger pauses, displayed in a "Variables" tab next to the Console.
+When paused at a breakpoint, users have to look at the Variables tab to see values. We want to show variable values inline next to the paused line in the editor, like VS Code does.
 
-## Design decisions
+## Approach
 
-- **Tab-based UI**: Add [Console] [Variables] tabs to the bottom pane. Only one tab visible at a time (full width for ~400px side panel).
-- **Auto-switch**: When debugger pauses → switch to Variables tab. When debugging ends → switch back to Console.
-- **Variables tab only visible during debugging** (`isStepDebugging === true`).
-- **Scope filtering**: Show `local`, `closure`, `script` scopes. Filter out `global` (too large).
-- **Lazy loading**: Top-level scope properties fetched on expand; nested objects use existing `ObjectTree` lazy expansion via `swGetProperties`.
-- **Local scope auto-expanded**, other scopes collapsed by default.
+**Show all local scope variables on the paused line** as faded text after the line content:
+
+```
+const x = 10;
+let total = 0;
+for (const n of arr) {
+  total += n;           ← paused here    total = 6, n = 3
+}
+```
+
+This is simpler than the "per-assignment-line" approach (which requires JS parsing) and still very useful. The `InlineValues` map supports multiple lines, so it can be extended later.
 
 ## Data flow
 
 ```
-Debugger.paused event (sw-debugger.ts)
-  → extract scopeChain from callFrames[0] (filter out 'global')
-  → pass ScopeInfo[] (type + objectId) through PauseCallback
-  → run.ts dispatches SET_SCOPE_DATA to reducer
-  → VariablesPane reads scopeData, calls swGetProperties(objectId)
-  → fromCdpGetProperties() → Record<string, SerializedValue>
-  → renders each variable with existing ObjectTree component
+Debugger.paused → sw-debugger.ts → onDebugPaused(line, scopes)
+  → run.ts dispatches SET_SCOPE_DATA + SET_RUN_LINE
+  → App.tsx useEffect: swGetProperties → fromCdpGetProperties → stores localProps
+  → localProps shared with both VariablePane (display) and formatInlineValues (inline text)
+  → formatInlineValues(line, props) → pure formatting, no CDP call
+  → passes InlineValues map to CodeMirrorEditorPane
+  → dispatches setInlineValuesEffect to CM
+  → inlineValuesDecoration renders InlineValueWidget at end of paused line
 ```
+
+**Key insight**: `swGetProperties` is called once in `App.tsx` for the local scope. The result is shared by both the Variables tab and the inline values formatter — no duplicate CDP calls.
 
 ## Changes
 
-### 1. `sw-debugger.ts` — Export ScopeInfo type + extend PauseCallback
+### 1. Export `inlineSummary` from ObjectTree.tsx
 
-Add exported type:
+Add `export` to the existing `inlineSummary` function (line 14). No other changes.
+
+### 2. `codemirror-setup.ts` — StateEffect + StateField + Widget + Decoration
+
+**a) New types/effects:**
 ```ts
-export type ScopeInfo = { type: string; name?: string; objectId: string };
+export type InlineValues = Map<number, string>;  // lineNum → "x = 10, total = 6"
+export const setInlineValuesEffect = StateEffect.define<InlineValues>();
 ```
 
-Change callback type:
+**b) StateField:**
 ```ts
-type PauseCallback = (lineNumber: number, scopes: ScopeInfo[]) => void;
+const inlineValuesField = StateField.define<InlineValues>({
+    create: () => new Map(),
+    update(value, tr) {
+        for (const e of tr.effects) {
+            if (e.is(setInlineValuesEffect)) return e.value;
+        }
+        return value;
+    },
+});
 ```
 
-In `Debugger.paused` handler (~line 326), extract scope chain and pass to callback:
+**c) Widget class:**
 ```ts
-const scopes: ScopeInfo[] = (params.callFrames[0].scopeChain ?? [])
-    .filter((s: any) => s.type !== 'global')
-    .map((s: any) => ({ type: s.type, name: s.name, objectId: s.object.objectId }));
-pauseCallback?.(params.callFrames[0].location.lineNumber, scopes);
+class InlineValueWidget extends WidgetType {
+    constructor(readonly text: string) { super(); }
+    toDOM() {
+        const span = document.createElement('span');
+        span.className = 'cm-inline-values';
+        span.textContent = '  ' + this.text;
+        return span;
+    }
+    eq(other: InlineValueWidget) { return this.text === other.text; }
+}
 ```
 
-### 2. `reducer.ts` — Add scopeData + bottomTab state
+**d) Decoration:**
 
-State additions:
+Note: import `Range` from `@codemirror/state`.
+
 ```ts
-scopeData: ScopeInfo[];                    // initial: []
-bottomTab: 'console' | 'variables';       // initial: 'console'
+const inlineValuesDecoration = EditorView.decorations.compute(
+    [inlineValuesField],
+    (state) => {
+        const values = state.field(inlineValuesField);
+        if (values.size === 0) return Decoration.none;
+        const decorations: Range<Decoration>[] = [];
+        for (const [lineNum, text] of values) {
+            if (lineNum < 0 || lineNum >= state.doc.lines) continue;
+            const line = state.doc.line(lineNum + 1);
+            decorations.push(
+                Decoration.widget({
+                    widget: new InlineValueWidget(text),
+                    side: 1,
+                }).range(line.to)
+            );
+        }
+        return Decoration.set(decorations, true);
+    }
+);
 ```
 
-New actions:
+**e) Register** `inlineValuesField` and `inlineValuesDecoration` in `baseExtensions`.
+
+**f) Update `dispatchRunState`:**
 ```ts
-| { type: 'SET_SCOPE_DATA', scopes: ScopeInfo[] }
-| { type: 'SET_BOTTOM_TAB', tab: 'console' | 'variables' }
+export function dispatchRunState(
+    view: EditorView, runLine: number,
+    lineResults: (string | null)[],
+    inlineValues: InlineValues = new Map(),
+) {
+    view.dispatch({
+        effects: [
+            setRunLineEffect.of(runLine),
+            setLineResultsEffect.of(lineResults),
+            setInlineValuesEffect.of(inlineValues),
+        ],
+    });
+}
 ```
 
-Handlers:
-- `SET_SCOPE_DATA`: set `scopeData`, auto-switch `bottomTab` to `'variables'` when scopes non-empty
-- `SET_BOTTOM_TAB`: set `bottomTab`
-- `RUN_STOP`: also clear `scopeData: []` and reset `bottomTab: 'console'`
-
-### 3. `run.ts` — Dispatch scope data on pause
-
-Update `onDebugPaused` callback signature to `(line: number, scopes: ScopeInfo[])`. Dispatch `SET_SCOPE_DATA` alongside `SET_RUN_LINE` on each pause:
+**g) Add to `pwTheme`:**
 ```ts
-dispatch({ type: 'SET_SCOPE_DATA', scopes });
+'.cm-inline-values': {
+    color: 'var(--color-inline-value)',
+    fontStyle: 'italic',
+    opacity: '0.7',
+    pointerEvents: 'none',
+},
 ```
 
-### 4. `VariablesPane.tsx` — New component
+### 3. New file: `lib/inline-values.ts`
 
-Renders scope sections. Each `ScopeSection`:
-- Shows header (e.g. "Local", "Closure (greet)") — click to expand/collapse
-- On expand: calls `swGetProperties(scope.objectId)` → `fromCdpGetProperties()` → renders each variable with `ObjectTree`
-- Local scope auto-expanded; others collapsed
-- Re-fetches when `scope.objectId` changes (new pause event)
-- Empty state: "Not paused" message
+Pure formatter — no CDP calls. Receives already-fetched props from App.tsx:
 
-Reuses existing exports:
-- `ObjectTree` from `Console/ObjectTree.tsx` (named export)
-- `fromCdpGetProperties` from `Console/cdpToSerialized.ts`
-- `swGetProperties` from `sw-debugger.ts`
+```ts
+import { inlineSummary } from '@/components/Console/ObjectTree';
+import type { SerializedValue } from '@/components/Console/types';
+import type { InlineValues } from './codemirror-setup';
 
-### 5. `BottomPane.tsx` — New wrapper component
+const MAX_INLINE_LENGTH = 80;
 
-Contains:
-- **Tab bar**: [Console] [Variables] buttons with `data-active` attribute pattern
-- Variables tab button only rendered when `isStepDebugging === true`
-- Conditionally renders `<Console>` or `<VariablesPane>` based on `bottomTab`
+export function formatInlineValues(
+    pausedLine: number,
+    props: Record<string, SerializedValue> | null,
+): InlineValues {
+    const values = new Map<number, string>();
+    if (pausedLine < 0 || !props) return values;
 
-### 6. `Console/index.tsx` — Remove header bar
+    const parts: string[] = [];
+    for (const [name, val] of Object.entries(props)) {
+        if (name.startsWith('[[')) continue;
+        const summary = inlineSummary(val);
+        if (!summary) continue;
+        parts.push(`${name} = ${summary}`);
+    }
+    if (parts.length > 0) {
+        let text = parts.join(', ');
+        if (text.length > MAX_INLINE_LENGTH) text = text.slice(0, MAX_INLINE_LENGTH) + '…';
+        values.set(pausedLine, text);
+    }
 
-The Console currently renders its own header (`<span>Console</span>` at line 97-99). Remove this header since the tab bar in `BottomPane` replaces it. Keep the clear button row.
+    return values;
+}
+```
 
-### 7. `App.tsx` — Replace Console with BottomPane
+### 4. `App.tsx` — Fetch local scope props + derive inline values
 
-Replace `<Console outputLines={state.outputLines} dispatch={dispatch} />` with:
+Fetch local scope properties once, share with both VariablePane and inline values:
+
 ```tsx
-<BottomPane
-    bottomTab={state.bottomTab}
-    outputLines={state.outputLines}
-    scopeData={state.scopeData}
-    isStepDebugging={state.isStepDebugging}
-    dispatch={dispatch}
-/>
+const [localProps, setLocalProps] = useState<Record<string, SerializedValue> | null>(null);
+
+// Fetch local scope properties (shared by VariablePane + inline values)
+useEffect(() => {
+    if (state.scopeData.length === 0) {
+        setLocalProps(null);
+        return;
+    }
+    const localScope = state.scopeData.find(s => s.type === 'local' || s.type === 'block');
+    if (!localScope) { setLocalProps(null); return; }
+
+    let cancelled = false;
+    swGetProperties(localScope.objectId).then(raw => {
+        if (!cancelled) setLocalProps(fromCdpGetProperties(raw));
+    });
+    return () => { cancelled = true; };
+}, [state.scopeData]);
+
+// Derive inline values from already-fetched props (pure, no CDP call)
+const inlineValues = useMemo(
+    () => formatInlineValues(state.currentRunLine, localProps),
+    [state.currentRunLine, localProps],
+);
 ```
 
-### 8. `panel.css` — Tab styling
+Pass `inlineValues` to `<CodeMirrorEditorPane>` and `localProps` to `<VariablePane>`.
 
-Style active/inactive tabs using `data-active` attribute (same pattern as .pw/JS mode toggle).
+### 4b. `VariablePane.tsx` — Accept pre-fetched local props
+
+Update `ScopeSection` for the local scope to use the pre-fetched `localProps` from App.tsx instead of calling `swGetProperties` again. Other scopes (closure, script) still fetch on expand as before.
+
+### 5. `CodeMirrorEditorPane.tsx` — Accept + dispatch
+
+Add `inlineValues` prop. Update the `useEffect` that calls `dispatchRunState`:
+```ts
+dispatchRunState(view, currentRunLine, lineResults, inlineValues ?? new Map());
+```
+Add `inlineValues` to the dependency array.
+
+### 6. `panel.css` — Color variable
+
+```css
+/* In :root */
+--color-inline-value: #6e6e6e;
+
+/* In .theme-dark */
+--color-inline-value: #888888;
+```
+
+## Cleanup on debug end
+
+Automatic — `RUN_STOP` sets `scopeData: []` and `currentRunLine: -1`, which triggers the `useEffect` to clear `inlineValues` to an empty map.
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `src/panel/lib/sw-debugger.ts` | Export `ScopeInfo`, extend `PauseCallback`, extract scope chain |
-| `src/panel/reducer.ts` | Add `scopeData`, `bottomTab` state + actions, clear on `RUN_STOP` |
-| `src/panel/lib/run.ts` | Update `onDebugPaused` callback to accept + dispatch scopes |
-| `src/panel/components/VariablesPane.tsx` | **New** — scope sections with ObjectTree rendering |
-| `src/panel/components/BottomPane.tsx` | **New** — tab bar + conditional Console/Variables rendering |
-| `src/panel/components/Console/index.tsx` | Remove header bar (replaced by tab bar) |
-| `src/panel/App.tsx` | Replace `<Console>` with `<BottomPane>` |
-| `src/panel/panel.css` | Tab active/inactive styles |
+| `src/panel/components/Console/ObjectTree.tsx` | Export `inlineSummary` |
+| `src/panel/lib/codemirror-setup.ts` | StateEffect, StateField, Widget, decoration, update dispatchRunState (import `Range` from `@codemirror/state`) |
+| `src/panel/lib/inline-values.ts` | **New** — pure `formatInlineValues` formatter (no CDP calls) |
+| `src/panel/App.tsx` | Fetch local scope props once, derive inlineValues via `useMemo`, pass to both VariablePane and EditorPane |
+| `src/panel/components/VariablePane.tsx` | Accept pre-fetched `localProps` for local scope (avoid duplicate fetch) |
+| `src/panel/components/CodeMirrorEditorPane.tsx` | Accept + dispatch inlineValues prop |
+| `src/panel/panel.css` | --color-inline-value CSS variable |
 
 ## Verification
 
 1. Build: `cd packages/extension && pnpm build`
-2. Tests: `cd packages/extension && pnpm test && npm run test:component`
-3. Manual testing:
-   - Click Debug → Variables tab auto-appears with scope data
-   - Step Over → variables update in place
-   - Local scope shows variables; Closure scope collapsed
-   - Click Console tab → console output visible; click Variables → back to variables
-   - Click Stop → switches back to Console tab, Variables tab disappears
-   - Expand nested object → lazy loads properties
-   - When not debugging, only Console tab shown (no Variables tab)
+2. Debug JS code with breakpoints → faded inline values appear on paused line
+3. Step Over → inline values update
+4. Stop → inline values disappear
+5. Code without local variables (top-level only) → no inline values (only local/block scope shown)

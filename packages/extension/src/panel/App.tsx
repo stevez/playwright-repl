@@ -1,4 +1,4 @@
-import { useReducer, useRef, useEffect } from 'react'
+import { useReducer, useRef, useEffect, useState, useMemo } from 'react'
 import Toolbar from './components/Toolbar'
 import CodeMirrorEditorPane, { type EditorHandle } from "./components/CodeMirrorEditorPane"
 import Splitter from './components/Splitter'
@@ -8,12 +8,20 @@ import { BottomPane } from './components/BottomPane'
 import DebugBar from './components/DebugBar';
 import { onConsoleEvent } from '@/lib/sw-debugger';
 import { loadSettings } from './lib/settings';
+import { SerializedValue } from './components/Console/types'
+import { formatInlineValues } from './lib/inline-values'
 
 function App() {
   const [state, dispatch] = useReducer(panelReducer, initialState)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorHandle | null>(null);
   const attachedTabRef = useRef<number | null>(null);
+  const [localProps, setLocalProps] = useState<Record<string, SerializedValue> | null>(null);
+
+  const inlineValues = useMemo(
+    () => formatInlineValues(state.currentRunLine, localProps),
+    [state.currentRunLine, localProps],
+  );
 
   useEffect(() => {
     onConsoleEvent((level, args) => {
@@ -129,6 +137,7 @@ function App() {
           editorMode={state.editorMode}
           currentRunLine={state.currentRunLine}
           lineResults={state.lineResults}
+          inlineValues={inlineValues}
           dispatch={dispatch}
         />
       </div>
@@ -142,6 +151,7 @@ function App() {
           bottomTab={state.bottomTab}
           isStepDebugging={state.isStepDebugging}
           scopeData={state.scopeData} 
+          onLocalProps={setLocalProps}
       />
     </>
   )

@@ -48,6 +48,7 @@
   --color-toolbar-sep: #d4d4d4;
   --color-caret: #1e1e1e;
   --color-breakpoint: #e51400;
+  --color-inline-value: #6e6e6e;
 }
 
 .theme-dark {
@@ -95,6 +96,7 @@
   --color-toolbar-sep: #444444;
   --color-caret: #d4d4d4;
   --color-breakpoint: #e51400;
+  --color-inline-value: #888888;
 }
 
 /* === Reset === */

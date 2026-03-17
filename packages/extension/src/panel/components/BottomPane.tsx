@@ -1,12 +1,14 @@
 import { Console } from './Console';
 import { VariablePane } from './VariablePane';
 import type { PanelState, Action } from "@/reducer";
+import type { SerializedValue } from '@/components/Console/types';
 
 interface BottomPaneProps extends Pick<PanelState, 'isStepDebugging' | 'bottomTab' | 'outputLines'| 'scopeData'> {
     dispatch: React.Dispatch<Action>,
+    onLocalProps?: (props: Record<string, SerializedValue> | null) => void;
 };
 
-export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, scopeData }: BottomPaneProps) {
+export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, scopeData, onLocalProps }: BottomPaneProps) {
     return (
         <div className="flex flex-col flex-1 min-h-20 overflow-hidden" data-testid="bottom-pane">
         {/* Tab bar */}
@@ -26,7 +28,7 @@ export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, s
         </div>
         {/* Tab content */}
         { bottomTab === 'console' &&  <Console outputLines={outputLines} dispatch={dispatch} />}
-        { bottomTab === 'variables' && isStepDebugging && <VariablePane scopeData={scopeData} />}
+        { bottomTab === 'variables' && isStepDebugging && <VariablePane scopeData={scopeData} onLocalProps={onLocalProps} />}
         </div>
         
     )

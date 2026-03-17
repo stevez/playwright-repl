@@ -3,6 +3,7 @@ import { EditorView } from 'codemirror';
 import { baseExtensions, dispatchRunState, languageCompartment, pwModeExtension, jsModeExtension } from '@/lib/codemirror-setup';
 import type { PanelState, Action } from "@/reducer";
 import { breakpointField } from '@/lib/codemirror-setup';
+import { InlineValues } from '@/lib/codemirror-setup';
 
 export interface EditorHandle {
     insertAtCursor: (text: string) => void;
@@ -13,10 +14,11 @@ interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRun
     dispatch: React.Dispatch<Action>
     ref?: React.Ref<EditorHandle | null>
     containerRef?: React.Ref<HTMLDivElement>
+    inlineValues: InlineValues
 }
 
 
-function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref, containerRef }: EditorPaneProps) {
+function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineResults, dispatch, ref, containerRef, inlineValues }: EditorPaneProps) {
     const cmContainerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView>(null);
     const externalUpdateRef = useRef(false);
@@ -90,8 +92,8 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
     useEffect(()=> {
         const view = viewRef.current;
         if(!view) return;
-        dispatchRunState(view, currentRunLine, lineResults);
-    }, [currentRunLine, lineResults]);
+        dispatchRunState(view, currentRunLine, lineResults, inlineValues ?? new Map());
+    }, [currentRunLine, lineResults, inlineValues]);
 
     useEffect(() => {
         const view = viewRef.current;

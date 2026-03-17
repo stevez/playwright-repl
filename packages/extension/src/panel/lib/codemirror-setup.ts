@@ -1,17 +1,19 @@
 
 import { EditorView } from "codemirror";
-import { lineNumbers, highlightActiveLineGutter, highlightActiveLine, keymap, placeholder } from '@codemirror/view';
+import { lineNumbers, highlightActiveLineGutter, highlightActiveLine, keymap, placeholder, WidgetType } from '@codemirror/view';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import { pwSyntax } from './pw-language';
 import { search, searchKeymap } from '@codemirror/search';
-import { StateEffect, StateField, EditorState, RangeSet, Compartment } from '@codemirror/state';
+import { StateEffect, StateField, EditorState, RangeSet, Compartment, Range } from '@codemirror/state';
 import { Decoration, GutterMarker, gutter } from '@codemirror/view';
 import { autocompletion, acceptCompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { pwCompletion } from './pw-completion'
 import { playwrightCompletions } from './pw-completion-source'
+
+export type InlineValues = Map<number, string>;
 
 const pwTheme = EditorView.theme({
     '&': {
@@ -62,13 +64,20 @@ const pwTheme = EditorView.theme({
         backgroundColor: 'var(--bg-button)',
     },
     '.cm-breakpoint-gutter': { width: '16px' },
-    '.cm-breakpoint-gutter .cm-gutterElement': { cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+    '.cm-breakpoint-gutter .cm-gutterElement': { cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    '.cm-inline-values': {
+        color: 'var(--color-inline-value)',
+        fontStyle: 'italic',
+        opacity: '0.7',
+        pointerEvents: 'none',
+    },
 
 });
 
 export const setRunLineEffect = StateEffect.define<number>();           // -1 = none
 export const setLineResultsEffect = StateEffect.define<(string | null)[]>();  // per-line
 export const toggleBreakpointEffect = StateEffect.define<number>();
+export const setInlineValuesEffect = StateEffect.define<InlineValues>();
 
 const runLineField = StateField.define<number>({
     create: () => -1,
@@ -118,6 +127,16 @@ export const breakpointField = StateField.define<Set<number>>({
     },
 });
 
+const inlineValuesField = StateField.define<InlineValues>({
+    create: () => new Map(),
+    update(value, tr) {
+        for (const e of tr.effects) {
+            if (e.is(setInlineValuesEffect)) return e.value;
+        }
+        return value;
+    }
+});
+
 const runLineHighlight = EditorView.decorations.compute(
     [runLineField],
     (state) => {
@@ -130,6 +149,25 @@ const runLineHighlight = EditorView.decorations.compute(
     }
 );
 
+const inlineValuesDecoration = EditorView.decorations.compute(
+    [inlineValuesField],
+    (state) => {
+        const values = state.field(inlineValuesField);
+        if (values.size === 0) return Decoration.none;
+        const decorations: Range<Decoration>[] = [];
+        for (const [lineNum, text] of values) {
+            if (lineNum < 0 || lineNum >= state.doc.lines ) continue;
+            const line = state.doc.line(lineNum + 1);
+            decorations.push(
+                Decoration.widget({
+                    widget: new InlineValueWidget(text),
+                    side: 1,
+                }).range(line.to)
+            );
+        }
+        return Decoration.set(decorations, true);
+    }
+)
 class ResultMarker extends GutterMarker {
     constructor(readonly result: string) { super(); }
     toDOM() {
@@ -149,6 +187,17 @@ class BreakpointMarker extends GutterMarker {
         dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:var(--color-breakpoint);display:inline-block;';
         return dot;
     }
+}
+
+class InlineValueWidget extends WidgetType {
+    constructor(readonly text: string) { super();}
+    toDOM() {
+        const span = document.createElement('span');
+        span.className = 'cm-inline-values';
+        span.textContent = '  ' + this.text;
+        return span;
+    }
+    eq(other: InlineValueWidget) { return this.text === other.text; }
 }
 
 const resultGutter = gutter({
@@ -187,15 +236,18 @@ const breakpointGutter = gutter({
         },
     },
 });
+
 export function dispatchRunState(
     view: EditorView,
     runLine: number,
     lineResults: (string | null)[],
+    inlineValues: InlineValues = new Map(),
 ) {
     view.dispatch({
         effects: [
             setRunLineEffect.of(runLine),
             setLineResultsEffect.of(lineResults),
+            setInlineValuesEffect.of(inlineValues),
         ],
     });
 }
@@ -251,5 +303,7 @@ export const baseExtensions = [
     lineResultsField,      // ← register the StateField so CM6 tracks it
     runLineHighlight,      // ← decoration that reads runLineField
     resultGutter,          // ← gutter that reads lineResultsField
+    inlineValuesField,
+    inlineValuesDecoration
 ];
 

@@ -11,7 +11,7 @@ interface Props {
     getProperties?: (objectId: string) => Promise<unknown>;
 }
 
-function inlineSummary(data: SerializedValue): string {
+export function inlineSummary(data: SerializedValue): string {
     if (data.__type === 'null')      return 'null';
     if (data.__type === 'undefined') return 'undefined';
     if (data.__type === 'string')    return `"${data.v}"`;
