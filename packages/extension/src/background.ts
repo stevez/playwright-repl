@@ -149,6 +149,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
+// Invalidate stale state when a tab is closed (user clicks X, tab-close command, etc.)
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === activeTabId) {
+    currentPage = null;
+    activeTabId = null;
+  }
+  if (tabId === recordingTabId) {
+    recordingTabId = null;
+  }
+});
+
 // ─── Pick Element ────────────────────────────────────────────────────────────
 
 async function startPicking(): Promise<{ ok: boolean; error?: string }> {
@@ -366,41 +377,72 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
   return executeBridgeExpr(parsed.jsExpr);
 }
 
-async function handleBridgeCommand(msg: {
+type BridgeResult = { text: string; isError: boolean; image?: string };
+
+function executeCommandPayload(msg: {
   command: string;
   scriptType?: 'command' | 'script';
   language?: 'pw' | 'javascript';
-}): Promise<{ text: string; isError: boolean; image?: string }> {
-  if (!currentPage) {
-    const tabId = await getActiveTabId();
-    if (tabId) await attachToTab(tabId);
-    if (!currentPage) return { text: 'No active tab to attach to.', isError: true };
-  }
-
+}): Promise<BridgeResult> {
   const { command, scriptType, language } = msg;
 
   // Script mode: execute each line as a separate pw command
   if (scriptType === 'script' && language !== 'javascript') {
-    const lines = command.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-    const output: string[] = [];
-    let isError = false;
-    for (const line of lines) {
-      const r = await executeSingleCommand(line).catch((err: unknown) => ({ text: String(err), isError: true }));
-      output.push(`${r.isError ? '\u2717' : '\u2713'} ${line}${r.text ? `\n  ${r.text}` : ''}`);
-      if (r.isError) { isError = true; break; }
-    }
-    return { text: output.join('\n'), isError };
+    return (async () => {
+      const lines = command.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+      const output: string[] = [];
+      let isError = false;
+      for (const line of lines) {
+        const r = await executeSingleCommand(line).catch((err: unknown) => ({ text: String(err), isError: true }));
+        output.push(`${r.isError ? '\u2717' : '\u2713'} ${line}${r.text ? `\n  ${r.text}` : ''}`);
+        if (r.isError) { isError = true; break; }
+      }
+      return { text: output.join('\n'), isError };
+    })();
   }
 
   // Single command or JS script
   return executeSingleCommand(command);
 }
 
+async function handleBridgeCommand(msg: {
+  command: string;
+  scriptType?: 'command' | 'script';
+  language?: 'pw' | 'javascript';
+}): Promise<BridgeResult> {
+  if (!currentPage) {
+    const tabId = await getActiveTabId();
+    if (tabId) await attachToTab(tabId);
+    if (!currentPage) return { text: 'No active tab to attach to.', isError: true };
+  }
+
+  const result = await executeCommandPayload(msg);
+
+  // Stale page recovery: if the command failed because the page/tab was closed,
+  // clear state and retry once with a fresh attach.
+  if (result.isError && result.text.includes('TargetClosedError')) {
+    currentPage = null;
+    activeTabId = null;
+    const tabId = await getActiveTabId();
+    if (tabId) await attachToTab(tabId);
+    if (!currentPage) return result;
+    return executeCommandPayload(msg);
+  }
+
+  return result;
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
+
+// Serialize bridge commands so concurrent messages don't race on currentPage / attachToTab.
+let commandQueue: Promise<void> = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'bridge-command') {
-    handleBridgeCommand(msg).then(sendResponse).catch(e =>
+    const execute = () => handleBridgeCommand(msg);
+    const queued = commandQueue.then(execute, execute);
+    commandQueue = queued.then(() => {}, () => {});
+    queued.then(sendResponse).catch(e =>
       sendResponse({ text: String(e), isError: true })
     );
     return true;

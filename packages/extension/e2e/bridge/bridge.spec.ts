@@ -222,9 +222,6 @@ test.describe("Bridge command tests", () => {
     });
 
     test('localstorage set, get, list, delete cycle', async ({ bridgeContext }) => {
-      // Reset stale page state left by tab-close/tab-select tests
-      await bridgeContext.bridge.run('tab-select 0');
-      await bridgeContext.bridge.run(`goto ${bridgeContext.testUrl}`);
 
       const r1 = await bridgeContext.bridge.run('localstorage-set lk_bridge lv_bridge');
       expectOk(r1);

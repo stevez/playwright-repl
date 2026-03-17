@@ -42,6 +42,7 @@ describe("background.ts message handlers", () => {
   let onStorageChanged: (...args: any[]) => void;
   let onActionClicked: (...args: any[]) => void;
   let onDebuggerDetach: (...args: any[]) => void;
+  let onTabRemoved: (tabId: number) => void;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -75,6 +76,8 @@ describe("background.ts message handlers", () => {
     (chrome.tabs as any).query = vi.fn().mockResolvedValue([{ id: 42, url: 'https://example.com' }]);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
     (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    const tabRemovedListeners: any[] = [];
+    (chrome.tabs as any).onRemoved = { addListener: vi.fn((fn: any) => tabRemovedListeners.push(fn)) };
     (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
     (chrome.scripting as any).executeScript = vi.fn().mockResolvedValue([]);
 
@@ -110,6 +113,7 @@ describe("background.ts message handlers", () => {
     onStorageChanged = storageListeners[0];
     onActionClicked = actionListeners[0];
     onDebuggerDetach = detachListeners[0];
+    onTabRemoved = tabRemovedListeners[0];
   });
 
   function sendMessage(msg: any): Promise<any> {
@@ -506,6 +510,7 @@ describe("background.ts message handlers", () => {
     (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
     (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
     (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
@@ -805,6 +810,7 @@ describe("background.ts message handlers", () => {
     (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
     (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
     (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
@@ -824,6 +830,7 @@ describe("background.ts message handlers", () => {
     (chrome.debugger as any).onDetach = { addListener: vi.fn() };
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
     (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
     (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
@@ -844,6 +851,8 @@ describe("background.ts message handlers", () => {
     (chrome.action as any).onClicked = { addListener: vi.fn() };
     (chrome.debugger as any).onDetach = { addListener: vi.fn() };
     (chrome.tabs as any).onActivated = { addListener: vi.fn() };
+    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
+    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
 
     vi.resetModules();
     await import('../src/background.js');
@@ -1074,5 +1083,104 @@ describe("background.ts message handlers", () => {
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
     expect(result.text).toBe('getTargets failed');
+  });
+
+  // ─── chrome.tabs.onRemoved listener ─────────────────────────────────────────
+
+  it("tab removed clears currentPage and activeTabId", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
+
+    // Fire onRemoved for the active tab
+    onTabRemoved(42);
+
+    // Next bridge-command should auto-attach (currentPage was cleared)
+    mockCrxApp.attach.mockClear();
+    const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
+    expect(mockCrxApp.attach).toHaveBeenCalledWith(42);
+    expect(result.isError).toBe(false);
+  });
+
+  it("tab removed clears recordingTabId", async () => {
+    await sendMessage({ type: 'record-start' });
+    // Fire onRemoved for the recording tab
+    onTabRemoved(42);
+    // record-stop should not try to sendMessage (recordingTabId was cleared)
+    const result = await sendMessage({ type: 'record-stop' });
+    expect((chrome.tabs as any).sendMessage).not.toHaveBeenCalledWith(42, { type: 'record-stop' });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("tab removed ignores non-active tab", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
+
+    // Fire onRemoved for a different tab
+    onTabRemoved(99);
+
+    // bridge-command should NOT re-attach (currentPage is still valid)
+    mockCrxApp.attach.mockClear();
+    const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
+    expect(mockCrxApp.attach).not.toHaveBeenCalled();
+    expect(result.isError).toBe(false);
+  });
+
+  // ─── Stale page recovery (TargetClosedError) ───────────────────────────────
+
+  it("bridge-command retries on TargetClosedError", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
+
+    // First call returns TargetClosedError, second succeeds
+    let callCount = 0;
+    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+      if (method === 'Runtime.enable') { cb(); return; }
+      callCount++;
+      if (callCount === 1) {
+        cb({ exceptionDetails: { exception: { description: 'TargetClosedError2: page.evaluate: Target page, context or browser has been closed' } } });
+      } else {
+        cb({ result: { type: 'string', value: 'recovered' } });
+      }
+    });
+
+    const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('recovered');
+    // Should have re-attached
+    expect(mockCrxApp.attach).toHaveBeenCalledTimes(2);
+  });
+
+  // ─── Command serialization ─────────────────────────────────────────────────
+
+  it("bridge-commands execute sequentially, not concurrently", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1');
+
+    const executionOrder: number[] = [];
+
+    // First command takes 50ms, second is instant
+    let callCount = 0;
+    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+      if (method === 'Runtime.enable') { cb(); return; }
+      callCount++;
+      const idx = callCount;
+      if (idx === 1) {
+        setTimeout(() => { executionOrder.push(1); cb({ result: { type: 'string', value: 'first' } }); }, 50);
+      } else {
+        executionOrder.push(2);
+        cb({ result: { type: 'string', value: 'second' } });
+      }
+    });
+
+    // Send both concurrently
+    const [r1, r2] = await Promise.all([
+      sendMessage({ type: 'bridge-command', command: 'cmd1' }),
+      sendMessage({ type: 'bridge-command', command: 'cmd2' }),
+    ]);
+
+    expect(r1.text).toBe('first');
+    expect(r2.text).toBe('second');
+    // First must complete before second starts
+    expect(executionOrder).toEqual([1, 2]);
   });
 });
