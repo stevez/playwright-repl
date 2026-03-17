@@ -56,6 +56,19 @@ let crxApp: CrxApplication | null = null;
 let currentPage: Page | null = null;
 let activeTabId: number | null = null;
 
+function resetCrxState() {
+  crxApp = null;
+  currentPage = null;
+  activeTabId = null;
+}
+
+async function ensureCrxApp(): Promise<CrxApplication> {
+  if (crxApp) return crxApp;
+  crxApp = await crx.start();
+  (crxApp as any).on('close', () => resetCrxState());
+  return crxApp;
+}
+
 async function getActiveTabId(): Promise<number | null> {
   if (activeTabId) return activeTabId;
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -73,33 +86,33 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       return { ok: false, error: 'Cannot attach to internal pages. Navigate to a regular webpage first.' };
     }
 
-    if (!crxApp) crxApp = await crx.start();
+    const app = await ensureCrxApp();
 
-    // Always detach first — stale frame connections cause "Frame has been detached" errors
-    // (e.g. GitHub SPA navigation replaces frames within the same tab)
-    if (activeTabId !== null) {
-      await crxApp.detach(activeTabId).catch(() => {});
+    // Only detach when re-attaching to the SAME tab (SPA navigation / stale frames).
+    // playwright-crx supports multiple attached pages, so switching tabs is safe.
+    if (activeTabId === tabId) {
+      app.detach(activeTabId).catch(() => {});
       currentPage = null;
       activeTabId = null;
     }
 
-    // Retry once on "Frame has been detached" — can happen with SPA navigation
     try {
-      currentPage = await crxApp.attach(tabId);
-    } catch (e) {
-      if (String(e).includes('Frame') && String(e).includes('detached')) {
-        await new Promise(r => setTimeout(r, 500));
-        currentPage = await crxApp.attach(tabId);
-      } else {
-        throw e;
-      }
+      currentPage = await app.attach(tabId);
+    } catch {
+      // Attach failed (stale frames, etc.) — detach all stale sessions and retry.
+      // The _doDetach fix in playwright-crx handles broken pages gracefully.
+      await app.detachAll().catch(() => {});
+      currentPage = await app.attach(tabId);
     }
+
     activeTabId = tabId;
-    Object.assign(globalThis, { page: currentPage, context: crxApp.context(), crxApp, activeTabId, expect });
+    Object.assign(globalThis, { page: currentPage, context: app.context(), crxApp: app, activeTabId, expect });
     return { ok: true, url: currentPage.url() };
   } catch (e) {
-    activeTabId = null;
+    // Don't reset crxApp — the browser connection is likely still valid.
+    // Only clear the page/tab so the next command triggers a fresh attach.
     currentPage = null;
+    activeTabId = null;
     return { ok: false, error: String(e) };
   }
 }

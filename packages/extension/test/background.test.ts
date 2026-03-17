@@ -17,6 +17,7 @@ vi.mock('@playwright-repl/playwright-crx', () => {
   mockCrxApp = {
     attach: vi.fn().mockResolvedValue(mockPage),
     detach: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn(),
     context: vi.fn().mockReturnValue(mockContext),
   };
   return { crx: { start: vi.fn().mockResolvedValue(mockCrxApp) } };
@@ -56,6 +57,8 @@ describe("background.ts message handlers", () => {
     mockCrxApp = {
       attach: vi.fn().mockResolvedValue(mockPage),
       detach: vi.fn().mockResolvedValue(undefined),
+      detachAll: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
       context: vi.fn().mockReturnValue(mockContext),
       recorder: {
         show: vi.fn().mockResolvedValue(undefined),
@@ -161,18 +164,34 @@ describe("background.ts message handlers", () => {
     expect(result.error).toContain('Cannot attach to internal pages');
   });
 
-  it("attach returns error when crxApp.attach throws", async () => {
+  it("attach returns error when all recovery attempts fail", async () => {
     mockCrxApp.attach.mockRejectedValue(new Error('CDP failed'));
     const result = await sendMessage({ type: 'attach', tabId: 42 });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('CDP failed');
   });
 
-  it("attach detaches from previous tab before attaching to new one", async () => {
+  it("attach recovers via detachAll on transient error", async () => {
+    mockCrxApp.attach
+      .mockRejectedValueOnce(new Error('Frame has been detached'))
+      .mockResolvedValueOnce(mockPage);
+    const result = await sendMessage({ type: 'attach', tabId: 42 });
+    expect(mockCrxApp.detachAll).toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, url: 'https://example.com' });
+  });
+
+  it("attach switches to new tab without detaching previous tab", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     mockCrxApp.attach.mockResolvedValue({ url: vi.fn().mockReturnValue('https://new.com') });
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 99, url: 'https://new.com' });
     await sendMessage({ type: 'attach', tabId: 99 });
+    // playwright-crx supports multiple attached pages, so we don't detach when switching tabs
+    expect(mockCrxApp.detach).not.toHaveBeenCalled();
+  });
+
+  it("attach detaches when re-attaching to the same tab", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'attach', tabId: 42 });
     expect(mockCrxApp.detach).toHaveBeenCalledWith(42);
   });
 
@@ -223,7 +242,7 @@ describe("background.ts message handlers", () => {
 
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
-  it("attach retries on 'Frame has been detached' error", async () => {
+  it("attach retries on 'Frame has been detached' error via detachAll", async () => {
     const retryPage = { url: vi.fn().mockReturnValue('https://example.com') };
     let callCount = 0;
     mockCrxApp.attach.mockImplementation(() => {
@@ -234,6 +253,7 @@ describe("background.ts message handlers", () => {
 
     const result = await sendMessage({ type: 'attach', tabId: 42 });
     expect(result.ok).toBe(true);
+    expect(mockCrxApp.detachAll).toHaveBeenCalled();
     expect(mockCrxApp.attach).toHaveBeenCalledTimes(2);
   });
 
@@ -837,14 +857,12 @@ describe("background.ts message handlers", () => {
     // The .catch(() => {}) should swallow the rejection
   });
 
-  it("detach catch is exercised when detach rejects", async () => {
+  it("detach catch is exercised when detach rejects on same-tab re-attach", async () => {
     // Attach first
     await sendMessage({ type: 'attach', tabId: 42 });
     mockCrxApp.detach.mockRejectedValue(new Error('already detached'));
-    // Attach to different tab — triggers detach of old tab
-    (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 99, url: 'https://new.com' });
-    mockCrxApp.attach.mockResolvedValue({ url: vi.fn().mockReturnValue('https://new.com') });
-    const result = await sendMessage({ type: 'attach', tabId: 99 });
+    // Re-attach to same tab — triggers detach which rejects
+    const result = await sendMessage({ type: 'attach', tabId: 42 });
     // Should succeed despite detach error
     expect(result.ok).toBe(true);
   });
