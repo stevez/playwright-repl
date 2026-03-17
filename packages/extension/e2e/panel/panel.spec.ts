@@ -403,10 +403,10 @@ test.describe("Panel page test", () => {
     await expect(toggle.getByText('.pw')).not.toHaveAttribute('data-active');
   });
 
-  test('step button is enabled in JS mode (starts debug session)', async ({ panelPage }) => {
+  test('debug button is enabled in JS mode', async ({ panelPage }) => {
     await fillEditor(panelPage, 'goto https://example.com');
     await panelPage.getByTestId('mode-toggle').getByText('JS').click(); // pw → js
-    await expect(panelPage.locator('#step-btn')).toBeEnabled();
+    await expect(panelPage.getByTestId('debug-btn')).toBeEnabled();
   });
 
   test('step button is enabled when switching back to pw mode', async ({ panelPage }) => {
