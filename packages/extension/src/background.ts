@@ -83,18 +83,16 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       activeTabId = null;
     }
 
-    // Try direct attach first; if it fails (e.g. tab existed before crx.start()),
-    // fall back to opening a new tab under crxApp control with the same URL.
+    // Retry once on "Frame has been detached" — can happen with SPA navigation
     try {
       currentPage = await crxApp.attach(tabId);
-    } catch (_e) {
-      await crxApp.detach(tabId).catch(() => {});
-      const url = tab.url ?? '';
-      currentPage = await crxApp.newPage();
-      if (url && url !== 'about:blank') await currentPage.goto(url);
-      // Track the new tab's ID instead of the old one
-      const [newTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      tabId = newTab?.id ?? tabId;
+    } catch (e) {
+      if (String(e).includes('Frame') && String(e).includes('detached')) {
+        await new Promise(r => setTimeout(r, 500));
+        currentPage = await crxApp.attach(tabId);
+      } else {
+        throw e;
+      }
     }
     activeTabId = tabId;
     Object.assign(globalThis, { page: currentPage, context: crxApp.context(), crxApp, activeTabId, expect });
