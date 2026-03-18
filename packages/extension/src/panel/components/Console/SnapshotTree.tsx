@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SnapshotNode } from "@/lib/snapshot-parser";
+import { useTreeExpand } from "./TreeExpandContext";
 
 export function SnapshotTree({node, depth}: { node: SnapshotNode, depth: number}) {
     const [open, setOpen] = useState(depth < 2);
     const hasChildren = node.children.length > 0;
+    const { generation, expanded } = useTreeExpand();
+
+    useEffect(() => {
+        if (generation > 0) setOpen(expanded);
+    }, [generation]);
 
     return (
         <div>

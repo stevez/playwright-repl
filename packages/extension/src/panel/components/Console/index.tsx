@@ -1,7 +1,8 @@
-import { useImperativeHandle, useRef, useEffect, useMemo, type Ref } from 'react';
+import { useImperativeHandle, useRef, useEffect, useMemo, useState, type Ref } from 'react';
 import { useConsole } from './useConsole';
 import { ConsoleOutput } from './ConsoleOutput';
 import { ConsoleInput, type ConsoleInputHandle } from './ConsoleInput';
+import { TreeExpandContext } from './TreeExpandContext';
 import type { ConsoleHandle, ConsoleProps, ConsoleEntry, SerializedValue } from './types';
 import type { OutputLine } from '@/types';
 
@@ -75,10 +76,15 @@ export function Console({ outputLines, dispatch, className, ref }: Props) {
     const inputRef = useRef<ConsoleInputHandle>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
     const entries = useMemo(() => outputLinesToEntries(outputLines ?? []), [outputLines]);
+    const [treeExpand, setTreeExpand] = useState({ generation: 0, expanded: false });
 
     function clearAll() {
         dispatch({ type: 'CLEAR_CONSOLE' });
         inputRef.current?.clear();
+    }
+
+    function toggleExpand() {
+        setTreeExpand(prev => ({ generation: prev.generation + 1, expanded: !prev.expanded }));
     }
 
     function handleExecute(input: string) {
@@ -96,15 +102,18 @@ export function Console({ outputLines, dispatch, className, ref }: Props) {
         <div className={`flex flex-col flex-1 min-h-20 overflow-hidden ${className ?? ''}`} data-testid="console-pane">
             <div className="flex items-center gap-1 px-1 py-0.5 border-b border-(--border-primary) shrink-0">
                 <button className="console-clear-btn" onClick={clearAll} title="Clear console (Ctrl+L)">⊘</button>
+                <button className="console-clear-btn" onClick={toggleExpand} title={treeExpand.expanded ? "Collapse all trees" : "Expand all trees"}>{treeExpand.expanded ? '⊟' : '⊞'}</button>
             </div>
-            <div className="flex-1 overflow-y-auto py-1 px-2" data-testid="output">
-                <ConsoleOutput entries={entries} />
-                <div className="flex items-start gap-1 py-0.5">
-                    <span className="text-(--color-prompt) shrink-0" data-testid="prompt">&gt;</span>
-                    <ConsoleInput ref={inputRef} onSubmit={handleExecute} onClear={clearAll} />
+            <TreeExpandContext.Provider value={treeExpand}>
+                <div className="flex-1 overflow-y-auto py-1 px-2" data-testid="output">
+                    <ConsoleOutput entries={entries} />
+                    <div className="flex items-start gap-1 py-0.5">
+                        <span className="text-(--color-prompt) shrink-0" data-testid="prompt">&gt;</span>
+                        <ConsoleInput ref={inputRef} onSubmit={handleExecute} onClear={clearAll} />
+                    </div>
+                    <div ref={bottomRef} />
                 </div>
-                <div ref={bottomRef} />
-            </div>
+            </TreeExpandContext.Provider>
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { SerializedValue } from './types';
 import { fromCdpGetProperties } from './cdpToSerialized';
+import { useTreeExpand } from './TreeExpandContext';
 
 const MAX_DEPTH = 8;
 
@@ -67,6 +68,11 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
     const [childProps, setChildProps] = useState<Record<string, SerializedValue> | null>(null);
     const [loading, setLoading] = useState(false);
     const fetchedRef = useRef(false);
+    const { generation, expanded } = useTreeExpand();
+
+    useEffect(() => {
+        if (generation > 0) setOpen(expanded);
+    }, [generation]);
 
     const objectId =
         depth < MAX_DEPTH && (data.__type === 'object' || data.__type === 'array' || data.__type === 'ref')
