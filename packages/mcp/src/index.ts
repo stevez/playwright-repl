@@ -101,10 +101,10 @@ server.registerTool(
             };
         }
         const result = await srv.run(command);
-        const snapshotMatch = result.text?.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
-        if (snapshotMatch) {
-            const urlMatch = result.text?.match(/### Page\n-\s*\[.*?\]\((.*?)\)/);
-            lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: snapshotMatch[1].trim() };
+        // Cache snapshot for locator command
+        // Bridge mode: snapshot returns raw YAML (no ### headers)
+        if (trimmed.startsWith('snapshot') && result.text && !result.isError) {
+            lastSnapshot = { url: '', snapshotString: result.text.trim() };
         }
         if (result.image) {
             const [header, data] = result.image.split(',');

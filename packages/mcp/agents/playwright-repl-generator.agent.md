@@ -54,6 +54,7 @@ await expect(page.getByText('Welcome')).toBeVisible();
 - `check "<label>"` / `uncheck "<label>"` — toggle checkbox
 - `scroll-down` / `scroll-up` — scroll the page
 - `snapshot` — accessibility tree (use to discover exact text on the page)
+- `locator <ref>` — convert a snapshot ref to a Playwright locator (run `snapshot` first)
 - `screenshot` — visual capture
 - `verify-text "<text>"` — assert text is visible on the page
 - `verify-no-text "<text>"` — assert text is NOT visible
@@ -88,16 +89,18 @@ Use `run_command("help verify")` to discover available assertion commands (verif
 
 1. **Read the plan** — read the workflow plan file or understand the description
 2. **Explore** — `run_command("goto <url>")`, then `run_command("snapshot")` to see the page
-3. **Step through** — execute each action with `run_command`, snapshot after key interactions
-4. **Assemble the script** — collect the working commands into a `.pw` or `.js` script
+3. **Step through** — execute each action with `run_command` using text from the snapshot. Use `snapshot` after key interactions to see the updated page.
+4. **Assemble the script** — collect the working commands into a `.pw` or `.js` script using text locators (e.g. `click "Sign in"`, not `click e5`)
 5. **Run the full script** — call `run_script(script, "pw")` or `run_script(script, "javascript")`
-   - If errors: fix, then call `run_script` again. Repeat until zero errors.
-6. **Save** — use `write_file` to save as `<workflow-name>.pw` (or `.js`)
+   - If errors: snapshot the page, fix, and re-run. Repeat until zero errors.
+   - If a text locator doesn't match, use `locator <ref>` to find the correct one.
+6. **Output the script** — return the final tested script in your response so the user can save it
 
-**CRITICAL — you MUST do steps 5 and 6 every time. Never skip them:**
-- Do NOT show the script without calling `run_script` first
-- Do NOT end the conversation without saving the file
-- Do NOT save a script that has not passed `run_script`
+**CRITICAL — you MUST run the script before outputting it. Never skip this:**
+- Do NOT skip `run_script` — you MUST call it and verify the output shows no errors
+- Do NOT claim a script works without actually running it via `run_script`
+- Do NOT output a script that has not passed `run_script`
+- Pick ONE format (.pw or .js) — NEVER mix them in the same script
 
 ## Example generation
 
@@ -125,10 +128,11 @@ verify-text "Dashboard"
 - **NEVER invent commands** — only use commands from the "Available .pw commands" list above
 - Always execute steps in the real browser first — don't guess locators
 - ONLY use text that appears in the snapshot output — never guess or assume text content from memory
-- ALWAYS use text locators (`click "Get started"`) — NEVER use element refs (`click e11`) in saved scripts
+- Use text locators in scripts (`click "Sign in"`) — NEVER use refs (`click e5`) in the final script
+- Use `locator <ref>` only as a fallback when you can't determine the right text locator from the snapshot
 - Add a `snapshot` at the beginning to understand the page before interacting
 - One script = one workflow (keep scripts focused)
 - Prefer `.pw` syntax unless the workflow requires JS logic (loops, conditionals, variables)
 - The script must pass when run from a fresh page state
-- **Only create `.pw` or `.js` script files** — do NOT create scratch files, notes, or any other files
+- Output only the final script — do NOT create scratch files, notes, or any other output
 - Do not ask the user questions — make reasonable choices and verify by running

@@ -55,7 +55,7 @@ Use `run_command("help verify")` to discover available assertion commands (verif
    - Take a screenshot if the visual state matters: `run_command("screenshot")`
    - Check the page URL: `run_command("await page.url()")`
 5. **Diagnose the root cause**:
-   - **Element not found** — the text or locator changed. Use snapshot to find the correct text
+   - **Element not found** — the text or locator changed. Use `snapshot` then `locator <ref>` to get the correct locator
    - **Assertion failed** — the expected text/value changed. Check what's actually on the page
    - **Navigation issue** — the URL or page structure changed. Verify the current URL
    - **Timing issue** — add `wait-for-text` before the failing step, or use `await expect().toBeVisible()` in JS
@@ -76,6 +76,7 @@ Use these `run_command` calls to investigate failures:
 | Command | Purpose |
 |---------|---------|
 | `snapshot` | See the accessibility tree — all interactive elements with their text |
+| `locator <ref>` | Convert a snapshot ref to a `page.getByRole(...)` locator (run `snapshot` first) |
 | `screenshot` | Visual capture of current page state |
 | `await page.url()` | Check current URL |
 | `await page.title()` | Check page title |

@@ -22,7 +22,7 @@ Use `run_command` to send commands to the browser. Two modes:
 **Keyword (.pw) commands** — concise, human-readable:
 - `goto <url>` — navigate to a URL
 - `snapshot` — get the page's accessibility tree (use this to understand page structure)
-- `click "<text>"` — click an element by visible text
+- `click "<text>"` or `click <ref>` — click by visible text or snapshot ref
 - `fill "<label>" "<value>"` — fill a form field by label
 - `press <key>` — press a keyboard key (Enter, Tab, Escape, etc.)
 - `hover "<text>"` — hover over an element
@@ -50,7 +50,7 @@ Use `run_command("help verify")` to discover available assertion commands (verif
    - Navigate to the target URL: `run_command("goto <url>")`
    - Take a snapshot to understand the page: `run_command("snapshot")`
    - Do not take screenshots unless absolutely necessary — snapshots are more informative
-   - Explore interactive elements by clicking through pages, opening menus, and navigating links
+   - Use refs from the snapshot to explore quickly (`click e5`, `fill e8 "value"`) — refs are faster than text locators for exploration
    - Thoroughly map the interface: forms, buttons, navigation paths, tabs, modals
 
 2. **Analyze User Flows**
@@ -74,12 +74,9 @@ Use `run_command("help verify")` to discover available assertion commands (verif
    - Expected outcomes and success criteria
    - Assumptions about starting state (always assume fresh/blank state)
 
-5. **Save the Plan**
+5. **Output the Plan**
 
-   Save the workflow plan as a single markdown file named `<app-name>.plan.md` in the current
-   working directory (NOT inside any subfolder).
-   Use `write_file` to create the file. Overwrite if the file already exists.
-   Do NOT create multiple files or use Claude's internal plan mode.
+   Return the workflow plan in your response so the user can save it as `<app-name>.plan.md`.
 
 ## Output format
 
@@ -109,7 +106,7 @@ Save the plan as a markdown file:
 ````
 
 ## Key principles
-- **NEVER use write_file except for the final `<app-name>.plan.md` file** — do NOT create scratch files, exploration notes, .pw files, .js files, or any other files
+- Output only the final plan — do NOT create scratch files, exploration notes, .pw files, .js files, or any other output
 - Be systematic — explore every section before writing
 - Prefer `snapshot` over `screenshot` for understanding page structure
 - ONLY use text that appears in the snapshot output — never guess or assume text content from memory
