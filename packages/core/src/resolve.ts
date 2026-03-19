@@ -148,6 +148,9 @@ export const COMMANDS: Record<string, CommandInfo> = {
   'scroll-down':       { desc: 'Scroll down', options: [] },
   'highlight':         { desc: 'Highlight an element', options: [],
                          usage: 'highlight <text> | highlight <ref>' },
+  'locator':           { desc: 'Generate Playwright locator for a ref', options: [],
+                         usage: 'locator <ref>',
+                         examples: ['locator e5'] },
   'install-browser':   { desc: 'Install browser', options: [] },
   'list':              { desc: 'List sessions', options: [] },
   'close-all':         { desc: 'Close all sessions', options: [] },
@@ -157,7 +160,7 @@ export const COMMANDS: Record<string, CommandInfo> = {
 export const CATEGORIES: Record<string, string[]> = {
   'Navigation':     ['goto', 'open', 'go-back', 'go-forward', 'reload'],
   'Interaction':    ['click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag'],
-  'Inspection':     ['snapshot', 'screenshot', 'eval', 'console', 'network', 'run-code', 'highlight'],
+  'Inspection':     ['snapshot', 'locator', 'screenshot', 'eval', 'console', 'network', 'run-code', 'highlight'],
   'Assertions':     ['verify', 'verify-text', 'verify-no-text', 'verify-element', 'verify-no-element', 'verify-value', 'verify-list', 'verify-title', 'verify-url', 'wait-for-text'],
   'Scrolling':      ['scroll-up', 'scroll-down'],
   'Tabs':           ['tab-list', 'tab-new', 'tab-close', 'tab-select'],

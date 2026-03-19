@@ -2,7 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { BridgeServer, COMMANDS, CATEGORIES } from '@playwright-repl/core';
+import { BridgeServer, COMMANDS, CATEGORIES, refToLocator } from '@playwright-repl/core';
 
 const argv = process.argv.slice(2);
 const portIdx = argv.indexOf('--port');
@@ -11,6 +11,7 @@ const port = portIdx !== -1
     : (process.env.BRIDGE_PORT ? parseInt(process.env.BRIDGE_PORT) : 9876);
 
 const srv = new BridgeServer();
+let lastSnapshot: { url: string; snapshotString: string } | null = null;
 try {
     await srv.start(port);
 } catch (err: any) {
@@ -68,6 +69,17 @@ server.registerTool(
                 .join('\n');
             return { content: [{ type: 'text' as const, text: `Available commands:\n${lines}\n\nType "help <command>" for details.` }] };
         }
+        if (trimmed.startsWith('locator ')) {
+            const ref = command.trim().slice(8).trim();
+            if (!lastSnapshot) {
+                return { content: [{ type: 'text' as const, text: 'No snapshot cached. Run "snapshot" first.' }], isError: true };
+            }
+            const locator = refToLocator(lastSnapshot.snapshotString, ref);
+            if (!locator) {
+                return { content: [{ type: 'text' as const, text: `Ref "${ref}" not found in last snapshot. Run "snapshot" to refresh.` }], isError: true };
+            }
+            return { content: [{ type: 'text' as const, text: `js: ${locator.js}\npw: ${locator.pw}` }] };
+        }
         if (trimmed.startsWith('help ')) {
             const cmd = trimmed.slice(5).trim();
             const info = COMMANDS[cmd];
@@ -89,6 +101,11 @@ server.registerTool(
             };
         }
         const result = await srv.run(command);
+        const snapshotMatch = result.text?.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
+        if (snapshotMatch) {
+            const urlMatch = result.text?.match(/### Page\n-\s*\[.*?\]\((.*?)\)/);
+            lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: snapshotMatch[1].trim() };
+        }
         if (result.image) {
             const [header, data] = result.image.split(',');
             const mimeType = (header.match(/data:(.*);base64/) ?? [])[1] ?? 'image/png';

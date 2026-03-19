@@ -45,7 +45,7 @@ describe('buildCompletionItems', () => {
   });
 
   it('has correct count (commands + extra + meta-commands)', () => {
-    const expected = Object.keys(COMMANDS).length + 10 + 13;
+    const expected = Object.keys(COMMANDS).length + 9 + 13;
     expect(items.length).toBe(expected);
   });
 

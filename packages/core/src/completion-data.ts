@@ -25,7 +25,6 @@ const META_COMMANDS = [
 ];
 
 const EXTRA_COMMANDS = [
-  { cmd: 'highlight',       desc: 'Highlight matching elements' },
   { cmd: 'verify',          desc: 'Assert page state (title, url, text, element, value, list)' },
   { cmd: 'verify-text',     desc: 'Assert text is visible on page' },
   { cmd: 'verify-element',  desc: 'Assert element exists by role and name' },

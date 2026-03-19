@@ -17,3 +17,5 @@ export { CommandServer } from './extension-server.js';
 export { BridgeServer } from './bridge-server.js';
 export type { CompletionItem } from './completion-data.js';
 export type { CommandInfo } from './resolve.js';
+export { parseSnapshot, refToLocator, allRefLocators } from './snapshot-parser.js';
+export type { SnapshotNode, LocatorResult, RefLocatorEntry } from './snapshot-parser.js';

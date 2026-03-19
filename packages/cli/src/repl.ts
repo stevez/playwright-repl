@@ -13,7 +13,7 @@ import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  Engine, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
+  Engine, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -41,6 +41,7 @@ export interface ReplContext {
   sessionHistory: string[];
   commandCount: number;
   errors: number;
+  lastSnapshot?: { url: string; snapshotString: string };
 }
 
 // ─── Response filtering ─────────────────────────────────────────────────────
@@ -289,6 +290,22 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     return;
   }
 
+  // ── Locator (local — uses cached snapshot) ───────────────────────
+  if (line.startsWith('locator ')) {
+    const ref = line.slice(8).trim();
+    if (!ctx.lastSnapshot) {
+      console.log(`${c.yellow}No snapshot cached. Run "snapshot" first.${c.reset}`);
+      return;
+    }
+    const locator = refToLocator(ctx.lastSnapshot.snapshotString, ref);
+    if (!locator) {
+      console.log(`${c.yellow}Ref "${ref}" not found in last snapshot.${c.reset}`);
+      return;
+    }
+    console.log(`js: ${locator.js}\npw: ${locator.pw}`);
+    return;
+  }
+
   // ── Regular command — parse and send ─────────────────────────────
 
   let args: ParsedArgs | null = parseInput(line);
@@ -298,7 +315,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   if (!cmdName) return;
 
   // Validate command exists
-  const knownExtras = ['help', 'highlight', 'list', 'close-all', 'kill-all', 'install', 'install-browser',
+  const knownExtras = ['help', 'highlight', 'locator', 'list', 'close-all', 'kill-all', 'install', 'install-browser',
                        'verify', 'verify-text', 'verify-element', 'verify-value', 'verify-list',
                        'verify-title', 'verify-url', 'verify-no-text', 'verify-no-element'];
   if (!ALL_COMMANDS.includes(cmdName) && !knownExtras.includes(cmdName)) {
@@ -407,6 +424,11 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   const startTime = performance.now();
   try {
     const result = await ctx.conn.run(args);
+    const snapshotMatch = result?.text?.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
+    if (snapshotMatch) {
+      const urlMatch = result?.text?.match(/### Page\n-\s*\[.*?\]\((.*?)\)/);
+      ctx.lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: snapshotMatch[1].trim() };
+    }
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {
       const filtered = filterResponse(result.text, cmdName);
@@ -918,6 +940,7 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
   const historyDir = path.join(os.homedir(), '.playwright-repl');
   const historyFile = path.join(historyDir, '.repl-history');
   const sessionHistory: string[] = [];
+  let lastSnapshot: { url: string; snapshotString: string } | null = null;
 
   const promptReady = `${c.cyan}pw>${c.reset} `;
   const promptCont  = `${c.dim}...${c.reset} `;
@@ -974,12 +997,33 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
       console.error(`${c.dim}Warning: could not write history: ${(err as Error).message}${c.reset}`);
     }
 
+    // Locator (local — uses cached snapshot)
+    if (command.startsWith('locator ')) {
+      const ref = command.slice(8).trim();
+      if (!lastSnapshot) {
+        log(`${c.yellow}No snapshot cached. Run "snapshot" first.${c.reset}`);
+        return;
+      }
+      const locator = refToLocator(lastSnapshot.snapshotString, ref);
+      if (!locator) {
+        log(`${c.yellow}Ref "${ref}" not found in last snapshot.${c.reset}`);
+        return;
+      }
+      log(`js: ${locator.js}\npw: ${locator.pw}`);
+      return;
+    }
+
     if (!srv.connected) {
       log(`${c.yellow}[not connected] Waiting for extension...${c.reset}`);
       return;
     }
 
     const result = await srv.run(command);
+    // Cache snapshot for locator command
+    // Bridge mode: snapshot command returns raw YAML (no ### headers)
+    if (command.trim().startsWith('snapshot') && result?.text && !result.isError) {
+      lastSnapshot = { url: '', snapshotString: result.text.trim() };
+    }
     displayBridgeResult(result, silent);
   }
 
