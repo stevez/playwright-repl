@@ -437,9 +437,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     if (result?.isError) ctx.errors++;
     ctx.commandCount++;
 
-    if (Number(elapsed) > 500) {
-      ctx.log(`${c.dim}(${elapsed}ms)${c.reset}`);
-    }
+    ctx.log(`${c.dim}(${elapsed}ms)${c.reset}`);
   } catch (err: unknown) {
     ctx.errors++;
     console.error(`${c.red}Error:${c.reset} ${(err as Error).message}`);
@@ -1018,13 +1016,16 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
       return;
     }
 
+    const startTime = performance.now();
     const result = await srv.run(command);
+    const elapsed = (performance.now() - startTime).toFixed(0);
     // Cache snapshot for locator command
     // Bridge mode: snapshot command returns raw YAML (no ### headers)
     if (command.trim().startsWith('snapshot') && result?.text && !result.isError) {
       lastSnapshot = { url: '', snapshotString: result.text.trim() };
     }
     displayBridgeResult(result, silent);
+    log(`${c.dim}(${elapsed}ms)${c.reset}`);
   }
 
   async function processQueue(): Promise<void> {
