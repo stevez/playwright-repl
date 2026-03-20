@@ -19,6 +19,7 @@ export interface ConsoleEntry {
   id: string;
   input: string;
   status: 'pending' | 'done' | 'error';
+  time?: number;
   value?: SerializedValue;
   text?: string;
   image?: string;

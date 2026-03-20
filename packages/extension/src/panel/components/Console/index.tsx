@@ -17,7 +17,7 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
         if (line.type === 'command') {
             const next = lines[i + 1];
             if (next && next.type !== 'command' && next.type !== 'comment') {
-                const entry: ConsoleEntry = { id, input: line.text, status: next.type === 'error' ? 'error' : 'done' };
+                const entry: ConsoleEntry = { id, input: line.text, status: next.type === 'error' ? 'error' : 'done', time: next.time };
                 if (next.type === 'success') {
                     if (next.value !== undefined) {
                         entry.value = next.value as SerializedValue;

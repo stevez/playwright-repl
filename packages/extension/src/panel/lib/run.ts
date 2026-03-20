@@ -73,6 +73,16 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
         dispatch({ type: 'ADD_LINE', line: { text, type: 'info'} });
         return true;
     }
+    if (command.trim().toLowerCase() === 'log time on') {
+        localStorage.setItem('logTime', 'true');
+        dispatch({ type: 'ADD_LINE', line: { text: 'Time logging enabled', type: 'info' } });
+        return true;
+    }
+    if (command.trim().toLowerCase() === 'log time off') {
+        localStorage.setItem('logTime', 'false');
+        dispatch({ type: 'ADD_LINE', line: { text: 'Time logging disabled', type: 'info' } });
+        return true;
+    }
 
     return false;
 }
@@ -80,17 +90,19 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
 export async function runJsScript(code: string, dispatch: React.Dispatch<Action>): Promise<void> {
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
     try {
+        const start = performance.now();
         const raw = await swDebugEval(code) as { result?: CdpRemoteObject };
+        const time = Math.round(performance.now() - start);
         const r = raw?.result;
         if (!r || r.type === 'undefined') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success', time } });
         } else if (r.type === 'string') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success' } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: r.value as string, type: 'success', time } });
         } else if (r.type === 'number' || r.type === 'boolean') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success' } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: String(r.value), type: 'success', time } });
         } else {
             const value = fromCdpRemoteObject(r);
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', time, value, getProperties: swGetProperties } });
         }
     } catch (e: any) {
         const text = trimStack(e?.message ?? String(e));
@@ -183,14 +195,16 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     if (cmdName === 'run-code') {
         const code = command.trim().slice('run-code'.length).trim();
         try {
+            const start = performance.now();
             const raw = await swDebugEval(code) as { result?: CdpRemoteObject };
+            const time = Math.round(performance.now() - start);
             const r = raw?.result;
             let text: string;
             if (!r || r.type === 'undefined' || r.type === 'object' || r.type === 'function') text = 'Done';
             else if (r.type === 'string') text = r.value as string;
             else if (r.type === 'number' || r.type === 'boolean') text = String(r.value);
             else text = 'Done';
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success' } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success', time } });
             return { text, isError: false };
         } catch (e: any) {
             const text = trimStack(e?.message ?? String(e));
@@ -200,15 +214,18 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     }
 
     try {
+        const start = performance.now();
         const result = await executeCommand(command);
+        const time = Math.round(performance.now() - start);
         const text = filterResponse(result.text, cmdName);
         if (cmdName === 'snapshot') {
-            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'snapshot' } });
+            dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'snapshot', time } });
         } else {
             dispatch({
                 type: 'COMMAND_SUCCESS', line: {
                     text,
                     type: result.isError ? 'error' : result.image ? 'screenshot' : 'success',
+                    time,
                     image: result.image
                 }
             });

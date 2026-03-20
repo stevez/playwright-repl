@@ -227,7 +227,7 @@ describe('Toolbar component tests', () => {
       expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_RUN_LINE', currentRunLine: 0 });
       expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: 'goto https://example.com', type: 'command' } });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success', time: expect.any(Number) } });
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_LINE_RESULT', index: 0, result: 'pass' });
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_RUN_LINE', currentRunLine: 1 });
       expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: 'click e5', type: 'command' } });
@@ -249,7 +249,7 @@ describe('Toolbar component tests', () => {
 
     await vi.waitFor(() => {
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_LINE_RESULT', index: 0, result: 'fail' });
-      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'error' } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'error', time: expect.any(Number) } });
     });
   });
 
@@ -779,7 +779,7 @@ describe('Toolbar component tests', () => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_START' });
         expect(swDebugEval).toHaveBeenCalledWith('document.title');
         expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUBMITTED', line: { text: '(run JS script)', type: 'command' } });
-        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success', time: expect.any(Number) } });
         expect(dispatch).toHaveBeenCalledWith({ type: 'RUN_STOP' });
       });
     });
@@ -804,7 +804,7 @@ describe('Toolbar component tests', () => {
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: '6', type: 'success' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: '6', type: 'success', time: expect.any(Number) } });
       });
     });
 
@@ -817,7 +817,7 @@ describe('Toolbar component tests', () => {
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'true', type: 'success' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'true', type: 'success', time: expect.any(Number) } });
       });
     });
 
@@ -830,7 +830,7 @@ describe('Toolbar component tests', () => {
       await screen.getByText('▶').click();
 
       await vi.waitFor(() => {
-        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success' } });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: { text: 'Done', type: 'success', time: expect.any(Number) } });
       });
     });
 
@@ -845,6 +845,7 @@ describe('Toolbar component tests', () => {
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'COMMAND_SUCCESS', line: expect.objectContaining({
           type: 'success',
+          time: expect.any(Number),
           value: expect.objectContaining({ __type: 'object', cls: 'Object' }),
         }) });
       });

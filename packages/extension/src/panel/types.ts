@@ -1,6 +1,7 @@
 export type OutputLine = {
     text: string
     type: 'command' | 'success' | 'error' | 'info' | 'comment' | 'snapshot' | 'code-block' | 'screenshot'
+    time?: number
     image?: string
     value?: unknown
     getProperties?: (objectId: string) => Promise<unknown>

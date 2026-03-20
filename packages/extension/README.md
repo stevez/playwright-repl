@@ -160,6 +160,24 @@ Most browser automation tools require a Node.js backend. This extension runs the
 | CDP object tree | ❌ | ✅ | ✅ |
 | Real attached tab | ❌ (separate launch) | ✅ | ✅ |
 
+### Performance
+
+Commands execute directly via CDP in the service worker — no Node.js roundtrip. Enable `log time on` in the console to see execution times.
+
+| Command | Time |
+|---------|------|
+| `goto https://demo.playwright.dev/todomvc` | 305ms |
+| `snapshot` | 6ms |
+| `fill "What needs to be done?" "Buy milk"` | 14ms |
+| `press Enter` | 12ms |
+| `screenshot` | 87ms |
+| `hover "What needs to be done?"` | 38ms |
+| `click "Walk dog"` | 33ms |
+| `console` | 4ms |
+| `network` | 4ms |
+| `tab-list` | 4ms |
+| `go-back` | 196ms |
+
 ---
 
 ## Architecture

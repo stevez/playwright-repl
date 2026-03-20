@@ -91,6 +91,16 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
             dispatch({ type: 'ADD_LINE', line: { text: h.length ? h.join('\n') : '(no history)', type: 'info' } });
             return;
         }
+        if (trimmed.toLowerCase() === 'log time on') {
+            localStorage.setItem('logTime', 'true');
+            dispatch({ type: 'ADD_LINE', line: { text: 'Time logging enabled', type: 'info' } });
+            return;
+        }
+        if (trimmed.toLowerCase() === 'log time off') {
+            localStorage.setItem('logTime', 'false');
+            dispatch({ type: 'ADD_LINE', line: { text: 'Time logging disabled', type: 'info' } });
+            return;
+        }
 
         addCommand(trimmed);
 
@@ -98,15 +108,17 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
         dispatch({ type: 'COMMAND_SUBMITTED', line: { text: trimmed, type: 'command' } });
 
         try {
+            const start = performance.now();
             const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.js(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
+            const time = Math.round(performance.now() - start);
             if (result.value !== undefined) {
-                dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value: result.value, getProperties: result.getProperties } });
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', time, value: result.value, getProperties: result.getProperties } });
             } else if (result.image !== undefined) {
-                dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'screenshot', image: result.image } });
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'screenshot', time, image: result.image } });
             } else if (result.codeBlock !== undefined) {
-                dispatch({ type: 'COMMAND_SUCCESS', line: { text: result.codeBlock, type: 'snapshot' } });
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: result.codeBlock, type: 'snapshot', time } });
             } else {
-                dispatch({ type: 'COMMAND_SUCCESS', line: { text: result.text ?? 'Done', type: 'success' } });
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: result.text ?? 'Done', type: 'success', time } });
             }
         } catch (e: any) {
             const raw = e?.message ?? String(e);

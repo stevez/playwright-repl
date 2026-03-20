@@ -239,7 +239,7 @@ describe('runAndDispatch', () => {
         });
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'Clicked', type: 'success', image: undefined },
+            line: { text: 'Clicked', type: 'success', time: expect.any(Number), image: undefined },
         });
         expect(result).toEqual({ text: '### Result\nClicked', isError: false });
     });
@@ -251,7 +251,7 @@ describe('runAndDispatch', () => {
         await runAndDispatch('snapshot', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: '- tree', type: 'snapshot' },
+            line: { text: '- tree', type: 'snapshot', time: expect.any(Number) },
         });
     });
 
@@ -262,7 +262,7 @@ describe('runAndDispatch', () => {
         await runAndDispatch('click e99', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'Not found', type: 'error', image: undefined },
+            line: { text: 'Not found', type: 'error', time: expect.any(Number), image: undefined },
         });
     });
 
@@ -273,7 +273,7 @@ describe('runAndDispatch', () => {
         await runAndDispatch('screenshot', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: '', type: 'screenshot', image: 'data:image/png;base64,...' },
+            line: { text: '', type: 'screenshot', time: expect.any(Number), image: 'data:image/png;base64,...' },
         });
     });
 
@@ -308,7 +308,7 @@ describe('runJsScript', () => {
         await runJsScript('void 0', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'Done', type: 'success' },
+            line: { text: 'Done', type: 'success', time: expect.any(Number) },
         });
     });
 
@@ -318,7 +318,7 @@ describe('runJsScript', () => {
         await runJsScript('null', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'Done', type: 'success' },
+            line: { text: 'Done', type: 'success', time: expect.any(Number) },
         });
     });
 
@@ -328,7 +328,7 @@ describe('runJsScript', () => {
         await runJsScript('"hello"', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'hello', type: 'success' },
+            line: { text: 'hello', type: 'success', time: expect.any(Number) },
         });
     });
 
@@ -338,7 +338,7 @@ describe('runJsScript', () => {
         await runJsScript('42', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: '42', type: 'success' },
+            line: { text: '42', type: 'success', time: expect.any(Number) },
         });
     });
 
@@ -348,7 +348,7 @@ describe('runJsScript', () => {
         await runJsScript('true', dispatch);
         expect(dispatch).toHaveBeenCalledWith({
             type: 'COMMAND_SUCCESS',
-            line: { text: 'true', type: 'success' },
+            line: { text: 'true', type: 'success', time: expect.any(Number) },
         });
     });
 
@@ -364,6 +364,7 @@ describe('runJsScript', () => {
             line: expect.objectContaining({
                 text: '',
                 type: 'success',
+                time: expect.any(Number),
                 value: { __type: 'object', cls: 'Object', props: {} },
             }),
         });
