@@ -11,6 +11,7 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { parseInput } from './parser.js';
 import { replVersion } from './resolve.js';
+import { filterResponse } from './filter.js';
 import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
@@ -120,8 +121,11 @@ export class CommandServer {
           res.end(JSON.stringify({ text: `Unknown command: ${raw}`, isError: true }));
           return;
         }
+        const cmdName = args._[0];
         args = resolveArgs(args);
         const result = await withTimeout(this._engine.run(args), 15000);
+        if (result.text)
+          result.text = filterResponse(result.text, cmdName);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (e: unknown) {

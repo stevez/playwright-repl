@@ -5,8 +5,8 @@
  *   ### Error / Result / Modal state / Page / Snapshot / ...
  *
  * Strategy:
- *   - Keep: Result, Error, Modal state, Page, Snapshot (only when cmdName is 'snapshot')
- *   - Skip: Ran Playwright code, Open tabs, Events
+ *   - Keep: Result, Error, Modal state, Snapshot (only when cmdName is 'snapshot')
+ *   - Skip: Ran Playwright code, Open tabs, Page, Events
  *   - Fallback: raw text if no sections found, otherwise 'Done'
  */
 export function filterResponse(text: string, cmdName?: string): string {
@@ -19,7 +19,7 @@ export function filterResponse(text: string, cmdName?: string): string {
         const title = section.substring(0, nl).trim();
         const content = section.substring(nl + 1).trim();
         if (title === 'Snapshot' && cmdName !== 'snapshot') continue;
-        if (title === 'Result' || title === 'Error' || title === 'Modal state' || title === 'Page' || title === 'Snapshot')
+        if (title === 'Result' || title === 'Error' || title === 'Modal state' || title === 'Snapshot')
             kept.push(content);
     }
     return kept.length > 0 ? kept.join('\n') : 'Done';

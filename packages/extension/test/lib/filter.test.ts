@@ -4,12 +4,12 @@ import { filterResponse } from '@/lib/filter';
 describe('filterResponse', () => {
   it('extracts Result section', () => {
     const text = '### Page\nhttp://example.com\n### Result\nClicked element';
-    expect(filterResponse(text)).toBe('http://example.com\nClicked element');
+    expect(filterResponse(text)).toBe('Clicked element');
   });
 
-  it('extracts Error section in red', () => {
+  it('extracts Error section', () => {
     const text = '### Page\nhttp://example.com\n### Error\nElement not found';
-    expect(filterResponse(text)).toBe(`http://example.com\nElement not found`);
+    expect(filterResponse(text)).toBe('Element not found');
   });
 
   it('extracts Modal state section', () => {
@@ -17,19 +17,19 @@ describe('filterResponse', () => {
     expect(filterResponse(text)).toBe('[Alert] Are you sure?');
   });
 
-  it('includes Page and Snapshot sections for snapshot command', () => {
+  it('includes Snapshot section for snapshot command', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- element tree\n### Result\nDone';
-    expect(filterResponse(text, 'snapshot')).toBe('http://example.com\n- element tree\nDone');
+    expect(filterResponse(text, 'snapshot')).toBe('- element tree\nDone');
   });
 
   it('suppresses Snapshot section for non-snapshot commands', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- element tree\n### Result\nDone';
-    expect(filterResponse(text, 'goto')).toBe('http://example.com\nDone');
+    expect(filterResponse(text, 'goto')).toBe('Done');
   });
 
-  it('returns Page and Snapshot content when no Result section', () => {
+  it('returns Snapshot content when no Result section', () => {
     const text = '### Page\nhttp://example.com\n### Snapshot\n- tree';
-    expect(filterResponse(text, 'snapshot')).toBe('http://example.com\n- tree');
+    expect(filterResponse(text, 'snapshot')).toBe('- tree');
   });
 
   it('returns raw text when no sections found', () => {

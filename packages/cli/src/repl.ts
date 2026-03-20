@@ -14,6 +14,7 @@ import {
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
+  filterResponse as filterResponseBase,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -47,22 +48,12 @@ export interface ReplContext {
 
 // ─── Response filtering ─────────────────────────────────────────────────────
 
+/** CLI wrapper: uses core filterResponse + ANSI-colors for error lines. */
 export function filterResponse(text: string, cmdName?: string): string | null {
-  const sections = text.split(/^### /m).slice(1);
-  const kept: string[] = [];
-  for (const section of sections) {
-    const newline = section.indexOf('\n');
-    if (newline === -1) continue;
-    const title = section.substring(0, newline).trim();
-    const content = section.substring(newline + 1).trim();
-    if (title === 'Error')
-      kept.push(`${c.red}${content}${c.reset}`);
-    else if (title === 'Snapshot' && cmdName !== 'snapshot')
-      continue;
-    else if (title === 'Result' || title === 'Modal state' || title === 'Page' || title === 'Snapshot')
-      kept.push(content);
-  }
-  return kept.length > 0 ? kept.join('\n') : null;
+  const filtered = filterResponseBase(text, cmdName);
+  if (!filtered) return null;
+  // Color error lines red (core returns them as plain "Error: ..." text)
+  return filtered.replace(/^(Error: .*)$/gm, `${c.red}$1${c.reset}`);
 }
 
 // ─── Meta-command handlers ──────────────────────────────────────────────────
