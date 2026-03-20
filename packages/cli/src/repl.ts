@@ -856,8 +856,11 @@ async function runSingleBridgeFile(
     const indent = prefixed ? '  ' : '';
     log(`${indent}${c.dim}[${commandsRun}/${commands.length}]${c.reset} ${cmd}`);
 
+    const startTime = performance.now();
     const result = await srv.run(cmd);
+    const elapsed = (performance.now() - startTime).toFixed(0);
     displayBridgeResult(result, silent);
+    log(`${c.dim}(${elapsed}ms)${c.reset}`);
 
     if (result.isError) {
       return { passed: false, commandsRun, errorMsg: `failed at [${commandsRun}/${commands.length}]: ${cmd}` };

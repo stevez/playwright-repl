@@ -1,0 +1,25 @@
+// Benchmark: same commands as playwright-cli run
+// Refs from TodoMVC snapshot: e8=input, e21=checkbox, e22=todo text
+
+// ─── Setup ───
+goto https://demo.playwright.dev/todomvc
+
+// ─── Queries ───
+snapshot
+tab-list
+screenshot
+eval document.title
+
+// ─── Actions ───
+fill e8 "Buy groceries"
+press Enter
+fill e8 "Walk the dog"
+press Enter
+snapshot
+click e21
+hover e22
+
+// ─── Storage ───
+cookie-list
+localstorage-list
+sessionstorage-list

@@ -39,6 +39,26 @@ Two modes:
 
 → **[Full CLI docs](https://github.com/stevez/playwright-repl/blob/main/packages/cli/README.md)**
 
+### Performance
+
+Response time per command on [TodoMVC](https://demo.playwright.dev/todomvc), measured in milliseconds:
+
+| Command | `playwright-cli` | Standalone | Bridge |
+|---------|------------------:|-----------:|-------:|
+| `snapshot` | 211 | 4 | 14 |
+| `click` | 1538 | 1046 | 30 |
+| `hover` | 1240 | 1050 | 28 |
+| `fill` | 1236 | 1036 | 7 |
+| `press` | 1216 | 1033 | 11 |
+| `eval` | 1220 | 1010 | 3 |
+| `screenshot` | 274 | 107 | 129 |
+| `tab-list` | 217 | 4 | 4 |
+| `cookie-list` | 201 | 3 | 2 |
+
+- **`playwright-cli`** — Playwright's official CLI. Each command spawns a new process (~200ms overhead).
+- **Standalone** — `playwright-repl` (default). REPL stays open — no per-command startup cost.
+- **Bridge** — `playwright-repl --bridge`. Playwright runs inside Chrome via `playwright-crx` — no external CDP round-trips.
+
 ---
 
 ## Dramaturg — Chrome Extension
