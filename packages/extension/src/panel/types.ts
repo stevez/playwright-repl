@@ -14,7 +14,6 @@ export type PickResultData = {
     jsExpression: string;      // "await page.getByRole('button', { name: 'Submit' }).highlight()"
     assertJs?: string;         // "await expect(page.getByRole('button', { name: 'Submit' })).toContainText('Submit')"
     assertPw?: string;         // 'verify-text "Submit"'
-    ref?: string;              // 'e5' — element ref from snapshot
     details?: {
         tag: string;
         text: string;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ObjectTree } from './ObjectTree';
 import { SnapshotTree } from './SnapshotTree';
-import { PickResult } from './PickResult';
+import { pickResultToSerialized } from '@/lib/pick-info';
 import { parseSnapshot } from '@/lib/snapshot-parser';
 import Lightbox from '../Lightbox';
 import { saveToFile } from '@/lib/file-utils';
@@ -28,7 +28,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                 {entry.status === 'done' && (
                     <div className="pt-0.5">
                         {entry.pickResult !== undefined ? (
-                            <PickResult data={entry.pickResult} />
+                            <div data-type="pick-result"><ObjectTree data={pickResultToSerialized(entry.pickResult)} noQuote /></div>
                         ) : entry.value !== undefined ? (
                             <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (

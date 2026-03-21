@@ -9,6 +9,8 @@ interface Props {
     data: SerializedValue;
     label?: string;
     depth?: number;
+    expandDepth?: number;
+    noQuote?: boolean;
     getProperties?: (objectId: string) => Promise<unknown>;
 }
 
@@ -46,6 +48,11 @@ export function inlineSummary(data: SerializedValue): string {
             const items = keys.map(k => inlineSummary(data.props[k])).join(', ');
             return `{${items}${Object.keys(data.props).length > 3 ? ', …' : ''}}`;
         }
+        if (data.cls === 'PickResult' || data.cls === '') {
+            const allKeys = Object.keys(data.props);
+            const shown = allKeys.slice(0, 3);
+            return `{${shown.join(', ')}${allKeys.length > 3 ? ', …' : ''}}`;
+        }
         const keys = Object.keys(data.props).slice(0, 3);
         const items = keys.map(k => `${k}: ${inlineSummary(data.props[k])}`).join(', ');
         return `{${items}${Object.keys(data.props).length > 3 ? ', …' : ''}}`;
@@ -63,8 +70,8 @@ function mergeMapSetProps(original: Record<string, SerializedValue>, fetched: Re
     return merged;
 }
 
-export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
-    const [open, setOpen] = useState(depth < 1);
+export function ObjectTree({ data, label, depth = 0, expandDepth = 1, noQuote, getProperties }: Props) {
+    const [open, setOpen] = useState(depth < expandDepth);
     const [childProps, setChildProps] = useState<Record<string, SerializedValue> | null>(null);
     const [loading, setLoading] = useState(false);
     const fetchedRef = useRef(false);
@@ -97,7 +104,18 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
     // Primitives
     if (data.__type === 'null')      return <span>{prefix}<span className="ot-null">null</span></span>;
     if (data.__type === 'undefined') return <span>{prefix}<span className="ot-undefined">undefined</span></span>;
-    if (data.__type === 'string')    return <span>{prefix}<span className="ot-string">"{data.v}"</span></span>;
+    if (data.__type === 'string') {
+        const val = noQuote ? data.v : `"${data.v}"`;
+        if (noQuote && label !== undefined) {
+            return (
+                <span className="flex">
+                    <span className="shrink-0">{prefix}</span>
+                    <span className="ot-string min-w-0">{val}</span>
+                </span>
+            );
+        }
+        return <span>{prefix}<span className="ot-string">{val}</span></span>;
+    }
     if (data.__type === 'number')    return <span>{prefix}<span className="ot-number">{data.v}</span></span>;
     if (data.__type === 'boolean')   return <span>{prefix}<span className="ot-boolean">{String(data.v)}</span></span>;
     if (data.__type === 'function')  return <span>{prefix}<span className="ot-summary">ƒ {data.name}()</span></span>;
@@ -121,7 +139,7 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
                             ? <div className="ot-row"><span className="ot-empty">Loading…</span></div>
                             : keys.map(k => (
                                 <div key={k} className="ot-row">
-                                    <ObjectTree data={childProps![k]} label={k} depth={depth + 1} getProperties={getProperties} />
+                                    <ObjectTree data={childProps![k]} label={k} depth={depth + 1} expandDepth={expandDepth} noQuote={noQuote} getProperties={getProperties} />
                                 </div>
                             ))
                         }
@@ -165,10 +183,10 @@ export function ObjectTree({ data, label, depth = 0, getProperties }: Props) {
                                         <span>
                                             <span className="ot-key">{k}</span>
                                             <span className="ot-colon">{' => '}</span>
-                                            <ObjectTree data={propsToShow[k]} depth={depth + 1} getProperties={getProperties} />
+                                            <ObjectTree data={propsToShow[k]} depth={depth + 1} expandDepth={expandDepth} noQuote={noQuote} getProperties={getProperties} />
                                         </span>
                                     ) : (
-                                        <ObjectTree data={propsToShow[k]} label={k} depth={depth + 1} getProperties={getProperties} />
+                                        <ObjectTree data={propsToShow[k]} label={k} depth={depth + 1} expandDepth={expandDepth} noQuote={noQuote} getProperties={getProperties} />
                                     )}
                                 </div>
                             );

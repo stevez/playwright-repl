@@ -1,5 +1,6 @@
 import { swDebugEval } from '@/lib/sw-debugger';
 import type { ElementPickInfo, PickResultData } from '@/types';
+import type { SerializedValue } from '@/components/Console/types';
 
 /**
  * Extract --nth flag from a JS locator chain (.first(), .last(), .nth(N)).
@@ -225,6 +226,51 @@ export function buildPickResult(info: ElementPickInfo): PickResultData {
             checked: info.checked,
         },
     };
+}
+
+/**
+ * Convert a PickResultData into a SerializedValue for rendering via ObjectTree.
+ */
+export function pickResultToSerialized(data: PickResultData): SerializedValue {
+    const props: Record<string, SerializedValue> = {};
+
+    // locator: { js, pw }
+    const locatorProps: Record<string, SerializedValue> = {
+        js: { __type: 'string', v: data.jsExpression },
+    };
+    if (data.pwCommand) locatorProps.pw = { __type: 'string', v: data.pwCommand };
+    props.locator = { __type: 'object', cls: '', props: locatorProps };
+
+    // assert: { js, pw }
+    if (data.assertJs) {
+        const assertProps: Record<string, SerializedValue> = {
+            js: { __type: 'string', v: data.assertJs },
+        };
+        if (data.assertPw) assertProps.pw = { __type: 'string', v: data.assertPw };
+        props.assert = { __type: 'object', cls: '', props: assertProps };
+    }
+
+    // element: { tag, text, visible, enabled, ... }
+    if (data.details) {
+        const d = data.details;
+        const ep: Record<string, SerializedValue> = {};
+        if (d.html) ep.dom = { __type: 'string', v: d.html };
+        ep.tag = { __type: 'string', v: d.tag };
+        if (d.text) ep.text = { __type: 'string', v: d.text.length > 80 ? d.text.slice(0, 80) + '…' : d.text };
+        ep.visible = { __type: 'boolean', v: d.visible };
+        ep.enabled = { __type: 'boolean', v: d.enabled };
+        if (d.value !== undefined) ep.value = { __type: 'string', v: d.value };
+        if (d.checked !== undefined) ep.checked = { __type: 'boolean', v: d.checked };
+        if (d.count > 1) ep.matches = { __type: 'number', v: d.count };
+        if (d.box) {
+            ep.size = { __type: 'string', v: `${Math.round(d.box.width)} × ${Math.round(d.box.height)}` };
+            ep.position = { __type: 'string', v: `(${Math.round(d.box.x)}, ${Math.round(d.box.y)})` };
+        }
+        for (const [k, v] of Object.entries(d.attributes)) ep[k] = { __type: 'string', v };
+        props.element = { __type: 'object', cls: '', props: ep };
+    }
+
+    return { __type: 'object', cls: 'PickResult', props };
 }
 
 /**
