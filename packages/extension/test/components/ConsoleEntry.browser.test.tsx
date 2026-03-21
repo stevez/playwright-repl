@@ -1,11 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
-import { ConsoleEntry } from '@/components/Console/ConsoleEntry';
-import type { ConsoleEntry as Entry } from '@/components/Console/types';
+
+vi.mock('@/lib/sw-debugger', () => ({
+    swDebugEval: vi.fn(),
+}));
 
 vi.mock('@/lib/file-utils', () => ({
     saveToFile: vi.fn(),
 }));
+
+import { ConsoleEntry } from '@/components/Console/ConsoleEntry';
+import type { ConsoleEntry as Entry } from '@/components/Console/types';
 import { saveToFile } from '@/lib/file-utils';
 
 const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
