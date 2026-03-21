@@ -323,29 +323,6 @@ describe('locator', () => {
     // ─── generateLocator ──────────────────────────────────────────────────
 
     describe('generateLocator', () => {
-        it('uses data-pw-locator when present (Playwright integration)', () => {
-            const el = document.createElement('button');
-            el.textContent = 'Submit';
-            el.setAttribute('data-pw-locator', "getByRole('button', { name: 'Submit' })");
-            document.body.appendChild(el);
-            expect(generateLocator(el)).toBe("getByRole('button', { name: 'Submit' })");
-        });
-
-        it('removes data-pw-locator after reading', () => {
-            const el = document.createElement('button');
-            el.setAttribute('data-pw-locator', "getByRole('button', { name: 'OK' })");
-            document.body.appendChild(el);
-            generateLocator(el);
-            expect(el.hasAttribute('data-pw-locator')).toBe(false);
-        });
-
-        it('falls back to normal locator when data-pw-locator is absent', () => {
-            document.body.innerHTML = '<button>Submit</button>';
-            const btn = document.querySelector('button')!;
-            expect(btn.hasAttribute('data-pw-locator')).toBe(false);
-            expect(generateLocator(btn)).toBe("getByRole('button', { name: 'Submit' })");
-        });
-
         it('uses data-testid when present', () => {
             const el = document.createElement('div');
             el.setAttribute('data-testid', 'my-widget');

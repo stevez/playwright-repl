@@ -193,7 +193,7 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
 /**
  * Build a PickResultData from element info gathered by the content script.
  * Uses CDP _generateLocatorString() when available (cleaner locators),
- * falls back to content script's locator (from data-pw-locator or custom logic).
+ * falls back to content script's custom locator logic.
  */
 export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | null): PickResultData {
     const jsLocator = cdpLocator ?? info.locator;

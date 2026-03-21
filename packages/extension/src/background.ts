@@ -6,7 +6,6 @@ import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
-import PW_SELECTOR_SOURCE from './pw-selector.js?raw';
 
 // ─── Offscreen Document (CLI Bridge) ─────────────────────────────────────────
 
@@ -61,7 +60,6 @@ function resetCrxState() {
   crxApp = null;
   currentPage = null;
   activeTabId = null;
-  pwSelectorInjected = false;
 }
 
 async function ensureCrxApp(): Promise<CrxApplication> {
@@ -142,31 +140,11 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
 // ─── Recording ───────────────────────────────────────────────────────────────
 
 let recordingTabId: number | null = null;
-let pwSelectorInjected = false;
-
-async function installPwSelectors(): Promise<void> {
-  if (pwSelectorInjected) return;
-  try {
-    const app = await ensureCrxApp();
-    await app.extendInjectedScript(PW_SELECTOR_SOURCE);
-    pwSelectorInjected = true;
-  } catch (e) {
-    console.debug('[pw-repl] installPwSelectors failed:', e);
-  }
-}
-
 async function startRecording(): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
     const tabId = await getActiveTabId();
     if (!tabId) return { ok: false, error: 'No active tab' };
     const tab = await chrome.tabs.get(tabId);
-
-    // Attach to tab if needed (required for extendInjectedScript)
-    if (activeTabId !== tabId) await attachToTab(tabId);
-
-    // Install Playwright selector generator in main world (persists across navigations)
-    await installPwSelectors();
-
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] });
     recordingTabId = tabId;
     return { ok: true, url: tab.url ?? '' };

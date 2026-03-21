@@ -279,13 +279,6 @@ export function escapeString(s: string): string {
 }
 
 export function generateLocator(el: Element): string {
-    // 0. Use Playwright-generated locator if available (set by extendInjectedScript)
-    const pwLocator = el.getAttribute('data-pw-locator');
-    if (pwLocator) {
-        el.removeAttribute('data-pw-locator');
-        return pwLocator;
-    }
-
     // 1. Test ID
     const testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id');
     if (testId) return `getByTestId(${escapeString(testId)})`;

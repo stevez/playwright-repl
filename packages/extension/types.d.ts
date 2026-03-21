@@ -67,13 +67,6 @@ declare module "nextcov" {
   }
 }
 
-// ─── Vite raw imports ────────────────────────────────────────────────────────
-
-declare module '*.js?raw' {
-  const content: string;
-  export default content;
-}
-
 // ─── vitest-chrome (no published types) ──────────────────────────────────────
 
 declare module "vitest-chrome/lib/index.esm.js" {
