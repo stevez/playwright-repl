@@ -7,6 +7,8 @@ import { getCommandHistory, clearHistory, addCommand } from '@/lib/command-histo
 import { swDebugEval, swDebugEvalRaw, swGetProperties, swDebuggerEnable, swDebuggerDisable, swDebugPause, swDebugResume, onDebugPaused, swTrackBreakpoint, swSetBreakpointByUrl, swRemoveAllBreakpoints, ScopeInfo } from '@/lib/sw-debugger';
 import { fromCdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
+import { refToLocator } from '@/lib/snapshot-parser';
+import { getLastSnapshot, setLastSnapshot } from '@/lib/last-snapshot';
 
 function trimStack(msg: string): string {
     return msg.split('\n    at ')[0].split('\nCall log:')[0].trim();
@@ -81,6 +83,29 @@ function runLocalCommand(command: string, dispatch: React.Dispatch<Action>): boo
     if (command.trim().toLowerCase() === 'log time off') {
         localStorage.setItem('logTime', 'false');
         dispatch({ type: 'ADD_LINE', line: { text: 'Time logging disabled', type: 'info' } });
+        return true;
+    }
+    if (trimmed.startsWith('locator ')) {
+        const ref = trimmed.slice('locator '.length).trim();
+        if (!ref) {
+            dispatch({ type: 'ADD_LINE', line: { text: 'Usage: locator <ref>', type: 'info' } });
+            return true;
+        }
+        const snap = getLastSnapshot();
+        if (!snap) {
+            dispatch({ type: 'ADD_LINE', line: { text: 'No snapshot available. Run "snapshot" first.', type: 'error' } });
+            return true;
+        }
+        const loc = refToLocator(snap, ref);
+        if (!loc) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Element "${ref}" not found in last snapshot.`, type: 'error' } });
+            return true;
+        }
+        dispatch({ type: 'ADD_LINE', line: { text: `js: ${loc.js}\npw: ${loc.pw}`, type: 'info' } });
+        return true;
+    }
+    if (trimmed === 'locator') {
+        dispatch({ type: 'ADD_LINE', line: { text: 'Usage: locator <ref>', type: 'info' } });
         return true;
     }
 
@@ -219,6 +244,7 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
         const time = Math.round(performance.now() - start);
         const text = filterResponse(result.text, cmdName);
         if (cmdName === 'snapshot') {
+            setLastSnapshot(text);
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'snapshot', time } });
         } else {
             dispatch({

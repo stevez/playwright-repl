@@ -133,7 +133,9 @@ function parseRoleName(text: string): { role: string; name?: string } {
     // text is already stripped of [ref=eN] by parseSnapshot
     // but may contain other attrs like [level=2], [checked], [disabled]
     const withoutAttrs = text.replace(/\s*\[.*?\]/g, '').trim();
-    const match = withoutAttrs.match(/^(\S+?)(?:\s+"(.*)")?$/);
+    // Strip value suffix — e.g. `textbox "Search": dddd` → `textbox "Search"`
+    const withoutValue = withoutAttrs.replace(/":\s.*$/, '"');
+    const match = withoutValue.match(/^(\S+?)(?:\s+"(.*)")?$/);
     if (!match) return { role: text };
     return { role: match[1], name: match[2] };
 }

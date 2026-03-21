@@ -180,6 +180,28 @@ describe('refToLocator — full page', () => {
     - link "Privacy" [ref=e60]
     - link "Terms" [ref=e61]`;
 
+  it('handles textbox with value suffix', () => {
+    const yaml = `\
+- document [ref=e1]:
+  - textbox "Search" [ref=e5]: hello`;
+    const result = refToLocator(yaml, 'e5');
+    expect(result).toEqual({
+      js: "page.getByRole('textbox', { name: 'Search', exact: true })",
+      pw: 'textbox "Search"',
+    });
+  });
+
+  it('handles textbox with empty value suffix', () => {
+    const yaml = `\
+- document [ref=e1]:
+  - textbox "What needs to be done?" [ref=e8]: dddd`;
+    const result = refToLocator(yaml, 'e8');
+    expect(result).toEqual({
+      js: "page.getByRole('textbox', { name: 'What needs to be done?', exact: true })",
+      pw: 'textbox "What needs to be done?"',
+    });
+  });
+
   it('lists all ref → locator mappings', () => {
     const root = parseSnapshot(FULL_PAGE_YAML);
     expect(root).not.toBeNull();

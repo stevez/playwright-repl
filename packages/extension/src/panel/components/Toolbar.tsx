@@ -6,6 +6,9 @@ import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
+import { swDebugEval } from '@/lib/sw-debugger';
+import { locatorToRef } from '@/lib/snapshot-parser';
+import { setLastSnapshot } from '@/lib/last-snapshot';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging' | 'breakPoints'> {
@@ -292,8 +295,23 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         const listener = (msg: any) => {
             if (msg.type === 'element-picked-raw') {
                 setIsPicking(false);
-                resolvePlaywrightLocator(msg.pickId).then(pwLocator => {
+                const snapshotPromise = swDebugEval('takeSnapshot(page)')
+                    .then((r: unknown) => {
+                        const res = r as { result?: { type?: string; value?: string } };
+                        return res?.result?.type === 'string' ? res.result.value! : null;
+                    })
+                    .catch(() => null);
+                resolvePlaywrightLocator(msg.pickId).then(async pwLocator => {
                     const pickResult = buildPickResult({ ...msg.info, pwLocator });
+                    const snap = await snapshotPromise;
+                    if (snap) {
+                        setLastSnapshot(snap);
+                        const jsLocator = pickResult.locator.replace(/^page\./, '');
+                        pickResult.ref = locatorToRef(snap, jsLocator) ?? undefined;
+                        if (pickResult.ref) {
+                            pickResult.pwCommand = `highlight ${pickResult.ref}`;
+                        }
+                    }
                     dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
                 });
             }
