@@ -143,3 +143,43 @@ describe("existing verify commands", () => {
     expect(jsExpr).toContain('"dashboard"');
   });
 });
+
+// ─── highlight ───────────────────────────────────────────────────────────────
+
+describe("highlight", () => {
+  it("routes ref to highlightByRef", () => {
+    const { jsExpr } = direct("highlight e8");
+    expect(jsExpr).toContain('highlightByRef');
+    expect(jsExpr).toContain('"e8"');
+  });
+
+  it("routes ref e1 to highlightByRef", () => {
+    const { jsExpr } = direct("highlight e1");
+    expect(jsExpr).toContain('highlightByRef');
+    expect(jsExpr).toContain('"e1"');
+  });
+
+  it("routes role+name to highlightByRole", () => {
+    const { jsExpr } = direct('highlight textbox "Email"');
+    expect(jsExpr).toContain('highlightByRole');
+    expect(jsExpr).toContain('"textbox"');
+    expect(jsExpr).toContain('"Email"');
+  });
+
+  it("routes text to highlightByText", () => {
+    const { jsExpr } = direct('highlight "Submit"');
+    expect(jsExpr).toContain('highlightByText');
+    expect(jsExpr).toContain('"Submit"');
+  });
+
+  it("routes CSS selector to highlightBySelector", () => {
+    const { jsExpr } = direct("highlight .btn-primary");
+    expect(jsExpr).toContain('highlightBySelector');
+    expect(jsExpr).toContain('".btn-primary"');
+  });
+
+  it("routes --clear to clearHighlight", () => {
+    const { jsExpr } = direct("highlight --clear");
+    expect(jsExpr).toContain('clearHighlight');
+  });
+});

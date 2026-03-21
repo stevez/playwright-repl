@@ -241,6 +241,12 @@ export async function highlightBySelector(page, selector, nth?) {
     : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
+export async function highlightByRef(page, ref) {
+  const loc = page.locator('aria-ref=' + ref);
+  await loc.highlight();
+  return 'Highlighted';
+}
+
 export async function clearHighlight(page) {
   // Highlight a non-matching locator — Playwright replaces the current highlight
   // with nothing (0 elements), clearing it visually while keeping internal state valid.

@@ -129,7 +129,7 @@ import {
   verifyVisible, verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole,
-  highlightByText, highlightByRole, highlightBySelector, clearHighlight, chainAction, goBack, goForward,
+  highlightByText, highlightByRole, highlightBySelector, highlightByRef, clearHighlight, chainAction, goBack, goForward,
   gotoUrl, reloadPage, waitMs, getTitle, getUrl,
   evalCode, runCode, takeScreenshot, takeSnapshot,
   refAction, pressKey, typeText,
@@ -394,6 +394,8 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     if (args.clear) return { jsExpr: call(clearHighlight) };
     const loc = args._[1];
     if (loc) {
+      // highlight <ref> → use aria-ref selector
+      if (/^e\d+$/.test(loc)) return { jsExpr: call(highlightByRef, loc) };
       const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
       const exact = args.exact ? true : undefined;
       const isSelector = /[.#[\]>:=]/.test(loc);
