@@ -28,9 +28,10 @@ describe('SnapshotTree', () => {
         await expect.element(screen.getByText('document')).toBeInTheDocument();
     });
 
-    it('renders ref badge for root', async () => {
-        const screen = await render(<SnapshotTree node={makeTree()} depth={0} />);
-        await expect.element(screen.getByText('[ref=e1]')).toBeInTheDocument();
+    it('renders ref as part of node text', async () => {
+        const node: SnapshotNode = { text: 'document [ref=e1]', ref: 'e1', children: [] };
+        const screen = await render(<SnapshotTree node={node} depth={0} />);
+        await expect.element(screen.getByText('document [ref=e1]')).toBeInTheDocument();
     });
 
     it('auto-expands at depth < 2', async () => {

@@ -3,6 +3,7 @@ import yaml from 'js-yaml';
 export interface SnapshotNode {
     text: string,
     ref?: string,
+    value?: string,
     children: SnapshotNode[];
 }
 
@@ -16,22 +17,17 @@ export function parseSnapshot(yamlText: string): SnapshotNode | null {
 function toNodes(parsed: unknown[]): SnapshotNode[] {
     return parsed.map(item => {
         if(typeof item === 'string') {
-            return { text: stripRef(item), ref: extractRef(item), children: []}
+            return { text: item, ref: extractRef(item), children: []}
         }
         // Object: { "document [ref=e1]": [...children] } or { "textbox [ref=e5]": "value" }
         const obj = item as Record<string, unknown>;
         const key = Object.keys(obj)[0];
         const val = obj[key];
-        const children = Array.isArray(val) ? toNodes(val)
-            : (typeof val === 'string' || typeof val === 'number') ? [{ text: String(val), children: [] }]
-            : [];
-        return { text: stripRef(key), ref: extractRef(key), children }
+        const isScalar = typeof val === 'string' || typeof val === 'number';
+        const children = Array.isArray(val) ? toNodes(val) : [];
+        const text = isScalar ? `${key}: ${String(val)}` : key;
+        return { text, ref: extractRef(key), value: isScalar ? String(val) : undefined, children }
     })
-}
-
-// "document [ref=e1]" → "document"
-function stripRef(text: string): string {
-  return text.replace(/\s*\[ref=e\d+\]/, '').trim();
 }
 
 // "document [ref=e1]" → "e1"

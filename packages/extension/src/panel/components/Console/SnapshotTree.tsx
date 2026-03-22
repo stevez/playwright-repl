@@ -20,7 +20,6 @@ export function SnapshotTree({node, depth}: { node: SnapshotNode, depth: number}
                     </span>
                 ) : <span style={{ width: 12, display: 'inline-block' }} />}
                 <span>{node.text}</span>
-                {node.ref && <span className="ot-key" style={{ marginLeft: 4 }}>[ref={node.ref}]</span>}
             </div>
             {open && hasChildren && (
                 <div className="ot-children">

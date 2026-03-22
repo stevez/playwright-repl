@@ -13,40 +13,45 @@ const SAMPLE_YAML = `\
     - img [ref=e7]
 `;
 
-describe('parseSnapshot — scalar values as child nodes', () => {
-  it('creates child node for string value', () => {
+describe('parseSnapshot — scalar values inline, refs in text', () => {
+  it('shows value inline and keeps ref in text', () => {
     const yaml = `\
 - document [ref=e1]:
   - textbox "Search" [ref=e5]: hello`;
     const root = parseSnapshot(yaml);
     const textbox = root!.children[0];
-    expect(textbox.text).toBe('textbox "Search"');
+    expect(textbox.text).toBe('textbox "Search" [ref=e5]: hello');
     expect(textbox.ref).toBe('e5');
-    expect(textbox.children).toEqual([{ text: 'hello', children: [] }]);
+    expect(textbox.value).toBe('hello');
+    expect(textbox.children).toEqual([]);
   });
 
-  it('creates child node for numeric value', () => {
+  it('shows numeric value inline', () => {
     const yaml = `\
 - document [ref=e1]:
   - textbox "Amount" [ref=e2]: 42`;
     const root = parseSnapshot(yaml);
-    expect(root!.children[0].children).toEqual([{ text: '42', children: [] }]);
+    expect(root!.children[0].text).toBe('textbox "Amount" [ref=e2]: 42');
+    expect(root!.children[0].value).toBe('42');
+    expect(root!.children[0].children).toEqual([]);
   });
 
-  it('creates child for /url value', () => {
+  it('shows /url value inline', () => {
     const yaml = `\
 - document [ref=e1]:
   - link "Get started" [ref=e2]:
     - /url: /docs/intro`;
     const root = parseSnapshot(yaml);
     const link = root!.children[0];
+    expect(link.text).toBe('link "Get started" [ref=e2]');
     expect(link.children.length).toBe(1);
     const urlNode = link.children[0];
-    expect(urlNode.text).toBe('/url');
-    expect(urlNode.children).toEqual([{ text: '/docs/intro', children: [] }]);
+    expect(urlNode.text).toBe('/url: /docs/intro');
+    expect(urlNode.value).toBe('/docs/intro');
+    expect(urlNode.children).toEqual([]);
   });
 
-  it('keeps array children as-is', () => {
+  it('keeps ref in text for leaf nodes', () => {
     const yaml = `\
 - document [ref=e1]:
   - navigation "Main":
@@ -54,7 +59,7 @@ describe('parseSnapshot — scalar values as child nodes', () => {
     const root = parseSnapshot(yaml);
     const nav = root!.children[0];
     expect(nav.children.length).toBe(1);
-    expect(nav.children[0].text).toBe('link "Home"');
+    expect(nav.children[0].text).toBe('link "Home" [ref=e3]');
   });
 });
 
