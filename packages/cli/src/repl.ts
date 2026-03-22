@@ -10,13 +10,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
-  buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
-  verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue,
-  actionByText, fillByText, selectByText, checkByText, uncheckByText,
-  actionByRole, fillByRole, selectByRole, pressKeyByRole,
   Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
-  filterResponse as filterResponseBase,
+  filterResponse as filterResponseBase, resolveArgs,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -322,139 +317,18 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   if (cmdName === 'kill-all') return handleKillAll(ctx) as unknown as void;
   if (cmdName === 'close' || cmdName === 'close-all') return handleClose(ctx) as unknown as void;
 
-  // ── Unified verify command → run-code translation ──────────
-  type PageScriptFn = (...fnArgs: unknown[]) => Promise<void>;
-  if (cmdName === 'verify') {
-    const subType = args._[1];
-    const rest = args._.slice(2);
-    let translated: ParsedArgs | null = null;
-    if (subType === 'title' && rest.length > 0)
-      translated = buildRunCode(verifyTitle as PageScriptFn, rest.join(' '));
-    else if (subType === 'url' && rest.length > 0)
-      translated = buildRunCode(verifyUrl as PageScriptFn, rest.join(' '));
-    else if (subType === 'text' && rest.length > 0)
-      translated = buildRunCode(verifyText as PageScriptFn, rest.join(' '));
-    else if (subType === 'no-text' && rest.length > 0)
-      translated = buildRunCode(verifyNoText as PageScriptFn, rest.join(' '));
-    else if (subType === 'element' && rest.length >= 2)
-      translated = buildRunCode(verifyElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'no-element' && rest.length >= 2)
-      translated = buildRunCode(verifyNoElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'value' && rest.length >= 2)
-      translated = buildRunCode(verifyValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'visible' && rest.length >= 2)
-      translated = buildRunCode(verifyVisible as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'input-value' && rest.length >= 2)
-      translated = buildRunCode(verifyInputValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'list' && rest.length >= 2)
-      translated = buildRunCode(verifyList as PageScriptFn, rest[0], rest.slice(1));
-    if (translated) {
-      args = translated;
-    } else {
-      console.log(`${c.yellow}Usage: verify <title|url|text|no-text|element|no-element|value|visible|input-value|list> <args>${c.reset}`);
-      return;
-    }
+  // ── Command transformations (verify, role-based, text, run-code) ──
+  const resolved = resolveArgs(args);
+  if (resolved._[0] === args._[0] && cmdName === 'verify') {
+    // resolveArgs didn't transform — bad verify usage
+    console.log(`${c.yellow}Usage: verify <title|url|text|no-text|element|no-element|value|visible|input-value|list> <args>${c.reset}`);
+    return;
   }
-
-  // ── Legacy verify-* commands (backward compat) ─────────────
-  const verifyFns: Record<string, PageScriptFn> = {
-    'verify-text': verifyText as PageScriptFn,
-    'verify-element': verifyElement as PageScriptFn,
-    'verify-value': verifyValue as PageScriptFn,
-    'verify-visible': verifyVisible as PageScriptFn,
-    'verify-input-value': verifyInputValue as PageScriptFn,
-    'verify-list': verifyList as PageScriptFn,
-    'verify-title': verifyTitle as PageScriptFn,
-    'verify-url': verifyUrl as PageScriptFn,
-    'verify-no-text': verifyNoText as PageScriptFn,
-    'verify-no-element': verifyNoElement as PageScriptFn,
-  };
-  if (verifyFns[cmdName]) {
-    const pos = args._.slice(1);
-    const fn = verifyFns[cmdName];
-    let translated: ParsedArgs | null = null;
-    if (cmdName === 'verify-text' || cmdName === 'verify-no-text' || cmdName === 'verify-title' || cmdName === 'verify-url') {
-      const text = pos.join(' ');
-      if (text) translated = buildRunCode(fn, text);
-    } else if (cmdName === 'verify-no-element' || cmdName === 'verify-element' || cmdName === 'verify-visible') {
-      if (pos[0] && pos.length >= 2) translated = buildRunCode(fn, pos[0], pos.slice(1).join(' '));
-    } else if (pos[0] && pos.length >= 2) {
-      const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
-      translated = buildRunCode(fn, pos[0], rest);
-    }
-    if (translated) {
-      args = translated;
-    } else {
-      console.log(`${c.yellow}Usage: ${cmdName} <args>${c.reset}`);
-      return;
-    }
+  if (resolved._[0] !== args._[0] || resolved._[1] !== args._[1]) {
+    // Command was transformed — log hint
+    ctx.log(`${c.dim}→ ${resolved._[1]?.substring(0, 80)}${resolved._[1]?.length > 80 ? '…' : ''} (via run-code)${c.reset}`);
   }
-
-  // ── Auto-resolve role-based to native Playwright locator ──
-  const ROLE_ACTIONS: Record<string, string> = {
-    click: 'click', dblclick: 'dblclick', hover: 'hover',
-    check: 'check', uncheck: 'uncheck',
-  };
-  if (args._.length >= 3 && args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
-    const role = args._[1];
-    const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
-    const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
-    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
-    const inHint = inRole && inText ? ` --in ${inRole} "${inText}"` : '';
-    const nthHint = nth !== undefined ? ` --nth ${nth}` : '';
-    if (ROLE_ACTIONS[cmdName]) {
-      const name = args._.slice(2).join(' ');
-      args = buildRunCode(actionByRole as PageScriptFn, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText);
-      ctx.log(`${c.dim}→ ${cmdName} ${role} "${name}"${inHint}${nthHint} (via run-code)${c.reset}`);
-    } else if (cmdName === 'fill') {
-      const name = args._[2];
-      const value = args._.slice(3).join(' ') || '';
-      args = buildRunCode(fillByRole as PageScriptFn, role, name, value, nth, inRole, inText);
-      ctx.log(`${c.dim}→ fill ${role} "${name}" "${value}"${inHint}${nthHint} (via run-code)${c.reset}`);
-    } else if (cmdName === 'select') {
-      const name = args._[2];
-      const value = args._.slice(3).join(' ') || '';
-      args = buildRunCode(selectByRole as PageScriptFn, role, name, value, nth, inRole, inText);
-      ctx.log(`${c.dim}→ select ${role} "${name}" "${value}"${inHint}${nthHint} (via run-code)${c.reset}`);
-    } else if (cmdName === 'press') {
-      const name = args._[2];
-      const key = args._.slice(3).join(' ') || '';
-      args = buildRunCode(pressKeyByRole as PageScriptFn, role, name, key, nth, inRole, inText);
-      ctx.log(`${c.dim}→ press ${role} "${name}" ${key}${inHint}${nthHint} (via run-code)${c.reset}`);
-    }
-  }
-
-  // ── Auto-resolve text to native Playwright locator ─────────
-  const textFns: Record<string, PageScriptFn> = {
-    click: actionByText as PageScriptFn, dblclick: actionByText as PageScriptFn, hover: actionByText as PageScriptFn,
-    fill: fillByText as PageScriptFn, select: selectByText as PageScriptFn, check: checkByText as PageScriptFn, uncheck: uncheckByText as PageScriptFn,
-  };
-  if (textFns[cmdName] && args._[0] !== 'run-code' && args._[1] && !/^e\d+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
-    const textArg = args._[1];
-    const extraArgs = args._.slice(2);
-    const fn = textFns[cmdName];
-    const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
-    const exact = args.exact === true ? true : undefined;
-    let runCodeArgs: ParsedArgs;
-    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName, nth, exact);
-    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '', nth, exact);
-    else runCodeArgs = buildRunCode(fn, textArg, nth, exact);
-    const argsHint = extraArgs.length > 0 ? ` ${extraArgs.join(' ')}` : '';
-    const nthHint = nth !== undefined ? ` --nth ${nth}` : '';
-    const exactHint = exact ? ' --exact' : '';
-    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint}${nthHint}${exactHint} (via run-code)${c.reset}`);
-    args = runCodeArgs;
-  }
-
-  // ── Auto-wrap run-code body with async (page) => { ... } ──
-  if (cmdName === 'run-code' && args._[1] && !args._[1].startsWith('async')) {
-    const STMT = /^(await|return|const|let|var|for|if|while|throw|try)\b/;
-    const body = !args._[1].includes(';') && !STMT.test(args._[1])
-      ? `return await ${args._[1]}`
-      : args._[1];
-    args = { _: ['run-code', `async (page) => { ${body} }`] };
-    ctx.log(`${c.dim}→ ${args._[1]}${c.reset}`);
-  }
+  args = resolved;
 
   ctx.session.record(line);
   const startTime = performance.now();

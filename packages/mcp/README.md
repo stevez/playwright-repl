@@ -1,6 +1,10 @@
 # @playwright-repl/mcp
 
-MCP server that lets AI agents (Claude Desktop, Claude Code, or any MCP client) control your real Chrome browser through the **Dramaturg** Chrome extension.
+MCP server that lets AI agents (Claude Desktop, Claude Code, or any MCP client) automate a browser using playwright-repl keyword commands.
+
+Two modes:
+- **Bridge mode** (default) — controls your real Chrome browser through the **Dramaturg** Chrome extension
+- **Standalone mode** (`--standalone`) — launches its own browser via Playwright, no extension needed
 
 ## Why
 
@@ -31,6 +35,8 @@ It consists of two parts working together: **Dramaturg** (a Chrome extension tha
 
 ## Architecture
 
+### Bridge mode (default)
+
 ```
 Claude Desktop / Claude Code (or any MCP client)
   ↕ MCP (stdio)
@@ -41,6 +47,18 @@ Chrome extension (offscreen document → service worker)
 Playwright running in your real Chrome session
 ```
 
+### Standalone mode (`--standalone`)
+
+```
+Claude Desktop / Claude Code (or any MCP client)
+  ↕ MCP (stdio)
+playwright-repl MCP server
+  ↕ Engine.run() (in-process)
+Playwright BrowserServerBackend
+  ↕ CDP
+Browser (launched by Playwright)
+```
+
 ## Setup
 
 ### 1. Install the MCP server
@@ -49,11 +67,22 @@ Playwright running in your real Chrome session
 npm install -g @playwright-repl/mcp
 ```
 
-### 2. Install Dramaturg (Chrome extension)
+### 2. Choose a mode
+
+#### Bridge mode (default) — use your real Chrome session
+
+Install Dramaturg (Chrome extension):
 
 Load `packages/extension/dist/` as an unpacked extension in Chrome (`chrome://extensions` → Enable Developer mode → Load unpacked).
 
 Or install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa).
+
+#### Standalone mode — no extension needed
+
+Add `--standalone` to the MCP server command. The server launches its own browser via Playwright.
+
+- Default: headless. Add `--headed` to show the browser window.
+- Only `.pw` keyword commands are supported (no raw Playwright API or JavaScript expressions). Use `run-code` or `eval` keywords within `.pw` mode for Playwright API / JS.
 
 ### 3. Configure your MCP client
 
@@ -61,6 +90,8 @@ Or install from the [Chrome Web Store](https://chromewebstore.google.com/detail/
 
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+Bridge mode:
 
 ```json
 {
@@ -72,17 +103,36 @@ Or install from the [Chrome Web Store](https://chromewebstore.google.com/detail/
 }
 ```
 
+Standalone mode:
+
+```json
+{
+  "mcpServers": {
+    "playwright-repl": {
+      "command": "playwright-repl-mcp",
+      "args": ["--standalone", "--headed"]
+    }
+  }
+}
+```
+
 Restart Claude Desktop after saving.
 
 **Claude Code** — run once in a terminal:
 
 ```bash
+# Bridge mode
 claude mcp add playwright-repl playwright-repl-mcp
+
+# Standalone mode
+claude mcp add playwright-repl playwright-repl-mcp -- --standalone --headed
 ```
 
 ### 4. Connect
 
-The extension connects to the MCP server automatically — no need to open the side panel. Just make sure Chrome is running with the Dramaturg extension installed.
+**Bridge mode:** The extension connects to the MCP server automatically — no need to open the side panel. Just make sure Chrome is running with the Dramaturg extension installed.
+
+**Standalone mode:** The browser launches automatically on the first command. No extension needed.
 
 ## Dramaturg — The Extension
 
@@ -113,9 +163,9 @@ When the extension is connected, the MCP server logs `Extension connected` to st
 
 ## Tool: `run_command`
 
-One tool, two input modes:
-
 ### Keyword commands (`.pw` syntax)
+
+Both modes support `.pw` keyword commands:
 
 ```
 snapshot                              # accessibility tree — always start here
@@ -125,13 +175,14 @@ fill "Email" user@example.com        # fill a form field
 press Enter                          # key press
 verify-text Welcome                  # assert text is visible
 screenshot                           # capture page (returned as image to AI)
-scroll-down                          # scroll
 check "Remember me"                  # check a checkbox
 select "Country" "United States"     # select dropdown option
 localstorage-list                    # list localStorage
 ```
 
-### Playwright API / JavaScript
+### Playwright API / JavaScript (bridge mode only)
+
+In bridge mode, `run_command` also accepts raw Playwright expressions and JavaScript:
 
 ```
 await page.url()
@@ -142,13 +193,16 @@ await page.evaluate(() => document.title)
 await page.evaluate(() => document.querySelectorAll('a').length)
 ```
 
+> In standalone mode, use the `run-code` or `eval` keywords to run Playwright API / JavaScript:
+> `run-code await page.url()` or `eval document.title`.
+
 ## Tool: `run_script`
 
-Batch execution for multi-line scripts. Two language modes:
+Batch execution for multi-line scripts.
 
 ### Keyword script (`language="pw"`)
 
-Splits by line, runs each command sequentially, returns ✓/✗ per line:
+Splits by line, runs each command sequentially, returns ✓/✗ per line. Lines starting with `#` are skipped. Stops on first error.
 
 ```
 goto https://demo.playwright.dev/todomvc/
@@ -157,7 +211,9 @@ press Enter
 verify-text "Buy groceries"
 ```
 
-### JavaScript (`language="javascript"`)
+> In standalone mode, `run_script` only accepts `.pw` keyword scripts (no `language` parameter needed).
+
+### JavaScript (`language="javascript"`) — bridge mode only
 
 Runs the entire block as one evaluation — use for Playwright API with assertions:
 
@@ -167,20 +223,6 @@ await page.getByPlaceholder('What needs to be done?').fill('Buy groceries');
 await page.keyboard.press('Enter');
 await expect(page.getByText('Buy groceries')).toBeVisible();
 ```
-
-## Prompt: `generate-test`
-
-A prompt template that guides the AI to generate a passing Playwright test from a described scenario.
-
-**Args:**
-- `steps` (required) — describe the test scenario, e.g. "log in with email/password, verify the dashboard loads". Also accepts pasted `.pw` scripts.
-- `url` (optional) — URL to navigate to first.
-
-**In Claude Desktop:** click "+" → select `generate-test` → fill in the form → send.
-
-**In Claude Code:** `/mcp__playwright-repl__generate-test`
-
-The AI navigates the page, takes snapshots, writes Playwright assertions, runs them via `run_script(language="javascript")`, and iterates until all pass.
 
 ## AI Agents
 

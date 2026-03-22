@@ -15,7 +15,7 @@ export {
 } from './page-scripts.js';
 export { Engine } from './engine.js';
 export type { EngineOpts, EngineResult, ParsedArgs } from './engine.js';
-export { CommandServer } from './extension-server.js';
+export { CommandServer, resolveArgs } from './extension-server.js';
 export { filterResponse } from './filter.js';
 export { BridgeServer } from './bridge-server.js';
 export type { CompletionItem } from './completion-data.js';
