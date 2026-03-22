@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "test:e2e": "node dist/playwright-repl.js --replay examples/ --silent"
+    "test:e2e": "node dist/playwright-repl.js --replay examples/ --silent",
+    "test:e2e:bridge": "node e2e/test-bridge-replay.js"
   },
   "keywords": [
     "playwright",
