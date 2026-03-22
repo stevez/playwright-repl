@@ -1,0 +1,25 @@
+# Test inspection commands: snapshot, locator, highlight, console, network, scroll
+# App: https://demo.playwright.dev/todomvc/
+
+goto https://demo.playwright.dev/todomvc/
+localstorage-clear
+reload
+fill textbox "What needs to be done?" "Buy groceries"
+press Enter
+
+# Snapshot and locator
+snapshot
+locator e8
+
+# Highlight
+highlight "Buy groceries"
+
+# Console and network
+console
+network
+
+# Verify visible
+verify-visible textbox "What needs to be done?"
+
+# Cleanup
+localstorage-clear

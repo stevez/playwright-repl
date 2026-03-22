@@ -12,6 +12,7 @@ import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
+  verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
   Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
@@ -309,7 +310,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
 
   // Validate command exists
   const knownExtras = ['help', 'highlight', 'locator', 'list', 'close-all', 'kill-all', 'install', 'install-browser',
-                       'verify', 'verify-text', 'verify-element', 'verify-value', 'verify-list',
+                       'verify', 'verify-text', 'verify-element', 'verify-value', 'verify-visible', 'verify-input-value', 'verify-list',
                        'verify-title', 'verify-url', 'verify-no-text', 'verify-no-element'];
   if (!ALL_COMMANDS.includes(cmdName) && !knownExtras.includes(cmdName)) {
     console.log(`${c.yellow}Unknown command: ${cmdName}${c.reset}`);
@@ -341,12 +342,16 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
       translated = buildRunCode(verifyNoElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
     else if (subType === 'value' && rest.length >= 2)
       translated = buildRunCode(verifyValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
+    else if (subType === 'visible' && rest.length >= 2)
+      translated = buildRunCode(verifyVisible as PageScriptFn, rest[0], rest.slice(1).join(' '));
+    else if (subType === 'input-value' && rest.length >= 2)
+      translated = buildRunCode(verifyInputValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
     else if (subType === 'list' && rest.length >= 2)
       translated = buildRunCode(verifyList as PageScriptFn, rest[0], rest.slice(1));
     if (translated) {
       args = translated;
     } else {
-      console.log(`${c.yellow}Usage: verify <title|url|text|no-text|element|no-element|value|list> <args>${c.reset}`);
+      console.log(`${c.yellow}Usage: verify <title|url|text|no-text|element|no-element|value|visible|input-value|list> <args>${c.reset}`);
       return;
     }
   }
@@ -356,6 +361,8 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     'verify-text': verifyText as PageScriptFn,
     'verify-element': verifyElement as PageScriptFn,
     'verify-value': verifyValue as PageScriptFn,
+    'verify-visible': verifyVisible as PageScriptFn,
+    'verify-input-value': verifyInputValue as PageScriptFn,
     'verify-list': verifyList as PageScriptFn,
     'verify-title': verifyTitle as PageScriptFn,
     'verify-url': verifyUrl as PageScriptFn,
@@ -369,7 +376,7 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     if (cmdName === 'verify-text' || cmdName === 'verify-no-text' || cmdName === 'verify-title' || cmdName === 'verify-url') {
       const text = pos.join(' ');
       if (text) translated = buildRunCode(fn, text);
-    } else if (cmdName === 'verify-no-element' || cmdName === 'verify-element') {
+    } else if (cmdName === 'verify-no-element' || cmdName === 'verify-element' || cmdName === 'verify-visible') {
       if (pos[0] && pos.length >= 2) translated = buildRunCode(fn, pos[0], pos.slice(1).join(' '));
     } else if (pos[0] && pos.length >= 2) {
       const rest = cmdName === 'verify-list' ? pos.slice(1) : pos.slice(1).join(' ');
@@ -427,13 +434,15 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     const extraArgs = args._.slice(2);
     const fn = textFns[cmdName];
     const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    const exact = args.exact === true ? true : undefined;
     let runCodeArgs: ParsedArgs;
-    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName, nth);
-    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '', nth);
-    else runCodeArgs = buildRunCode(fn, textArg, nth);
+    if (fn === actionByText) runCodeArgs = buildRunCode(fn, textArg, cmdName, nth, exact);
+    else if (cmdName === 'fill' || cmdName === 'select') runCodeArgs = buildRunCode(fn, textArg, extraArgs[0] || '', nth, exact);
+    else runCodeArgs = buildRunCode(fn, textArg, nth, exact);
     const argsHint = extraArgs.length > 0 ? ` ${extraArgs.join(' ')}` : '';
     const nthHint = nth !== undefined ? ` --nth ${nth}` : '';
-    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint}${nthHint} (via run-code)${c.reset}`);
+    const exactHint = exact ? ' --exact' : '';
+    ctx.log(`${c.dim}→ ${cmdName} "${textArg}"${argsHint}${nthHint}${exactHint} (via run-code)${c.reset}`);
     args = runCodeArgs;
   }
 
@@ -454,7 +463,9 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     const snapshotMatch = result?.text?.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
     if (snapshotMatch) {
       const urlMatch = result?.text?.match(/### Page\n-\s*\[.*?\]\((.*?)\)/);
-      ctx.lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: snapshotMatch[1].trim() };
+      const raw = snapshotMatch[1].trim();
+      const yamlBody = raw.replace(/^```(?:yaml)?\n?/, '').replace(/\n?```$/, '');
+      ctx.lastSnapshot = { url: urlMatch?.[1] ?? '', snapshotString: yamlBody };
     }
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {

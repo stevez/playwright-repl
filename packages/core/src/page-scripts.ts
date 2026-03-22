@@ -79,54 +79,97 @@ export async function verifyNoElement(page, role, name) {
     throw new Error('Element still exists: ' + role + ' "' + name + '"');
 }
 
+export async function verifyVisible(page, role, name) {
+  if (!(await page.getByRole(role, { name }).isVisible()))
+    throw new Error('Element not visible: ' + role + ' "' + name + '"');
+}
+
+export async function verifyInputValue(page, label, expected) {
+  let loc = page.getByLabel(label);
+  if (await loc.count() === 0) loc = page.getByRole('spinbutton', { name: label });
+  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: label });
+  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: label });
+  if (await loc.count() === 0)
+    throw new Error('Element not found for label: ' + label);
+  const el = loc.first();
+  const inputType = await el.evaluate(e => e instanceof HTMLInputElement ? e.type : '');
+  if (inputType === 'checkbox') {
+    const isChecked = await el.isChecked();
+    const expectChecked = ['checked', 'true', 'yes', '1'].includes(expected.toLowerCase());
+    if (isChecked !== expectChecked)
+      throw new Error('Expected "' + label + '" to be ' + expected + ', but was ' + (isChecked ? 'checked' : 'unchecked'));
+    return;
+  }
+  const value = await el.inputValue();
+  if (String(value) !== String(expected))
+    throw new Error('Expected "' + expected + '", got "' + value + '" for "' + label + '"');
+}
+
 // ─── Text locator actions ───────────────────────────────────────────────────
 
-export async function actionByText(page, text, action, nth) {
+export async function actionByText(page, text, action, nth, exact?) {
   let loc = page.getByText(text, { exact: true });
-  if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
-  if (await loc.count() === 0) loc = page.getByRole('link', { name: text });
-  if (await loc.count() === 0) loc = page.getByText(text);
+  if (!exact) {
+    if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
+    if (await loc.count() === 0) loc = page.getByRole('link', { name: text });
+    if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+    if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+    if (await loc.count() === 0) loc = page.getByPlaceholder(text);
+    if (await loc.count() === 0) loc = page.getByText(text);
+  }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc[action]();
 }
 
-export async function fillByText(page, text, value, nth) {
+export async function fillByText(page, text, value, nth, exact?) {
   let loc = page.getByLabel(text);
-  if (await loc.count() === 0) loc = page.getByPlaceholder(text);
-  if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+  if (!exact) {
+    if (await loc.count() === 0) loc = page.getByPlaceholder(text);
+    if (await loc.count() === 0) loc = page.getByRole('textbox', { name: text });
+  }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.fill(value);
 }
 
-export async function selectByText(page, text, value, nth) {
+export async function selectByText(page, text, value, nth, exact?) {
   let loc = page.getByLabel(text);
-  if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+  if (!exact) {
+    if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+  }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.selectOption(value);
 }
 
-export async function checkByText(page, text, nth) {
-  const item = page.getByRole('listitem').filter({ hasText: text });
-  if (await item.count() > 0) {
-    const target = nth !== undefined ? item.filter({ visible: true }).nth(nth) : item;
-    await target.getByRole('checkbox').check();
-    return;
+export async function checkByText(page, text, nth, exact?) {
+  if (!exact) {
+    const item = page.getByRole('listitem').filter({ hasText: text });
+    if (await item.count() > 0) {
+      const target = nth !== undefined ? item.filter({ visible: true }).nth(nth) : item;
+      await target.getByRole('checkbox').check();
+      return;
+    }
   }
   let loc = page.getByLabel(text);
-  if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  if (!exact) {
+    if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.check();
 }
 
-export async function uncheckByText(page, text, nth) {
-  const item = page.getByRole('listitem').filter({ hasText: text });
-  if (await item.count() > 0) {
-    const target = nth !== undefined ? item.filter({ visible: true }).nth(nth) : item;
-    await target.getByRole('checkbox').uncheck();
-    return;
+export async function uncheckByText(page, text, nth, exact?) {
+  if (!exact) {
+    const item = page.getByRole('listitem').filter({ hasText: text });
+    if (await item.count() > 0) {
+      const target = nth !== undefined ? item.filter({ visible: true }).nth(nth) : item;
+      await target.getByRole('checkbox').uncheck();
+      return;
+    }
   }
   let loc = page.getByLabel(text);
-  if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  if (!exact) {
+    if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
+  }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.uncheck();
 }

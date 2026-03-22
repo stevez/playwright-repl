@@ -9,6 +9,7 @@ export { c, prettyJson } from './colors.js';
 export {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
+  verifyVisible, verifyInputValue,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';

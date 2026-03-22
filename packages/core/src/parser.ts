@@ -63,7 +63,7 @@ export const ALIASES: Record<string, string> = {
 
 export const booleanOptions = new Set([
   'headed', 'persistent', 'extension', 'submit', 'clear',
-  'fullPage', 'includeStatic',
+  'fullPage', 'static', 'exact',
 ]);
 
 // ─── All known commands ──────────────────────────────────────────────────────
