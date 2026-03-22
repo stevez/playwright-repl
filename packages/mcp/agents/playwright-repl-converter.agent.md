@@ -148,11 +148,17 @@ When using `run_script(code, "javascript")`:
 - Top-level `await` works
 - No `import`, no `test()` wrapper — raw statements only
 
+## Snapshot behavior
+
+Update commands (`click`, `fill`, `goto`, `press`, `hover`, `select`, `check`, `uncheck`, etc.) automatically
+include a `### Snapshot` section in their response showing the page's accessibility tree after the action.
+You do NOT need to call `snapshot` separately after these commands — just read the snapshot from the response.
+
 ## Your workflow
 
 1. **Read the script** — read the input script file using `search`
 2. **Detect format** — `.pw` files use keyword syntax, `.js` files use Playwright JS
-3. **Explore the page** — `run_command("goto <url>")` then `run_command("snapshot")` to understand the page structure
+3. **Explore the page** — `run_command("goto <url>")` to navigate (the response includes a snapshot of the page)
 4. **Convert** — translate each line using the conversion reference table. Use `snapshot` output to pick the right JS locator strategy (getByRole, getByLabel, getByText, etc.)
 5. **Run the converted script** — `run_script(converted, "javascript")` or `run_script(converted, "pw")`
    - If errors: snapshot the page, fix, and re-run. Repeat until zero errors.

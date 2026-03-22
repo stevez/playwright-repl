@@ -17,7 +17,9 @@ export const descriptions = {
    verify-text <text>, verify-no-text <text>, screenshot,
    check <label>, select <label> <value>, localstorage-list, localstorage-clear
 
-Use snapshot to understand the page structure before interacting. Use screenshot to visually verify the current state.
+Update commands (click, fill, goto, press, hover, select, check, uncheck, etc.) automatically include a snapshot of the page after the action. You do NOT need to call snapshot separately after these commands.
+
+Use snapshot only for initial exploration or after read-only commands. Use screenshot to visually verify the current state.
 
 IMPORTANT: Before writing .pw commands, run 'help' to get the full list of available commands. Only use commands that appear in the help output. Do not invent commands.`,
 

@@ -44,13 +44,18 @@ Only use commands that appear in the help output. Never invent or guess command 
 
 Use `run_command("help verify")` to discover available assertion commands (verify-text, verify-element, verify-url, etc.).
 
+## Snapshot behavior
+
+Update commands (`click`, `fill`, `goto`, `press`, `hover`, `select`, `check`, `uncheck`, etc.) automatically
+include a `### Snapshot` section in their response showing the page's accessibility tree after the action.
+You do NOT need to call `snapshot` separately after these commands — just read the snapshot from the response.
+
 ## Your workflow
 
 1. **Navigate and Explore**
-   - Navigate to the target URL: `run_command("goto <url>")`
-   - Take a snapshot to understand the page: `run_command("snapshot")`
+   - Navigate to the target URL: `run_command("goto <url>")` — the response includes a snapshot of the page
    - Do not take screenshots unless absolutely necessary — snapshots are more informative
-   - Use refs from the snapshot to explore quickly (`click e5`, `fill e8 "value"`) — refs are faster than text locators for exploration
+   - **Use refs (e.g. `click e5`, `fill e8 "value"`) for all exploration** — refs are much faster than text locators. Every update command returns an updated snapshot with new refs, so you can chain actions without calling `snapshot` in between.
    - Thoroughly map the interface: forms, buttons, navigation paths, tabs, modals
 
 2. **Analyze User Flows**

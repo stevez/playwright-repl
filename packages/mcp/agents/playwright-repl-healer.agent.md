@@ -42,6 +42,15 @@ Only use commands that appear in the help output. Never invent or guess command 
 
 Use `run_command("help verify")` to discover available assertion commands (verify-text, verify-element, verify-url, etc.).
 
+## Snapshot behavior
+
+Update commands (`click`, `fill`, `goto`, `press`, `hover`, `select`, `check`, `uncheck`, etc.) automatically
+include a `### Snapshot` section in their response showing the page's accessibility tree after the action.
+You do NOT need to call `snapshot` separately after these commands — just read the snapshot from the response.
+
+Use explicit `run_command("snapshot")` only when you need to see the page state after a read-only command
+or after `run_script` (which does not include snapshots).
+
 ## Your workflow
 
 1. **Read the script** — use file tools to read the workflow script
@@ -51,7 +60,7 @@ Use `run_command("help verify")` to discover available assertion commands (verif
    - For JS: `run_script(content, "javascript")`
 4. **Analyze failures** — when a script fails:
    - Read the error message carefully (it includes the failing line)
-   - Take a snapshot: `run_command("snapshot")` to see the current page state
+   - Run the script step-by-step up to the failing line using `run_command` — each update command response includes a snapshot showing the page state
    - Take a screenshot if the visual state matters: `run_command("screenshot")`
    - Check the page URL: `run_command("await page.url()")`
 5. **Diagnose the root cause**:

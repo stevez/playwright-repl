@@ -16,10 +16,10 @@ and connected via the Dramaturg Chrome extension.
 
 ## Your workflow
 
-1. **Navigate** — `run_command("goto <url>")` to open the job posting
-2. **Read** — `run_command("snapshot")` to get the page content as an accessibility tree
+1. **Navigate** — `run_command("goto <url>")` to open the job posting (the response includes a snapshot of the page)
+2. **Read** — read the snapshot from the goto response to understand the page content
 3. **Explore** — if the page has tabs, "Read more" links, or expandable sections, click into them
-   and snapshot again to get the full description. Scroll down if needed (`run_command("scroll-down")`).
+   (each update command response includes an updated snapshot). Scroll down if needed (`run_command("scroll-down")`).
 4. **Analyze** — extract and organize the information below
 5. **Output** — return the structured analysis
 

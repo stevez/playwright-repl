@@ -85,11 +85,20 @@ Only use commands that appear in the help output. Never invent or guess command 
 
 Use `run_command("help verify")` to discover available assertion commands (verify-text, verify-element, verify-url, etc.).
 
+## Snapshot behavior
+
+Update commands (`click`, `fill`, `goto`, `press`, `hover`, `select`, `check`, `uncheck`, etc.) automatically
+include a `### Snapshot` section in their response showing the page's accessibility tree after the action.
+You do NOT need to call `snapshot` separately after these commands — just read the snapshot from the response.
+
+Use explicit `run_command("snapshot")` only for initial exploration or after read-only commands that don't
+include snapshots (like `verify-text`, `eval`, `screenshot`).
+
 ## Your workflow
 
 1. **Read the plan** — read the workflow plan file or understand the description
-2. **Explore** — `run_command("goto <url>")`, then `run_command("snapshot")` to see the page
-3. **Step through** — execute each action with `run_command` using text from the snapshot. Use `snapshot` after key interactions to see the updated page.
+2. **Explore** — `run_command("goto <url>")` to navigate (the response includes a snapshot of the page)
+3. **Step through** — execute each action with `run_command`. **Use refs (e.g. `click e5`, `fill e8 "value"`) during exploration** — they're faster than text locators. Each update command response includes the updated snapshot with new refs, so you can chain actions without calling `snapshot` separately.
 4. **Assemble the script** — collect the working commands into a `.pw` or `.js` script using text locators (e.g. `click "Sign in"`, not `click e5`)
 5. **Run the full script** — call `run_script(script, "pw")` or `run_script(script, "javascript")`
    - If errors: snapshot the page, fix, and re-run. Repeat until zero errors.
