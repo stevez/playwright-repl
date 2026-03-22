@@ -19,7 +19,7 @@ describe('parseSnapshot', () => {
   it('parses a YAML snapshot into a tree', () => {
     const root = parseSnapshot(SAMPLE_YAML);
     expect(root).not.toBeNull();
-    expect(root!.text).toBe('document');
+    expect(root!.text).toBe('document [ref=e1]');
     expect(root!.ref).toBe('e1');
     expect(root!.children.length).toBeGreaterThan(0);
   });
@@ -32,10 +32,10 @@ describe('parseSnapshot', () => {
     expect(parseSnapshot('')).toBeNull();
   });
 
-  it('strips ref from text', () => {
+  it('keeps ref in text', () => {
     const root = parseSnapshot(SAMPLE_YAML);
     const heading = root!.children[0];
-    expect(heading.text).toBe('heading "Welcome" [level=2]');
+    expect(heading.text).toBe('heading "Welcome" [level=2] [ref=e2]');
     expect(heading.ref).toBe('e2');
   });
 });
