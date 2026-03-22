@@ -188,6 +188,12 @@ importers:
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
+      playwright:
+        specifier: 1.59.0-alpha-2026-02-21
+        version: 1.59.0-alpha-2026-02-21
+      playwright-core:
+        specifier: 1.59.0-alpha-2026-02-21
+        version: 1.59.0-alpha-2026-02-21
       zod:
         specifier: ^3.24.0
         version: 3.25.76
