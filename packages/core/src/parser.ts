@@ -128,6 +128,14 @@ export function parseInput(line: string): ParsedArgs | null {
     return rest ? { _: [tokens[0], rest] } : { _: [tokens[0]] };
   }
 
+  // Pre-process --in <role> <text> → --in-role <role> --in-text <text>
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === '--in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--')) {
+      tokens.splice(i, 3, '--in-role', tokens[i + 1], '--in-text', tokens[i + 2]);
+      break;
+    }
+  }
+
   // Parse with minimist (same lib and boolean set as playwright-cli)
   const args = minimist(tokens, { boolean: [...booleanOptions] }) as ParsedArgs;
 

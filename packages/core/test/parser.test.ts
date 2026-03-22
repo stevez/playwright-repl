@@ -113,6 +113,29 @@ describe('ALIASES', () => {
   });
 });
 
+describe('--in option', () => {
+  it('parses --in role text into in-role and in-text', () => {
+    const args = parseInput('click button "Submit" --in dialog "Settings"');
+    expect(args['in-role']).toBe('dialog');
+    expect(args['in-text']).toBe('Settings');
+    expect(args._).toEqual(['click', 'button', 'Submit']);
+  });
+
+  it('parses --in with --nth', () => {
+    const args = parseInput('click tab "npm" --nth 0 --in article "Getting Started"');
+    expect(args['in-role']).toBe('article');
+    expect(args['in-text']).toBe('Getting Started');
+    expect(args.nth).toBe('0');
+  });
+
+  it('does not parse --in when fewer than 2 values follow', () => {
+    const args = parseInput('click button "Submit" --in dialog');
+    // minimist treats --in as a string option with value "dialog"
+    expect(args.in).toBe('dialog');
+    expect(args).not.toHaveProperty('in-role');
+  });
+});
+
 describe('booleanOptions', () => {
   it('includes expected options', () => {
     expect(booleanOptions.has('headed')).toBe(true);

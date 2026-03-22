@@ -13,6 +13,7 @@ import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
+  actionByRole, fillByRole, selectByRole, pressKeyByRole,
   Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
   filterResponse as filterResponseBase,
 } from '@playwright-repl/core';
@@ -382,12 +383,46 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     }
   }
 
+  // ── Auto-resolve role-based to native Playwright locator ──
+  const ROLE_ACTIONS: Record<string, string> = {
+    click: 'click', dblclick: 'dblclick', hover: 'hover',
+    check: 'check', uncheck: 'uncheck',
+  };
+  if (args._.length >= 3 && args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
+    const role = args._[1];
+    const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
+    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
+    const inHint = inRole && inText ? ` --in ${inRole} "${inText}"` : '';
+    const nthHint = nth !== undefined ? ` --nth ${nth}` : '';
+    if (ROLE_ACTIONS[cmdName]) {
+      const name = args._.slice(2).join(' ');
+      args = buildRunCode(actionByRole as PageScriptFn, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText);
+      ctx.log(`${c.dim}→ ${cmdName} ${role} "${name}"${inHint}${nthHint} (via run-code)${c.reset}`);
+    } else if (cmdName === 'fill') {
+      const name = args._[2];
+      const value = args._.slice(3).join(' ') || '';
+      args = buildRunCode(fillByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      ctx.log(`${c.dim}→ fill ${role} "${name}" "${value}"${inHint}${nthHint} (via run-code)${c.reset}`);
+    } else if (cmdName === 'select') {
+      const name = args._[2];
+      const value = args._.slice(3).join(' ') || '';
+      args = buildRunCode(selectByRole as PageScriptFn, role, name, value, nth, inRole, inText);
+      ctx.log(`${c.dim}→ select ${role} "${name}" "${value}"${inHint}${nthHint} (via run-code)${c.reset}`);
+    } else if (cmdName === 'press') {
+      const name = args._[2];
+      const key = args._.slice(3).join(' ') || '';
+      args = buildRunCode(pressKeyByRole as PageScriptFn, role, name, key, nth, inRole, inText);
+      ctx.log(`${c.dim}→ press ${role} "${name}" ${key}${inHint}${nthHint} (via run-code)${c.reset}`);
+    }
+  }
+
   // ── Auto-resolve text to native Playwright locator ─────────
   const textFns: Record<string, PageScriptFn> = {
     click: actionByText as PageScriptFn, dblclick: actionByText as PageScriptFn, hover: actionByText as PageScriptFn,
     fill: fillByText as PageScriptFn, select: selectByText as PageScriptFn, check: checkByText as PageScriptFn, uncheck: uncheckByText as PageScriptFn,
   };
-  if (textFns[cmdName] && args._[1] && !/^e\d+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
+  if (textFns[cmdName] && args._[0] !== 'run-code' && args._[1] && !/^e\d+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
     const textArg = args._[1];
     const extraArgs = args._.slice(2);
     const fn = textFns[cmdName];

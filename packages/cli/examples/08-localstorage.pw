@@ -4,9 +4,9 @@
 goto https://demo.playwright.dev/todomvc/
 localstorage-clear
 reload
-fill "What needs to be done?" "Buy groceries"
+fill textbox "What needs to be done?" "Buy groceries"
 press Enter
-fill "What needs to be done?" "Write tests"
+fill textbox "What needs to be done?" "Write tests"
 press Enter
 verify-text "2 items left"
 
@@ -19,7 +19,7 @@ localstorage-list
 reload
 
 # After reload with empty storage, todos should be gone
-fill "What needs to be done?" "Fresh todo"
+fill textbox "What needs to be done?" "Fresh todo"
 press Enter
 verify-text "1 item left"
 

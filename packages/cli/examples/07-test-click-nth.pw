@@ -1,17 +1,20 @@
+# Click tabs by role on Playwright docs
+# Demonstrates role-based commands with --nth
+
 goto https://playwright.dev/
-click "Get started"
-click "npm" --nth 0
-click "yarn" --nth 0
-click "pnpm" --nth 0
-click "npm" --nth 1
-click "yarn" --nth 1
-click "pnpm" --nth 1
-click "npm" --nth 2
-click "yarn" --nth 2
-click "pnpm" --nth 2
-click "npm" --nth 3
-click "yarn" --nth 3
-click "pnpm" --nth 3
-click "npm" --nth 4
-click "yarn" --nth 4
-click "pnpm" --nth 4
+click link "Get started"
+click tab "npm" --nth 0
+click tab "yarn" --nth 0
+click tab "pnpm" --nth 0
+click tab "npm" --nth 1
+click tab "yarn" --nth 1
+click tab "pnpm" --nth 1
+click tab "npm" --nth 2
+click tab "yarn" --nth 2
+click tab "pnpm" --nth 2
+click tab "npm" --nth 3
+click tab "yarn" --nth 3
+click tab "pnpm" --nth 3
+click tab "npm" --nth 4
+click tab "yarn" --nth 4
+click tab "pnpm" --nth 4

@@ -10,6 +10,7 @@ export {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
+  actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
 export { Engine } from './engine.js';
 export type { EngineOpts, EngineResult, ParsedArgs } from './engine.js';

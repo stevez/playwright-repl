@@ -49,7 +49,7 @@ jobs:
         working-directory: packages/extension
 
       - name: Run CLI E2E tests
-        run: node dist/playwright-repl.js --replay examples/ --silent
+        run: node dist/playwright-repl.js --replay examples/
         working-directory: packages/cli
 
       - name: Run extension E2E tests

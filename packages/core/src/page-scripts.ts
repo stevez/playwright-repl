@@ -130,3 +130,45 @@ export async function uncheckByText(page, text, nth) {
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.uncheck();
 }
+
+// ─── Role-based actions ─────────────────────────────────────────────────────
+
+export async function actionByRole(page, role, name, action, nth, inRole, inText) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  }
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc[action]();
+}
+
+export async function fillByRole(page, role, name, value, nth, inRole, inText) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  }
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.fill(value);
+}
+
+export async function selectByRole(page, role, name, value, nth, inRole, inText) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  }
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.selectOption(value);
+}
+
+export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
+  let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  }
+  if (nth !== undefined) loc = loc.nth(nth);
+  await loc.press(key);
+}

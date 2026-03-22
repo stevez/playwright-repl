@@ -5,6 +5,7 @@ import {
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   actionByText, fillByText, selectByText,
   checkByText, uncheckByText,
+  actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from '../src/page-scripts.js';
 
 // ─── buildRunCode ───────────────────────────────────────────────────────────
@@ -288,5 +289,77 @@ describe('uncheckByText', () => {
     const page = mockPage(1);
     await uncheckByText(page, 'Newsletter');
     expect(page._loc.uncheck).toHaveBeenCalled();
+  });
+});
+
+// ─── Role-based actions ─────────────────────────────────────────────────────
+
+describe('actionByRole', () => {
+  it('clicks by role and name', async () => {
+    const page = mockPage(1);
+    await actionByRole(page, 'button', 'Submit', 'click');
+    expect(page.getByRole).toHaveBeenCalledWith('button', { name: 'Submit', exact: true });
+    expect(page._loc.click).toHaveBeenCalled();
+  });
+
+  it('supports nth parameter', async () => {
+    const nthLoc = mockLocator(1);
+    const loc = mockLocator(1);
+    loc.nth = vi.fn().mockReturnValue(nthLoc);
+    const page = { getByRole: vi.fn().mockReturnValue(loc) };
+    await actionByRole(page, 'tab', 'npm', 'click', 0);
+    expect(loc.nth).toHaveBeenCalledWith(0);
+    expect(nthLoc.click).toHaveBeenCalled();
+  });
+
+  it('supports --in container context', async () => {
+    const innerLoc = mockLocator(1);
+    const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
+    const loc = mockLocator(1);
+    loc.filter = vi.fn().mockReturnValue(filterLoc);
+    const page = { getByRole: vi.fn().mockReturnValue(loc) };
+    await actionByRole(page, 'button', 'Save', 'click', undefined, 'dialog', 'Settings');
+    expect(page.getByRole).toHaveBeenCalledWith('dialog');
+    expect(loc.filter).toHaveBeenCalledWith({ hasText: 'Settings' });
+    expect(filterLoc.getByRole).toHaveBeenCalledWith('button', { name: 'Save', exact: true });
+    expect(innerLoc.click).toHaveBeenCalled();
+  });
+
+  it('maps list to listitem for --in', async () => {
+    const innerLoc = mockLocator(1);
+    const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
+    const loc = mockLocator(1);
+    loc.filter = vi.fn().mockReturnValue(filterLoc);
+    const page = { getByRole: vi.fn().mockReturnValue(loc) };
+    await actionByRole(page, 'checkbox', 'Done', 'check', undefined, 'list', 'Tasks');
+    expect(page.getByRole).toHaveBeenCalledWith('listitem');
+  });
+});
+
+describe('fillByRole', () => {
+  it('fills by role and name', async () => {
+    const page = mockPage(1);
+    await fillByRole(page, 'textbox', 'Email', 'test@example.com');
+    expect(page.getByRole).toHaveBeenCalledWith('textbox', { name: 'Email', exact: true });
+    expect(page._loc.fill).toHaveBeenCalledWith('test@example.com');
+  });
+});
+
+describe('selectByRole', () => {
+  it('selects by role and name', async () => {
+    const page = mockPage(1);
+    await selectByRole(page, 'combobox', 'Country', 'US');
+    expect(page.getByRole).toHaveBeenCalledWith('combobox', { name: 'Country', exact: true });
+    expect(page._loc.selectOption).toHaveBeenCalledWith('US');
+  });
+});
+
+describe('pressKeyByRole', () => {
+  it('presses key on element by role', async () => {
+    const page = mockPage(1);
+    page._loc.press = vi.fn().mockResolvedValue(undefined);
+    await pressKeyByRole(page, 'textbox', 'Search', 'Enter');
+    expect(page.getByRole).toHaveBeenCalledWith('textbox', { name: 'Search', exact: true });
+    expect(page._loc.press).toHaveBeenCalledWith('Enter');
   });
 });

@@ -4,11 +4,11 @@
 goto https://demo.playwright.dev/todomvc/
 localstorage-clear
 reload
-fill "What needs to be done?" "Buy groceries"
+fill textbox "What needs to be done?" "Buy groceries"
 press Enter
-fill "What needs to be done?" "Write tests"
+fill textbox "What needs to be done?" "Write tests"
 press Enter
-fill "What needs to be done?" "Deploy to production"
+fill textbox "What needs to be done?" "Deploy to production"
 press Enter
 verify-text "Buy groceries"
 verify-text "Write tests"
