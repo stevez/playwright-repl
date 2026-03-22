@@ -69,6 +69,10 @@ export async function verifyUrl(page, text) {
     throw new Error('URL "' + url + '" does not contain "' + text + '"');
 }
 
+export async function waitForText(page, text) {
+  await page.getByText(text).first().waitFor({ state: 'visible', timeout: 10000 });
+}
+
 export async function verifyNoText(page, text) {
   if (await page.getByText(text).filter({ visible: true }).count() > 0)
     throw new Error('Text still visible: ' + text);

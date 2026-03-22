@@ -15,7 +15,7 @@ import { filterResponse } from './filter.js';
 import {
   buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue,
+  verifyVisible, verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
@@ -211,6 +211,12 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
       translated = buildRunCode(fn, pos[0], rest);
     }
     if (translated) args = translated;
+  }
+
+  // ── wait-for-text → run-code with polling ──────────────────
+  if (cmdName === 'wait-for-text') {
+    const text = args._.slice(1).join(' ');
+    if (text) args = buildRunCode(waitForText as PageScriptFn, text);
   }
 
   // ── Auto-resolve role-based to native Playwright locator ──
