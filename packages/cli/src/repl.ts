@@ -464,11 +464,13 @@ export async function runMultiReplayMode(ctx: ReplContext, targets: string[], st
   log(`Files: ${files.length}\n`);
 
   const results: FileResult[] = [];
+  const totalStart = performance.now();
 
   for (const file of files) {
     const basename = path.basename(file);
     log(`=== ${basename} ===`);
     console.log(`${c.blue}▶${c.reset} ${c.bold}${basename}${c.reset}`);
+    const fileStart = performance.now();
 
     let passed = true;
     let commandsRun = 0;
@@ -503,15 +505,17 @@ export async function runMultiReplayMode(ctx: ReplContext, targets: string[], st
       try { ctx.session.endReplay(); } catch { /* ignore */ }
     }
 
+    const fileElapsed = ((performance.now() - fileStart) / 1000).toFixed(1);
     const status = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
-    log(passed ? `PASS ${basename} (${commandsRun} commands)` : `FAIL ${basename} (${errorMsg})`);
-    console.log(`  ${status} ${basename}\n`);
+    log(passed ? `PASS ${basename} (${commandsRun} commands, ${fileElapsed}s)` : `FAIL ${basename} (${errorMsg})`);
+    console.log(`  ${status} ${basename} ${c.dim}(${fileElapsed}s)${c.reset}\n`);
     log('');
 
     results.push({ file: basename, passed, commands: commandsRun, error: errorMsg });
   }
 
   // Summary
+  const totalElapsed = ((performance.now() - totalStart) / 1000).toFixed(1);
   const passCount = results.filter(r => r.passed).length;
   const failCount = results.filter(r => !r.passed).length;
 
@@ -524,7 +528,7 @@ export async function runMultiReplayMode(ctx: ReplContext, targets: string[], st
     log(`${r.passed ? 'PASS' : 'FAIL'} ${r.file}${r.error ? ` — ${r.error}` : ''}`);
   }
 
-  const summary = `\n${passCount} passed, ${failCount} failed (${results.length} total)`;
+  const summary = `\n${passCount} passed, ${failCount} failed (${results.length} total, ${totalElapsed}s)`;
   console.log(summary);
   log(summary);
 
@@ -820,16 +824,20 @@ async function runBridgeReplayMode(opts: ReplOpts, srv: BridgeServer): Promise<v
   // Multi-file
   log(`${c.blue}▶${c.reset} Running ${c.bold}${files.length}${c.reset} files\n`);
   const results: { file: string; passed: boolean; commands: number; error?: string }[] = [];
+  const totalStart = performance.now();
 
   for (const file of files) {
     const basename = path.basename(file);
     log(`${c.blue}▶${c.reset} ${c.bold}${basename}${c.reset}`);
+    const fileStart = performance.now();
     const { passed, commandsRun, errorMsg } = await runSingleBridgeFile(srv, file, opts.step || false, silent, true);
+    const fileElapsed = ((performance.now() - fileStart) / 1000).toFixed(1);
     const status = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
-    log(`  ${status} ${basename}\n`);
+    log(`  ${status} ${basename} ${c.dim}(${fileElapsed}s)${c.reset}\n`);
     results.push({ file: basename, passed, commands: commandsRun, error: errorMsg });
   }
 
+  const totalElapsed = ((performance.now() - totalStart) / 1000).toFixed(1);
   const passCount = results.filter(r => r.passed).length;
   const failCount = results.filter(r => !r.passed).length;
 
@@ -838,7 +846,7 @@ async function runBridgeReplayMode(opts: ReplOpts, srv: BridgeServer): Promise<v
     const icon = r.passed ? `${c.green}✓${c.reset}` : `${c.red}✗${c.reset}`;
     log(`  ${icon} ${r.file}${r.error ? ` — ${r.error}` : ''}`);
   }
-  log(`\n${passCount} passed, ${failCount} failed (${results.length} total)`);
+  log(`\n${passCount} passed, ${failCount} failed (${results.length} total, ${totalElapsed}s)`);
 
   await srv.close();
   process.exit(failCount > 0 ? 1 : 0);
