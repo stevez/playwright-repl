@@ -174,6 +174,16 @@ export const CATEGORIES: Record<string, string[]> = {
   'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'config-print'],
 };
 
+/** Commands that mutate the page — snapshot should be attached when includeSnapshot is on. */
+export const UPDATE_COMMANDS = new Set([
+  // Navigation
+  'goto', 'go-back', 'go-forward', 'reload',
+  // Interaction
+  'click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag', 'upload',
+  // Wait
+  'wait-for-text',
+]);
+
 export const JS_CATEGORIES: Record<string, string[]> = {
   'Navigation':   ['page.goto(url)', 'page.goBack()', 'page.reload()', '...'],
   'Locators':     ['page.getByRole(role)', 'page.getByText(text)', 'page.locator(sel)', 'page.getByTestId(id)', '...'],

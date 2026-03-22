@@ -131,6 +131,11 @@ describe('filterResponse', () => {
     const text = '### Ran Playwright code\nasync (page) => {...}\n### Result\nOK';
     expect(filterResponse(text)).toBe('OK');
   });
+
+  it('preserves headers when verbose is on', () => {
+    const text = '### Result\nClicked\n### Modal state\n[Alert] Sure?';
+    expect(filterResponse(text, undefined, { verbose: true })).toBe('### Result\nClicked\n### Modal state\n[Alert] Sure?');
+  });
 });
 
 // ─── getGhostMatches ─────────────────────────────────────────────────────────

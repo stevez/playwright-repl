@@ -16,7 +16,7 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge', 'server'],
+  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge', 'server', 'include-snapshot', 'verbose'],
   string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
@@ -46,6 +46,8 @@ Options:
   --port <number>        HTTP server port (default: 6781)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --extension            (deprecated) Use --server or --bridge instead
+  --include-snapshot     Include snapshot in update command responses
+  --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
   --config <file>        Path to config file
   --replay <files...>   Replay .pw file(s) or folder(s)
   --record <file>        Start REPL with recording to file
@@ -110,6 +112,8 @@ startRepl({
   server: args.server as boolean,
   bridge: args.bridge as boolean,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
+  includeSnapshot: args['include-snapshot'] as boolean,
+  verbose: args.verbose as boolean,
 }).catch((err: Error) => {
   console.error(`Fatal: ${err.message}`);
   process.exit(1);

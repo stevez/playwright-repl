@@ -28,6 +28,8 @@ export interface ReplOpts extends EngineOpts {
   server?: boolean;
   bridge?: boolean;
   bridgePort?: number;
+  includeSnapshot?: boolean;
+  verbose?: boolean;
 }
 
 export interface ReplContext {
@@ -46,11 +48,13 @@ export interface ReplContext {
 // ─── Response filtering ─────────────────────────────────────────────────────
 
 /** CLI wrapper: uses core filterResponse + ANSI-colors for error lines. */
-export function filterResponse(text: string, cmdName?: string): string | null {
-  const filtered = filterResponseBase(text, cmdName);
+export function filterResponse(text: string, cmdName?: string, opts?: { includeSnapshot?: boolean; verbose?: boolean }): string | null {
+  const filtered = filterResponseBase(text, cmdName, opts);
   if (!filtered) return null;
+  // Strip section headers for human-friendly output (unless verbose)
+  const body = opts?.verbose ? filtered : filtered.replace(/^### \w[\w ]*\n/gm, '');
   // Color error lines red (core returns them as plain "Error: ..." text)
-  return filtered.replace(/^(Error: .*)$/gm, `${c.red}$1${c.reset}`);
+  return body.replace(/^(Error: .*)$/gm, `${c.red}$1${c.reset}`);
 }
 
 // ─── Meta-command handlers ──────────────────────────────────────────────────
@@ -343,7 +347,9 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
     }
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result?.text) {
-      const filtered = filterResponse(result.text, cmdName);
+      const filterOpts = (ctx.opts.includeSnapshot || ctx.opts.verbose)
+        ? { includeSnapshot: ctx.opts.includeSnapshot, verbose: ctx.opts.verbose } : undefined;
+      const filtered = filterResponse(result.text, cmdName, filterOpts);
       if (filtered !== null) console.log(filtered);
     }
     if (result?.isError) ctx.errors++;
@@ -940,12 +946,17 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     }
 
     const startTime = performance.now();
-    const result = await srv.run(command);
+    const runOpts = opts.includeSnapshot ? { includeSnapshot: true } : undefined;
+    const result = await srv.run(command, runOpts);
     const elapsed = (performance.now() - startTime).toFixed(0);
     // Cache snapshot for locator command
-    // Bridge mode: snapshot command returns raw YAML (no ### headers)
-    if (command.trim().startsWith('snapshot') && result?.text && !result.isError) {
-      lastSnapshot = { url: '', snapshotString: result.text.trim() };
+    if (result?.text && !result.isError) {
+      const snapMatch = result.text.match(/### Snapshot\n([\s\S]+)$/);
+      if (snapMatch) {
+        lastSnapshot = { url: '', snapshotString: snapMatch[1].trim() };
+      } else if (command.trim().startsWith('snapshot')) {
+        lastSnapshot = { url: '', snapshotString: result.text.trim() };
+      }
     }
     displayBridgeResult(result, silent);
     log(`${c.dim}(${elapsed}ms)${c.reset}`);

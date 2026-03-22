@@ -1183,4 +1183,161 @@ describe("background.ts message handlers", () => {
     // First must complete before second starts
     expect(executionOrder).toEqual([1, 2]);
   });
+
+  // ─── includeSnapshot ──────────────────────────────────────────────────────
+
+  it("bridge-command appends snapshot when includeSnapshot is true", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+
+    // Track eval calls: first returns command result, second returns snapshot
+    let evalCount = 0;
+    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+      { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
+    ]));
+    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
+    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+      if (method === 'Runtime.enable') { cb(); return; }
+      evalCount++;
+      if (evalCount === 1) {
+        // Command result (e.g. click)
+        cb({ result: { type: 'string', value: 'Clicked' } });
+      } else {
+        // Snapshot result
+        cb({ result: { type: 'string', value: '- heading "Hello" [ref=e1]' } });
+      }
+    });
+    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+
+    // parseReplCommand returns jsExpr for both calls
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'click e5',
+      includeSnapshot: true,
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.text).toContain('### Result');
+    expect(result.text).toContain('Clicked');
+    expect(result.text).toContain('### Snapshot');
+    expect(result.text).toContain('heading "Hello"');
+  });
+
+  it("bridge-command does not append snapshot when includeSnapshot is false", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1', { result: { type: 'string', value: 'Clicked' } });
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'click e5',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Clicked');
+    expect(result.text).not.toContain('### Snapshot');
+  });
+
+  it("bridge-command does not append snapshot on error result", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1', {
+      exceptionDetails: { exception: { description: 'Element not found' } },
+    });
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'click e5',
+      includeSnapshot: true,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.text).not.toContain('### Snapshot');
+  });
+
+  it("bridge-command does not append snapshot for script mode", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    setupDebuggerMocks('sw-1', { result: { type: 'string', value: 'ok' } });
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'snapshot',
+      scriptType: 'script',
+      language: 'pw',
+      includeSnapshot: true,
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.text).not.toContain('### Snapshot');
+  });
+
+  it("bridge-command returns snapshot-only when command result is empty", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+
+    let evalCount = 0;
+    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+      { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
+    ]));
+    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
+    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+      if (method === 'Runtime.enable') { cb(); return; }
+      evalCount++;
+      if (evalCount === 1) {
+        // Command returns undefined → "Done"
+        cb({ result: { type: 'undefined' } });
+      } else {
+        // Snapshot result
+        cb({ result: { type: 'string', value: '- button "OK" [ref=e2]' } });
+      }
+    });
+    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'click e5',
+      includeSnapshot: true,
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.text).toContain('### Result');
+    expect(result.text).toContain('Done');
+    expect(result.text).toContain('### Snapshot');
+    expect(result.text).toContain('button "OK"');
+  });
+
+  it("bridge-command handles snapshot failure gracefully", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+
+    let evalCount = 0;
+    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+      { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
+    ]));
+    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
+    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+      if (method === 'Runtime.enable') { cb(); return; }
+      evalCount++;
+      if (evalCount === 1) {
+        cb({ result: { type: 'string', value: 'Clicked' } });
+      } else {
+        // Snapshot fails
+        cb({ exceptionDetails: { exception: { description: 'Snapshot error' } } });
+      }
+    });
+    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
+
+    const result = await sendMessage({
+      type: 'bridge-command',
+      command: 'click e5',
+      includeSnapshot: true,
+    });
+
+    // Should return original result without snapshot
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Clicked');
+    expect(result.text).not.toContain('### Snapshot');
+  });
 });

@@ -258,4 +258,40 @@ describe('offscreen bridge', () => {
     onMessageListener({ type: 'something-else' });
     expect(MockWebSocket.instances).toHaveLength(wsBefore);
   });
+
+  it('forwards includeSnapshot flag to service worker', async () => {
+    const ws = MockWebSocket.instances[0];
+    sendMessage.mockResolvedValueOnce({ text: 'Clicked\n### Snapshot\n- button', isError: false });
+
+    ws.onmessage!({
+      data: JSON.stringify({ id: '5', command: 'click e5', type: 'command', includeSnapshot: true }),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'bridge-command',
+      command: 'click e5',
+      scriptType: 'command',
+      language: undefined,
+      includeSnapshot: true,
+    });
+  });
+
+  it('omits includeSnapshot when not set in WebSocket message', async () => {
+    const ws = MockWebSocket.instances[0];
+    sendMessage.mockResolvedValueOnce({ text: 'Clicked', isError: false });
+
+    ws.onmessage!({
+      data: JSON.stringify({ id: '6', command: 'click e5', type: 'command' }),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    const call = sendMessage.mock.calls.find(
+      (c: any[]) => c[0]?.type === 'bridge-command' && c[0]?.command === 'click e5'
+    );
+    expect(call).toBeDefined();
+    expect(call![0]).not.toHaveProperty('includeSnapshot');
+  });
 });

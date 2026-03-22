@@ -6,6 +6,8 @@ import { Engine, parseInput, resolveArgs, filterResponse } from '@playwright-rep
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule, SnapshotCache } from './types.js';
 
+const INCLUDE_SNAPSHOT = { includeSnapshot: true } as const;
+
 export const descriptions = {
     runCommandInput: `A keyword command ('snapshot', 'goto https://example.com', 'click Submit', \
 'fill "Email" user@example.com')`,
@@ -57,8 +59,7 @@ export function createStandaloneRunner(
         const result = await e.run(resolved);
 
         // Cache snapshot for locator command — strip YAML code fences
-        const trimmed = command.trim().toLowerCase();
-        if (trimmed.startsWith('snapshot') && result.text && !result.isError) {
+        if (result.text && !result.isError) {
             const snapshotMatch = result.text.match(/### Snapshot\n([\s\S]*?)(?=\n### |$)/);
             if (snapshotMatch) {
                 const raw = snapshotMatch[1].trim();
@@ -67,8 +68,8 @@ export function createStandaloneRunner(
             }
         }
 
-        // Filter verbose Playwright response sections
-        if (result.text) result.text = filterResponse(result.text, cmdName);
+        // Filter verbose Playwright response sections — keep snapshots for MCP
+        if (result.text) result.text = filterResponse(result.text, cmdName, INCLUDE_SNAPSHOT);
         return result;
     }
 

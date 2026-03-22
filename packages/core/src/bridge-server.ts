@@ -48,7 +48,7 @@ export class BridgeServer {
         });
     }
 
-    async run(command: string): Promise<EngineResult> {
+    async run(command: string, opts?: { includeSnapshot?: boolean }): Promise<EngineResult> {
         if (!this.connected) {
             try { await this.waitForConnection(10000); }
             catch { return { text: 'Extension not connected', isError: true }; }
@@ -56,7 +56,9 @@ export class BridgeServer {
         const id = Math.random().toString(36).slice(2);
         return new Promise((resolve) => {
             this.pending.set(id, resolve);
-            this.socket!.send(JSON.stringify({ id, command, type: 'command' }));
+            const msg: Record<string, unknown> = { id, command, type: 'command' };
+            if (opts?.includeSnapshot) msg.includeSnapshot = true;
+            this.socket!.send(JSON.stringify(msg));
         });
     }
 

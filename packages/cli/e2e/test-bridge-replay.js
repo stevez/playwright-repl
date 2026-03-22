@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const headed = process.argv.includes('--headed');
+const extraArgs = process.argv.slice(2).filter(a => a !== '--headed');
 const EXTENSION_PATH = path.resolve(__dirname, '../../extension/dist');
 const CLI_PATH = path.resolve(__dirname, '../dist/playwright-repl.js');
 const EXAMPLES_DIR = path.resolve(__dirname, '../examples');
@@ -24,6 +25,7 @@ async function main() {
   const cli = spawn('node', [
     CLI_PATH, '--bridge', '--replay', EXAMPLES_DIR,
     '--bridge-port', String(BRIDGE_PORT),
+    ...extraArgs,
   ]);
 
   let stdout = '';

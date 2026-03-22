@@ -16,15 +16,18 @@ function connect(port: number) {
                 command: string;
                 type?: 'command' | 'script';
                 language?: 'pw' | 'javascript';
+                includeSnapshot?: boolean;
             };
 
             try {
-                const result = await chrome.runtime.sendMessage({
+                const runtimeMsg: Record<string, unknown> = {
                     type: 'bridge-command',
                     command: msg.command,
                     scriptType: msg.type,
                     language: msg.language,
-                });
+                };
+                if (msg.includeSnapshot) runtimeMsg.includeSnapshot = true;
+                const result = await chrome.runtime.sendMessage(runtimeMsg);
 
                 if (ws?.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ id: msg.id, ...result }));

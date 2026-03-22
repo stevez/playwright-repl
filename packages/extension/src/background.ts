@@ -428,6 +428,7 @@ async function handleBridgeCommand(msg: {
   command: string;
   scriptType?: 'command' | 'script';
   language?: 'pw' | 'javascript';
+  includeSnapshot?: boolean;
 }): Promise<BridgeResult> {
   if (!currentPage) {
     const tabId = await getActiveTabId();
@@ -435,7 +436,7 @@ async function handleBridgeCommand(msg: {
     if (!currentPage) return { text: 'No active tab to attach to.', isError: true };
   }
 
-  const result = await executeCommandPayload(msg);
+  let result = await executeCommandPayload(msg);
 
   // Stale page recovery: if the command failed because the page/tab was closed,
   // clear state and retry once with a fresh attach.
@@ -445,7 +446,18 @@ async function handleBridgeCommand(msg: {
     const tabId = await getActiveTabId();
     if (tabId) await attachToTab(tabId);
     if (!currentPage) return result;
-    return executeCommandPayload(msg);
+    result = await executeCommandPayload(msg);
+  }
+
+  // Append snapshot when requested (MCP update commands)
+  if (msg.includeSnapshot && !result.isError && msg.scriptType !== 'script') {
+    const snap = await executeSingleCommand('snapshot').catch(() => null);
+    if (snap && !snap.isError && snap.text) {
+      const resultText = result.text?.trim() || '';
+      result.text = resultText
+        ? `### Result\n${resultText}\n### Snapshot\n${snap.text}`
+        : `### Snapshot\n${snap.text}`;
+    }
   }
 
   return result;

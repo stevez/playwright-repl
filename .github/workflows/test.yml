@@ -52,8 +52,16 @@ jobs:
         run: node dist/playwright-repl.js --replay examples/
         working-directory: packages/cli
 
+      - name: Run CLI E2E tests (include-snapshot)
+        run: node dist/playwright-repl.js --replay examples/ --include-snapshot --verbose
+        working-directory: packages/cli
+
       - name: Run bridge replay E2E tests
         run: node e2e/test-bridge-replay.js
+        working-directory: packages/cli
+
+      - name: Run bridge replay E2E tests (include-snapshot)
+        run: node e2e/test-bridge-replay.js --include-snapshot --verbose
         working-directory: packages/cli
 
       - name: Run extension E2E tests
