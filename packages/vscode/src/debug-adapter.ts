@@ -175,7 +175,7 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
           }
           if (method === 'Debugger.paused') {
             const frame = params.callFrames?.[0];
-            this._outputChannel.appendLine(`[CDP] Paused at line ${frame?.location?.lineNumber} col ${frame?.location?.columnNumber} script ${frame?.location?.scriptId}`);
+            this._outputChannel.appendLine(`[CDP] Paused: url=${frame?.url} fn=${frame?.functionName} line=${frame?.location?.lineNumber} col=${frame?.location?.columnNumber} script=${frame?.location?.scriptId}`);
             if (frame) {
               this._pausedLine = frame.location.lineNumber;
               this._pausedScopes = (frame.scopeChain ?? [])
