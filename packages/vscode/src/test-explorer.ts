@@ -34,6 +34,14 @@ export class TestExplorer {
       true, // isDefault
     );
 
+    // Debug profile: runs tests with debugger attached
+    this._controller.createRunProfile(
+      'Debug',
+      vscode.TestRunProfileKind.Debug,
+      (request, _token) => this._debugTests(request),
+      true,
+    );
+
     // Discover existing test files
     this._discoverTests();
 
@@ -161,6 +169,24 @@ export class TestExplorer {
     }
 
     run.end();
+  }
+
+  private async _debugTests(request: vscode.TestRunRequest) {
+    // Find the test file to debug
+    const items: vscode.TestItem[] = [];
+    if (request.include) {
+      for (const item of request.include) this._collectLeafTests(item, items);
+    }
+    const fileUri = items[0] ? this._getFileUri(items[0]) : undefined;
+    if (!fileUri) return;
+
+    // Launch debug session with the test file
+    await vscode.debug.startDebugging(undefined, {
+      type: 'playwright-ide',
+      request: 'launch',
+      name: 'Debug Playwright Test',
+      program: fileUri.fsPath,
+    });
   }
 
   private _collectLeafTests(item: vscode.TestItem, out: vscode.TestItem[]) {

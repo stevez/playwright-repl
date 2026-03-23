@@ -69,6 +69,7 @@ export class BrowserManager {
         '--no-default-browser-check',
         '--disable-background-timer-throttling',
         '--disable-infobars',
+        '--remote-debugging-port=9222',
       ],
       env: cleanEnv,
     });
