@@ -22,12 +22,16 @@ class CdpClient {
   private _pending = new Map<number, { resolve: (r: any) => void; reject: (e: Error) => void }>();
   private _onEvent?: (method: string, params: any) => void;
 
-  async connect(port: number): Promise<void> {
+  async connect(port: number, log?: (msg: string) => void): Promise<void> {
     // Find the service worker target
     const res = await fetch(`http://localhost:${port}/json`);
     const targets = await res.json() as { id: string; type: string; url: string; webSocketDebuggerUrl: string }[];
-    const sw = targets.find(t => t.type === 'service_worker' || t.url.includes('background.js'));
-    if (!sw) throw new Error('Service worker target not found');
+    for (const t of targets) {
+      log?.(`  Target: type=${t.type} url=${t.url.substring(0, 80)}`);
+    }
+    const sw = targets.find(t => t.type === 'service_worker' && t.url.includes('background.js'));
+    if (!sw) throw new Error('Service worker target not found. Targets: ' + targets.map(t => t.type).join(', '));
+    log?.(`  → Connecting to: ${sw.type} ${sw.url}`);
 
     // Connect to the SW's WebSocket debugger URL
     this._ws = new WebSocket(sw.webSocketDebuggerUrl);
@@ -109,6 +113,9 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
   private _pausedScopes: any[] = [];
   private _pendingBreakpoints: { req: DapRequest; filePath: string; breakpoints: any[] }[] = [];
   private _breakpointLines: number[] = []; // original source lines (0-based)
+  private _lineMap: Map<number, number> = new Map(); // bundled line → original line (0-based)
+  private _reverseLineMap: Map<number, number> = new Map(); // original line → bundled line (0-based)
+  private _testScriptId: string | null = null;
 
   onDidSendMessage = this._sendMessage.event;
 
@@ -119,7 +126,9 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
 
   handleMessage(message: vscode.DebugProtocolMessage): void {
     const msg = message as unknown as DapRequest;
+    this._outputChannel.appendLine(`[DAP] → ${msg.command} (seq: ${msg.seq})`);
     this._handleRequest(msg).catch(err => {
+      this._outputChannel.appendLine(`[DAP] ERROR in ${msg.command}: ${(err as Error).message}`);
       this._sendResponse(msg, false, undefined, (err as Error).message);
     });
   }
@@ -157,7 +166,7 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
         // Connect CDP directly to Chrome's service worker
         this._cdp = new CdpClient();
         try {
-          await this._cdp.connect(9222);
+          await this._cdp.connect(9222, (msg) => this._outputChannel.appendLine(msg));
           this._outputChannel.appendLine('CDP connected to service worker.');
         } catch (err: unknown) {
           this._sendResponse(req, false, undefined, `CDP connection failed: ${(err as Error).message}`);
@@ -172,12 +181,25 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
         this._cdp.onEvent((method, params) => {
           if (method === 'Debugger.scriptParsed') {
             this._outputChannel.appendLine(`[CDP] Script parsed: ${params.url} (id: ${params.scriptId}, hasSourceMap: ${!!params.sourceMapURL})`);
+            // When our test script is parsed, apply breakpoints by script ID
+            if (params.sourceMapURL && params.url.startsWith('pw-ide-bundle-')) {
+              this._testScriptId = params.scriptId;
+              this._applyBreakpointsByScriptId().catch(() => {});
+            }
           }
           if (method === 'Debugger.paused') {
             const frame = params.callFrames?.[0];
-            this._outputChannel.appendLine(`[CDP] Paused: url=${frame?.url} fn=${frame?.functionName} line=${frame?.location?.lineNumber} col=${frame?.location?.columnNumber} script=${frame?.location?.scriptId}`);
+            const line = frame?.location?.lineNumber;
+            this._outputChannel.appendLine(`[CDP] Paused: line=${line} fn=${frame?.functionName}`);
+
+            // Only pause on test file lines (in the line map). Skip shim/runner code.
+            if (line !== undefined && !this._lineMap.has(line)) {
+              this._cdp?.send('Debugger.resume').catch(() => {});
+              return;
+            }
+
             if (frame) {
-              this._pausedLine = frame.location.lineNumber;
+              this._pausedLine = line!;
               this._pausedScopes = (frame.scopeChain ?? [])
                 .filter((s: any) => s.type !== 'global');
             }
@@ -195,18 +217,31 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
         this._sendResponse(req, true);
 
         // Ensure extension has a page attached (needed for page/expect globals)
-        await this._browserManager.runCommand('snapshot').catch(() => {});
+        const snapResult = await this._browserManager.runCommand('snapshot').catch((e: Error) => ({ text: e.message, isError: true }));
+        this._outputChannel.appendLine(`Snapshot: ${snapResult.isError ? 'FAILED: ' + snapResult.text : 'OK'}`);
 
-        // Apply any breakpoints that were queued before CDP connected
-        for (const pending of this._pendingBreakpoints) {
-          await this._applyBreakpoints(pending.req, pending.filePath, pending.breakpoints);
-        }
-        this._pendingBreakpoints = [];
+        // Check if globals are visible via CDP
+        const pageCheck = await this._cdp.send('Runtime.evaluate', {
+          expression: 'typeof globalThis.page',
+          returnByValue: true,
+        });
+        this._outputChannel.appendLine(`CDP globalThis.page type: ${pageCheck?.result?.value}`);
+
+        // Breakpoints will be applied when scriptParsed fires (after Runtime.evaluate starts)
 
         // Bundle and run the test with source maps
         const { bundleTestFile } = await import('./bundler.js');
-        const script = await bundleTestFile(testFile, { debug: true });
-        this._outputChannel.appendLine(`Debugging ${testFile}... (${script.length} bytes)`);
+        const bundle = await bundleTestFile(testFile, { debug: true });
+        const script = bundle.script;
+        this._lineMap = bundle.lineMap;
+        // Build reverse map: original line → bundled line
+        this._reverseLineMap = new Map();
+        for (const [bundled, original] of this._lineMap) {
+          if (!this._reverseLineMap.has(original)) {
+            this._reverseLineMap.set(original, bundled);
+          }
+        }
+        this._outputChannel.appendLine(`Debugging ${testFile}... (${script.length} bytes, ${this._lineMap.size} mapped lines)`);
 
         // Run via CDP directly (not bridge — so debugger can pause)
         // replMode: true enables top-level await (same as panel's sw-debugger)
@@ -215,15 +250,18 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
           awaitPromise: true,
           returnByValue: true,
           replMode: true,
-        }).then(result => {
+        }).then(async result => {
           if (result?.exceptionDetails) {
             this._outputChannel.appendLine(`Error: ${result.exceptionDetails.exception?.description || result.exceptionDetails.text}`);
           } else {
             this._outputChannel.appendLine(result?.result?.value || '(completed)');
           }
+          this._outputChannel.appendLine('Test finished. Ending debug session.');
+          await this._cdp?.send('Debugger.disable').catch(() => {});
           this._sendEvent('terminated');
-        }).catch((err: Error) => {
+        }).catch(async (err: Error) => {
           this._outputChannel.appendLine(`Debug error: ${err.message}`);
+          await this._cdp?.send('Debugger.disable').catch(() => {});
           this._sendEvent('terminated');
         });
         break;
@@ -249,18 +287,8 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
         break;
 
       case 'stackTrace': {
-        // Map bundled line back to nearest original breakpoint line
-        let originalLine = this._pausedLine;
-        if (this._breakpointLines.length > 0) {
-          // Find the closest breakpoint line to the paused bundled line
-          let closest = this._breakpointLines[0];
-          for (const bl of this._breakpointLines) {
-            if (Math.abs(bl - this._pausedLine) < Math.abs(closest - this._pausedLine)) {
-              closest = bl;
-            }
-          }
-          originalLine = closest;
-        }
+        // Map bundled line → original source line via source map
+        const originalLine = this._lineMap.get(this._pausedLine) ?? this._pausedLine;
         this._sendResponse(req, true, {
           stackFrames: [{
             id: 1,
@@ -365,27 +393,48 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
     }
   }
 
-  private async _applyBreakpoints(_req: DapRequest, filePath: string, breakpoints: any[]) {
+  private async _applyBreakpointsByScriptId() {
+    if (!this._testScriptId || !this._cdp) return;
+    for (const pending of this._pendingBreakpoints) {
+      for (const bp of pending.breakpoints) {
+        const originalLine = bp.line - 1; // DAP 1-based → 0-based
+        const bundledLine = this._reverseLineMap.get(originalLine);
+        if (bundledLine === undefined) {
+          this._outputChannel.appendLine(`  No mapping for original line ${bp.line}`);
+          continue;
+        }
+        try {
+          const result = await this._cdp.send('Debugger.setBreakpoint', {
+            location: { scriptId: this._testScriptId, lineNumber: bundledLine },
+          });
+          this._outputChannel.appendLine(`  Breakpoint: line ${bp.line} → bundled ${bundledLine} → ${result?.breakpointId}`);
+        } catch (err: unknown) {
+          this._outputChannel.appendLine(`  Breakpoint failed: line ${bp.line} → bundled ${bundledLine}: ${(err as Error).message}`);
+        }
+      }
+    }
+    this._pendingBreakpoints = [];
+  }
+
+  private async _applyBreakpointsOnly(filePath: string, breakpoints: any[]) {
     const fileName = filePath.replace(/.*[\\/]/, '');
     this._outputChannel.appendLine(`Setting ${breakpoints.length} breakpoint(s) in ${fileName}`);
 
     this._breakpointLines = breakpoints.map((bp: any) => bp.line - 1); // DAP 1-based → 0-based
 
-    const responseBreakpoints: any[] = [];
     for (const bp of breakpoints) {
       try {
+        // Use urlRegex to match the source map's relative path
+        const escapedName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const result = await this._cdp!.send('Debugger.setBreakpointByUrl', {
-          url: fileName,
+          urlRegex: `.*${escapedName}`,
           lineNumber: bp.line - 1, // DAP 1-based → CDP 0-based
         });
         this._outputChannel.appendLine(`  Breakpoint set at line ${bp.line} → ${result?.breakpointId}`);
-        responseBreakpoints.push({ verified: true, line: bp.line, id: result?.breakpointId });
       } catch (err: unknown) {
         this._outputChannel.appendLine(`  Breakpoint failed at line ${bp.line}: ${(err as Error).message}`);
-        responseBreakpoints.push({ verified: false, line: bp.line });
       }
     }
-    this._sendResponse(req, true, { breakpoints: responseBreakpoints });
   }
 
   private _sendResponse(req: DapRequest, success: boolean, body?: any, message?: string) {
@@ -398,6 +447,7 @@ export class PlaywrightDebugSession implements vscode.DebugAdapter {
       body,
       message,
     };
+    this._outputChannel.appendLine(`[DAP] ← response ${req.command} (success: ${success}${message ? ', msg: ' + message : ''})`);
     this._sendMessage.fire(response as any);
   }
 
