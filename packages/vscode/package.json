@@ -41,6 +41,10 @@
       {
         "command": "playwright-ide.stopRecording",
         "title": "Playwright IDE: Stop Recording"
+      },
+      {
+        "command": "playwright-ide.pickLocator",
+        "title": "Playwright IDE: Pick Locator"
       }
     ],
     "configuration": {

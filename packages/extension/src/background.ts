@@ -432,6 +432,7 @@ async function handleBridgeCommand(msg: {
 }): Promise<BridgeResult> {
   // Recording/picker commands — handled before currentPage check
   const cmd = msg.command.trim();
+  console.log('[bridge] command:', JSON.stringify(cmd), 'type:', msg.scriptType);
   if (cmd === 'record-start') {
     const r = await startRecording();
     return { text: r.ok ? `Recording started${r.url ? ': ' + r.url : ''}` : (r.error || 'Failed'), isError: !r.ok };
@@ -439,6 +440,14 @@ async function handleBridgeCommand(msg: {
   if (cmd === 'record-stop') {
     const r = await stopRecording();
     return { text: r.ok ? 'Recording stopped' : 'Failed', isError: !r.ok };
+  }
+  if (cmd === 'pick-start') {
+    const r = await startPicking();
+    return { text: r.ok ? 'Pick mode started' : (r.error || 'Failed'), isError: !r.ok };
+  }
+  if (cmd === 'pick-stop') {
+    const r = await stopPicking();
+    return { text: r.ok ? 'Pick mode stopped' : 'Failed', isError: !r.ok };
   }
 
   if (!currentPage) {
