@@ -1,15 +1,21 @@
 import * as vscode from 'vscode';
 import { BrowserManager } from './browser.js';
 import { PlaywrightRepl } from './repl.js';
+import { TestExplorer } from './test-explorer.js';
 
 let browserManager: BrowserManager | undefined;
 let repl: PlaywrightRepl | undefined;
+let testExplorer: TestExplorer | undefined;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel('Playwright IDE');
   outputChannel.appendLine('Playwright IDE activated');
   browserManager = new BrowserManager(outputChannel);
+
+  // ─── Test Explorer ────────────────────────────────────────────────────────
+  testExplorer = new TestExplorer(browserManager, outputChannel);
+  context.subscriptions.push({ dispose: () => testExplorer?.dispose() });
 
   // ─── Launch Browser ──────────────────────────────────────────────────────
   context.subscriptions.push(
