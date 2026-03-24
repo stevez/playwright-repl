@@ -56,6 +56,7 @@ export async function run(args: string[]): Promise<number> {
   // Run test files
   const allResults: TestResult[] = [];
   let failed = 0;
+  const startTime = Date.now();
 
   for (const file of testFiles) {
     const results = await executeTestFile(file, bridge, runOpts);
@@ -72,9 +73,10 @@ export async function run(args: string[]): Promise<number> {
   }
 
   // Summary
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   const passed = allResults.filter(r => r.passed).length;
   const skipped = allResults.filter(r => r.skipped).length;
-  console.log(`\n  ${passed} passed, ${failed} failed, ${skipped} skipped\n`);
+  console.log(`\n  ${passed} passed, ${failed} failed, ${skipped} skipped (${totalTime}s)\n`);
 
   // Cleanup
   await bridge.close();
