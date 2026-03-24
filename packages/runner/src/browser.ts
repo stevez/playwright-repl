@@ -12,10 +12,10 @@ const __filename = fileURLToPath(import.meta.url);
 export async function launchBrowser(opts: { headed: boolean; bridgePort: number }) {
   const require = createRequire(__filename);
 
-  // Find extension dist path
-  const coreMain = require.resolve('@playwright-repl/core');
-  const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
-  const extPath = path.resolve(coreDir, '../extension/dist');
+  // Find extension dist path via package dependency
+  const extMain = require.resolve('@playwright-repl/extension');
+  const extDir = extMain.replace(/[\\/]dist[\\/].*$/, '');
+  const extPath = path.resolve(extDir, 'dist');
 
   // Launch Chromium with extension
   const pw = require('playwright-core');

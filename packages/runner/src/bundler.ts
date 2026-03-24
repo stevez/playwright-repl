@@ -4,13 +4,19 @@
  */
 
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 
 export async function bundleTestFile(testFilePath: string): Promise<string> {
   const esbuild = await import('esbuild');
-  const shimPath = path.resolve(path.dirname(__filename), 'shim/test-runner.js');
+  // In dev: resolve from src/. In dist: resolve from dist/.
+  // esbuild can compile .ts directly, so point to source.
+  let shimPath = path.resolve(path.dirname(__filename), 'shim/test-runner.ts');
+  if (!fs.existsSync(shimPath)) {
+    shimPath = path.resolve(path.dirname(__filename), 'shim/test-runner.js');
+  }
 
   const result = await esbuild.build({
     entryPoints: [testFilePath],
