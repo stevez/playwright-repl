@@ -210,9 +210,11 @@ export class TestExplorer {
         program: fileUri.fsPath,
       });
     } else {
-      // Compiler mode: run in extension host (same process, bridge works)
-      // No breakpoints yet — future: attach debugger to extension host
-      this._outputChannel.appendLine('Compiler mode debug: running in extension host...');
+      // Compiler mode: breakpoints not supported yet — run test and show message
+      vscode.window.showInformationMessage(
+        'Debugging Node.js tests: breakpoints not yet supported. Running test instead.',
+        'OK'
+      );
       await this._runTests(request, new vscode.CancellationTokenSource().token);
     }
   }
