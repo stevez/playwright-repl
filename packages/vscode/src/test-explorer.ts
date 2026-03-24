@@ -220,8 +220,8 @@ export class TestExplorer {
           });
         }
 
-        const { compileForDebug } = await import('./compiler.js');
-        const tmpFile = await compileForDebug(fileUri.fsPath, 9222);
+        const { createDebugRunner } = await import('./compiler.js');
+        const tmpFile = createDebugRunner(fileUri.fsPath, 9222);
         this._outputChannel.appendLine(`Debug (Node.js + CDP): ${tmpFile}`);
 
         await vscode.debug.startDebugging(undefined, {
@@ -232,6 +232,7 @@ export class TestExplorer {
           sourceMaps: true,
           skipFiles: ['<node_internals>/**'],
           cwd: path.dirname(fileUri.fsPath),
+          runtimeArgs: ['--experimental-strip-types', '--no-warnings'],
         });
 
         // Clean up temp file after debug session ends

@@ -89,7 +89,13 @@ async function runSuite(
   suite: Suite, parentBE: TestFn[], parentAE: TestFn[], prefix: string,
 ): Promise<TestResult[]> {
   const results: TestResult[] = [];
-  const fixtures = { page: null, bridge }; // page is null — compiler transforms page.* to bridge.run()
+  // In compiler mode: page is null (compiler transforms page.* to bridge.run())
+  // In debug mode: page is a real Playwright page (set on globalThis by connectOverCDP)
+  const fixtures = {
+    page: (globalThis as any).page ?? null,
+    context: (globalThis as any).context ?? null,
+    expect: (globalThis as any).expect ?? undefined,
+  };
   const allBE = [...parentBE, ...suite.beforeEach];
   const allAE = [...suite.afterEach, ...parentAE];
 

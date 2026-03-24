@@ -110,76 +110,45 @@ export async function executeCompiledTest(
 }
 
 /**
- * Compile for Node.js debugging via connectOverCDP.
- * No bridge, no transforms — original test code runs with real Playwright page.
- * Full debugging support (breakpoints, stepping, variables).
- *
+ * Create a debug runner file — no compilation, no transforms.
+ * Just a plain wrapper that connects to Chrome via CDP and runs the test.
  * Returns the temp file path. Caller must clean up.
  */
-export async function compileForDebug(
+export function createDebugRunner(
   testFilePath: string,
   cdpPort: number,
-): Promise<string> {
-  const esbuild = await import('esbuild');
-  const shimPath = path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts');
+): string {
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
+  const shimRelPath = path.relative(testDir, path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts')).replace(/\\/g, '/');
 
-  const debugPlugin = {
-    name: 'debug-runner',
-    setup(build: any) {
-      build.onResolve({ filter: /^__debug-entry__$/ }, () => ({
-        path: '__debug-entry__',
-        namespace: 'debug',
-      }));
-      build.onLoad({ filter: /.*/, namespace: 'debug' }, () => ({
-        contents: `
-          import { chromium } from 'playwright-core';
-          import { __runTests } from '@playwright/test';
+  const script = `
+import { chromium } from 'playwright-core';
 
-          const browser = await chromium.connectOverCDP('http://localhost:${cdpPort}');
-          const context = browser.contexts()[0];
-          const page = context.pages()[0] || await context.newPage();
+// Connect to the already-running Chrome
+const browser = await chromium.connectOverCDP('http://localhost:${cdpPort}');
+const context = browser.contexts()[0];
+const page = context.pages()[0] || await context.newPage();
 
-          globalThis.page = page;
-          globalThis.context = context;
-          globalThis.expect = (await import('playwright-core')).expect
-            || ((v) => ({ toBe: (e) => { if (v !== e) throw new Error('Expected ' + e + ' but got ' + v); } }));
+// Provide page/context as globals for the test
+globalThis.page = page;
+globalThis.context = context;
 
-          await import('./${testFileName}');
-          const result = await __runTests();
-          console.log(result);
+// Import our test shim (provides test/describe/beforeEach/expect)
+const { __runTests } = await import('${shimRelPath}');
 
-          await browser.close();
-        `,
-        resolveDir: testDir,
-        loader: 'ts',
-      }));
+// Import the test file
+await import('./${testFileName}');
 
-      // NO transform — test code runs as-is with real Playwright page
-    },
-  };
+// Run and report
+const result = await __runTests();
+console.log(result);
 
-  const result = await esbuild.build({
-    entryPoints: ['__debug-entry__'],
-    bundle: true,
-    write: false,
-    format: 'esm',
-    platform: 'node',
-    sourcemap: 'inline',
-    absWorkingDir: testDir,
-    plugins: [debugPlugin],
-    alias: { '@playwright/test': shimPath },
-    external: [
-      'playwright-core',
-      'fs', 'path', 'child_process', 'os', 'crypto', 'util',
-      'stream', 'events', 'net', 'http', 'https', 'url',
-      'worker_threads', 'node:*',
-    ],
-  });
+await browser.close();
+`;
 
   const tmpFile = path.join(testDir, `.pw-debug-${Date.now()}.mjs`);
-  fs.writeFileSync(tmpFile, result.outputFiles[0].text);
+  fs.writeFileSync(tmpFile, script);
   return tmpFile;
 }
 
