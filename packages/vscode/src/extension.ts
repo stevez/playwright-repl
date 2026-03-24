@@ -94,13 +94,34 @@ export function activate(context: vscode.ExtensionContext) {
           outputChannel.show();
         }
 
-        const { bundleTestFile } = await import('./bundler.js');
-        outputChannel.appendLine(`Bundling ${fileName}...`);
-        const script = await bundleTestFile(filePath);
-        outputChannel.appendLine(`Running tests in ${fileName}...`);
-        const result = await browserManager!.runScript(script);
+        // Detect mode: browser (fast) or compiler (Node.js compatible)
+        const fs = await import('fs');
+        const source = fs.default.readFileSync(filePath, 'utf-8');
+        const { detectTestMode } = await import('./mode-detect.js');
+        const mode = detectTestMode(source);
+        outputChannel.appendLine(`Mode: ${mode === 'browser' ? '⚡ browser (fast)' : '🔧 compiler (Node.js)'}`);
+
+        let resultText: string;
+        if (mode === 'browser') {
+          // Current approach: bundle with shim, run in browser
+          const { bundleTestFile } = await import('./bundler.js');
+          const script = await bundleTestFile(filePath);
+          const result = await browserManager!.runScript(script);
+          resultText = result.text || '(no output)';
+        } else {
+          // Compiler approach: transform page/expect to bridge.run(), run in Node.js
+          const { compileTestFile } = await import('./compiler.js');
+          const compiled = await compileTestFile(filePath);
+          // TODO: execute compiled code in Node.js with bridge context
+          // For now, fall back to browser mode
+          outputChannel.appendLine('Compiler mode not fully implemented yet — falling back to browser mode');
+          const { bundleTestFile } = await import('./bundler.js');
+          const script = await bundleTestFile(filePath);
+          const result = await browserManager!.runScript(script);
+          resultText = result.text || '(no output)';
+        }
         outputChannel.appendLine(`\n── ${fileName} ──`);
-        outputChannel.appendLine(result.text || '(no output)');
+        outputChannel.appendLine(resultText);
         outputChannel.show();
       } catch (err: unknown) {
         vscode.window.showErrorMessage(`Test run failed: ${(err as Error).message}`);
