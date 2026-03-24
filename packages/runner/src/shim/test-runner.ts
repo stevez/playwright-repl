@@ -89,6 +89,47 @@ test.describe = (name: string, fn: () => void) => {
 test.beforeAll = (fn: HookFn) => { currentSuite.beforeAll.push(fn); };
 test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };
 test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
+
+// test.extend() — creates a new test function with custom fixtures
+// The fixture functions receive { page, context, expect } and can wrap them
+test.extend = (fixtures: Record<string, any>) => {
+  const extendedTest = (name: string, fn: TestFn) => {
+    // Wrap the test fn to apply fixtures
+    currentSuite.tests.push({
+      name, only: false, skip: false,
+      fn: async (baseFixtures: any) => {
+        const extended = { ...baseFixtures };
+        // Apply each fixture — call the fixture function, wait for use() callback
+        for (const [key, fixtureFn] of Object.entries(fixtures)) {
+          if (typeof fixtureFn === 'function') {
+            await new Promise<void>((resolve, reject) => {
+              const useCallback = async (value: any) => {
+                extended[key] = value;
+                resolve();
+              };
+              // Call fixture fn — it does setup, then calls use(value)
+              Promise.resolve(fixtureFn(
+                { ...extended, [key]: extended[key] },
+                useCallback,
+              )).catch(reject);
+            });
+          }
+        }
+        await fn(extended);
+      },
+    });
+  };
+  // Copy all methods to the extended test function
+  extendedTest.only = test.only;
+  extendedTest.skip = test.skip;
+  extendedTest.describe = test.describe;
+  extendedTest.beforeAll = test.beforeAll;
+  extendedTest.afterAll = test.afterAll;
+  extendedTest.beforeEach = test.beforeEach;
+  extendedTest.afterEach = test.afterEach;
+  extendedTest.extend = test.extend;
+  return extendedTest;
+};
 test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
 // ─── Runner ────────────────────────────────────────────────────────────────

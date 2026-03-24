@@ -12,10 +12,9 @@ const __filename = fileURLToPath(import.meta.url);
 export async function launchBrowser(opts: { headed: boolean; bridgePort: number }) {
   const require = createRequire(__filename);
 
-  // Find extension dist path via package dependency
-  const extMain = require.resolve('@playwright-repl/extension');
-  const extDir = extMain.replace(/[\\/]dist[\\/].*$/, '');
-  const extPath = path.resolve(extDir, 'dist');
+  // Find extension dist path — resolve package.json to find the package root
+  const extPkgPath = require.resolve('@playwright-repl/extension/package.json');
+  const extPath = path.resolve(path.dirname(extPkgPath), 'dist');
 
   // Launch Chromium with extension
   const pw = require('playwright-core');
@@ -30,7 +29,6 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
       '--disable-background-timer-throttling',
       '--disable-infobars',
       '--remote-debugging-port=9222',
-      'https://www.google.com',
     ],
   });
 }

@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
 
-  testDir: './tests',
+  testDir: './todomvc',
 
   /* Maximum time one test can run for. */
   timeout: 15_000,
@@ -44,7 +44,6 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
-    video: { mode: 'on', annotate: { delay: 500 } },
   },
 
   /* Configure projects for major browsers */

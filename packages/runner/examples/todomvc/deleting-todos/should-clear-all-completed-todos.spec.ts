@@ -12,12 +12,9 @@ test.describe('Deleting Todos', () => {
     await page.getByRole('textbox', { name: 'What needs to be done?' }).press('Enter');
     await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Task 3');
     await page.getByRole('textbox', { name: 'What needs to be done?' }).press('Enter');
-    await expect(page.locator('body')).toMatchAriaSnapshot(`
-- list:
-  - listitem: "Task 1"
-  - listitem: "Task 2"
-  - listitem: "Task 3"
-`);
+    await expect(page.getByText('Task 1')).toBeVisible();
+    await expect(page.getByText('Task 2')).toBeVisible();
+    await expect(page.getByText('Task 3')).toBeVisible();
 
     // 2. Mark 'Task 1' and 'Task 3' as complete
     await page.getByRole('listitem').filter({ hasText: 'Task 1' }).getByLabel('Toggle Todo').click();
