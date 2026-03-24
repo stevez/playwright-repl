@@ -28,7 +28,6 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
       '--no-default-browser-check',
       '--disable-background-timer-throttling',
       '--disable-infobars',
-      '--remote-debugging-port=9222',
     ],
   });
 
@@ -43,5 +42,5 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
   await page.evaluate((port: number) => (globalThis as any).chrome.storage.local.set({ bridgePort: port }), opts.bridgePort);
   await page.goto('about:blank');
 
-  return context;
+  return { context, page };
 }

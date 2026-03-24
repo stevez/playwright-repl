@@ -46,33 +46,13 @@ export async function run(args: string[]): Promise<number> {
   await bridge.start(0);
   const bridgePort = bridge.port;
 
-  // Launch Chromium with extension
+  // Launch Chromium with extension — returns context + the active page
   const { launchBrowser } = await import('./browser.js');
-  const context = await launchBrowser({ headed: runOpts.headed, bridgePort });
+  const { context, page: nodePage } = await launchBrowser({ headed: runOpts.headed, bridgePort });
 
   // Wait for extension to connect
   await bridge.waitForConnection(30000);
   console.log('Browser connected.\n');
-
-  // Connect via CDP to get a real Node.js Page for the bridge's tab.
-  // context-level routing handles route/unroute, but waitForEvent needs the actual page.
-  const pw = (await import('playwright-core')).default;
-  const cdpBrowser = await pw.chromium.connectOverCDP('http://localhost:9222');
-
-  // Make bridge navigate so we can find its page via CDP
-  await bridge.run('await page.goto("about:blank")');
-  // The bridge's page is in the extension's context — find it via CDP
-  let nodePage: any = null;
-  for (const ctx of cdpBrowser.contexts()) {
-    for (const p of ctx.pages()) {
-      const url = p.url();
-      if (url === 'about:blank' && !nodePage) {
-        nodePage = p;
-      }
-    }
-  }
-  // Fallback to context for route/unroute if CDP page not found
-  if (!nodePage) nodePage = context;
 
   // Run test files
   const allResults: TestResult[] = [];
