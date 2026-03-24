@@ -197,54 +197,40 @@ export class TestExplorer {
     const fileUri = items[0] ? this._getFileUri(items[0]) : undefined;
     if (!fileUri) return;
 
-    // Detect mode
-    const { detectTestMode } = await import('./mode-detect.js');
-    const mode = await detectTestMode(fileUri.fsPath);
+    // All debug uses npx playwright test + connectOverCDP
+    try {
+      if (!this._browserManager.isRunning()) {
+        const config = vscode.workspace.getConfiguration('playwright-ide');
+        await this._browserManager.launch({
+          browser: config.get('browser', 'chromium'),
+          bridgePort: config.get('bridgePort', 9876),
+        });
+      }
 
-    if (mode === 'browser') {
-      // Browser mode: custom CDP debugger (fast, uses playwright-crx)
+      const testDir = path.dirname(fileUri.fsPath);
+      const testFileName = path.basename(fileUri.fsPath);
+      const { createDebugConfig } = await import('./compiler.js');
+      const tmpConfig = createDebugConfig(testDir, 9222);
+      this._outputChannel.appendLine(`Debug (Playwright + connectOverCDP): ${tmpConfig}`);
+
       await vscode.debug.startDebugging(undefined, {
-        type: 'playwright-ide',
+        type: 'node',
         request: 'launch',
         name: 'Debug Playwright Test',
-        program: fileUri.fsPath,
+        runtimeExecutable: 'npx',
+        runtimeArgs: ['playwright', 'test', testFileName, '--config', path.basename(tmpConfig), '--headed'],
+        cwd: testDir,
+        sourceMaps: true,
+        skipFiles: ['<node_internals>/**'],
       });
-    } else {
-      // Compiler mode: npx playwright test + connectOverCDP (standard speed, full debugging)
-      try {
-        if (!this._browserManager.isRunning()) {
-          const config = vscode.workspace.getConfiguration('playwright-ide');
-          await this._browserManager.launch({
-            browser: config.get('browser', 'chromium'),
-            bridgePort: config.get('bridgePort', 9876),
-          });
-        }
 
-        const testDir = path.dirname(fileUri.fsPath);
-        const testFileName = path.basename(fileUri.fsPath);
-        const { createDebugConfig } = await import('./compiler.js');
-        const tmpConfig = createDebugConfig(testDir, 9222);
-        this._outputChannel.appendLine(`Debug (connectOverCDP): ${tmpConfig}`);
-
-        await vscode.debug.startDebugging(undefined, {
-          type: 'node',
-          request: 'launch',
-          name: 'Debug Playwright Test (Node.js)',
-          runtimeExecutable: 'npx',
-          runtimeArgs: ['playwright', 'test', testFileName, '--config', path.basename(tmpConfig), '--headed'],
-          cwd: testDir,
-          sourceMaps: true,
-          skipFiles: ['<node_internals>/**'],
-        });
-
-        const disposable = vscode.debug.onDidTerminateDebugSession(() => {
-          try { fs.unlinkSync(tmpConfig); } catch { /* ignore */ }
-          disposable.dispose();
-        });
-      } catch (err: unknown) {
-        this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
-        vscode.window.showErrorMessage(`Debug failed: ${(err as Error).message}`);
-      }
+      const disposable = vscode.debug.onDidTerminateDebugSession(() => {
+        try { fs.unlinkSync(tmpConfig); } catch { /* ignore */ }
+        disposable.dispose();
+      });
+    } catch (err: unknown) {
+      this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
+      vscode.window.showErrorMessage(`Debug failed: ${(err as Error).message}`);
     }
   }
 

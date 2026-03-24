@@ -47,32 +47,6 @@
         "title": "Playwright IDE: Pick Locator"
       }
     ],
-    "debuggers": [
-      {
-        "type": "playwright-ide",
-        "label": "Playwright IDE",
-        "languages": ["typescript", "javascript"],
-        "configurationAttributes": {
-          "launch": {
-            "required": ["program"],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "Path to the test file to debug"
-              }
-            }
-          }
-        },
-        "initialConfigurations": [
-          {
-            "type": "playwright-ide",
-            "request": "launch",
-            "name": "Debug Playwright Test",
-            "program": "${file}"
-          }
-        ]
-      }
-    ],
     "configuration": {
       "title": "Playwright IDE",
       "properties": {

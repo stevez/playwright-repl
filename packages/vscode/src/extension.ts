@@ -4,7 +4,6 @@ import { PlaywrightRepl } from './repl.js';
 import { TestExplorer } from './test-explorer.js';
 import { Recorder } from './recorder.js';
 import { Picker } from './picker.js';
-import { PlaywrightDebugAdapterFactory } from './debug-adapter.js';
 
 let browserManager: BrowserManager | undefined;
 let repl: PlaywrightRepl | undefined;
@@ -188,12 +187,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Browser stopped.');
       }
     })
-  );
-
-  // ─── Debug Adapter ──────────────────────────────────────────────────────
-  const debugFactory = new PlaywrightDebugAdapterFactory(browserManager, outputChannel);
-  context.subscriptions.push(
-    vscode.debug.registerDebugAdapterDescriptorFactory('playwright-ide', debugFactory)
   );
 
   // ─── Cleanup on deactivation ─────────────────────────────────────────────

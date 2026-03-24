@@ -62,10 +62,9 @@ chrome.runtime.onMessage.addListener((msg) => {
         connect(msg.port as number);
     }
 
-    // Forward recording/picker/debug events to the bridge client (VS Code)
+    // Forward recording/picker events to the bridge client (VS Code)
     if (msg.type === 'recorded-action' || msg.type === 'recorded-fill-update' ||
-        msg.type === 'element-picked-raw' || msg.type === 'pick-cancelled' ||
-        msg.type === 'debug-paused' || msg.type === 'debug-resumed') {
+        msg.type === 'element-picked-raw' || msg.type === 'pick-cancelled') {
         if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ _event: true, ...msg }));
         }
