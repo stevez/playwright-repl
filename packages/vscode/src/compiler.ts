@@ -128,7 +128,15 @@ function transformSource(source: string): string {
 function transformLine(line: string, trimmed: string): string {
   const indent = line.match(/^(\s*)/)?.[1] || '';
 
-  // await page.method(...)
+  // const x = await page.method(...) — return value needed
+  const assignMatch = trimmed.match(/^((?:const|let|var)\s+\w+)\s*=\s*(await\s+page\..+?);?\s*$/);
+  if (assignMatch) {
+    const varDecl = assignMatch[1]; // "const title"
+    const expr = assignMatch[2].replace(/;?\s*$/, ''); // "await page.title()"
+    return `${indent}${varDecl} = JSON.parse((await bridge.run("JSON.stringify(" + ${JSON.stringify(expr)} + ")")).text ?? 'null');`;
+  }
+
+  // await page.method(...) — no return value
   if (/^\s*await\s+page\./.test(line)) {
     const clean = trimmed.replace(/;?\s*$/, '');
     return `${indent}await bridge.run(${JSON.stringify(clean)});`;

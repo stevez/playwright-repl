@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
 
-// Test the line transform logic directly
+// Test the line transform logic directly (mirrors compiler.ts transformLine)
 function transformLine(line: string): string {
   const trimmed = line.trim();
   const indent = line.match(/^(\s*)/)?.[1] || '';
 
   if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
     return line;
+  }
+
+  // const x = await page.method(...) — return value
+  const assignMatch = trimmed.match(/^((?:const|let|var)\s+\w+)\s*=\s*(await\s+page\..+?);?\s*$/);
+  if (assignMatch) {
+    const varDecl = assignMatch[1];
+    const expr = assignMatch[2].replace(/;?\s*$/, '');
+    return `${indent}${varDecl} = JSON.parse((await bridge.run("JSON.stringify(" + ${JSON.stringify(expr)} + ")")).text ?? 'null');`;
   }
 
   // await page.method(...)
@@ -97,6 +105,41 @@ describe('compiler transform', () => {
     it('transforms expect with getByRole', () => {
       const result = transformLine("    await expect(page.getByRole('heading')).toHaveText('Title');");
       expect(result).toBe(`    await bridge.run("await expect(page.getByRole('heading')).toHaveText('Title')");`);
+    });
+  });
+
+  describe('return values (Phase 3)', () => {
+    it('transforms const = await page.title()', () => {
+      const result = transformLine("    const title = await page.title();");
+      expect(result).toContain('JSON.parse');
+      expect(result).toContain('JSON.stringify');
+      expect(result).toContain('await page.title()');
+      expect(result).toContain('const title =');
+    });
+
+    it('transforms const = await page.url()', () => {
+      const result = transformLine("    const url = await page.url();");
+      expect(result).toContain('const url =');
+      expect(result).toContain('JSON.parse');
+    });
+
+    it('transforms const = await page.locator().textContent()', () => {
+      const result = transformLine("    const text = await page.locator('h1').textContent();");
+      expect(result).toContain('const text =');
+      expect(result).toContain('JSON.parse');
+      expect(result).toContain("await page.locator('h1').textContent()");
+    });
+
+    it('transforms let = await page.innerText()', () => {
+      const result = transformLine("    let content = await page.innerText('.main');");
+      expect(result).toContain('let content =');
+      expect(result).toContain('JSON.parse');
+    });
+
+    it('transforms var = await page.isVisible()', () => {
+      const result = transformLine("    var visible = await page.isVisible('#btn');");
+      expect(result).toContain('var visible =');
+      expect(result).toContain('JSON.parse');
     });
   });
 
