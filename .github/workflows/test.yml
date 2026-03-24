@@ -64,10 +64,6 @@ jobs:
         run: node e2e/test-bridge-replay.js --include-snapshot --verbose
         working-directory: packages/cli
 
-      - name: Install Playwright Chromium for runner
-        run: pnpm exec playwright install chromium
-        working-directory: packages/runner
-
       - name: Run runner E2E tests (23 todomvc tests via bridge)
         run: node ../dist/cli.js test
         working-directory: packages/runner/examples
