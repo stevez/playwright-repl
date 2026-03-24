@@ -65,7 +65,7 @@ jobs:
         working-directory: packages/cli
 
       - name: Run runner E2E tests (23 todomvc tests via bridge)
-        run: node dist/cli.js test
+        run: node ../dist/cli.js test
         working-directory: packages/runner/examples
 
       - name: Run extension E2E tests
