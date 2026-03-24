@@ -195,13 +195,23 @@ export class TestExplorer {
     const fileUri = items[0] ? this._getFileUri(items[0]) : undefined;
     if (!fileUri) return;
 
-    // Launch debug session with the test file
-    await vscode.debug.startDebugging(undefined, {
-      type: 'playwright-ide',
-      request: 'launch',
-      name: 'Debug Playwright Test',
-      program: fileUri.fsPath,
-    });
+    // Detect mode
+    const { detectTestMode } = await import('./mode-detect.js');
+    const mode = await detectTestMode(fileUri.fsPath);
+
+    if (mode === 'browser') {
+      // Browser mode: use our custom CDP debugger
+      await vscode.debug.startDebugging(undefined, {
+        type: 'playwright-ide',
+        request: 'launch',
+        name: 'Debug Playwright Test',
+        program: fileUri.fsPath,
+      });
+    } else {
+      // Compiler mode: run in Node.js (no breakpoints yet — future: wire up Node.js debugger)
+      this._outputChannel.appendLine('Compiler mode debug: running test in Node.js...');
+      await this._runTests(request, new vscode.CancellationTokenSource().token);
+    }
   }
 
   private _collectLeafTests(item: vscode.TestItem, out: vscode.TestItem[]) {
