@@ -94,11 +94,9 @@ export function activate(context: vscode.ExtensionContext) {
           outputChannel.show();
         }
 
-        // Detect mode: browser (fast) or compiler (Node.js compatible)
-        const fs = await import('fs');
-        const source = fs.default.readFileSync(filePath, 'utf-8');
+        // Detect mode by analyzing full dependency tree via esbuild
         const { detectTestMode } = await import('./mode-detect.js');
-        const mode = detectTestMode(source);
+        const mode = await detectTestMode(filePath);
         outputChannel.appendLine(`Mode: ${mode === 'browser' ? '⚡ browser (fast)' : '🔧 compiler (Node.js)'}`);
 
         let resultText: string;
