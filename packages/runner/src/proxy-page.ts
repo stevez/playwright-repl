@@ -17,14 +17,17 @@ type BridgeRun = (command: string) => Promise<{ text?: string; isError?: boolean
 const PROXY_FLAG = Symbol('isProxy');
 const CHAIN_KEY = Symbol('chain');
 
-// Methods that must run on the Node page (CDP) instead of bridge.
-// These either take callback args or return non-serializable objects.
-const NODE_PAGE_METHODS = new Set([
+// Methods delegated to Node.js context (context-level routing).
+const CONTEXT_METHODS = new Set([
   'route', 'unroute', 'routeFromHAR', 'unrouteAll',
+]);
+
+// Methods delegated to CDP page (same tab, returns non-serializable objects).
+const CDP_PAGE_METHODS = new Set([
   'waitForEvent',
 ]);
 
-function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any): any {
+function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdpPage?: any): any {
   const handler: ProxyHandler<any> = {
     get(_target, prop) {
       // Internal: check if this is a proxy
@@ -54,20 +57,25 @@ function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any): any {
         return () => chain;
       }
 
-      // Node page methods — delegate to real Playwright page (same tab as bridge).
-      if (nodePage && chain === 'page' && NODE_PAGE_METHODS.has(String(prop))) {
+      // Context methods — delegate to Node.js context (route/unroute).
+      if (nodePage && chain === 'page' && CONTEXT_METHODS.has(String(prop))) {
         return (...args: any[]) => nodePage[String(prop)](...args);
       }
 
+      // CDP page methods — delegate to real page via CDP (waitForEvent).
+      if (cdpPage && chain === 'page' && CDP_PAGE_METHODS.has(String(prop))) {
+        return (...args: any[]) => cdpPage[String(prop)](...args);
+      }
+
       // Property access → extend chain (returns callable proxy)
-      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage);
+      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage, cdpPage);
     },
   };
 
   return new Proxy({}, handler);
 }
 
-function makeCallableProxy(chain: string, bridge: BridgeRun, nodePage?: any): any {
+function makeCallableProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdpPage?: any): any {
   // A proxy that can be both called as a function AND have properties accessed
   const fn = function() {};
   return new Proxy(fn, {
@@ -95,12 +103,12 @@ function makeCallableProxy(chain: string, bridge: BridgeRun, nodePage?: any): an
         return () => chain;
       }
 
-      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage);
+      return makeCallableProxy(`${chain}.${String(prop)}`, bridge, nodePage, cdpPage);
     },
 
     apply(_target, _thisArg, args) {
       const argsStr = args.map(serializeArg).join(', ');
-      return makeProxy(`${chain}(${argsStr})`, bridge, nodePage);
+      return makeProxy(`${chain}(${argsStr})`, bridge, nodePage, cdpPage);
     },
   });
 }
@@ -126,8 +134,8 @@ function serializeArg(arg: unknown): string {
  * Create a proxy page that routes most calls through the bridge.
  * Methods in NODE_PAGE_METHODS delegate to the real Node page (CDP) instead.
  */
-export function createPageProxy(bridge: BridgeRun, nodePage?: any): any {
-  return makeProxy('page', bridge, nodePage);
+export function createPageProxy(bridge: BridgeRun, nodePage?: any, cdpPage?: any): any {
+  return makeProxy('page', bridge, nodePage, cdpPage);
 }
 
 /**

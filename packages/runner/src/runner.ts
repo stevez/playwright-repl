@@ -54,10 +54,25 @@ export async function run(args: string[]): Promise<number> {
   await bridge.waitForConnection(30000);
   console.log('Browser connected.\n');
 
-  // The bridge's page lives inside the extension's context — not visible to
-  // launchPersistentContext. Use context-level routing instead, which intercepts
-  // all pages across all contexts in the browser.
-  const nodePage = context;
+  // Connect via CDP to get a real Node.js Page for the bridge's tab.
+  // context-level routing handles route/unroute, but waitForEvent needs the actual page.
+  const pw = (await import('playwright-core')).default;
+  const cdpBrowser = await pw.chromium.connectOverCDP('http://localhost:9222');
+
+  // Make bridge navigate so we can find its page via CDP
+  await bridge.run('await page.goto("about:blank")');
+  // The bridge's page is in the extension's context — find it via CDP
+  let nodePage: any = null;
+  for (const ctx of cdpBrowser.contexts()) {
+    for (const p of ctx.pages()) {
+      const url = p.url();
+      if (url === 'about:blank' && !nodePage) {
+        nodePage = p;
+      }
+    }
+  }
+  // Fallback to context for route/unroute if CDP page not found
+  if (!nodePage) nodePage = context;
 
   // Run test files
   const allResults: TestResult[] = [];
@@ -65,7 +80,8 @@ export async function run(args: string[]): Promise<number> {
   const startTime = Date.now();
 
   for (const file of testFiles) {
-    const results = await executeTestFile(file, bridge, runOpts, nodePage);
+    // context = for route/unroute (context-level), nodePage = for waitForEvent (CDP page)
+    const results = await executeTestFile(file, bridge, runOpts, context, nodePage);
     allResults.push(...results);
     for (const r of results) {
       if (r.passed) {

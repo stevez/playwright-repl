@@ -50,11 +50,12 @@ export async function executeTestFile(
   bridge: BridgeServer,
   _opts: RunOptions,
   nodePage?: any,
+  cdpPage?: any,
 ): Promise<TestResult[]> {
   const needsNode = await detectNodeAPIs(testFilePath);
 
   if (needsNode) {
-    return executeNode(testFilePath, bridge, nodePage);
+    return executeNode(testFilePath, bridge, nodePage, cdpPage);
   }
   return executeBrowser(testFilePath, bridge);
 }
@@ -115,6 +116,7 @@ async function executeNode(
   testFilePath: string,
   bridge: BridgeServer,
   nodePage?: any,
+  cdpPage?: any,
 ): Promise<TestResult[]> {
   ensureFramework();
   (globalThis as any).__resetTestState();
@@ -124,7 +126,7 @@ async function executeNode(
     if (r.isError) throw new Error(r.text || 'Bridge error');
     return r;
   };
-  (globalThis as any).__proxyPage = createPageProxy(bridgeRun, nodePage);
+  (globalThis as any).__proxyPage = createPageProxy(bridgeRun, nodePage, cdpPage);
   (globalThis as any).__proxyExpect = createExpect(bridgeRun);
 
   const compiled = await compileNode(testFilePath);

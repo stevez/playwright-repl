@@ -74,7 +74,7 @@ test.describe('demo tests', () => {
     await expect(showOriginalSetting).not.toBeChecked();
   });
 
-  test.skip('download result', async ({ page }) => {  // skip: waitForEvent returns non-serializable Download object
+  test('download result', async ({ page }) => {
     const downloadButton = page.locator('a[title=Download]');
     await expect(downloadButton).toHaveAttribute('href', /blob/);
     const [download] = await Promise.all([
@@ -87,7 +87,7 @@ test.describe('demo tests', () => {
   });
 });
 
-test.skip('open svg', async ({ page }) => {  // skip: waitForEvent returns non-serializable FileChooser object
+test('open svg', async ({ page }) => {
   // Start waiting for the file chooser, then click the button.
   const [fileChooser] = await Promise.all([
     page.waitForEvent('filechooser'),
