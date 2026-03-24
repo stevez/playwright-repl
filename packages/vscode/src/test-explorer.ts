@@ -202,6 +202,9 @@ export class TestExplorer {
       const testDir = path.dirname(fileUri.fsPath);
       const testFileName = path.basename(fileUri.fsPath);
 
+      const run = this._controller.createTestRun(request);
+      for (const item of items) run.started(item);
+
       await vscode.debug.startDebugging(undefined, {
         type: 'node',
         request: 'launch',
@@ -210,7 +213,14 @@ export class TestExplorer {
         runtimeArgs: ['playwright', 'test', testFileName, '--headed'],
         cwd: testDir,
         sourceMaps: true,
-        skipFiles: ['<node_internals>/**'],
+        skipFiles: ['<node_internals>/**', '**/node_modules/**'],
+      });
+
+      // Mark tests as passed when debug session ends
+      const disposable = vscode.debug.onDidTerminateDebugSession(() => {
+        for (const item of items) run.passed(item);
+        run.end();
+        disposable.dispose();
       });
     } catch (err: unknown) {
       this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
