@@ -167,13 +167,11 @@ export class TestExplorer {
           const result = await this._browserManager.runScript(script);
           resultText = result.text || '';
         } else {
-          // Compiler mode — TODO: execute in Node.js
-          // For now, fall back to browser mode
-          this._outputChannel.appendLine('Compiler mode not fully implemented — falling back to browser');
-          const { bundleTestFile } = await import('./bundler.js');
-          const script = await bundleTestFile(fileUri.fsPath);
-          const result = await this._browserManager.runScript(script);
-          resultText = result.text || '';
+          // Compiler mode: run in Node.js with bridge
+          const { compileTestFile, executeCompiledTest } = await import('./compiler.js');
+          const compiled = await compileTestFile(fileUri.fsPath);
+          this._outputChannel.appendLine('Running in Node.js with bridge...');
+          resultText = await executeCompiledTest(compiled, (cmd) => this._browserManager.runCommand(cmd));
         }
 
         // Parse structured results and map to test items

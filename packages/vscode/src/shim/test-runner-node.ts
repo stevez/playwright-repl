@@ -152,6 +152,10 @@ async function __runTests(): Promise<string> {
 
 // ─── Exports ───────────────────────────────────────────────────────────────
 
-// expect is not exported — it stays in the browser.
-// The compiler transforms expect() calls to bridge.run("await expect(...)").
-export { test, __runTests };
+// expect stub — the compiler transforms expect() calls to bridge.run("await expect(...)"),
+// so this is never actually called. But it must be exported so the import resolves.
+function expect(..._args: unknown[]): unknown {
+  throw new Error('expect() should not be called directly in compiler mode — the compiler transforms it to bridge.run()');
+}
+
+export { test, expect, __runTests };

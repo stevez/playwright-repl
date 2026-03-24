@@ -2,83 +2,127 @@
  * Compiler
  *
  * Transforms a test file for Node.js execution with bridge commands.
- * - `page.*` and `expect(page` lines → `bridge.run("...")`
- * - Everything else stays as Node.js code
- * - Uses esbuild to compile TS → JS first
+ * Uses esbuild plugin to transform page and expect calls BEFORE compilation,
+ * so esbuild validates the transformed code.
  *
- * Phase 1: handles pure string literal arguments (no variable extraction)
- * Phase 2: extracts Node.js variables and serializes them
- * Phase 3: handles return values from page methods
+ * Flow:
+ *   TS source → onLoad plugin (transform page/expect → bridge.run) → esbuild (compile + validate) → valid JS
  */
 
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 
 // __filename is available at runtime in esbuild's CJS output
 declare const __filename: string;
 
 /**
  * Compile a test file for Node.js + bridge execution.
- * Returns JS code that runs in Node.js with bridge.run() calls for browser operations.
+ * Transforms page/expect calls to bridge.run() during compilation.
  */
 export async function compileTestFile(testFilePath: string): Promise<string> {
   const esbuild = await import('esbuild');
-
-  // Step 1: Compile TS → JS with esbuild (no bundling for Node.js modules)
-  // But bundle the test file + its local imports, leave node_modules external
   const shimPath = path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts');
+  const testDir = path.dirname(testFilePath);
+  const testFileName = path.basename(testFilePath);
+
+  // Plugin: transforms test files and provides the entry wrapper
+  const bridgePlugin = {
+    name: 'bridge-transform',
+    setup(build: any) {
+      // Virtual entry that imports __runTests + the test file
+      build.onResolve({ filter: /^__test-entry__$/ }, () => ({
+        path: '__test-entry__',
+        namespace: 'bridge',
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'bridge' }, () => ({
+        contents: `
+          import { __runTests } from '@playwright/test';
+          import './${testFileName}';
+          const __result = await __runTests();
+          export default __result;
+        `,
+        resolveDir: testDir,
+        loader: 'ts',
+      }));
+
+      // Transform .spec.ts / .test.ts files: page/expect → bridge.run()
+      build.onLoad({ filter: /\.(spec|test)\.(ts|js|mjs)$/ }, (args: any) => {
+        const source = fs.readFileSync(args.path, 'utf-8');
+        const transformed = transformSource(source);
+        return {
+          contents: transformed,
+          loader: args.path.endsWith('.ts') ? 'ts' : 'js',
+          resolveDir: path.dirname(args.path),
+        };
+      });
+    },
+  };
 
   const result = await esbuild.build({
-    entryPoints: [testFilePath],
+    entryPoints: ['__test-entry__'],
     bundle: true,
     write: false,
     format: 'esm',
     platform: 'node',
+    plugins: [bridgePlugin],
     alias: {
       '@playwright/test': shimPath,
     },
     external: [
-      // Keep Node.js built-ins as imports (they run natively)
       'fs', 'path', 'child_process', 'os', 'crypto', 'util',
       'stream', 'events', 'net', 'http', 'https', 'url',
       'worker_threads', 'node:*',
     ],
   });
 
-  const jsCode = result.outputFiles[0].text;
-
-  // Step 2: Transform page.*/expect lines to bridge.run() calls
-  return transformToBridgeCalls(jsCode);
+  return result.outputFiles[0].text;
 }
 
 /**
- * Transform browser lines to bridge.run() calls.
- *
- * Rules:
- * - Lines with `await page.` → wrap entire expression as bridge string
- * - Lines with `await expect(page` → wrap as bridge string
- * - Lines with `await expect(` followed by locator → wrap as bridge string
- * - Everything else → leave untouched
+ * Execute compiled test code in Node.js with bridge context.
+ * Writes to a temp .mjs file and dynamically imports it.
  */
-function transformToBridgeCalls(code: string): string {
-  const lines = code.split('\n');
-  const output: string[] = [];
+export async function executeCompiledTest(
+  compiledCode: string,
+  bridgeRun: (command: string) => Promise<{ text?: string; isError?: boolean }>,
+): Promise<string> {
+  // Make bridge.run available as a global
+  (globalThis as any).bridge = {
+    run: async (command: string) => {
+      const result = await bridgeRun(command);
+      if (result.isError) throw new Error(result.text || 'Bridge command failed');
+      return result;
+    },
+  };
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
+  const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
 
-    // Skip empty lines, comments, imports
-    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
-      output.push(line);
-      continue;
-    }
-
-    // Detect browser lines and transform
-    const transformed = transformLine(line, trimmed);
-    output.push(transformed);
+  try {
+    fs.writeFileSync(tmpFile, compiledCode);
+    const module = await import(`file://${tmpFile.replace(/\\/g, '/')}`);
+    return typeof module.default === 'string' ? module.default : '(no output)';
+  } finally {
+    delete (globalThis as any).bridge;
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
   }
+}
 
-  return output.join('\n');
+// ─── Source Transform ──────────────────────────────────────────────────────
+
+/**
+ * Transform test source: page.* and expect() calls → bridge.run("...").
+ * Runs BEFORE esbuild compilation, so esbuild validates the result.
+ */
+function transformSource(source: string): string {
+  const lines = source.split('\n');
+  return lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
+      return line;
+    }
+    return transformLine(line, trimmed);
+  }).join('\n');
 }
 
 function transformLine(line: string, trimmed: string): string {
@@ -86,21 +130,15 @@ function transformLine(line: string, trimmed: string): string {
 
   // await page.method(...)
   if (/^\s*await\s+page\./.test(line)) {
-    const expr = trimmed; // e.g., "await page.goto('/login');"
-    const clean = expr.replace(/;?\s*$/, ''); // strip trailing semicolon
+    const clean = trimmed.replace(/;?\s*$/, '');
     return `${indent}await bridge.run(${JSON.stringify(clean)});`;
   }
 
-  // page.method(...) without await (assignments handled in Phase 3)
-  // const locator = page.locator(...)  → Phase 3
-
-  // await expect(page...) or await expect(locator...)
+  // await expect(...)
   if (/^\s*await\s+expect\s*\(/.test(line)) {
-    const expr = trimmed;
-    const clean = expr.replace(/;?\s*$/, '');
+    const clean = trimmed.replace(/;?\s*$/, '');
     return `${indent}await bridge.run(${JSON.stringify(clean)});`;
   }
 
-  // Not a browser line — leave untouched
   return line;
 }

@@ -108,15 +108,10 @@ export function activate(context: vscode.ExtensionContext) {
           resultText = result.text || '(no output)';
         } else {
           // Compiler approach: transform page/expect to bridge.run(), run in Node.js
-          const { compileTestFile } = await import('./compiler.js');
+          const { compileTestFile, executeCompiledTest } = await import('./compiler.js');
           const compiled = await compileTestFile(filePath);
-          // TODO: execute compiled code in Node.js with bridge context
-          // For now, fall back to browser mode
-          outputChannel.appendLine('Compiler mode not fully implemented yet — falling back to browser mode');
-          const { bundleTestFile } = await import('./bundler.js');
-          const script = await bundleTestFile(filePath);
-          const result = await browserManager!.runScript(script);
-          resultText = result.text || '(no output)';
+          outputChannel.appendLine('Running in Node.js with bridge...');
+          resultText = await executeCompiledTest(compiled, (cmd) => browserManager!.runCommand(cmd));
         }
         outputChannel.appendLine(`\n── ${fileName} ──`);
         outputChannel.appendLine(resultText);

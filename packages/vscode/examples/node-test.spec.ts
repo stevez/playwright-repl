@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import fs from 'fs';
+import path from 'path';
 
-test('reads fixture and fills form', async ({ page }) => {
-  const data = fs.readFileSync('fixtures/data.json', 'utf-8');
+test('uses Node.js path module', async ({ page }) => {
+  const dir = path.resolve('.');
+  console.log('Working directory:', dir);
   await page.goto('https://example.com');
-  await page.locator('h1').textContent();
   await expect(page).toHaveTitle('Example Domain');
 });
