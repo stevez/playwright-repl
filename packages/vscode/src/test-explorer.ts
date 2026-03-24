@@ -210,12 +210,39 @@ export class TestExplorer {
         program: fileUri.fsPath,
       });
     } else {
-      // Compiler mode: breakpoints not supported yet — run test and show message
-      vscode.window.showInformationMessage(
-        'Debugging Node.js tests: breakpoints not yet supported. Running test instead.',
-        'OK'
-      );
-      await this._runTests(request, new vscode.CancellationTokenSource().token);
+      // Compiler mode: debug with real Playwright via connectOverCDP
+      try {
+        if (!this._browserManager.isRunning()) {
+          const config = vscode.workspace.getConfiguration('playwright-ide');
+          await this._browserManager.launch({
+            browser: config.get('browser', 'chromium'),
+            bridgePort: config.get('bridgePort', 9876),
+          });
+        }
+
+        const { compileForDebug } = await import('./compiler.js');
+        const tmpFile = await compileForDebug(fileUri.fsPath, 9222);
+        this._outputChannel.appendLine(`Debug (Node.js + CDP): ${tmpFile}`);
+
+        await vscode.debug.startDebugging(undefined, {
+          type: 'node',
+          request: 'launch',
+          name: 'Debug Playwright Test (Node.js)',
+          program: tmpFile,
+          sourceMaps: true,
+          skipFiles: ['<node_internals>/**'],
+          cwd: path.dirname(fileUri.fsPath),
+        });
+
+        // Clean up temp file after debug session ends
+        const disposable = vscode.debug.onDidTerminateDebugSession(() => {
+          try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+          disposable.dispose();
+        });
+      } catch (err: unknown) {
+        this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
+        vscode.window.showErrorMessage(`Debug failed: ${(err as Error).message}`);
+      }
     }
   }
 

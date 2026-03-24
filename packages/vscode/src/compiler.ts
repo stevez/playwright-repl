@@ -110,83 +110,74 @@ export async function executeCompiledTest(
 }
 
 /**
- * Compile and write to a temp file for Node.js debugging.
- * Bridge setup is included in the esbuild compilation so source maps stay correct.
+ * Compile for Node.js debugging via connectOverCDP.
+ * No bridge, no transforms — original test code runs with real Playwright page.
+ * Full debugging support (breakpoints, stepping, variables).
+ *
  * Returns the temp file path. Caller must clean up.
  */
-export async function compileToTempFile(
+export async function compileForDebug(
   testFilePath: string,
-  bridgePort: number,
+  cdpPort: number,
 ): Promise<string> {
   const esbuild = await import('esbuild');
   const shimPath = path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts');
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
 
-  // Plugin: bridge setup + transform + entry wrapper — all inside esbuild
-  const bridgePlugin = {
-    name: 'bridge-debug',
+  const debugPlugin = {
+    name: 'debug-runner',
     setup(build: any) {
-      build.onResolve({ filter: /^__test-entry__$/ }, () => ({
-        path: '__test-entry__',
-        namespace: 'bridge',
+      build.onResolve({ filter: /^__debug-entry__$/ }, () => ({
+        path: '__debug-entry__',
+        namespace: 'debug',
       }));
-      build.onLoad({ filter: /.*/, namespace: 'bridge' }, () => ({
+      build.onLoad({ filter: /.*/, namespace: 'debug' }, () => ({
         contents: `
+          import { chromium } from 'playwright-core';
           import { __runTests } from '@playwright/test';
 
-          globalThis.bridge = {
-            run: async (command) => {
-              const res = await fetch('http://localhost:${bridgePort + 1}/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command }),
-              });
-              const result = await res.json();
-              if (result.isError) throw new Error(result.text || 'Bridge command failed');
-              return result;
-            },
-          };
+          const browser = await chromium.connectOverCDP('http://localhost:${cdpPort}');
+          const context = browser.contexts()[0];
+          const page = context.pages()[0] || await context.newPage();
+
+          globalThis.page = page;
+          globalThis.context = context;
+          globalThis.expect = (await import('playwright-core')).expect
+            || ((v) => ({ toBe: (e) => { if (v !== e) throw new Error('Expected ' + e + ' but got ' + v); } }));
 
           await import('./${testFileName}');
-          const __result = await __runTests();
-          export default __result;
+          const result = await __runTests();
+          console.log(result);
+
+          await browser.close();
         `,
         resolveDir: testDir,
         loader: 'ts',
       }));
 
-      // Transform test files: page/expect → bridge.run()
-      build.onLoad({ filter: /\.(spec|test)\.(ts|js|mjs)$/ }, (args: any) => {
-        const source = fs.readFileSync(args.path, 'utf-8');
-        return {
-          contents: transformSource(source),
-          loader: args.path.endsWith('.ts') ? 'ts' : 'js',
-          resolveDir: path.dirname(args.path),
-        };
-      });
+      // NO transform — test code runs as-is with real Playwright page
     },
   };
 
   const result = await esbuild.build({
-    entryPoints: ['__test-entry__'],
+    entryPoints: ['__debug-entry__'],
     bundle: true,
     write: false,
     format: 'esm',
     platform: 'node',
     sourcemap: 'inline',
-    absWorkingDir: testDir,  // source map paths relative to test file location
-    plugins: [bridgePlugin],
+    absWorkingDir: testDir,
+    plugins: [debugPlugin],
     alias: { '@playwright/test': shimPath },
     external: [
-      'ws',
+      'playwright-core',
       'fs', 'path', 'child_process', 'os', 'crypto', 'util',
       'stream', 'events', 'net', 'http', 'https', 'url',
       'worker_threads', 'node:*',
     ],
   });
 
-  // Write next to the test file so node_modules resolves correctly
   const tmpFile = path.join(testDir, `.pw-debug-${Date.now()}.mjs`);
   fs.writeFileSync(tmpFile, result.outputFiles[0].text);
   return tmpFile;
