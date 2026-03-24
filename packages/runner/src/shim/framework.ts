@@ -1,12 +1,11 @@
 /**
- * Test Runner Shim
+ * Test Framework Runtime
  *
- * Lightweight test framework that replaces @playwright/test imports.
- * esbuild aliases '@playwright/test' to this file, so test files
- * use our runner without any code changes.
+ * Loaded once by execute.ts onto globalThis. Provides the test registration
+ * API (test, describe, beforeEach, etc.) and the runner (__runTests).
  *
- * Runs inside playwright-crx's service worker where `page`, `context`,
- * and `expect` are already available in scope.
+ * Test files import from '@playwright/test' which esbuild aliases to
+ * ./alias.ts — a thin re-export from globalThis.
  */
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -41,18 +40,18 @@ interface TestResult {
 
 // ─── State ─────────────────────────────────────────────────────────────────
 
-const rootSuite: Suite = {
-  name: '',
-  tests: [],
-  beforeAll: [],
-  afterAll: [],
-  beforeEach: [],
-  afterEach: [],
-  children: [],
-};
+let rootSuite: Suite;
+let currentSuite: Suite;
+let hasOnly: boolean;
 
-let currentSuite = rootSuite;
-let hasOnly = false;
+function resetState() {
+  rootSuite = {
+    name: '', tests: [], beforeAll: [], afterAll: [],
+    beforeEach: [], afterEach: [], children: [],
+  };
+  currentSuite = rootSuite;
+  hasOnly = false;
+}
 
 // ─── Registration API ──────────────────────────────────────────────────────
 
@@ -71,13 +70,8 @@ test.skip = (name: string, fn: TestFn) => {
 
 test.describe = (name: string, fn: () => void) => {
   const suite: Suite = {
-    name,
-    tests: [],
-    beforeAll: [],
-    afterAll: [],
-    beforeEach: [],
-    afterEach: [],
-    children: [],
+    name, tests: [], beforeAll: [], afterAll: [],
+    beforeEach: [], afterEach: [], children: [],
   };
   currentSuite.children.push(suite);
   const parent = currentSuite;
@@ -86,24 +80,21 @@ test.describe = (name: string, fn: () => void) => {
   currentSuite = parent;
 };
 (test.describe as any).configure = () => {};
-(test as any).fixme = test.skip; // treat fixme as skip
-(test as any).slow = () => {};   // no-op
-(test as any).info = () => ({ annotations: [] }); // no-op
+(test as any).fixme = test.skip;
+(test as any).slow = () => {};
+(test as any).info = () => ({ annotations: [] });
 
 test.beforeAll = (fn: HookFn) => { currentSuite.beforeAll.push(fn); };
 test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };
 test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
+test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
-// test.extend() — creates a new test function with custom fixtures
-// The fixture functions receive { page, context, expect } and can wrap them
 test.extend = (fixtures: Record<string, any>) => {
   const extendedTest = (name: string, fn: TestFn) => {
-    // Wrap the test fn to apply fixtures
     currentSuite.tests.push({
       name, only: false, skip: false,
       fn: async (baseFixtures: any) => {
         const extended = { ...baseFixtures };
-        // Apply each fixture — call the fixture function, wait for use() callback
         for (const [key, fixtureFn] of Object.entries(fixtures)) {
           if (typeof fixtureFn === 'function') {
             await new Promise<void>((resolve, reject) => {
@@ -111,7 +102,6 @@ test.extend = (fixtures: Record<string, any>) => {
                 extended[key] = value;
                 resolve();
               };
-              // Call fixture fn — it does setup, then calls use(value)
               Promise.resolve(fixtureFn(
                 { ...extended, [key]: extended[key] },
                 useCallback,
@@ -123,7 +113,6 @@ test.extend = (fixtures: Record<string, any>) => {
       },
     });
   };
-  // Copy all methods to the extended test function
   extendedTest.only = test.only;
   extendedTest.skip = test.skip;
   extendedTest.describe = test.describe;
@@ -134,12 +123,16 @@ test.extend = (fixtures: Record<string, any>) => {
   extendedTest.extend = test.extend;
   return extendedTest;
 };
-test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
+
+// ─── Smart Expect ──────────────────────────────────────────────────────────
+
+function expect(target: unknown): unknown {
+  const smartExpect = (globalThis as any).__proxyExpect;
+  if (smartExpect) return smartExpect(target);
+  throw new Error('expect() not available — __proxyExpect not set');
+}
 
 // ─── Runner ────────────────────────────────────────────────────────────────
-
-// page = Proxy → bridge. expect = smart (proxy → bridge, value → native).
-// Provided via globalThis by the execution engine.
 
 async function runSuite(
   suite: Suite,
@@ -153,12 +146,8 @@ async function runSuite(
   const allBeforeEach = [...parentBeforeEach, ...suite.beforeEach];
   const allAfterEach = [...suite.afterEach, ...parentAfterEach];
 
-  // beforeAll
-  for (const fn of suite.beforeAll) {
-    await fn(fixtures);
-  }
+  for (const fn of suite.beforeAll) await fn(fixtures);
 
-  // Run tests
   for (const t of suite.tests) {
     const fullName = prefix ? `${prefix} > ${t.name}` : t.name;
 
@@ -169,7 +158,6 @@ async function runSuite(
 
     const start = Date.now();
     try {
-      // Clean up routes from previous tests (our shim reuses the same page)
       if (fixtures.page?.unrouteAll) await fixtures.page.unrouteAll();
       for (const fn of allBeforeEach) await fn(fixtures);
       await t.fn(fixtures);
@@ -177,26 +165,19 @@ async function runSuite(
       results.push({ name: fullName, passed: true, skipped: false, duration: Date.now() - start });
     } catch (err: unknown) {
       results.push({
-        name: fullName,
-        passed: false,
-        skipped: false,
+        name: fullName, passed: false, skipped: false,
         error: (err as Error).message || String(err),
         duration: Date.now() - start,
       });
     }
   }
 
-  // Run child suites
   for (const child of suite.children) {
     const childPrefix = prefix ? `${prefix} > ${child.name}` : child.name;
-    const childResults = await runSuite(child, allBeforeEach, allAfterEach, childPrefix);
-    results.push(...childResults);
+    results.push(...await runSuite(child, allBeforeEach, allAfterEach, childPrefix));
   }
 
-  // afterAll
-  for (const fn of suite.afterAll) {
-    await fn(fixtures);
-  }
+  for (const fn of suite.afterAll) await fn(fixtures);
 
   return results;
 }
@@ -206,17 +187,9 @@ function formatResults(results: TestResult[]): string {
   let passed = 0, failed = 0, skipped = 0;
 
   for (const r of results) {
-    if (r.skipped) {
-      lines.push(`  - ${r.name} (skipped)`);
-      skipped++;
-    } else if (r.passed) {
-      lines.push(`  ✓ ${r.name} (${r.duration}ms)`);
-      passed++;
-    } else {
-      lines.push(`  ✗ ${r.name} (${r.duration}ms)`);
-      lines.push(`    ${r.error}`);
-      failed++;
-    }
+    if (r.skipped) { lines.push(`  - ${r.name} (skipped)`); skipped++; }
+    else if (r.passed) { lines.push(`  ✓ ${r.name} (${r.duration}ms)`); passed++; }
+    else { lines.push(`  ✗ ${r.name} (${r.duration}ms)`); lines.push(`    ${r.error}`); failed++; }
   }
 
   lines.push('');
@@ -224,26 +197,25 @@ function formatResults(results: TestResult[]): string {
   return lines.join('\n');
 }
 
-/**
- * Run all registered tests and return formatted results.
- * Called after the test file has been evaluated (all test/describe calls done).
- */
 async function __runTests(): Promise<string> {
   const results = await runSuite(rootSuite, [], [], '');
   return formatResults(results);
 }
 
-// ─── Exports ───────────────────────────────────────────────────────────────
+// ─── Install on globalThis ─────────────────────────────────────────────────
 
-// Expose __runTests on globalThis so the bundler can call it after the IIFE.
-// esbuild tree-shakes unexported functions, but globalThis assignments survive.
-(globalThis as any).__runTests = __runTests;
-
-// Smart expect: proxy → bridge, value → native assertion
-function expect(target: unknown): unknown {
-  const smartExpect = (globalThis as any).__proxyExpect;
-  if (smartExpect) return smartExpect(target);
-  throw new Error('expect() not available — __proxyExpect not set');
+/**
+ * Installs test/expect/__runTests on globalThis.
+ * Called explicitly for Node.js path, or auto-installs when loaded in browser.
+ */
+export function installFramework() {
+  const _g = globalThis as any;
+  _g.__test = test;
+  _g.__expect = expect;
+  _g.__runTests = __runTests;
+  _g.__resetTestState = resetState;
+  resetState();
 }
 
-export { test, expect, __runTests };
+// Auto-install when loaded (browser path evaluates this as IIFE)
+installFramework();

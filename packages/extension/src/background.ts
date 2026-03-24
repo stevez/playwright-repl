@@ -7,6 +7,13 @@ import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
 
+// ─── Test Framework (for pw test browser path) ──────────────────────────────
+
+// Install test framework on globalThis so compiled tests can use it directly.
+// The runner sends compiled test code via bridge.run() which evaluates here.
+import { installFramework } from './test-framework';
+installFramework();
+
 // ─── Offscreen Document (CLI Bridge) ─────────────────────────────────────────
 
 async function ensureOffscreen() {
