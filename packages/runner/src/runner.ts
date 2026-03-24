@@ -41,13 +41,14 @@ export async function run(args: string[]): Promise<number> {
   }
   console.log(`Found ${testFiles.length} test file(s)\n`);
 
-  // Start bridge + browser
+  // Start bridge on random port (avoids conflicts with VS Code extension or other instances)
   const bridge = new BridgeServer();
-  await bridge.start(9876);
+  await bridge.start(0);
+  const bridgePort = bridge.port;
 
   // Launch Chromium with extension
   const { launchBrowser } = await import('./browser.js');
-  await launchBrowser({ headed: runOpts.headed, bridgePort: 9876 });
+  await launchBrowser({ headed: runOpts.headed, bridgePort });
 
   // Wait for extension to connect
   await bridge.waitForConnection(30000);

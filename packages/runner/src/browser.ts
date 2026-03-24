@@ -1,6 +1,6 @@
 /**
  * Launch Chromium with playwright-crx extension.
- * Same approach as the VS Code extension's BrowserManager.
+ * Sets the bridge port in chrome.storage so the offscreen doc connects to it.
  */
 
 import { createRequire } from 'node:module';
@@ -12,13 +12,13 @@ const __filename = fileURLToPath(import.meta.url);
 export async function launchBrowser(opts: { headed: boolean; bridgePort: number }) {
   const require = createRequire(__filename);
 
-  // Find extension dist path — resolve package.json to find the package root
+  // Find extension dist path
   const extPkgPath = require.resolve('@playwright-repl/extension/package.json');
   const extPath = path.resolve(path.dirname(extPkgPath), 'dist');
 
   // Launch Chromium with extension
   const pw = require('playwright-core');
-  await pw.chromium.launchPersistentContext('', {
+  const context = await pw.chromium.launchPersistentContext('', {
     channel: 'chromium',
     headless: !opts.headed,
     args: [
@@ -31,4 +31,17 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
       '--remote-debugging-port=9222',
     ],
   });
+
+  // Set bridge port in chrome.storage so offscreen doc connects to it
+  // (same approach as E2E bridge tests)
+  let sw = context.serviceWorkers()[0];
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 10000 });
+  const extensionId = sw.url().split('/')[2];
+
+  const page = context.pages()[0] || await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+  await page.evaluate((port: number) => chrome.storage.local.set({ bridgePort: port }), opts.bridgePort);
+  await page.goto('about:blank');
+
+  return context;
 }
