@@ -211,6 +211,7 @@ export class TestExplorer {
       });
     } else {
       // Compiler mode: debug with real Playwright via connectOverCDP
+      // Uses npx playwright test — standard Playwright, full debugging
       try {
         if (!this._browserManager.isRunning()) {
           const config = vscode.workspace.getConfiguration('playwright-ide');
@@ -220,24 +221,27 @@ export class TestExplorer {
           });
         }
 
-        const { createDebugRunner } = await import('./compiler.js');
-        const tmpFile = createDebugRunner(fileUri.fsPath, 9222);
-        this._outputChannel.appendLine(`Debug (Node.js + CDP): ${tmpFile}`);
+        const testDir = path.dirname(fileUri.fsPath);
+        const testFileName = path.basename(fileUri.fsPath);
+        const { createDebugConfig } = await import('./compiler.js');
+        const tmpConfig = createDebugConfig(testDir, 9222);
+        this._outputChannel.appendLine(`Debug (Playwright + CDP): config=${tmpConfig}`);
 
+        // Launch Playwright Test with Node.js debugger attached
         await vscode.debug.startDebugging(undefined, {
           type: 'node',
           request: 'launch',
-          name: 'Debug Playwright Test (Node.js)',
-          program: tmpFile,
+          name: 'Debug Playwright Test',
+          runtimeExecutable: 'npx',
+          runtimeArgs: ['playwright', 'test', testFileName, '--config', path.basename(tmpConfig), '--headed'],
+          cwd: testDir,
           sourceMaps: true,
           skipFiles: ['<node_internals>/**'],
-          cwd: path.dirname(fileUri.fsPath),
-          runtimeArgs: ['--experimental-strip-types', '--no-warnings'],
         });
 
-        // Clean up temp file after debug session ends
+        // Clean up temp config after debug session ends
         const disposable = vscode.debug.onDidTerminateDebugSession(() => {
-          try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+          try { fs.unlinkSync(tmpConfig); } catch { /* ignore */ }
           disposable.dispose();
         });
       } catch (err: unknown) {

@@ -110,45 +110,30 @@ export async function executeCompiledTest(
 }
 
 /**
- * Create a debug runner file — no compilation, no transforms.
- * Just a plain wrapper that connects to Chrome via CDP and runs the test.
- * Returns the temp file path. Caller must clean up.
+ * Create a temp Playwright config that connects to our already-running Chrome.
+ * For debugging: `npx playwright test` with this config = real Playwright, full debugging.
+ * Returns the temp config path. Caller must clean up.
  */
-export function createDebugRunner(
-  testFilePath: string,
+export function createDebugConfig(
+  testDir: string,
   cdpPort: number,
 ): string {
-  const testDir = path.dirname(testFilePath);
-  const testFileName = path.basename(testFilePath);
-  const shimRelPath = path.relative(testDir, path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts')).replace(/\\/g, '/');
+  const config = `
+import { defineConfig } from '@playwright/test';
 
-  const script = `
-import { chromium } from 'playwright-core';
-
-// Connect to the already-running Chrome
-const browser = await chromium.connectOverCDP('http://localhost:${cdpPort}');
-const context = browser.contexts()[0];
-const page = context.pages()[0] || await context.newPage();
-
-// Provide page/context as globals for the test
-globalThis.page = page;
-globalThis.context = context;
-
-// Import our test shim (provides test/describe/beforeEach/expect)
-const { __runTests } = await import('${shimRelPath}');
-
-// Import the test file
-await import('./${testFileName}');
-
-// Run and report
-const result = await __runTests();
-console.log(result);
-
-await browser.close();
+export default defineConfig({
+  use: {
+    connectOptions: {
+      wsEndpoint: 'http://localhost:${cdpPort}',
+    },
+  },
+  testDir: '.',
+  timeout: 60000,
+});
 `;
 
-  const tmpFile = path.join(testDir, `.pw-debug-${Date.now()}.mjs`);
-  fs.writeFileSync(tmpFile, script);
+  const tmpFile = path.join(testDir, `.pw-debug-config-${Date.now()}.ts`);
+  fs.writeFileSync(tmpFile, config);
   return tmpFile;
 }
 
