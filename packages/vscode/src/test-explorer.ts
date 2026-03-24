@@ -202,7 +202,7 @@ export class TestExplorer {
     const mode = await detectTestMode(fileUri.fsPath);
 
     if (mode === 'browser') {
-      // Browser mode: use our custom CDP debugger
+      // Browser mode: custom CDP debugger (fast, uses playwright-crx)
       await vscode.debug.startDebugging(undefined, {
         type: 'playwright-ide',
         request: 'launch',
@@ -210,8 +210,7 @@ export class TestExplorer {
         program: fileUri.fsPath,
       });
     } else {
-      // Compiler mode: debug with real Playwright via connectOverCDP
-      // Uses npx playwright test — standard Playwright, full debugging
+      // Compiler mode: npx playwright test + connectOverCDP (standard speed, full debugging)
       try {
         if (!this._browserManager.isRunning()) {
           const config = vscode.workspace.getConfiguration('playwright-ide');
@@ -225,13 +224,12 @@ export class TestExplorer {
         const testFileName = path.basename(fileUri.fsPath);
         const { createDebugConfig } = await import('./compiler.js');
         const tmpConfig = createDebugConfig(testDir, 9222);
-        this._outputChannel.appendLine(`Debug (Playwright + CDP): config=${tmpConfig}`);
+        this._outputChannel.appendLine(`Debug (connectOverCDP): ${tmpConfig}`);
 
-        // Launch Playwright Test with Node.js debugger attached
         await vscode.debug.startDebugging(undefined, {
           type: 'node',
           request: 'launch',
-          name: 'Debug Playwright Test',
+          name: 'Debug Playwright Test (Node.js)',
           runtimeExecutable: 'npx',
           runtimeArgs: ['playwright', 'test', testFileName, '--config', path.basename(tmpConfig), '--headed'],
           cwd: testDir,
@@ -239,7 +237,6 @@ export class TestExplorer {
           skipFiles: ['<node_internals>/**'],
         });
 
-        // Clean up temp config after debug session ends
         const disposable = vscode.debug.onDidTerminateDebugSession(() => {
           try { fs.unlinkSync(tmpConfig); } catch { /* ignore */ }
           disposable.dispose();
