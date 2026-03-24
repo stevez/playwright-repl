@@ -52,20 +52,4 @@ test.describe('Mocking with HAR files', () => {
     // Assert that the Playwright fruit is visible
     await expect(page.getByText('Strawberry')).toBeVisible();
   });
-
-  test.skip('gets the json from HAR and checks the new fruit has been added', async ({ page }) => {  // skip: routeFromHAR resolves path from CWD, not test file
-    // Replay API requests from HAR.
-    // Either use a matching response from the HAR,
-    // or abort the request if nothing matches.
-    await page.routeFromHAR('./hars/fruits.har', {
-      url: '*/**/api/v1/fruits',
-      update: false,
-    });
-
-    // Go to the page
-    await page.goto('https://demo.playwright.dev/api-mocking');
-
-    // Assert that the Playwright fruit is visible
-    await expect(page.getByText('Strawberry')).toBeVisible();
-  });
 });
