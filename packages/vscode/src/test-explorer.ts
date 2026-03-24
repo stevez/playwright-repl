@@ -210,42 +210,10 @@ export class TestExplorer {
         program: fileUri.fsPath,
       });
     } else {
-      // Compiler mode: launch VS Code's Node.js debugger on compiled temp file
-      try {
-        // Auto-launch browser if needed
-        if (!this._browserManager.isRunning()) {
-          const config = vscode.workspace.getConfiguration('playwright-ide');
-          await this._browserManager.launch({
-            browser: config.get('browser', 'chromium'),
-            bridgePort: config.get('bridgePort', 9876),
-          });
-        }
-
-        const { compileToTempFile } = await import('./compiler.js');
-        const config = vscode.workspace.getConfiguration('playwright-ide');
-        const tmpFile = await compileToTempFile(fileUri.fsPath, config.get('bridgePort', 9876));
-        this._outputChannel.appendLine(`Compiler mode debug: ${tmpFile}`);
-
-        await vscode.debug.startDebugging(undefined, {
-          type: 'node',
-          request: 'launch',
-          name: 'Debug Playwright Test (Node.js)',
-          program: tmpFile,
-          sourceMaps: true,
-          stopOnEntry: true,
-          skipFiles: ['<node_internals>/**'],
-          cwd: path.dirname(fileUri.fsPath),
-        });
-
-        // Clean up temp file after debug session ends
-        const disposable = vscode.debug.onDidTerminateDebugSession(() => {
-          try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-          disposable.dispose();
-        });
-      } catch (err: unknown) {
-        this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
-        vscode.window.showErrorMessage(`Debug failed: ${(err as Error).message}`);
-      }
+      // Compiler mode: run in extension host (same process, bridge works)
+      // No breakpoints yet — future: attach debugger to extension host
+      this._outputChannel.appendLine('Compiler mode debug: running in extension host...');
+      await this._runTests(request, new vscode.CancellationTokenSource().token);
     }
   }
 

@@ -133,31 +133,23 @@ export async function compileToTempFile(
       }));
       build.onLoad({ filter: /.*/, namespace: 'bridge' }, () => ({
         contents: `
-          import WebSocket from 'ws';
           import { __runTests } from '@playwright/test';
 
-          const __ws = new WebSocket('ws://localhost:${bridgePort}');
-          await new Promise((resolve, reject) => { __ws.on('open', resolve); __ws.on('error', reject); });
-
           globalThis.bridge = {
-            run: (command) => new Promise((resolve, reject) => {
-              const id = Math.random().toString(36).slice(2);
-              const handler = (data) => {
-                const msg = JSON.parse(data.toString());
-                if (msg.id === id) {
-                  __ws.off('message', handler);
-                  if (msg.isError) reject(new Error(msg.text));
-                  else resolve(msg);
-                }
-              };
-              __ws.on('message', handler);
-              __ws.send(JSON.stringify({ id, command, type: 'command' }));
-            }),
+            run: async (command) => {
+              const res = await fetch('http://localhost:${bridgePort + 1}/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command }),
+              });
+              const result = await res.json();
+              if (result.isError) throw new Error(result.text || 'Bridge command failed');
+              return result;
+            },
           };
 
           await import('./${testFileName}');
           const __result = await __runTests();
-          __ws.close();
           export default __result;
         `,
         resolveDir: testDir,
@@ -183,6 +175,7 @@ export async function compileToTempFile(
     format: 'esm',
     platform: 'node',
     sourcemap: 'inline',
+    absWorkingDir: testDir,  // source map paths relative to test file location
     plugins: [bridgePlugin],
     alias: { '@playwright/test': shimPath },
     external: [
