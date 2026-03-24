@@ -109,34 +109,6 @@ export async function executeCompiledTest(
   }
 }
 
-/**
- * Create a temp Playwright config that connects to our already-running Chrome.
- * For debugging: `npx playwright test` with this config = real Playwright, full debugging.
- * Returns the temp config path. Caller must clean up.
- */
-export function createDebugConfig(
-  testDir: string,
-  cdpPort: number,
-): string {
-  const config = `
-import { defineConfig } from '@playwright/test';
-
-export default defineConfig({
-  use: {
-    connectOptions: {
-      wsEndpoint: 'http://localhost:${cdpPort}',
-    },
-  },
-  testDir: '.',
-  timeout: 60000,
-});
-`;
-
-  const tmpFile = path.join(testDir, `.pw-debug-config-${Date.now()}.ts`);
-  fs.writeFileSync(tmpFile, config);
-  return tmpFile;
-}
-
 // ─── Source Transform ──────────────────────────────────────────────────────
 
 /**
