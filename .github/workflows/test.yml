@@ -64,6 +64,10 @@ jobs:
         run: node e2e/test-bridge-replay.js --include-snapshot --verbose
         working-directory: packages/cli
 
+      - name: Run runner E2E tests (23 todomvc tests via bridge)
+        run: node dist/cli.js test
+        working-directory: packages/runner/examples
+
       - name: Run extension E2E tests
         run: pnpm exec playwright test
         working-directory: packages/extension

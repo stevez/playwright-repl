@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.26.0",
   "scripts": {
-    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json packages/mcp/tsconfig.build.json && pnpm --filter @playwright-repl/extension run build",
+    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json packages/mcp/tsconfig.build.json packages/runner/tsconfig.build.json && pnpm --filter @playwright-repl/extension run build",
     "test": "pnpm run --recursive --if-present test",
     "test:core": "pnpm --filter @playwright-repl/core run test",
     "test:cli": "pnpm --filter playwright-repl run test"
