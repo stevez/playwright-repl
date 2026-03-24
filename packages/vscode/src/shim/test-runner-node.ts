@@ -3,7 +3,7 @@
  *
  * Replaces @playwright/test for compiler mode.
  * Same API as the browser shim, but runs in Node.js.
- * The compiler transforms page.*/expect calls to bridge.run().
+ * The compiler transforms page and expect calls to bridge.run().
  * This shim provides test/describe/hooks + the bridge connection.
  */
 

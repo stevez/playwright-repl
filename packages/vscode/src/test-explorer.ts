@@ -155,12 +155,29 @@ export class TestExplorer {
 
       const fileUri = vscode.Uri.parse(fileKey);
       try {
-        const { bundleTestFile } = await import('./bundler.js');
-        const script = await bundleTestFile(fileUri.fsPath);
-        const result = await this._browserManager.runScript(script);
+        // Detect mode: browser (fast) or compiler (Node.js compatible)
+        const { detectTestMode } = await import('./mode-detect.js');
+        const mode = await detectTestMode(fileUri.fsPath);
+        this._outputChannel.appendLine(`Mode: ${mode === 'browser' ? '⚡ browser (fast)' : '🔧 compiler (Node.js)'}`);
+
+        let resultText: string;
+        if (mode === 'browser') {
+          const { bundleTestFile } = await import('./bundler.js');
+          const script = await bundleTestFile(fileUri.fsPath);
+          const result = await this._browserManager.runScript(script);
+          resultText = result.text || '';
+        } else {
+          // Compiler mode — TODO: execute in Node.js
+          // For now, fall back to browser mode
+          this._outputChannel.appendLine('Compiler mode not fully implemented — falling back to browser');
+          const { bundleTestFile } = await import('./bundler.js');
+          const script = await bundleTestFile(fileUri.fsPath);
+          const result = await this._browserManager.runScript(script);
+          resultText = result.text || '';
+        }
 
         // Parse structured results and map to test items
-        this._mapResults(run, fileItems, result.text || '');
+        this._mapResults(run, fileItems, resultText);
       } catch (err: unknown) {
         for (const item of fileItems) {
           run.errored(item, new vscode.TestMessage((err as Error).message));
