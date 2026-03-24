@@ -31,7 +31,7 @@ export async function run(args: string[]): Promise<number> {
     baseURL: config.use?.baseURL,
   };
 
-  console.log(`\nplaywright-ide test runner\n`);
+  console.log(`\npw test runner\n`);
 
   // Discover test files
   const testFiles = discoverTests(runOpts.testDir, opts.filter);
