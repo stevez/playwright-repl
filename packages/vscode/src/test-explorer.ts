@@ -10,6 +10,8 @@
  */
 
 import * as vscode from 'vscode';
+import path from 'node:path';
+import fs from 'node:fs';
 import { parseTestFile, type ParsedTest } from './test-parser.js';
 import type { BrowserManager } from './browser.js';
 
@@ -208,9 +210,42 @@ export class TestExplorer {
         program: fileUri.fsPath,
       });
     } else {
-      // Compiler mode: run in Node.js (no breakpoints yet — future: wire up Node.js debugger)
-      this._outputChannel.appendLine('Compiler mode debug: running test in Node.js...');
-      await this._runTests(request, new vscode.CancellationTokenSource().token);
+      // Compiler mode: launch VS Code's Node.js debugger on compiled temp file
+      try {
+        // Auto-launch browser if needed
+        if (!this._browserManager.isRunning()) {
+          const config = vscode.workspace.getConfiguration('playwright-ide');
+          await this._browserManager.launch({
+            browser: config.get('browser', 'chromium'),
+            bridgePort: config.get('bridgePort', 9876),
+          });
+        }
+
+        const { compileToTempFile } = await import('./compiler.js');
+        const config = vscode.workspace.getConfiguration('playwright-ide');
+        const tmpFile = await compileToTempFile(fileUri.fsPath, config.get('bridgePort', 9876));
+        this._outputChannel.appendLine(`Compiler mode debug: ${tmpFile}`);
+
+        await vscode.debug.startDebugging(undefined, {
+          type: 'node',
+          request: 'launch',
+          name: 'Debug Playwright Test (Node.js)',
+          program: tmpFile,
+          sourceMaps: true,
+          stopOnEntry: true,
+          skipFiles: ['<node_internals>/**'],
+          cwd: path.dirname(fileUri.fsPath),
+        });
+
+        // Clean up temp file after debug session ends
+        const disposable = vscode.debug.onDidTerminateDebugSession(() => {
+          try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+          disposable.dispose();
+        });
+      } catch (err: unknown) {
+        this._outputChannel.appendLine(`Debug error: ${(err as Error).message}`);
+        vscode.window.showErrorMessage(`Debug failed: ${(err as Error).message}`);
+      }
     }
   }
 

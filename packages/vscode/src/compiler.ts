@@ -65,6 +65,7 @@ export async function compileTestFile(testFilePath: string): Promise<string> {
     write: false,
     format: 'esm',
     platform: 'node',
+    sourcemap: 'inline',  // source maps for Node.js debugger
     plugins: [bridgePlugin],
     alias: {
       '@playwright/test': shimPath,
@@ -106,6 +107,96 @@ export async function executeCompiledTest(
     delete (globalThis as any).bridge;
     try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
   }
+}
+
+/**
+ * Compile and write to a temp file for Node.js debugging.
+ * Bridge setup is included in the esbuild compilation so source maps stay correct.
+ * Returns the temp file path. Caller must clean up.
+ */
+export async function compileToTempFile(
+  testFilePath: string,
+  bridgePort: number,
+): Promise<string> {
+  const esbuild = await import('esbuild');
+  const shimPath = path.resolve(path.dirname(__filename), '../src/shim/test-runner-node.ts');
+  const testDir = path.dirname(testFilePath);
+  const testFileName = path.basename(testFilePath);
+
+  // Plugin: bridge setup + transform + entry wrapper — all inside esbuild
+  const bridgePlugin = {
+    name: 'bridge-debug',
+    setup(build: any) {
+      build.onResolve({ filter: /^__test-entry__$/ }, () => ({
+        path: '__test-entry__',
+        namespace: 'bridge',
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'bridge' }, () => ({
+        contents: `
+          import WebSocket from 'ws';
+          import { __runTests } from '@playwright/test';
+
+          const __ws = new WebSocket('ws://localhost:${bridgePort}');
+          await new Promise((resolve, reject) => { __ws.on('open', resolve); __ws.on('error', reject); });
+
+          globalThis.bridge = {
+            run: (command) => new Promise((resolve, reject) => {
+              const id = Math.random().toString(36).slice(2);
+              const handler = (data) => {
+                const msg = JSON.parse(data.toString());
+                if (msg.id === id) {
+                  __ws.off('message', handler);
+                  if (msg.isError) reject(new Error(msg.text));
+                  else resolve(msg);
+                }
+              };
+              __ws.on('message', handler);
+              __ws.send(JSON.stringify({ id, command, type: 'command' }));
+            }),
+          };
+
+          await import('./${testFileName}');
+          const __result = await __runTests();
+          __ws.close();
+          export default __result;
+        `,
+        resolveDir: testDir,
+        loader: 'ts',
+      }));
+
+      // Transform test files: page/expect → bridge.run()
+      build.onLoad({ filter: /\.(spec|test)\.(ts|js|mjs)$/ }, (args: any) => {
+        const source = fs.readFileSync(args.path, 'utf-8');
+        return {
+          contents: transformSource(source),
+          loader: args.path.endsWith('.ts') ? 'ts' : 'js',
+          resolveDir: path.dirname(args.path),
+        };
+      });
+    },
+  };
+
+  const result = await esbuild.build({
+    entryPoints: ['__test-entry__'],
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'node',
+    sourcemap: 'inline',
+    plugins: [bridgePlugin],
+    alias: { '@playwright/test': shimPath },
+    external: [
+      'ws',
+      'fs', 'path', 'child_process', 'os', 'crypto', 'util',
+      'stream', 'events', 'net', 'http', 'https', 'url',
+      'worker_threads', 'node:*',
+    ],
+  });
+
+  // Write next to the test file so node_modules resolves correctly
+  const tmpFile = path.join(testDir, `.pw-debug-${Date.now()}.mjs`);
+  fs.writeFileSync(tmpFile, result.outputFiles[0].text);
+  return tmpFile;
 }
 
 // ─── Source Transform ──────────────────────────────────────────────────────
