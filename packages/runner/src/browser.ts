@@ -40,7 +40,7 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
 
   const page = context.pages()[0] || await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
-  await page.evaluate((port: number) => chrome.storage.local.set({ bridgePort: port }), opts.bridgePort);
+  await page.evaluate((port: number) => (globalThis as any).chrome.storage.local.set({ bridgePort: port }), opts.bridgePort);
   await page.goto('about:blank');
 
   return context;
