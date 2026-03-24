@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * playwright-ide CLI
+ * pw CLI
  *
  * Drop-in replacement for `npx playwright test` with 50x faster bridge execution.
  *
  * Usage:
- *   playwright-ide test [options] [test-filter...]
- *   playwright-ide test --grep "login"
- *   playwright-ide test --headed
- *   playwright-ide test --config playwright.config.ts
+ *   pw test [options] [test-filter...]
+ *   pw test --grep "login"
+ *   pw test --headed
+ *   pw test --config playwright.config.ts
  */
 
 import { run } from './runner.js';
@@ -18,10 +18,10 @@ const args = process.argv.slice(2);
 // First arg should be "test"
 if (args[0] !== 'test') {
   console.log(`
-playwright-ide — Playwright test runner with 50x faster execution
+pw — Playwright test runner with 50x faster execution
 
 Usage:
-  playwright-ide test [options] [test-filter...]
+  pw test [options] [test-filter...]
 
 Options:
   -c, --config <file>     Configuration file (default: playwright.config.ts)

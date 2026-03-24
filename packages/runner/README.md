@@ -6,12 +6,12 @@ Playwright test runner with 10x faster execution via bridge mode (playwright-crx
 
 ```bash
 cd your-playwright-project
-playwright-ide test
+pw test
 ```
 
 ## Benchmark
 
-| | Standard Playwright | playwright-ide |
+| | Standard Playwright | pw |
 |---|---|---|
 | 23 todomvc tests | 26.1s | ~2s |
 | Per test avg | ~1.1s | ~60ms |
@@ -19,20 +19,20 @@ playwright-ide test
 
 ## How It Works
 
-Standard Playwright sends each browser command over CDP (Chrome DevTools Protocol) — one round-trip per action. playwright-ide uses playwright-crx running inside Chrome, executing commands in-process with zero round-trips.
+Standard Playwright sends each browser command over CDP (Chrome DevTools Protocol) — one round-trip per action. pw uses playwright-crx running inside Chrome, executing commands in-process with zero round-trips.
 
 ```
 Standard Playwright:
   Node.js ──CDP──CDP──CDP──→ Chrome    (many round-trips)
 
-playwright-ide:
+pw:
   Node.js ──bridge──→ playwright-crx    (one message, executes in-process)
 ```
 
 ## CLI Usage
 
 ```bash
-playwright-ide test [options] [test-filter...]
+pw test [options] [test-filter...]
 ```
 
 ### Options
@@ -50,19 +50,19 @@ playwright-ide test [options] [test-filter...]
 
 ```bash
 # Run all tests
-playwright-ide test
+pw test
 
 # Run specific file
-playwright-ide test tests/login.spec.ts
+pw test tests/login.spec.ts
 
 # Filter by name
-playwright-ide test --grep "login"
+pw test --grep "login"
 
 # Headed mode (see the browser)
-playwright-ide test --headed
+pw test --headed
 
 # With config
-playwright-ide test --config playwright.config.ts
+pw test --config playwright.config.ts
 ```
 
 ## Compatibility

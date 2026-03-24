@@ -4,7 +4,7 @@
   "description": "Playwright test runner with 50x faster bridge execution",
   "type": "module",
   "bin": {
-    "playwright-ide": "./dist/cli.js"
+    "pw": "./dist/cli.js"
   },
   "exports": {
     ".": "./dist/index.js"
