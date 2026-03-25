@@ -212,9 +212,6 @@ importers:
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
-      playwright-core:
-        specifier: 1.59.0-alpha-2026-02-21
-        version: 1.59.0-alpha-2026-02-21
     devDependencies:
       typescript:
         specifier: ^5.0.0

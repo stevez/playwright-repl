@@ -22,8 +22,7 @@
     "@playwright-repl/core": "workspace:*",
     "@playwright-repl/extension": "workspace:*",
     "esbuild": "^0.25.0",
-    "@playwright/test": "1.59.0-alpha-2026-02-21",
-    "playwright-core": "1.59.0-alpha-2026-02-21"
+    "@playwright/test": "1.59.0-alpha-2026-02-21"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
