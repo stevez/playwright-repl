@@ -145,7 +145,7 @@ async function executeNode(
     console.log(`  [node] DIRECT mode`);
     page = realPage;
     const pw = await import('playwright-core');
-    expect = (pw as any).expect ?? ((await import('@playwright/test')) as any).expect;
+    expect = (pw as any).expect;
   }
 
   // Collect registered tests
