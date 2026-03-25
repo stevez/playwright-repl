@@ -37,7 +37,9 @@ const CDP_PAGE_METHODS = new Set([
   'waitForEvent',
   '$', '$$', '$eval', '$$eval',
   'frames', 'mainFrame',
-  'evaluate', 'evaluateHandle',
+  'evaluate',            // needs concurrency with pending bridge actions
+  'evaluateHandle',      // returns JSHandle — non-serializable
+  'on', 'off', 'once',  // event listeners need real page
 ]);
 
 function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdpPage?: any): any {

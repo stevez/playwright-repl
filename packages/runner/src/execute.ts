@@ -125,9 +125,28 @@ async function executeNode(
   nodePage?: any,
   cdpPage?: any,
 ): Promise<TestResult[]> {
-  const page = cdpPage || nodePage;
-  const pw = await import('playwright-core');
-  const expect = (pw as any).expect ?? ((await import('@playwright/test')) as any).expect;
+  const realPage = cdpPage || nodePage;
+  const useProxy = process.argv.includes('--proxy');
+  let page: any;
+  let expect: any;
+
+  if (useProxy) {
+    console.log('  [node] PROXY mode');
+    const bridgeRun = async (cmd: string) => {
+      console.log(`    [bridge →] ${cmd.substring(0, 120)}`);
+      const r = await bridge.run(cmd);
+      console.log(`    [bridge ←] ${r.isError ? 'ERR' : 'OK'} ${(r.text || '').substring(0, 80)}`);
+      if (r.isError) throw new Error(r.text || 'Bridge error');
+      return r;
+    };
+    page = createPageProxy(bridgeRun, nodePage, cdpPage);
+    expect = createExpect(bridgeRun);
+  } else {
+    console.log(`  [node] DIRECT mode`);
+    page = realPage;
+    const pw = await import('playwright-core');
+    expect = (pw as any).expect ?? ((await import('@playwright/test')) as any).expect;
+  }
 
   // Collect registered tests
   const tests: { name: string; fn: (fixtures: any) => Promise<void>; skip: boolean }[] = [];
@@ -198,6 +217,10 @@ async function executeNode(
   }
 
   // Run tests from Node side with real page
+  let bridgeCallCount = 0;
+  const origRun = bridge.run.bind(bridge);
+  (bridge as any).run = async (cmd: string, opts?: any) => { bridgeCallCount++; return origRun(cmd, opts); };
+
   const results: TestResult[] = [];
   const fixtures = { page, context: page.context(), expect };
 
@@ -218,11 +241,16 @@ async function executeNode(
       const msg = (err as Error).message || String(err);
       console.error(`    [FAIL] ${t.name}\n      ${msg.split('\n').slice(0, 3).join('\n      ')}`);
       results.push({ name: t.name, file: testFilePath, passed: false, skipped: false, error: msg, duration: Date.now() - start });
+      // Cancel any pending bridge commands by navigating via Node page (bypasses bridge queue)
+      if (useProxy) {
+        try { await realPage.goto('about:blank', { timeout: 5000 }); } catch { /* ignore */ }
+      }
     }
   }
 
   for (const hook of hooks.afterAll) await hook(fixtures);
 
+  console.log(`  [node] bridge calls: ${bridgeCallCount}`);
   return results;
 }
 

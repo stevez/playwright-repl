@@ -18,9 +18,6 @@
 import { test as it, expect, rafraf } from './pageTest';
 import type { Page } from '@playwright/test';
 
-it.beforeEach(async ({ page }) => {
-  await page.goto('about:blank');
-});
 
 // Inline helpers (originally from ../config/utils)
 async function attachFrame(page: any, frameId: string, url: string) {
