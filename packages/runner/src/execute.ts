@@ -53,6 +53,7 @@ export async function executeTestFile(
   cdpPage?: any,
 ): Promise<TestResult[]> {
   const needsNode = opts.forceNode || await detectNodeAPIs(testFilePath);
+  console.log(`  [path] ${path.basename(testFilePath)} → ${needsNode ? 'NODE' : 'BROWSER'}`);
 
   if (needsNode) {
     return executeNode(testFilePath, bridge, opts.grep, nodePage, cdpPage);
@@ -124,33 +125,105 @@ async function executeNode(
   nodePage?: any,
   cdpPage?: any,
 ): Promise<TestResult[]> {
-  ensureFramework();
-  (globalThis as any).__resetTestState();
-  (globalThis as any).__setGrep(grep || null);
+  const page = cdpPage || nodePage;
+  const pw = await import('playwright-core');
+  const expect = (pw as any).expect ?? ((await import('@playwright/test')) as any).expect;
 
-  const bridgeRun = async (cmd: string) => {
-    const r = await bridge.run(cmd);
-    if (r.isError) throw new Error(r.text || 'Bridge error');
-    return r;
+  // Collect registered tests
+  const tests: { name: string; fn: (fixtures: any) => Promise<void>; skip: boolean }[] = [];
+  const hooks: { beforeEach: Function[]; afterEach: Function[]; beforeAll: Function[]; afterAll: Function[] } = {
+    beforeEach: [], afterEach: [], beforeAll: [], afterAll: [],
   };
-  (globalThis as any).__proxyPage = createPageProxy(bridgeRun, nodePage, cdpPage);
-  (globalThis as any).__proxyExpect = createExpect(bridgeRun);
 
-  console.log('  [compile]', path.basename(testFilePath));
+  // Provide test/expect on globalThis for the compiled test file
+  const grepRe = grep ? new RegExp(grep, 'i') : null;
+  const testFn: any = (name: string, fn: any) => { tests.push({ name, fn, skip: false }); };
+  testFn.only = testFn;
+  testFn.skip = (nameOrCond: any, fn?: any) => {
+    if (typeof nameOrCond === 'string') tests.push({ name: nameOrCond, fn, skip: true });
+  };
+  testFn.describe = (name: string, fn: () => void) => {
+    const prefix = name;
+    const origTest = (globalThis as any).__test;
+    const wrappedTest: any = (n: string, f: any) => { tests.push({ name: `${prefix} > ${n}`, fn: f, skip: false }); };
+    wrappedTest.skip = (nOrC: any, f?: any) => {
+      if (typeof nOrC === 'string') tests.push({ name: `${prefix} > ${nOrC}`, fn: f, skip: true });
+    };
+    wrappedTest.only = wrappedTest;
+    (globalThis as any).__test = wrappedTest;
+    fn();
+    (globalThis as any).__test = origTest;
+  };
+  (testFn.describe as any).configure = () => {};
+  testFn.beforeEach = (fn: Function) => { hooks.beforeEach.push(fn); };
+  testFn.afterEach = (fn: Function) => { hooks.afterEach.push(fn); };
+  testFn.beforeAll = (fn: Function) => { hooks.beforeAll.push(fn); };
+  testFn.afterAll = (fn: Function) => { hooks.afterAll.push(fn); };
+  testFn.fixme = (condOrName?: any, fn?: any) => {
+    if (typeof condOrName === 'string') tests.push({ name: condOrName, fn, skip: true });
+  };
+  testFn.slow = () => {};
+  testFn.info = () => ({ annotations: [] });
+  testFn.extend = (fixtures: Record<string, any>) => {
+    // Return a test function that applies extended fixtures
+    const extended: any = (name: string, fn: any) => {
+      testFn(name, async (baseFixtures: any) => {
+        const ext = { ...baseFixtures };
+        for (const [key, fixtureFn] of Object.entries(fixtures)) {
+          if (typeof fixtureFn === 'function') {
+            await new Promise<void>((resolve, reject) => {
+              Promise.resolve(fixtureFn({ ...ext }, async (value: any) => { ext[key] = value; resolve(); })).catch(reject);
+            });
+          }
+        }
+        await fn(ext);
+      });
+    };
+    // Copy methods
+    for (const k of Object.keys(testFn)) (extended as any)[k] = (testFn as any)[k];
+    return extended;
+  };
+
+  (globalThis as any).__test = testFn;
+  (globalThis as any).__expect = expect;
+
+  // Compile and import (registers tests, doesn't run them)
   const compiled = await compileNode(testFilePath);
-  console.log('  [compiled]', compiled.length, 'bytes');
   const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
   try {
     fs.writeFileSync(tmpFile, compiled);
-    console.log('  [import]');
-    const mod = await import(`file://${tmpFile.replace(/\\/g, '/')}`);
-    const resultText = typeof mod.default === 'string' ? mod.default : '';
-    return parseResults(resultText, testFilePath);
+    await import(`file://${tmpFile.replace(/\\/g, '/')}`);
   } finally {
-    delete (globalThis as any).__proxyPage;
-    delete (globalThis as any).__proxyExpect;
     try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
   }
+
+  // Run tests from Node side with real page
+  const results: TestResult[] = [];
+  const fixtures = { page, context: page.context(), expect };
+
+  for (const hook of hooks.beforeAll) await hook(fixtures);
+
+  for (const t of tests) {
+    if (t.skip || (grepRe && !grepRe.test(t.name))) {
+      results.push({ name: t.name, file: testFilePath, passed: true, skipped: true, duration: 0 });
+      continue;
+    }
+    const start = Date.now();
+    try {
+      for (const fn of hooks.beforeEach) await fn(fixtures);
+      await t.fn(fixtures);
+      for (const fn of hooks.afterEach) await fn(fixtures);
+      results.push({ name: t.name, file: testFilePath, passed: true, skipped: false, duration: Date.now() - start });
+    } catch (err: unknown) {
+      const msg = (err as Error).message || String(err);
+      console.error(`    [FAIL] ${t.name}\n      ${msg.split('\n').slice(0, 3).join('\n      ')}`);
+      results.push({ name: t.name, file: testFilePath, passed: false, skipped: false, error: msg, duration: Date.now() - start });
+    }
+  }
+
+  for (const hook of hooks.afterAll) await hook(fixtures);
+
+  return results;
 }
 
 async function compileNode(testFilePath: string): Promise<string> {
@@ -165,8 +238,6 @@ async function compileNode(testFilePath: string): Promise<string> {
       build.onLoad({ filter: /.*/, namespace: 'entry' }, () => ({
         contents: `
           import './${testFileName}';
-          const result = await globalThis.__runTests();
-          export default result;
         `,
         resolveDir: testDir,
         loader: 'ts',

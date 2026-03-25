@@ -54,7 +54,10 @@ async function ensureServer(): Promise<Server> {
       };
       fs.readFile(filePath, (err, data) => {
         if (err) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+        res.writeHead(200, {
+          'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        });
         res.end(data);
       });
     });
@@ -67,6 +70,7 @@ async function ensureServer(): Promise<Server> {
         port,
       };
       console.log(`    [server] started on port ${port}, assets: ${ASSETS_DIR}`);
+      (globalThis as any).__emptyPage = _server.EMPTY_PAGE;
       resolve(_server);
     });
   });

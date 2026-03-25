@@ -121,6 +121,9 @@ test.extend = (fixtures: Record<string, any>) => {
   extendedTest.beforeEach = test.beforeEach;
   extendedTest.afterEach = test.afterEach;
   extendedTest.extend = test.extend;
+  extendedTest.fixme = (test as any).fixme;
+  extendedTest.slow = (test as any).slow;
+  extendedTest.info = (test as any).info;
   return extendedTest;
 };
 

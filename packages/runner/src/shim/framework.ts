@@ -134,6 +134,9 @@ test.extend = (fixtures: Record<string, any>) => {
   extendedTest.beforeEach = test.beforeEach;
   extendedTest.afterEach = test.afterEach;
   extendedTest.extend = test.extend;
+  extendedTest.fixme = (test as any).fixme;
+  extendedTest.slow = (test as any).slow;
+  extendedTest.info = (test as any).info;
   return extendedTest;
 };
 
@@ -172,7 +175,6 @@ async function runSuite(
     const start = Date.now();
     console.log(`    [run] ${fullName}`);
     try {
-      // Note: we reuse the same page, unlike Playwright which creates a fresh context
       for (const fn of allBeforeEach) await fn(fixtures);
       await Promise.race([
         t.fn(fixtures),
@@ -184,9 +186,11 @@ async function runSuite(
       if ((err as Error).name === 'SkipError') {
         results.push({ name: fullName, passed: true, skipped: true, duration: 0 });
       } else {
+        const errMsg = (err as Error).message || String(err);
+        console.error(`    [FAIL] ${fullName}\n      ${errMsg.split('\n').slice(0, 5).join('\n      ')}`);
         results.push({
           name: fullName, passed: false, skipped: false,
-          error: (err as Error).message || String(err),
+          error: errMsg,
           duration: Date.now() - start,
         });
       }
