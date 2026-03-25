@@ -125,29 +125,73 @@ async function closeBridge() {
   _bridge = null;
 }
 
+// ─── Test name resolution ───
+
+async function resolveTestNames(worker, runPayload) {
+  await worker._loadIfNeeded();
+
+  const cacheKeys = Object.keys(require.cache);
+  const testLoaderPath = cacheKeys.find(k => k.includes('common') && k.endsWith('testLoader.js'));
+  const suiteUtilsPath = cacheKeys.find(k => k.includes('common') && k.endsWith('suiteUtils.js'));
+  if (!testLoaderPath || !suiteUtilsPath) return null;
+
+  const { loadTestFile } = require(testLoaderPath);
+  const { bindFileSuiteToProject, applyRepeatEachIndex } = require(suiteUtilsPath);
+
+  const fileSuite = await loadTestFile(runPayload.file, worker._config);
+  const suite = bindFileSuiteToProject(worker._project, fileSuite);
+  if (worker._params.repeatEachIndex)
+    applyRepeatEachIndex(worker._project, suite, worker._params.repeatEachIndex);
+
+  const idToTitle = new Map();
+  for (const test of suite.allTests()) {
+    const fullName = test.titlePath().slice(1).join(' > ');
+    idToTitle.set(test.id, fullName);
+  }
+  return idToTitle;
+}
+
+function buildGrep(testNames) {
+  if (!testNames || testNames.length === 0) return null;
+  const escaped = testNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return '^(' + escaped.join('|') + ')$';
+}
+
 // ─── Bridge execution ───
 
-async function runOnBridge(worker, compiled, runPayload) {
+async function runOnBridge(worker, compiled, runPayload, idToTitle) {
   const entries = runPayload.entries;
 
-  const r = await _bridge.runScript(`
-    globalThis.__resetTestState();
-    ${compiled}
-    await globalThis.__runTests();
-  `, 'javascript');
+  // Build grep to run only requested tests
+  const requestedNames = idToTitle
+    ? entries.map(e => idToTitle.get(e.testId)).filter(Boolean)
+    : [];
+  const grepPattern = buildGrep(requestedNames);
+
+  let script = 'globalThis.__resetTestState();\n';
+  if (grepPattern) {
+    script += 'globalThis.__setGrepExact(' + JSON.stringify(grepPattern) + ');\n';
+  }
+  script += compiled + '\n';
+  script += 'await globalThis.__runTests();';
+
+  const r = await _bridge.runScript(script, 'javascript');
 
   const resultText = r.isError ? '' : (r.text || '');
   const lines = resultText.split('\n');
 
   for (const entry of entries) {
     const testId = entry.testId;
+    const testName = idToTitle ? idToTitle.get(testId) : null;
 
     worker.dispatchEvent('testBegin', {
       testId: testId,
       startWallTime: Date.now(),
     });
 
-    const testResult = findResult(lines, testId, entries);
+    const testResult = testName
+      ? findResultByName(lines, testName)
+      : findResultByIndex(lines, entries.indexOf(entry));
 
     worker.dispatchEvent('testEnd', {
       testId: testId,
@@ -168,10 +212,30 @@ async function runOnBridge(worker, compiled, runPayload) {
   console.error('[pw-worker] bridge done (pid ' + process.pid + ')');
 }
 
-function findResult(lines, testId, entries) {
-  const idx = entries.findIndex(e => e.testId === testId);
-  let currentIdx = -1;
+function findResultByName(lines, testName) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const passMatch = line.match(/^\s*[✓✔]\s+(.+?)\s+\(\d+ms\)$/);
+    if (passMatch && passMatch[1] === testName) {
+      const dur = line.match(/\((\d+)ms\)/);
+      return { status: 'passed', duration: dur ? parseInt(dur[1]) : 0, errors: [] };
+    }
+    const failMatch = line.match(/^\s*[✗✘]\s+(.+?)\s+\(\d+ms\)$/);
+    if (failMatch && failMatch[1] === testName) {
+      const dur = line.match(/\((\d+)ms\)/);
+      const errLine = lines[i + 1] || '';
+      return { status: 'failed', duration: dur ? parseInt(dur[1]) : 0, errors: [{ message: errLine.trim() }] };
+    }
+    const skipMatch = line.match(/^\s*-\s+(.+?)\s+\(skipped\)$/);
+    if (skipMatch && skipMatch[1] === testName) {
+      return { status: 'skipped', duration: 0, errors: [] };
+    }
+  }
+  return { status: 'failed', duration: 0, errors: [{ message: 'Test result not found' }] };
+}
 
+function findResultByIndex(lines, idx) {
+  let currentIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.match(/^\s*[✓✔]/)) {
@@ -185,11 +249,7 @@ function findResult(lines, testId, entries) {
       if (currentIdx === idx) {
         const dur = line.match(/\((\d+)ms\)/);
         const errLine = lines[i + 1] || '';
-        return {
-          status: 'failed',
-          duration: dur ? parseInt(dur[1]) : 0,
-          errors: [{ message: errLine.trim() }],
-        };
+        return { status: 'failed', duration: dur ? parseInt(dur[1]) : 0, errors: [{ message: errLine.trim() }] };
       }
     } else if (line.match(/^\s*-.*\(skipped\)/)) {
       currentIdx++;
@@ -198,7 +258,6 @@ function findResult(lines, testId, entries) {
       }
     }
   }
-
   return { status: 'failed', duration: 0, errors: [{ message: 'Test result not found' }] };
 }
 
@@ -253,10 +312,16 @@ function patchWorker(worker, params) {
       return origRunTestGroup(runPayload);
     }
 
-    console.error('[pw-worker] bridge mode: ' + runPayload.file);
+    const idToTitle = await resolveTestNames(worker, runPayload);
+    const names = idToTitle
+      ? runPayload.entries.map(e => idToTitle.get(e.testId)).filter(Boolean)
+      : [];
+    console.error('[pw-worker] bridge mode: ' + runPayload.file +
+      (names.length ? ' (' + names.join(', ') + ')' : ''));
+
     const compiled = await compile(runPayload.file);
     await ensureBridge();
-    return runOnBridge(worker, compiled, runPayload);
+    return runOnBridge(worker, compiled, runPayload, idToTitle);
   };
 
   worker.gracefullyClose = async function() {

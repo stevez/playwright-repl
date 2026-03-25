@@ -218,6 +218,7 @@ export function installFramework() {
   _g.__runTests = __runTests;
   _g.__resetTestState = resetState;
   _g.__setGrep = (pattern: string | null) => { grepPattern = pattern ? new RegExp(pattern, 'i') : null; };
+  _g.__setGrepExact = (pattern: string | null) => { grepPattern = pattern ? new RegExp(pattern) : null; };
   _g.__setTimeout = (ms: number) => { testTimeout = ms; };
   resetState();
 }
