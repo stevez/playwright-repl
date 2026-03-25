@@ -8,8 +8,6 @@
  */
 'use strict';
 
-if (!process.env.PW_BRIDGE_WORKER) return;
-
 const Module = require('module');
 const origLoad = Module._load;
 

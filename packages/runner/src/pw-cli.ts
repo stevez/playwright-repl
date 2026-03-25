@@ -31,7 +31,6 @@ const child = spawn(process.execPath, [pwCliPath, ...args], {
   cwd: process.cwd(),
   env: {
     ...process.env,
-    PW_BRIDGE_WORKER: '1',
     PW_EXT_PATH: extPath,
     NODE_OPTIONS: `${existingNodeOptions} --require ${preloadPath}`.trim(),
   },
