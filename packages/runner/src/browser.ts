@@ -17,7 +17,7 @@ export async function launchBrowser(opts: { headed: boolean; bridgePort: number 
   const extPath = path.resolve(path.dirname(extPkgPath), 'dist');
 
   // Launch Chromium with extension
-  const pw = require('playwright-core');  // provided by @playwright/test
+  const pw = require('@playwright/test');
   const context = await pw.chromium.launchPersistentContext('', {
     channel: 'chromium',
     headless: !opts.headed,
