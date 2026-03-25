@@ -48,16 +48,16 @@ function getAliasPath(): string {
 export async function executeTestFile(
   testFilePath: string,
   bridge: BridgeServer,
-  _opts: RunOptions,
+  opts: RunOptions,
   nodePage?: any,
   cdpPage?: any,
 ): Promise<TestResult[]> {
-  const needsNode = await detectNodeAPIs(testFilePath);
+  const needsNode = opts.forceNode || await detectNodeAPIs(testFilePath);
 
   if (needsNode) {
-    return executeNode(testFilePath, bridge, nodePage, cdpPage);
+    return executeNode(testFilePath, bridge, opts.grep, nodePage, cdpPage);
   }
-  return executeBrowser(testFilePath, bridge);
+  return executeBrowser(testFilePath, bridge, opts.grep);
 }
 
 // ─── Browser Path ──────────────────────────────────────────────────────────
@@ -65,7 +65,12 @@ export async function executeTestFile(
 async function executeBrowser(
   testFilePath: string,
   bridge: BridgeServer,
+  grep?: string,
 ): Promise<TestResult[]> {
+  // Set grep in browser framework
+  if (grep) await bridge.run(`globalThis.__setGrep(${JSON.stringify(grep)})`);
+  else await bridge.run(`globalThis.__setGrep(null)`);
+
   const compiled = await compileBrowser(testFilePath);
 
   // Send compiled test to bridge — runs in SW with real page/expect
@@ -115,11 +120,13 @@ async function compileBrowser(testFilePath: string): Promise<string> {
 async function executeNode(
   testFilePath: string,
   bridge: BridgeServer,
+  grep?: string,
   nodePage?: any,
   cdpPage?: any,
 ): Promise<TestResult[]> {
   ensureFramework();
   (globalThis as any).__resetTestState();
+  (globalThis as any).__setGrep(grep || null);
 
   const bridgeRun = async (cmd: string) => {
     const r = await bridge.run(cmd);
@@ -129,10 +136,13 @@ async function executeNode(
   (globalThis as any).__proxyPage = createPageProxy(bridgeRun, nodePage, cdpPage);
   (globalThis as any).__proxyExpect = createExpect(bridgeRun);
 
+  console.log('  [compile]', path.basename(testFilePath));
   const compiled = await compileNode(testFilePath);
+  console.log('  [compiled]', compiled.length, 'bytes');
   const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
   try {
     fs.writeFileSync(tmpFile, compiled);
+    console.log('  [import]');
     const mod = await import(`file://${tmpFile.replace(/\\/g, '/')}`);
     const resultText = typeof mod.default === 'string' ? mod.default : '';
     return parseResults(resultText, testFilePath);
@@ -189,9 +199,10 @@ const NODE_MODULES = new Set([
 
 // Patterns that need Node.js path (context-level routing)
 const NODE_PATTERNS = [
-  /\.route\s*\(/,       // page.route() with callbacks
+  /\.route\s*\(/,        // page.route() with callbacks
   /\.routeFromHAR\s*\(/, // file path access
   /\.waitForEvent\s*\(/, // non-serializable return objects
+  /\bserver\b/,          // server fixture (http.createServer in Node.js)
 ];
 
 async function detectNodeAPIs(testFilePath: string): Promise<boolean> {

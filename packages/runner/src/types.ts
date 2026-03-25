@@ -6,6 +6,7 @@ export interface RunOptions {
   retries: number;
   workers: number;
   baseURL?: string;
+  forceNode?: boolean;
 }
 
 export interface TestResult {

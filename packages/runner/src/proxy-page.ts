@@ -13,6 +13,16 @@
  */
 
 type BridgeRun = (command: string) => Promise<{ text?: string; isError?: boolean }>;
+const BRIDGE_TIMEOUT = 30000;
+const BRIDGE_DEBUG = !!process.env.PW_DEBUG;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: any;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`Timeout ${ms}ms: ${label}`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 const PROXY_FLAG = Symbol('isProxy');
 const CHAIN_KEY = Symbol('chain');
@@ -22,9 +32,12 @@ const CONTEXT_METHODS = new Set([
   'route', 'unroute', 'routeFromHAR', 'unrouteAll',
 ]);
 
-// Methods delegated to CDP page (same tab, returns non-serializable objects).
+// Methods delegated to Node page (same tab, returns non-serializable objects or needs concurrency).
 const CDP_PAGE_METHODS = new Set([
   'waitForEvent',
+  '$', '$$', '$eval', '$$eval',
+  'frames', 'mainFrame',
+  'evaluate', 'evaluateHandle',
 ]);
 
 function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdpPage?: any): any {
@@ -37,10 +50,12 @@ function makeProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdpPage?: a
       // await triggers execution
       if (prop === 'then') {
         return (resolve: (v: any) => void, reject: (e: any) => void) => {
-          bridge(`await ${chain}`).then(r => {
+          const cmd = `await ${chain}`;
+          if (BRIDGE_DEBUG) console.log(`    [bridge →] ${cmd.substring(0, 120)}`);
+          withTimeout(bridge(cmd), BRIDGE_TIMEOUT, chain).then(r => {
+            if (BRIDGE_DEBUG) console.log(`    [bridge ←] ${r.isError ? 'ERR' : 'OK'} ${(r.text || '').substring(0, 80)}`);
             if (r.isError) reject(new Error(r.text || 'Bridge error'));
             else {
-              // Try to parse the result as JSON
               const text = r.text;
               if (text === undefined || text === '') resolve(undefined);
               else {
@@ -85,7 +100,7 @@ function makeCallableProxy(chain: string, bridge: BridgeRun, nodePage?: any, cdp
 
       if (prop === 'then') {
         return (resolve: (v: any) => void, reject: (e: any) => void) => {
-          bridge(`await ${chain}`).then(r => {
+          withTimeout(bridge(`await ${chain}`), BRIDGE_TIMEOUT, chain).then(r => {
             if (r.isError) reject(new Error(r.text || 'Bridge error'));
             else {
               const text = r.text;

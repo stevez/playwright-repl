@@ -29,6 +29,7 @@ export async function run(args: string[]): Promise<number> {
     retries: opts.retries ?? config.retries ?? 0,
     workers: opts.workers ?? 1, // Phase 1: single worker
     baseURL: config.use?.baseURL,
+    forceNode: opts.forceNode,
   };
 
   console.log(`\npw test runner\n`);

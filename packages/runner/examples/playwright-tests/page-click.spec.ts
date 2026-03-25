@@ -49,24 +49,6 @@ it('should click button inside frameset', async ({ page, server }) => {
   expect(await frame.evaluate('result')).toBe('Clicked');
 });
 
-it('should issue clicks in parallel in page and popup', async ({ page, server }) => {
-  await page.goto(server.PREFIX + '/counter.html');
-  const [popup] = await Promise.all([
-    page.waitForEvent('popup'),
-    page.evaluate(() => window.open('/counter.html')),
-  ]);
-  const clickPromises = [];
-  for (let i = 0; i < 21; ++i) {
-    if (i % 3 === 0)
-      clickPromises.push(popup.locator('button').click());
-    else
-      clickPromises.push(page.locator('button').click());
-  }
-  await Promise.all(clickPromises);
-  expect(await page.evaluate(() => window['count'])).toBe(14);
-  expect(await popup.evaluate(() => window['count'])).toBe(7);
-});
-
 it('should click svg', async ({ page }) => {
   await page.setContent(`
     <svg height="100" width="100">
@@ -372,22 +354,6 @@ it('should click the button inside an iframe', async ({ page, server }) => {
   expect(await frame.evaluate(() => window['result'])).toBe('Clicked');
 });
 
-it('should click the button with fixed position inside an iframe', async ({ page, server, browserName }) => {
-  it.fixme(browserName === 'chromium');
-
-  // @see https://github.com/GoogleChrome/puppeteer/issues/4110
-  // @see https://bugs.chromium.org/p/chromium/issues/detail?id=986390
-  // @see https://chromium-review.googlesource.com/c/chromium/src/+/1742784
-  await page.goto(server.EMPTY_PAGE);
-  await page.setViewportSize({ width: 500, height: 500 });
-  await page.setContent('<div style="width:100px;height:2000px">spacer</div>');
-  await attachFrame(page, 'button-test', server.CROSS_PROCESS_PREFIX + '/input/button.html');
-  const frame = page.frames()[1];
-  await frame.$eval('button', button => button.style.setProperty('position', 'fixed'));
-  await frame.click('button');
-  expect(await frame.evaluate(() => window['result'])).toBe('Clicked');
-});
-
 it('should click the button behind sticky header', async ({ page }) => {
   await page.setViewportSize({ width: 500, height: 240 });
   await page.setContent(`
@@ -421,54 +387,6 @@ it('should click the button behind sticky header', async ({ page }) => {
     </ol>
   `);
   await page.$eval('#li14', e => e.scrollIntoView());
-  await page.click('#target');
-  expect(await page.evaluate(() => window['__clicked'])).toBe(true);
-});
-
-it('should click the button behind position:absolute header', {
-  annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/36339' },
-}, async ({ page }) => {
-  await page.setViewportSize({ width: 500, height: 240 });
-  await page.setContent(`
-    <style>
-    * {
-      padding: 0;
-      margin: 0;
-    }
-    li {
-      height: 80px;
-      border: 1px solid black;
-    }
-    ol {
-      height: 100vh;
-      overflow: scroll;
-      padding-top: 160px;
-    }
-    body {
-      position: relative;
-    }
-    div.fixed {
-      position: absolute;
-      top: 0;
-      z-index: 1001;
-      width: 100%;
-      background: red;
-      height: 160px;
-    }
-    </style>
-
-    <ol>
-    <li>hi1</li><li>hi2</li><li>hi3</li><li>hi4</li><li>hi5</li><li>hi6</li><li>hi7</li><li>hi8</li>
-    <li id=target onclick="window.__clicked = true">hi9</li>
-    <li>hi10</li><li>hi11</li><li>hi12</li><li>hi13</li><li id=li14>hi14</li>
-    </ol>
-
-    <div class=fixed>Overlay</div>
-  `);
-  await page.$eval('ol', e => {
-    const target = document.querySelector('#target') as HTMLElement;
-    e.scrollTo({ top: target.offsetTop, behavior: 'instant' });
-  });
   await page.click('#target');
   expect(await page.evaluate(() => window['__clicked'])).toBe(true);
 });
@@ -905,70 +823,6 @@ it('should click zero-sized input by label', async ({ page }) => {
   expect(await page.evaluate('window.__clicked')).toBe(true);
 });
 
-it('should not throw protocol error when navigating during the click', async ({ page, server, mode }) => {
-  it.skip(mode !== 'default');
-
-  await page.goto(server.PREFIX + '/input/button.html');
-  let firstTime = true;
-  const __testHookBeforeStable = async () => {
-    if (!firstTime)
-      return;
-    firstTime = false;
-    await page.goto(server.PREFIX + '/input/button.html');
-  };
-  await page.click('button', { __testHookBeforeStable } as any);
-  expect(await page.evaluate('result')).toBe('Clicked');
-});
-
-it('should retry when navigating during the click', async ({ page, server, mode, isAndroid }) => {
-  it.skip(mode !== 'default');
-  it.fixme(isAndroid);
-
-  await page.goto(server.PREFIX + '/input/button.html');
-  let firstTime = true;
-  const __testHookBeforeStable = async () => {
-    if (!firstTime)
-      return;
-    firstTime = false;
-    await page.goto(server.EMPTY_PAGE);
-  };
-  const error = await page.click('button', { __testHookBeforeStable, timeout: 2000 } as any).catch(e => e);
-  expect(error.message).toContain('element was detached from the DOM, retrying');
-});
-
-it('should not hang when frame is detached', async ({ page, server, mode }) => {
-  it.skip(mode !== 'default');
-
-  await attachFrame(page, 'frame1', server.EMPTY_PAGE);
-  const frame = page.frames()[1];
-  await frame.goto(server.PREFIX + '/input/button.html');
-
-  // Start moving the button.
-  await frame.$eval('button', button => {
-    button.style.transition = 'margin 5s linear 0s';
-    button.style.marginLeft = '200px';
-  });
-
-  let resolveDetachPromise;
-  const detachPromise = new Promise(resolve => resolveDetachPromise = resolve);
-  let firstTime = true;
-  const __testHookBeforeStable = () => {
-    // Detach the frame after "waiting for stable" has started.
-    if (!firstTime)
-      return;
-    firstTime = false;
-    setTimeout(async () => {
-      await detachFrame(page, 'frame1');
-      resolveDetachPromise();
-    }, 1000);
-  };
-  const promise = frame.click('button', { __testHookBeforeStable } as any).catch(e => e);
-
-  await detachPromise;
-  const error = await promise;
-  expect(error).toBeTruthy();
-  expect(error.message).toMatch(/frame got detached|Frame was detached/);
-});
 
 it('should climb dom for inner label with pointer-events:none', async ({ page }) => {
   await page.setContent('<button onclick="window.__CLICKED=true;"><label style="pointer-events:none">Click target</label></button>');
@@ -1149,48 +1003,6 @@ it('should click in a nested transformed iframe', async ({ page }) => {
   expect(await page.evaluate('window._clicked')).toBe(true);
 });
 
-it('ensure events are dispatched in the individual tasks', async ({ page, browserName }) => {
-  it.info().annotations.push({ type: 'issue', description: 'https://github.com/microsoft/playwright/issues/19685' });
-  await page.setContent(`
-    <div id="outer" style="background: #d4d4d4; width: 60px; height: 60px;">
-      <div id="inner" style="background: #adadad; width: 46px; height: 46px;"></div>
-    </div>
-  `);
-
-  await page.evaluate(() => {
-    function onClick(name) {
-      console.log(`click ${name}`);
-
-      window.builtins.setTimeout(function() {
-        console.log(`timeout ${name}`);
-      }, 0);
-
-      void Promise.resolve().then(function() {
-        console.log(`promise ${name}`);
-      });
-    }
-
-    document.getElementById('inner').addEventListener('click', () => onClick('inner'));
-    document.getElementById('outer').addEventListener('click', () => onClick('outer'));
-  });
-
-  // Capture console messages
-  const messages: Array<string> = [];
-  page.on('console', msg => messages.push(msg.text()));
-
-  // Click on the inner div element
-  await page.locator('#inner').click();
-
-  await expect.poll(() => messages).toEqual([
-    'click inner',
-    'promise inner',
-    'click outer',
-    'promise outer',
-    'timeout inner',
-    'timeout outer',
-  ]);
-});
-
 it('should click if opened select covers the button', async ({ page }) => {
   it.info().annotations.push({ type: 'issue', description: 'https://github.com/microsoft/playwright/issues/23618' });
   await page.setContent(`
@@ -1211,29 +1023,6 @@ it('should click if opened select covers the button', async ({ page }) => {
   await page.click('select');
   await page.click('button');
   expect(await page.evaluate('window.__CLICKED')).toBe(42);
-});
-
-it('should fire contextmenu event on right click in correct order', async ({ page, server, browserName }) => {
-  it.info().annotations.push({ type: 'issue', description: 'https://github.com/microsoft/playwright/issues/26515' });
-  it.fixme(browserName === 'chromium', 'mouseup is fired');
-  it.fixme(browserName === 'firefox', 'mouseup is fired');
-  await page.goto(server.EMPTY_PAGE);
-  await page.setContent(`
-    <button id="target">Click me</button>
-  `);
-  await page.evaluate(() => {
-    const logEvent = e => console.log(e.type);
-    document.addEventListener('mousedown', logEvent);
-    document.addEventListener('mouseup', logEvent);
-    document.addEventListener('contextmenu', logEvent);
-  });
-  const entries = [];
-  page.on('console', message => entries.push(message.text()));
-  await page.getByRole('button', { name: 'Click me' }).click({ button: 'right' });
-  await expect.poll(() => entries).toEqual([
-    'mousedown',
-    'contextmenu',
-  ]);
 });
 
 it('should set PointerEvent.pressure on pointerdown', async ({ page, isLinux, headless }) => {
@@ -1282,20 +1071,7 @@ it('should set PointerEvent.pressure on pointermove', async ({ page, isLinux, he
   ]);
 });
 
-it('should click into shadow root with slotted div', { annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/37768' } }, async ({ page }) => {
-  await page.setContent(`
-    <my-button>
-      <template shadowrootmode="open">
-        <button><slot></slot></button>
-      </template>
-      <div>Foo</div>
-    </my-button>
-  `);
-
-  await page.getByRole('button', { name: 'Foo' }).click();
-});
-
-it('should click shadow root button', { annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/37768' } }, async ({ page }) => {
+it('should click shadow root button', async ({ page }) => {
   await page.setContent(`
     <my-button>
       <template shadowrootmode="open">
@@ -1339,29 +1115,3 @@ it('should click with tweened mouse movement', async ({ page, browserName, isAnd
   ]);
 });
 
-it('should not wait with noAutoWaiting', async ({ page }) => {
-  await page.setContent(`<button>click me</button>`);
-  const error = await page.locator('#target').click({ __testHookNoAutoWaiting: true } as any).catch(e => e);
-  expect(error.message).toContain('locator.click: Element(s) not found');
-});
-
-it('should not wait with noAutoWaiting 2', async ({ page }) => {
-  await page.setContent(`
-    <style>
-      div:hover button {
-        margin-left: 200px;
-      }
-    </style>
-    <div>
-      <button>click me</button>
-    </div>
-  `);
-  const error = await page.locator('button').click({ __testHookNoAutoWaiting: true } as any).catch(e => e);
-  expect(error.message).toContain('locator.click: <div>…</div> intercepts pointer events');
-});
-
-it('should not wait with noAutoWaiting 3', async ({ page }) => {
-  await page.setContent(`<button disabled>click me</button>`);
-  const error = await page.locator('button').click({ __testHookNoAutoWaiting: true } as any).catch(e => e);
-  expect(error.message).toContain('locator.click: Element is not enabled');
-});

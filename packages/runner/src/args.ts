@@ -7,6 +7,7 @@ export interface CliOptions {
   config: string;
   grep?: string;
   headed: boolean;
+  forceNode?: boolean;
   workers?: number;
   timeout?: number;
   retries?: number;
@@ -33,6 +34,9 @@ export function parseArgs(args: string[]): CliOptions {
         break;
       case '--headed':
         opts.headed = true;
+        break;
+      case '--node':
+        opts.forceNode = true;
         break;
       case '-j':
       case '--workers':

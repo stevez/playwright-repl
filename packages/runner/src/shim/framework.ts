@@ -44,6 +44,9 @@ let rootSuite: Suite;
 let currentSuite: Suite;
 let hasOnly: boolean;
 
+let grepPattern: RegExp | null = null;
+let testTimeout = 15000; // default per-test timeout
+
 function resetState() {
   rootSuite = {
     name: '', tests: [], beforeAll: [], afterAll: [],
@@ -64,8 +67,12 @@ test.only = (name: string, fn: TestFn) => {
   currentSuite.tests.push({ name, fn, only: true, skip: false });
 };
 
-test.skip = (name: string, fn: TestFn) => {
-  currentSuite.tests.push({ name, fn, only: false, skip: true });
+test.skip = (nameOrCond: any, fn?: any) => {
+  if (typeof nameOrCond === 'string') {
+    currentSuite.tests.push({ name: nameOrCond, fn, only: false, skip: true });
+  } else if (nameOrCond) {
+    throw new SkipError(); // conditional form inside test body
+  }
 };
 
 test.describe = (name: string, fn: () => void) => {
@@ -80,7 +87,13 @@ test.describe = (name: string, fn: () => void) => {
   currentSuite = parent;
 };
 (test.describe as any).configure = () => {};
-(test as any).fixme = test.skip;
+
+// Conditional skip: it.fixme(condition) / it.skip(condition) inside test body
+class SkipError extends Error { constructor() { super('SKIP'); this.name = 'SkipError'; } }
+(test as any).fixme = (condOrName?: any, fn?: any) => {
+  if (typeof condOrName === 'string') return test.skip(condOrName, fn); // registration form
+  if (condOrName) throw new SkipError(); // conditional form
+};
 (test as any).slow = () => {};
 (test as any).info = () => ({ annotations: [] });
 
@@ -151,24 +164,32 @@ async function runSuite(
   for (const t of suite.tests) {
     const fullName = prefix ? `${prefix} > ${t.name}` : t.name;
 
-    if (t.skip || (hasOnly && !t.only)) {
+    if (t.skip || (hasOnly && !t.only) || (grepPattern && !grepPattern.test(fullName))) {
       results.push({ name: fullName, passed: true, skipped: true, duration: 0 });
       continue;
     }
 
     const start = Date.now();
+    console.log(`    [run] ${fullName}`);
     try {
-      if (fixtures.page?.unrouteAll) await fixtures.page.unrouteAll();
+      // Note: we reuse the same page, unlike Playwright which creates a fresh context
       for (const fn of allBeforeEach) await fn(fixtures);
-      await t.fn(fixtures);
+      await Promise.race([
+        t.fn(fixtures),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Test timeout of ${testTimeout}ms exceeded`)), testTimeout)),
+      ]);
       for (const fn of allAfterEach) await fn(fixtures);
       results.push({ name: fullName, passed: true, skipped: false, duration: Date.now() - start });
     } catch (err: unknown) {
-      results.push({
-        name: fullName, passed: false, skipped: false,
-        error: (err as Error).message || String(err),
-        duration: Date.now() - start,
-      });
+      if ((err as Error).name === 'SkipError') {
+        results.push({ name: fullName, passed: true, skipped: true, duration: 0 });
+      } else {
+        results.push({
+          name: fullName, passed: false, skipped: false,
+          error: (err as Error).message || String(err),
+          duration: Date.now() - start,
+        });
+      }
     }
   }
 
@@ -214,6 +235,8 @@ export function installFramework() {
   _g.__expect = expect;
   _g.__runTests = __runTests;
   _g.__resetTestState = resetState;
+  _g.__setGrep = (pattern: string | null) => { grepPattern = pattern ? new RegExp(pattern, 'i') : null; };
+  _g.__setTimeout = (ms: number) => { testTimeout = ms; };
   resetState();
 }
 
