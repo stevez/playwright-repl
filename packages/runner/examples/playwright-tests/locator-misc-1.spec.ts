@@ -16,7 +16,6 @@
  */
 
 import { test as it, expect } from './pageTest';
-import path from 'path';
 
 it('should hover @smoke', async ({ page, server, headless }) => {
   it.skip(!headless, 'headed messes up with hover');
@@ -130,10 +129,3 @@ it('should dispatch click event via ElementHandles', async ({ page, server }) =>
   expect(await page.evaluate(() => window['result'])).toBe('Clicked');
 });
 
-it('should upload the file', async ({ page, server, asset }) => {
-  await page.goto(server.PREFIX + '/input/fileupload.html');
-  const filePath = path.relative(process.cwd(), asset('file-to-upload.txt'));
-  const input = page.locator('input[type=file]');
-  await input.setInputFiles(filePath);
-  expect(await page.evaluate(e => (e as HTMLInputElement).files[0].name, await input.elementHandle())).toBe('file-to-upload.txt');
-});

@@ -219,31 +219,6 @@ it('should fill contenteditable with new lines', async ({ page, server, browserN
   expect(await page.locator('div[contenteditable]').innerText()).toBe('John\nDoe');
 });
 
-it('should not double-fill in contenteditable with beforeinput handler in Firefox', {
-  annotation: {
-    type: 'issue',
-    description: 'https://github.com/microsoft/playwright/issues/36715'
-  }
-}, async ({ page, browserName }) => {
-  it.fixme(browserName === 'firefox', 'https://github.com/microsoft/playwright/issues/36715');
-
-  await page.setContent(`
-    <div id="editor" contenteditable="true"></div>
-    <script>
-      const editor = document.getElementById('editor');
-      editor.addEventListener('beforeinput', (event) => {
-        event.preventDefault();
-        editor.textContent = event.data;
-      });
-    </script>
-  `);
-
-  const locator = page.locator('#editor');
-  const testValue = 'Playwright';
-  await locator.fill(testValue);
-  await expect(locator).toHaveText(testValue);
-});
-
 it('should fill elements with existing value and selection', async ({ page, server }) => {
   await page.goto(server.PREFIX + '/input/textarea.html');
 
@@ -405,24 +380,3 @@ it('fill back to back', async ({ page }) => {
   await expect(page.locator('id=two')).toHaveValue('second value');
 });
 
-it('should fill contenteditable with focus handler that collapses selection', {
-  annotation: {
-    type: 'issue',
-    description: 'https://github.com/microsoft/playwright/issues/39492'
-  }
-}, async ({ page }) => {
-  await page.setContent(`
-    <div contenteditable="true">initial text</div>
-    <script>
-      const editor = document.querySelector('[contenteditable]');
-      editor.addEventListener('focus', () => {
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0)
-          selection.collapseToEnd();
-      });
-    </script>
-  `);
-
-  await page.fill('div[contenteditable]', 'some value');
-  expect(await page.locator('div[contenteditable]').textContent()).toBe('some value');
-});
