@@ -16,6 +16,7 @@ import type { BridgeServer } from '@playwright-repl/core';
 import { createPageProxy, createExpect } from './proxy-page.js';
 import { installFramework } from './shim/framework.js';
 import type { RunOptions, TestResult } from './types.js';
+import { expect as pwExpect } from '@playwright/test';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -144,7 +145,6 @@ async function executeNode(
   } else {
     console.log(`  [node] DIRECT mode`);
     page = realPage;
-    const { expect: pwExpect } = await import('@playwright/test');
     expect = pwExpect;
   }
 
