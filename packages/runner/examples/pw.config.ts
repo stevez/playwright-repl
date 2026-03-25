@@ -1,9 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './todomvc',
+  testDir: '.',
   timeout: 15000,
-  workers: 2,
+  workers: 4,
   fullyParallel: true,
   projects: [
     {
