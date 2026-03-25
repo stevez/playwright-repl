@@ -21,8 +21,11 @@
   "dependencies": {
     "@playwright-repl/core": "workspace:*",
     "@playwright-repl/extension": "workspace:*",
+    "@playwright/test": "1.59.0-alpha-2026-02-21",
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
     "esbuild": "^0.25.0",
-    "@playwright/test": "1.59.0-alpha-2026-02-21"
+    "magic-string": "^0.30.21"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

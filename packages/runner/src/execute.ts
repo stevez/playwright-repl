@@ -206,6 +206,13 @@ async function executeNode(
   (globalThis as any).__test = testFn;
   (globalThis as any).__expect = expect;
 
+  // __bridge sends commands to the SW for execution (used by compiler-transformed calls)
+  (globalThis as any).__bridge = async (cmd: string) => {
+    const r = await bridge.run(cmd);
+    if (r.isError) throw new Error(r.text || 'Bridge error');
+    // Don't return a value — bridge calls are fire-and-forget
+  };
+
   // Compile and import (registers tests, doesn't run them)
   const compiled = await compileNode(testFilePath);
   const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
@@ -259,14 +266,13 @@ async function compileNode(testFilePath: string): Promise<string> {
   const testDir = path.dirname(testFilePath);
   const testFileName = path.basename(testFilePath);
 
+  // Node path: no compiler, no bridge. Just bundle TS → JS.
   const plugin = {
     name: 'pw-node',
     setup(build: any) {
       build.onResolve({ filter: /^__entry__$/ }, () => ({ path: '__entry__', namespace: 'entry' }));
       build.onLoad({ filter: /.*/, namespace: 'entry' }, () => ({
-        contents: `
-          import './${testFileName}';
-        `,
+        contents: `import './${testFileName}';`,
         resolveDir: testDir,
         loader: 'ts',
       }));

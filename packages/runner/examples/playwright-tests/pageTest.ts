@@ -104,6 +104,7 @@ const test = base.extend<{
   mode: async ({}, use) => { await use('default'); },
 });
 
+
 function rafraf(page: any, count = 1): Promise<void> {
   return page.evaluate((c: number) => {
     return new Promise<void>(resolve => {

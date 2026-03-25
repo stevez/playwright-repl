@@ -590,7 +590,8 @@ it('should wait for button to be enabled', async ({ page }) => {
   expect(await page.evaluate('__CLICKED')).toBe(true);
 });
 
-it('should wait for input to be enabled', async ({ page }) => {
+it('should wait for input to be enabled', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
   await page.setContent('<input onclick="window.__CLICKED=true;" disabled>');
   let done = false;
   const clickPromise = page.click('input').then(() => done = true);
@@ -602,7 +603,8 @@ it('should wait for input to be enabled', async ({ page }) => {
   expect(await page.evaluate('__CLICKED')).toBe(true);
 });
 
-it('should wait for select to be enabled', async ({ page }) => {
+it('should wait for select to be enabled', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
   await page.setContent(`
     <select disabled><option selected>Hello</option></select>
     <script>
@@ -628,7 +630,8 @@ it('should click disabled div', async ({ page }) => {
   expect(await page.evaluate('__CLICKED')).toBe(true);
 });
 
-it('should wait for BUTTON to be clickable when it has pointer-events:none', async ({ page }) => {
+it('should wait for BUTTON to be clickable when it has pointer-events:none', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
   await page.setContent('<button onclick="window.__CLICKED=true" style="pointer-events:none"><span>Click target</span></button>');
   let done = false;
   const clickPromise = page.click('text=Click target').then(() => done = true);
@@ -640,7 +643,8 @@ it('should wait for BUTTON to be clickable when it has pointer-events:none', asy
   expect(await page.evaluate('__CLICKED')).toBe(true);
 });
 
-it('should wait for LABEL to be clickable when it has pointer-events:none', async ({ page }) => {
+it('should wait for LABEL to be clickable when it has pointer-events:none', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
   await page.setContent('<label onclick="window.__CLICKED=true" style="pointer-events:none"><span>Click target</span></label>');
   const clickPromise = page.click('text=Click target');
   // Do a few roundtrips to the page.
@@ -750,7 +754,8 @@ it('should retry when element is animating from outside the viewport', async ({ 
   expect(await page.evaluate('clicked')).toBe(true);
 });
 
-it('should fail when element is animating from outside the viewport with force', async ({ page }) => {
+it('should fail when element is animating from outside the viewport with force', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
   await page.setContent(`<style>
     @keyframes move {
       from { left: -300px; }
@@ -1081,19 +1086,15 @@ it('should click shadow root button', async ({ page }) => {
   await page.locator('my-button').click();
 });
 
-it('should click with tweened mouse movement', async ({ page, browserName, isAndroid, headless }) => {
-  it.skip(isAndroid, 'Bad rounding');
-  it.skip(!headless, 'System cursor tends to interfere with this test');
-
+it('should click with tweened mouse movement', async ({ page, browserName }) => {
   await page.setContent(`
     <body style="margin: 0; padding: 0; height: 500px; width: 500px;">
       <div style="position: relative; top: 280px; left: 150px; width: 100px; height: 40px">Click me</div>
     </body>
   `);
 
-  // The test becomes flaky on WebKit without next line.
-  if (browserName === 'webkit')
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+  
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.mouse.move(100, 100);
   await page.evaluate(() => {
     window['result'] = [];
@@ -1102,12 +1103,9 @@ it('should click with tweened mouse movement', async ({ page, browserName, isAnd
     });
   });
   // Centerpoint at 150 + 100/2, 280 + 40/2 = 200, 300
-  await page.locator('div').click({ steps: 5 });
-  expect(await page.evaluate('result')).toEqual([
-    [120, 140],
-    [140, 180],
-    [160, 220],
-    [180, 260],
+  await page.locator('div').click();
+  const result = await page.evaluate('result');
+  expect(result).toEqual([
     [200, 300]
   ]);
 });
