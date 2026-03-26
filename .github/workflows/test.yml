@@ -56,10 +56,6 @@ jobs:
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
 
-      - name: Install Chrome for runner (extensions need real Chrome + system deps)
-        run: pnpm exec playwright install --with-deps chrome
-        working-directory: packages/runner
-
       - name: Run runner E2E tests (todomvc via pw-cli)
         run: node ../dist/pw-cli.js test todomvc/ --workers 1
         working-directory: packages/runner/examples
