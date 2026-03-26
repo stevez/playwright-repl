@@ -324,8 +324,11 @@ function patchWorker(worker, params) {
     console.error('[pw-worker] bridge mode: ' + runPayload.file +
       (names.length ? ' (' + names.join(', ') + ')' : ''));
 
+    console.error('[pw-worker] compiling...');
     const compiled = await compile(runPayload.file);
+    console.error('[pw-worker] compiled, ' + compiled.length + ' chars');
     await ensureBridge();
+    console.error('[pw-worker] bridge ready, running...');
     return runOnBridge(worker, compiled, runPayload, idToTitle);
   };
 
