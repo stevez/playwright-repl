@@ -11,6 +11,7 @@
 
 import * as vscode from 'vscode';
 import path from 'node:path';
+import fs from 'node:fs';
 import { parseTestFile, type ParsedTest } from './test-parser.js';
 import type { BrowserManager } from './browser.js';
 
@@ -257,12 +258,13 @@ export class TestExplorer {
     for (const [fileKey, fileItems] of byFile) {
       if (token.isCancellationRequested) break;
 
-      for (const item of fileItems) run.started(item);
+      // Clear previous results — show empty/enqueued state
+      for (const item of fileItems) run.enqueued(item);
 
       const fileUri = vscode.Uri.parse(fileKey);
       try {
         const runTestPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'run-test.js');
-        const { runTestFile } = await import(`file://${runTestPath.replace(/\\/g, '/')}`);
+        const { runTestFile, needsNodeMode } = await import(`file://${runTestPath.replace(/\\/g, '/')}`);
         const bridge = this._browserManager.bridge!;
         const page = this._browserManager.page;
 
@@ -270,25 +272,71 @@ export class TestExplorer {
         const testNames = fileItems.map(i => i.label);
         const grep = testNames.length === 1 ? testNames[0] : undefined;
 
-        this._outputChannel.appendLine(`Running: ${fileUri.fsPath}${grep ? ` (${grep})` : ''}`);
-        const results = await runTestFile(fileUri.fsPath, bridge, page, { grep });
-        this._outputChannel.appendLine(`Results: ${results.length} tests`);
-        for (const r of results) {
-          const icon = r.skipped ? '-' : r.passed ? '✓' : '✗';
-          this._outputChannel.appendLine(`  ${icon} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
+        const isNode = needsNodeMode(fileUri.fsPath);
+        this._outputChannel.appendLine(`Running: ${fileUri.fsPath}${grep ? ` (${grep})` : ''} [${isNode ? 'node' : 'bridge'}]`);
+
+        // Bridge mode: mark all started upfront (results come back in batch)
+        if (!isNode) {
+          for (const item of fileItems) run.started(item);
         }
 
-        // Map structured results directly to test items
-        for (const item of fileItems) {
-          const fullName = this._getFullTestName(item);
-          const result = results.find((r: any) => r.name === fullName) || results.find((r: any) => r.name === item.label);
+        // Stream results: update Test Explorer as each test completes
+        const onResult = (r: any) => {
+          const icon = r.skipped ? '-' : r.passed ? '✓' : '✗';
+          this._outputChannel.appendLine(`  ${icon} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
+          // Find matching item and update immediately
+          const item = fileItems.find(i => {
+            const fullName = this._getFullTestName(i);
+            return fullName === r.name || i.label === r.name
+              || r.name.endsWith(fullName) || r.name.endsWith(i.label);
+          });
+          if (!item) {
+            this._outputChannel.appendLine(`  [no match] result="${r.name}" items=[${fileItems.map(i => `"${i.label}"`).slice(0, 5).join(', ')}...]`);
+          }
+          if (item) {
+            run.started(item);
+            if (r.skipped) run.skipped(item);
+            else if (r.passed) run.passed(item, r.duration);
+            else run.failed(item, new vscode.TestMessage(r.error || 'Test failed'), r.duration);
+          }
+        };
 
-          if (!result || result.skipped) {
-            run.skipped(item);
-          } else if (result.passed) {
-            run.passed(item, result.duration);
-          } else {
-            run.failed(item, new vscode.TestMessage(result.error || 'Test failed'), result.duration);
+        const results = await runTestFile(fileUri.fsPath, bridge, page, { grep }, isNode ? onResult : undefined);
+        this._outputChannel.appendLine(`Done: ${results.length} tests`);
+
+        // Bridge mode: dispatch results after batch completes
+        if (!isNode) {
+          for (const r of results) {
+            this._outputChannel.appendLine(`  ${r.skipped ? '-' : r.passed ? '✓' : '✗'} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
+          }
+          for (const item of fileItems) {
+            const fullName = this._getFullTestName(item);
+            const result = results.find((r: any) =>
+              r.name === fullName || r.name === item.label
+              || r.name.endsWith(fullName) || r.name.endsWith(item.label)
+            );
+            if (!result || result.skipped) {
+              run.skipped(item);
+            } else if (result.passed) {
+              run.passed(item, result.duration);
+            } else {
+              run.failed(item, new vscode.TestMessage(result.error || 'Test failed'), result.duration);
+            }
+          }
+        }
+
+        // Node mode: mark any items not matched by streaming as skipped
+        if (isNode) {
+          for (const item of fileItems) {
+            const fullName = this._getFullTestName(item);
+            const hasResult = results.some((r: any) =>
+              r.name === fullName || r.name === item.label
+              || r.name.endsWith(fullName) || r.name.endsWith(item.label)
+            );
+            if (!hasResult) {
+              run.started(item);
+              run.skipped(item);
+            }
           }
         }
       } catch (err: unknown) {
@@ -300,6 +348,74 @@ export class TestExplorer {
     }
 
     run.end();
+  }
+
+  private async _runViaPwCli(filePath: string, grep?: string): Promise<string> {
+    const { spawn } = await import('node:child_process');
+    const pwCliPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'pw-cli.js');
+    const args = ['node', `"${pwCliPath}"`, 'test', `"${filePath}"`, '--workers', '1'];
+    if (grep) {
+      args.push('--grep', `"${grep}"`);
+    }
+    const cmd = args.join(' ');
+    this._outputChannel.appendLine(`[pw-cli] ${cmd}`);
+
+    return new Promise((resolve) => {
+      let output = '';
+      // Find project root (walk up from test file to find playwright.config.ts)
+      let cwd = path.dirname(filePath);
+      while (cwd !== path.dirname(cwd)) {
+        if (fs.existsSync(path.join(cwd, 'playwright.config.ts'))) break;
+        cwd = path.dirname(cwd);
+      }
+      const child = spawn(cmd, [], {
+        cwd,
+        shell: true,
+        timeout: 60000,
+      });
+      child.stdout?.on('data', (data: Buffer) => { output += data.toString(); });
+      child.stderr?.on('data', (data: Buffer) => { this._outputChannel.appendLine('[stderr] ' + data.toString()); });
+      child.on('exit', (code) => {
+        this._outputChannel.appendLine(`[pw-cli] exit code: ${code}`);
+        this._outputChannel.appendLine(`[pw-cli] stdout:\n${output}`);
+        resolve(output);
+      });
+    });
+  }
+
+  private _mapTextResults(run: vscode.TestRun, items: vscode.TestItem[], output: string): void {
+    const results = new Map<string, { passed: boolean; duration: number; error?: string }>();
+    const lines = output.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      // Playwright list reporter: "  ✓  N [chromium] › file:line › name (Nms)"
+      // Or pw-run format: "  ✓ name (Nms)"
+      const passMatch = lines[i].match(/[✓✔]\s+(?:\d+\s+\[.*?\]\s+›.*?›\s+)?(.+?)\s+\((\d+)ms\)/);
+      if (passMatch) {
+        results.set(passMatch[1].trim(), { passed: true, duration: parseInt(passMatch[2]) });
+        continue;
+      }
+      const failMatch = lines[i].match(/[✗✘✕×]\s+(?:\d+\s+\[.*?\]\s+›.*?›\s+)?(.+?)\s+\((\d+)ms\)/);
+      if (failMatch) {
+        const error = lines[i + 1]?.trim() || 'Test failed';
+        results.set(failMatch[1].trim(), { passed: false, duration: parseInt(failMatch[2]), error });
+        continue;
+      }
+    }
+
+    this._outputChannel.appendLine(`Parsed ${results.size} results from pw-cli output`);
+
+    for (const item of items) {
+      const fullName = this._getFullTestName(item);
+      const result = results.get(fullName) || results.get(item.label);
+      if (!result) {
+        run.skipped(item);
+      } else if (result.passed) {
+        run.passed(item, result.duration);
+      } else {
+        run.failed(item, new vscode.TestMessage(result.error || 'Test failed'), result.duration);
+      }
+    }
   }
 
   private async _debugTests(request: vscode.TestRunRequest) {

@@ -43,8 +43,8 @@ export function parseTestFile(content: string): ParsedTest[] {
       }
     }
 
-    // test.describe('name', ...
-    const describeMatch = line.match(/test\.describe(?:\.(only|skip))?\s*\(\s*(['"`])(.+?)\2/);
+    // test.describe('name', ... or describe('name', ...
+    const describeMatch = line.match(/(?:test\.)?describe(?:\.(only|skip))?\s*\(\s*(['"`])(.+?)\2/);
     if (describeMatch) {
       const suite: ParsedTest = {
         name: describeMatch[3],
@@ -54,13 +54,12 @@ export function parseTestFile(content: string): ParsedTest[] {
         children: [],
       };
       stack[stack.length - 1].children.push(suite);
-      // Push after brace counting so we capture the opening { depth correctly
       stack.push({ children: suite.children!, depth: braceDepth - 1 });
       continue;
     }
 
-    // test('name', ... or test.only('name', ... or test.skip('name', ...
-    const testMatch = line.match(/(?:^|\s)test(?:\.(only|skip))?\s*\(\s*(['"`])(.+?)\2/);
+    // test('name', ... or it('name', ... or test.only/skip or it.only/skip
+    const testMatch = line.match(/(?:^|\s)(?:test|it)(?:\.(only|skip))?\s*\(\s*(['"`])(.+?)\2/);
     if (testMatch) {
       stack[stack.length - 1].children.push({
         name: testMatch[3],

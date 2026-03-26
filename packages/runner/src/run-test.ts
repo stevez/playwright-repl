@@ -11,7 +11,6 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { BridgeServer } from '@playwright-repl/core';
 import type { TestResult } from './types.js';
@@ -48,6 +47,8 @@ const NODE_PATTERNS = [
   /\.\$eval\s*\(/,
   /\.\$\$eval\s*\(/,
 ];
+
+export { needsNode as needsNodeMode };
 
 function needsNode(filePath: string): boolean {
   const checked = new Set<string>();
@@ -95,11 +96,26 @@ function getAliasPath(): string {
   return _aliasPath;
 }
 
+// ─── Find playwright.config.ts by walking up from test file ──────────────────
+
+function findConfigDir(startDir: string): string {
+  let dir = startDir;
+  while (dir !== path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, 'playwright.config.ts')) ||
+        fs.existsSync(path.join(dir, 'playwright.config.js'))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return startDir; // fallback to test file's directory
+}
+
 // ─── Main entry ─────────────────────────────────────────────────────────────
 
 export interface RunTestOptions {
   grep?: string;
   timeout?: number;
+  headless?: boolean;
 }
 
 export async function runTestFile(
@@ -107,11 +123,12 @@ export async function runTestFile(
   bridge: BridgeServer,
   page: any,
   opts?: RunTestOptions,
+  onResult?: (result: TestResult) => void,
 ): Promise<TestResult[]> {
   const isNode = needsNode(filePath);
 
   if (isNode) {
-    return executeNode(filePath, page, opts);
+    return executeNode(filePath, page, opts, onResult);
   }
   return executeBrowser(filePath, bridge, opts);
 }
@@ -169,133 +186,147 @@ async function executeBrowser(
 
 async function executeNode(
   filePath: string,
-  page: any,
+  _page: any,
   opts?: RunTestOptions,
+  onResult?: (result: TestResult) => void,
 ): Promise<TestResult[]> {
-  const { expect: pwExpect } = await import('@playwright/test');
+  const { spawn } = await import('node:child_process');
+  const { createRequire } = await import('node:module');
 
-  // Collect registered tests
-  const tests: { name: string; fn: (fixtures: any) => Promise<void>; skip: boolean }[] = [];
-  const hooks = { beforeEach: [] as Function[], afterEach: [] as Function[], beforeAll: [] as Function[], afterAll: [] as Function[] };
+  const require = createRequire(__filename);
+  const pwCliPath = require.resolve('@playwright/test/cli');
+  const configDir = findConfigDir(path.dirname(filePath));
 
-  const grepRe = opts?.grep ? new RegExp(opts.grep, 'i') : null;
+  const relPath = path.relative(configDir, filePath).replace(/\\/g, '/');
+  const args = [pwCliPath, 'test', relPath, '--workers', '1', '--reporter', 'list', '--project', 'chromium'];
+  if (opts?.grep) {
+    // Escape regex special chars for Playwright's --grep (which is a regex)
+    const escaped = opts.grep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    args.push('--grep', escaped);
+  }
 
-  // Build test registration API
-  const testFn: any = (name: string, fn: any) => { tests.push({ name, fn, skip: false }); };
-  testFn.only = testFn;
-  testFn.skip = (nameOrCond: any, fn?: any) => {
-    if (typeof nameOrCond === 'string') tests.push({ name: nameOrCond, fn, skip: true });
-  };
-  testFn.describe = (name: string, fn: () => void) => {
-    const origTest = (globalThis as any).__test;
-    const wrappedTest: any = (n: string, f: any) => { tests.push({ name: `${name} > ${n}`, fn: f, skip: false }); };
-    wrappedTest.skip = (nOrC: any, f?: any) => {
-      if (typeof nOrC === 'string') tests.push({ name: `${name} > ${nOrC}`, fn: f, skip: true });
-    };
-    wrappedTest.only = wrappedTest;
-    (globalThis as any).__test = wrappedTest;
-    fn();
-    (globalThis as any).__test = origTest;
-  };
-  (testFn.describe as any).configure = () => {};
-  testFn.beforeEach = (fn: Function) => { hooks.beforeEach.push(fn); };
-  testFn.afterEach = (fn: Function) => { hooks.afterEach.push(fn); };
-  testFn.beforeAll = (fn: Function) => { hooks.beforeAll.push(fn); };
-  testFn.afterAll = (fn: Function) => { hooks.afterAll.push(fn); };
-  testFn.fixme = (condOrName?: any, fn?: any) => {
-    if (typeof condOrName === 'string') tests.push({ name: condOrName, fn, skip: true });
-  };
-  testFn.slow = () => {};
-  testFn.info = () => ({ annotations: [] });
-  testFn.extend = (fixtures: Record<string, any>) => {
-    const extended: any = (name: string, fn: any) => {
-      testFn(name, async (baseFixtures: any) => {
-        const ext = { ...baseFixtures };
-        for (const [key, fixtureFn] of Object.entries(fixtures)) {
-          if (typeof fixtureFn === 'function') {
-            await new Promise<void>((resolve, reject) => {
-              Promise.resolve(fixtureFn({ ...ext }, async (value: any) => { ext[key] = value; resolve(); })).catch(reject);
-            });
-          }
+  // Use 'node' not process.execPath (which is Electron in VS Code)
+  const nodePath = process.env.NVM_SYMLINK
+    ? path.join(process.env.NVM_SYMLINK, 'node')
+    : 'node';
+
+  console.error(`[pw-cli] ${nodePath} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`);
+
+  return new Promise((resolve) => {
+    const results: TestResult[] = [];
+    let buffer = '';
+
+    const child = spawn(nodePath, args, {
+      cwd: configDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: true,
+      env: (() => {
+        const env = { ...process.env };
+        delete env.ELECTRON_RUN_AS_NODE;
+        delete env.NODE_OPTIONS;
+        return env;
+      })(),
+    });
+
+    child.stdout?.on('data', (d: Buffer) => {
+      buffer += d.toString();
+      // Parse complete lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // keep incomplete line in buffer
+      for (const line of lines) {
+        const result = parseListLine(line, filePath);
+        if (result) {
+          results.push(result);
+          if (onResult) onResult(result);
         }
-        await fn(ext);
-      });
-    };
-    for (const k of Object.keys(testFn)) (extended as any)[k] = (testFn as any)[k];
-    return extended;
-  };
+      }
+    });
 
-  (globalThis as any).__test = testFn;
-  (globalThis as any).__expect = pwExpect;
-
-  // Compile and import (registers tests, doesn't run them)
-  const compiled = await compileNode(filePath);
-  const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
-  try {
-    fs.writeFileSync(tmpFile, compiled);
-    await import(`file://${tmpFile.replace(/\\/g, '/')}`);
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-  }
-
-  // Run tests with real page
-  const results: TestResult[] = [];
-  const fixtures = { page, context: page.context(), expect: pwExpect };
-
-  for (const hook of hooks.beforeAll) await hook(fixtures);
-
-  for (const t of tests) {
-    if (t.skip || (grepRe && !grepRe.test(t.name))) {
-      results.push({ name: t.name, file: filePath, passed: true, skipped: true, duration: 0 });
-      continue;
-    }
-    const start = Date.now();
-    try {
-      for (const fn of hooks.beforeEach) await fn(fixtures);
-      await t.fn(fixtures);
-      for (const fn of hooks.afterEach) await fn(fixtures);
-      results.push({ name: t.name, file: filePath, passed: true, skipped: false, duration: Date.now() - start });
-    } catch (err: unknown) {
-      const msg = (err as Error).message || String(err);
-      results.push({ name: t.name, file: filePath, passed: false, skipped: false, error: msg, duration: Date.now() - start });
-    }
-  }
-
-  for (const hook of hooks.afterAll) await hook(fixtures);
-
-  return results;
+    child.on('close', (code: number | null) => {
+      // Parse remaining buffer
+      if (buffer.trim()) {
+        const result = parseListLine(buffer, filePath);
+        if (result) {
+          results.push(result);
+          if (onResult) onResult(result);
+        }
+      }
+      console.error(`[pw-cli] exit code: ${code}, ${results.length} results`);
+      resolve(results);
+    });
+  });
 }
 
-async function compileNode(filePath: string): Promise<string> {
-  const esbuild = await import('esbuild');
-  const testDir = path.dirname(filePath);
-  const testFileName = path.basename(filePath);
+// Parse Playwright list reporter line:
+//   ✓  1 [chromium] › file.spec.ts:10:1 › describe › test name (1.2s)
+//   ✗  2 [chromium] › file.spec.ts:20:1 › test name (3.4s)
+//   -  3 [chromium] › file.spec.ts:30:1 › test name
+function parseListLine(line: string, filePath: string): TestResult | null {
+  // Match passed: ✓ or ok
+  const passMatch = line.match(/^\s*[✓✔].*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
+  if (passMatch) {
+    const dur = passMatch[3] === 's' ? parseFloat(passMatch[2]) * 1000 : parseFloat(passMatch[2]);
+    return { name: passMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur };
+  }
+  // Match passed (plain text): "  ok N [project] › ..."
+  const okMatch = line.match(/^\s*ok\s+\d+.*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
+  if (okMatch) {
+    const dur = okMatch[3] === 's' ? parseFloat(okMatch[2]) * 1000 : parseFloat(okMatch[2]);
+    return { name: okMatch[1].trim(), file: filePath, passed: true, skipped: false, duration: dur };
+  }
+  // Match failed: ✗ or x
+  const failMatch = line.match(/^\s*[✗✘×].*?›\s+.*?›\s+(.+?)\s+\(([0-9.]+)(m?s)\)/);
+  if (failMatch) {
+    const dur = failMatch[3] === 's' ? parseFloat(failMatch[2]) * 1000 : parseFloat(failMatch[2]);
+    return { name: failMatch[1].trim(), file: filePath, passed: false, skipped: false, duration: dur };
+  }
+  // Match skipped: -
+  const skipMatch = line.match(/^\s*-\s+\d+.*?›\s+.*?›\s+(.+)/);
+  if (skipMatch) {
+    return { name: skipMatch[1].trim(), file: filePath, passed: true, skipped: true, duration: 0 };
+  }
+  return null;
+}
 
-  const plugin = {
-    name: 'pw-node',
-    setup(build: any) {
-      build.onResolve({ filter: /^__entry__$/ }, () => ({ path: '__entry__', namespace: 'entry' }));
-      build.onLoad({ filter: /.*/, namespace: 'entry' }, () => ({
-        contents: `import './${testFileName}';`,
-        resolveDir: testDir,
-        loader: 'ts',
-      }));
-    },
-  };
+function parseJsonResults(stdout: string, filePath: string): TestResult[] {
+  try {
+    const report = JSON.parse(stdout);
+    const results: TestResult[] = [];
 
-  const result = await esbuild.build({
-    entryPoints: ['__entry__'],
-    bundle: true, write: false, format: 'esm', platform: 'node',
-    plugins: [plugin],
-    alias: { '@playwright/test': getAliasPath() },
-    external: [
-      'fs', 'path', 'child_process', 'os', 'crypto', 'util',
-      'stream', 'events', 'net', 'http', 'https', 'url',
-      'worker_threads', 'node:*',
-    ],
-  });
+    for (const suite of report.suites || []) {
+      collectResults(suite, results, filePath);
+    }
+    console.error(`[pw-cli] parsed ${results.length} results: ${results.map(r => `${r.passed ? '✓' : '✗'} ${r.name} (${r.duration}ms)`).join(', ')}`);
+    return results;
+  } catch (e) {
+    console.error(`[pw-cli] failed to parse JSON: ${(e as Error).message}`);
+    console.error(`[pw-cli] stdout first 200 chars: ${stdout.slice(0, 200)}`);
+    return [];
+  }
+}
 
-  return result.outputFiles[0].text;
+function collectResults(suite: any, results: TestResult[], filePath: string, parentTitle?: string): void {
+  for (const spec of suite.specs || []) {
+    for (const test of spec.tests || []) {
+      const result = test.results?.[0];
+      const name = parentTitle ? `${parentTitle} > ${spec.title}` : spec.title;
+      results.push({
+        name,
+        file: filePath,
+        passed: test.status === 'expected',
+        skipped: test.status === 'skipped',
+        error: result?.error?.message,
+        duration: result?.duration || 0,
+      });
+    }
+  }
+  for (const child of suite.suites || []) {
+    // Skip file-level suite title (it's the filename), keep describe titles
+    const childTitle = parentTitle !== undefined
+      ? (child.title ? `${parentTitle} > ${child.title}` : parentTitle)
+      : child.title || undefined;
+    collectResults(child, results, filePath, childTitle);
+  }
 }
 
 // ─── Parse Results (browser path) ───────────────────────────────────────────
