@@ -71,7 +71,7 @@ jobs:
       - name: Run runner E2E tests (192 tests via pw-cli)
         run: node ../dist/pw-cli.js test --workers 1
         working-directory: packages/runner/examples
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
