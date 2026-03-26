@@ -91,6 +91,43 @@ test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };
 test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
 test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test.extend = (fixtures: Record<string, any>) => {
+  const extendedTest = (name: string, fn: TestFn) => {
+    currentSuite.tests.push({
+      name, only: false, skip: false,
+      fn: async (baseFixtures: any) => {
+        const extended = { ...baseFixtures };
+        for (const [key, fixtureFn] of Object.entries(fixtures)) {
+          if (typeof fixtureFn === 'function') {
+            await new Promise<void>((resolve, reject) => {
+              const useCallback = async (value: any) => {
+                extended[key] = value;
+                resolve();
+              };
+              Promise.resolve(fixtureFn(
+                { ...extended, [key]: extended[key] },
+                useCallback,
+              )).catch(reject);
+            });
+          }
+        }
+        await fn(extended);
+      },
+    });
+  };
+  extendedTest.only = test.only;
+  extendedTest.skip = test.skip;
+  extendedTest.describe = test.describe;
+  extendedTest.beforeAll = test.beforeAll;
+  extendedTest.afterAll = test.afterAll;
+  extendedTest.beforeEach = test.beforeEach;
+  extendedTest.afterEach = test.afterEach;
+  extendedTest.extend = test.extend;
+  return extendedTest;
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // ─── Runner ────────────────────────────────────────────────────────────────
 
 // These globals are provided by playwright-crx's service worker scope.

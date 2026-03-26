@@ -59,11 +59,26 @@ export async function detectTestMode(testFilePath: string): Promise<TestMode> {
       }
     }
 
-    // Also check the source for process.env / __dirname (not import-based)
+    // Check source + local imports for Node globals and Playwright Node-only APIs
     const fs = await import('fs');
-    const source = fs.default.readFileSync(testFilePath, 'utf-8');
-    if (/process\.env\b|process\.cwd\b|process\.argv\b|__dirname\b|__filename\b/.test(source)) {
-      return 'compiler';
+    const NODE_PATTERNS = [
+      /\bprocess\.env\b/, /\bprocess\.cwd\b/, /\bprocess\.argv\b/,
+      /\b__dirname\b/, /\b__filename\b/, /\bBuffer\.\b/,
+      // Playwright APIs that need Node (callbacks, non-serializable)
+      /\.route\s*\(/, /\.unroute\s*\(/, /\.routeFromHAR\s*\(/,
+      /\.waitForEvent\s*\(/, /\.waitForResponse\s*\(/, /\.waitForRequest\s*\(/,
+      /\.\$eval\s*\(/, /\.\$\$eval\s*\(/,
+    ];
+
+    // Check all resolved source files (not just the entry)
+    for (const inputPath of Object.keys(result.metafile!.inputs)) {
+      if (inputPath.includes('node_modules')) continue;
+      try {
+        const src = fs.default.readFileSync(inputPath, 'utf-8');
+        for (const pattern of NODE_PATTERNS) {
+          if (pattern.test(src)) return 'compiler';
+        }
+      } catch { /* skip unreadable files */ }
     }
 
     return 'browser';

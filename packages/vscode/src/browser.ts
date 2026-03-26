@@ -11,7 +11,7 @@ declare const __filename: string;
 
 export interface LaunchOptions {
   browser: string;
-  bridgePort: number;
+  bridgePort?: number;
   headless?: boolean;
 }
 
@@ -43,7 +43,7 @@ export class BrowserManager {
 
     // 2. Start BridgeServer (WebSocket)
     const bridge = new BridgeServer();
-    await bridge.start(opts.bridgePort || 9876);
+    await bridge.start(opts.bridgePort || 0);
     this._bridge = bridge;
     this._log.appendLine(`BridgeServer on port ${bridge.port}`);
 
@@ -75,11 +75,19 @@ export class BrowserManager {
     });
     this._log.appendLine('Chromium launched.');
 
-    // 4. Navigate initial page so extension can attach
+    // 4. Set bridge port via service worker so extension knows where to connect
+    let sw = this._browserContext.serviceWorkers()[0];
+    if (!sw) sw = await this._browserContext.waitForEvent('serviceworker', { timeout: 10000 });
+    await sw.evaluate((port: number) => {
+      chrome.storage.local.set({ bridgePort: port });
+    }, bridge.port);
+    this._log.appendLine(`Bridge port ${bridge.port} set via service worker.`);
+
+    // 5. Navigate initial page so extension can attach
     const page = this._browserContext.pages()[0];
     if (page) await page.goto('https://www.google.com');
 
-    // 5. Wait for offscreen document to connect via WebSocket
+    // 6. Wait for offscreen document to connect via WebSocket
     this._log.appendLine('Waiting for extension to connect...');
     await bridge.waitForConnection(30000);
     this._running = true;

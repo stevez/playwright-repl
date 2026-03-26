@@ -56,12 +56,7 @@
           "enum": ["chromium", "chrome", "msedge"],
           "description": "Browser to launch (chromium = Playwright's bundled Chromium)"
         },
-        "playwright-ide.bridgePort": {
-          "type": "number",
-          "default": 9876,
-          "description": "WebSocket bridge port for extension communication"
-        },
-        "playwright-ide.headless": {
+"playwright-ide.headless": {
           "type": "boolean",
           "default": false,
           "description": "Run browser in headless mode (no visible window)"

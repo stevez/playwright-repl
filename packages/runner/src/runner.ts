@@ -70,7 +70,9 @@ export async function run(args: string[]): Promise<number> {
     const results = await executeTestFile(file, bridge, runOpts, context, nodePage);
     allResults.push(...results);
     for (const r of results) {
-      if (r.passed) {
+      if (r.skipped) {
+        console.log(`  - ${r.name} (skipped)`);
+      } else if (r.passed) {
         console.log(`  \u2713 ${r.name} (${r.duration}ms)`);
       } else {
         console.log(`  \u2717 ${r.name} (${r.duration}ms)`);
@@ -82,7 +84,7 @@ export async function run(args: string[]): Promise<number> {
 
   // Summary
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  const passed = allResults.filter(r => r.passed).length;
+  const passed = allResults.filter(r => r.passed && !r.skipped).length;
   const skipped = allResults.filter(r => r.skipped).length;
   console.log(`\n  ${passed} passed, ${failed} failed, ${skipped} skipped (${totalTime}s)\n`);
 

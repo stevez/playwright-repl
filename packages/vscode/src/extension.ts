@@ -32,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
         const config = vscode.workspace.getConfiguration('playwright-ide');
         await browserManager!.launch({
           browser: config.get('browser', 'chromium'),
-          bridgePort: config.get('bridgePort', 9876),
         });
         outputChannel.show();
         vscode.window.showInformationMessage('Playwright IDE: Browser launched.');
@@ -87,8 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
           outputChannel.appendLine('Auto-launching browser for test run...');
           await browserManager!.launch({
             browser: config.get('browser', 'chromium'),
-            bridgePort: config.get('bridgePort', 9876),
-            headless: config.get('headless', false),
+              headless: config.get('headless', false),
           });
           outputChannel.show();
         }
@@ -133,8 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
         try {
           await browserManager!.launch({
             browser: config.get('browser', 'chromium'),
-            bridgePort: config.get('bridgePort', 9876),
-          });
+            });
         } catch (err: unknown) {
           vscode.window.showErrorMessage(`Failed to launch browser: ${(err as Error).message}`);
           return;
@@ -166,8 +163,7 @@ export function activate(context: vscode.ExtensionContext) {
         try {
           await browserManager!.launch({
             browser: config.get('browser', 'chromium'),
-            bridgePort: config.get('bridgePort', 9876),
-          });
+            });
         } catch (err: unknown) {
           vscode.window.showErrorMessage(`Failed to launch browser: ${(err as Error).message}`);
           return;

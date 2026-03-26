@@ -11,7 +11,6 @@
 
 import * as vscode from 'vscode';
 import path from 'node:path';
-import fs from 'node:fs';
 import { parseTestFile, type ParsedTest } from './test-parser.js';
 import type { BrowserManager } from './browser.js';
 
@@ -83,8 +82,13 @@ export class TestExplorer {
       this._outputChannel.appendLine(`  Parsed ${uri.fsPath}: ${parsed.length} top-level items`);
       if (parsed.length === 0) return;
 
-      const fileName = uri.path.replace(/.*[\\/]/, '');
-      const fileItem = this._controller.createTestItem(uri.toString(), fileName, uri);
+      // Show relative path as label for better navigation
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+      const label = workspaceFolder
+        ? path.relative(workspaceFolder.uri.fsPath, uri.fsPath).replace(/\\/g, '/')
+        : path.basename(uri.fsPath);
+
+      const fileItem = this._controller.createTestItem(uri.toString(), label, uri);
       this._buildTree(fileItem, parsed, uri);
       this._controller.items.add(fileItem);
     } catch (err: unknown) {
@@ -139,7 +143,6 @@ export class TestExplorer {
         this._outputChannel.appendLine('Auto-launching browser for test run...');
         await this._browserManager.launch({
           browser: config.get('browser', 'chromium'),
-          bridgePort: config.get('bridgePort', 9876),
           headless: config.get('headless', false),
         });
       } catch (err: unknown) {
@@ -163,20 +166,23 @@ export class TestExplorer {
         this._outputChannel.appendLine(`Mode: ${mode === 'browser' ? '⚡ browser (fast)' : '🔧 compiler (Node.js)'}`);
 
         let resultText: string;
+        this._outputChannel.appendLine(`Running: ${fileUri.fsPath}`);
         if (mode === 'browser') {
           const { bundleTestFile } = await import('./bundler.js');
           const script = await bundleTestFile(fileUri.fsPath);
+          this._outputChannel.appendLine(`Bundled: ${script.length} chars`);
           const result = await this._browserManager.runScript(script);
+          this._outputChannel.appendLine(`Result: isError=${result.isError}, text=${(result.text || '').substring(0, 200)}`);
           resultText = result.text || '';
         } else {
-          // Compiler mode: run in Node.js with bridge
-          const { compileTestFile, executeCompiledTest } = await import('./compiler.js');
-          const compiled = await compileTestFile(fileUri.fsPath);
-          this._outputChannel.appendLine('Running in Node.js with bridge...');
-          resultText = await executeCompiledTest(compiled, (cmd) => this._browserManager.runCommand(cmd));
+          // Node mode: run via pw-cli (handles bridge/Node routing internally)
+          this._outputChannel.appendLine('Node mode: running via pw-cli...');
+          const testNames = fileItems.map(i => i.label);
+          resultText = await this._runViaPw(fileUri.fsPath, testNames);
         }
 
         // Parse structured results and map to test items
+        this._outputChannel.appendLine(`Results:\n${resultText}`);
         this._mapResults(run, fileItems, resultText);
       } catch (err: unknown) {
         for (const item of fileItems) {
@@ -236,6 +242,32 @@ export class TestExplorer {
     }
   }
 
+  private async _runViaPw(filePath: string, testNames?: string[]): Promise<string> {
+    const { spawn } = await import('node:child_process');
+
+    // Resolve pw from monorepo (packages/vscode/dist → ../../runner/dist/cli.js)
+    const pwPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'cli.js');
+    const parts = ['node', `"${pwPath}"`, 'test', `"${filePath}"`];
+    if (testNames && testNames.length > 0) {
+      const grepPattern = testNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+      parts.push('--grep', `"${grepPattern}"`);
+    }
+
+    const cmd = parts.join(' ');
+    this._outputChannel.appendLine(`[pw] ${cmd}`);
+
+    return new Promise((resolve) => {
+      let output = '';
+      const child = spawn(cmd, [], {
+        cwd: path.dirname(filePath),
+        shell: true,
+      });
+      child.stdout?.on('data', (data: Buffer) => { output += data.toString(); });
+      child.stderr?.on('data', (data: Buffer) => { this._outputChannel.appendLine(data.toString()); });
+      child.on('exit', () => resolve(output));
+    });
+  }
+
   private _getFileUri(item: vscode.TestItem): vscode.Uri | undefined {
     if (item.uri) return item.uri;
     if (item.parent) return this._getFileUri(item.parent);
@@ -268,9 +300,9 @@ export class TestExplorer {
 
     // Map results to test items
     for (const item of items) {
-      // Build full name: "Suite > Test"
+      // Try full name first ("Suite > Test"), then just test name ("Test")
       const fullName = this._getFullTestName(item);
-      const result = results.get(fullName);
+      const result = results.get(fullName) || results.get(item.label);
 
       if (!result) {
         run.skipped(item);
