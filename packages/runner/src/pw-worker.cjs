@@ -100,18 +100,33 @@ async function ensureBridge() {
   console.error('[pw-worker] ensureBridge: bridge on port ' + _bridge.port);
 
   const extPath = process.env.PW_EXT_PATH;
-  console.error('[pw-worker] ensureBridge: launching Chrome, ext=' + extPath);
+  const fs = require('fs');
+  console.error('[pw-worker] ensureBridge: ext=' + extPath + ' exists=' + fs.existsSync(extPath));
+  console.error('[pw-worker] ensureBridge: manifest=' + fs.existsSync(require('path').join(extPath, 'manifest.json')));
+  console.error('[pw-worker] ensureBridge: env.PLAYWRIGHT_BROWSERS_PATH=' + (process.env.PLAYWRIGHT_BROWSERS_PATH || 'not set'));
+  console.error('[pw-worker] ensureBridge: process.execPath=' + process.execPath);
+  console.error('[pw-worker] ensureBridge: platform=' + process.platform);
+
   // Use @playwright/test (not playwright-core) — it knows where installed browsers are
   const pw = require('@playwright/test');
-  _context = await pw.chromium.launchPersistentContext('', {
-    channel: 'chromium',
-    headless: true,
-    args: [
-      '--disable-extensions-except=' + extPath,
-      '--load-extension=' + extPath,
-      '--disable-background-timer-throttling',
-    ],
-  });
+  console.error('[pw-worker] ensureBridge: launching Chrome...');
+  try {
+    _context = await Promise.race([
+      pw.chromium.launchPersistentContext('', {
+        channel: 'chromium',
+        headless: true,
+        args: [
+          '--disable-extensions-except=' + extPath,
+          '--load-extension=' + extPath,
+          '--disable-background-timer-throttling',
+        ],
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Chrome launch timeout after 30s')), 30000)),
+    ]);
+  } catch (err) {
+    console.error('[pw-worker] ensureBridge: Chrome launch FAILED: ' + err.message);
+    throw err;
+  }
 
   let sw = _context.serviceWorkers()[0];
   if (!sw) sw = await _context.waitForEvent('serviceworker', { timeout: 10000 });
