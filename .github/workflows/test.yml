@@ -68,6 +68,7 @@ jobs:
         timeout-minutes: 10
         env:
           FORCE_COLOR: '1'
+          PLAYWRIGHT_FORCE_TTY: '1'
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
