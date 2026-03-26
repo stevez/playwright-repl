@@ -19,7 +19,6 @@ const origLoad = (Module as any)._load;
 
 (Module as any)._load = function (request: string, parent: unknown) {
   if (typeof request === 'string' && request.includes('workerMain')) {
-    console.error('[pw] patching workerMain');
     const realModule = origLoad.call(this, request, parent);
     const origCreate = realModule.create;
 
