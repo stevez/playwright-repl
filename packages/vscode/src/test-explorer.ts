@@ -21,6 +21,8 @@ export class TestExplorer {
   private _browserManager: BrowserManager;
   private _outputChannel: vscode.OutputChannel;
   private _watchers: vscode.FileSystemWatcher[] = [];
+  private _watchMode = false;
+  private _disposables: vscode.Disposable[] = [];
 
   constructor(browserManager: BrowserManager, outputChannel: vscode.OutputChannel) {
     this._browserManager = browserManager;
@@ -28,12 +30,13 @@ export class TestExplorer {
     this._controller = vscode.tests.createTestController('playwright-ide', 'Playwright IDE');
 
     // Run profile: executes tests via bridge
-    this._controller.createRunProfile(
+    const runProfile = this._controller.createRunProfile(
       'Run',
       vscode.TestRunProfileKind.Run,
       (request, token) => this._runTests(request, token),
       true, // isDefault
     );
+    runProfile.supportsContinuousRun = true;
 
     // Debug profile: runs tests with debugger attached
     this._controller.createRunProfile(
@@ -46,13 +49,30 @@ export class TestExplorer {
     // Discover existing test files
     this._discoverTests();
 
-    // Watch for changes
+    // Watch for file changes (discovery)
     const pattern = '**/*.{spec,test}.{ts,js,mjs}';
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
     watcher.onDidCreate(uri => this._parseFile(uri));
     watcher.onDidChange(uri => this._parseFile(uri));
     watcher.onDidDelete(uri => this._deleteFile(uri));
     this._watchers.push(watcher);
+
+    // Watch mode: auto-run tests on save
+    const config = vscode.workspace.getConfiguration('playwright-ide');
+    this._watchMode = config.get('watchMode', false);
+    this._disposables.push(
+      vscode.workspace.onDidSaveTextDocument(doc => {
+        if (this._watchMode && /\.(spec|test)\.(ts|js|mjs)$/.test(doc.uri.fsPath)) {
+          this._runFileOnSave(doc.uri);
+        }
+      }),
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('playwright-ide.watchMode')) {
+          this._watchMode = vscode.workspace.getConfiguration('playwright-ide').get('watchMode', false);
+          this._outputChannel.appendLine(`Watch mode: ${this._watchMode ? 'ON' : 'OFF'}`);
+        }
+      }),
+    );
   }
 
   get controller() { return this._controller; }
@@ -79,6 +99,35 @@ export class TestExplorer {
   dispose() {
     this._controller.dispose();
     for (const w of this._watchers) w.dispose();
+    for (const d of this._disposables) d.dispose();
+  }
+
+  // ─── Watch Mode ─────────────────────────────────────────────────────────
+
+  private async _runFileOnSave(uri: vscode.Uri) {
+    if (!this._browserManager.isRunning()) return;
+
+    // Find all test items for this file
+    const fileItems: vscode.TestItem[] = [];
+    const findItems = (items: vscode.TestItemCollection) => {
+      items.forEach(item => {
+        if (item.uri?.toString() === uri.toString() && item.children.size === 0) {
+          fileItems.push(item);
+        }
+        if (item.children.size > 0) findItems(item.children);
+      });
+    };
+    findItems(this._controller.items);
+    if (fileItems.length === 0) return;
+
+    // Re-parse test structure (file may have changed)
+    await this._parseFile(uri);
+
+    // Run via the same path as clicking "Run" in Test Explorer
+    const request = new vscode.TestRunRequest(fileItems);
+    const token = new vscode.CancellationTokenSource().token;
+    this._outputChannel.appendLine(`[watch] ${path.basename(uri.fsPath)}`);
+    await this._runTests(request, token);
   }
 
   // ─── Discovery ───────────────────────────────────────────────────────────
@@ -148,6 +197,23 @@ export class TestExplorer {
   // ─── Run ─────────────────────────────────────────────────────────────────
 
   private async _runTests(request: vscode.TestRunRequest, token: vscode.CancellationToken) {
+    // Continuous run (watch icon) — run now, then re-run on save
+    if (request.continuous) {
+      await this._runTestsOnce(request, token);
+      const saveListener = vscode.workspace.onDidSaveTextDocument(async (doc) => {
+        if (token.isCancellationRequested) return;
+        if (/\.(spec|test)\.(ts|js|mjs)$/.test(doc.uri.fsPath)) {
+          await this._parseFile(doc.uri);
+          await this._runTestsOnce(request, token);
+        }
+      });
+      token.onCancellationRequested(() => saveListener.dispose());
+      return;
+    }
+    await this._runTestsOnce(request, token);
+  }
+
+  private async _runTestsOnce(request: vscode.TestRunRequest, token: vscode.CancellationToken) {
     const run = this._controller.createTestRun(request);
 
     // Collect test items to run

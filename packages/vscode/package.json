@@ -60,6 +60,11 @@
           "type": "boolean",
           "default": false,
           "description": "Run browser in headless mode (no visible window)"
+        },
+        "playwright-ide.watchMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-run tests on save (also available via Test Explorer's continuous run icon)"
         }
       }
     }
