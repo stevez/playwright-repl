@@ -44,7 +44,6 @@ jobs:
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
-        working-directory: packages/extension
 
       - name: Run extension component tests
         run: pnpm run test:component
@@ -57,10 +56,6 @@ jobs:
       - name: Run bridge replay E2E tests
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
-
-      - name: Install Chromium for runner
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
-        working-directory: packages/runner
 
       - name: Run runner E2E tests (192 tests via pw-cli)
         run: node ../dist/pw-cli.js test --workers 2 --reporter list
