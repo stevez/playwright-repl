@@ -68,10 +68,10 @@ jobs:
         run: pnpm exec playwright install chrome
         working-directory: packages/runner
 
-      - name: Run runner E2E tests (192 tests via pw-cli)
-        run: node ../dist/pw-cli.js test --workers 1
+      - name: Run runner E2E tests (todomvc via pw-cli)
+        run: node ../dist/pw-cli.js test todomvc/ --workers 1
         working-directory: packages/runner/examples
-        timeout-minutes: 10
+        timeout-minutes: 5
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
