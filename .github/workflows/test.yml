@@ -99,8 +99,8 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Install Chrome
-        run: pnpm exec playwright install chrome
+      - name: Install Chrome + Chromium
+        run: pnpm exec playwright install chrome chromium
         working-directory: packages/runner
 
       - name: Run runner E2E tests (192 tests via pw-cli)
