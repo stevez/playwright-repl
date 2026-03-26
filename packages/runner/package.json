@@ -4,7 +4,7 @@
   "description": "Playwright test runner with 10x faster bridge execution",
   "type": "module",
   "bin": {
-    "pw": "./dist/cli.js"
+    "pw": "./dist/pw-cli.js"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -15,8 +15,8 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
     "test": "vitest run",
-    "test:e2e": "node dist/cli.js test",
-    "test:benchmark": "echo '--- Standard Playwright ---' && npx playwright test --workers=1 && echo '--- pw ---' && node dist/cli.js test"
+    "test:e2e": "node dist/pw-cli.js test",
+    "test:benchmark": "echo '--- Standard Playwright ---' && npx playwright test --workers=1 && echo '--- pw ---' && node dist/pw-cli.js test"
   },
   "dependencies": {
     "@playwright-repl/core": "workspace:*",
