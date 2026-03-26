@@ -42,8 +42,8 @@ jobs:
         run: pnpm run lint
         working-directory: packages/extension
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
         working-directory: packages/extension
 
       - name: Run extension component tests
