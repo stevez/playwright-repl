@@ -44,6 +44,7 @@ jobs:
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+        working-directory: packages/extension
 
       - name: Run extension component tests
         run: pnpm run test:component
