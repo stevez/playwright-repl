@@ -152,7 +152,7 @@ export class TestExplorer {
       }
     }
 
-    // Run each file
+    // Run each file via runTestFile (in-process, reuses existing bridge + page)
     for (const [fileKey, fileItems] of byFile) {
       if (token.isCancellationRequested) break;
 
@@ -160,31 +160,38 @@ export class TestExplorer {
 
       const fileUri = vscode.Uri.parse(fileKey);
       try {
-        // Detect mode: browser (fast) or compiler (Node.js compatible)
-        const { detectTestMode } = await import('./mode-detect.js');
-        const mode = await detectTestMode(fileUri.fsPath);
-        this._outputChannel.appendLine(`Mode: ${mode === 'browser' ? '⚡ browser (fast)' : '🔧 compiler (Node.js)'}`);
+        const runTestPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'run-test.js');
+        const { runTestFile } = await import(`file://${runTestPath.replace(/\\/g, '/')}`);
+        const bridge = this._browserManager.bridge!;
+        const page = this._browserManager.page;
 
-        let resultText: string;
-        this._outputChannel.appendLine(`Running: ${fileUri.fsPath}`);
-        if (mode === 'browser') {
-          const { bundleTestFile } = await import('./bundler.js');
-          const script = await bundleTestFile(fileUri.fsPath);
-          this._outputChannel.appendLine(`Bundled: ${script.length} chars`);
-          const result = await this._browserManager.runScript(script);
-          this._outputChannel.appendLine(`Result: isError=${result.isError}, text=${(result.text || '').substring(0, 200)}`);
-          resultText = result.text || '';
-        } else {
-          // Node mode: run via pw-cli (handles bridge/Node routing internally)
-          this._outputChannel.appendLine('Node mode: running via pw-cli...');
-          const testNames = fileItems.map(i => i.label);
-          resultText = await this._runViaPw(fileUri.fsPath, testNames);
+        // Build grep from requested test names
+        const testNames = fileItems.map(i => i.label);
+        const grep = testNames.length === 1 ? testNames[0] : undefined;
+
+        this._outputChannel.appendLine(`Running: ${fileUri.fsPath}${grep ? ` (${grep})` : ''}`);
+        const results = await runTestFile(fileUri.fsPath, bridge, page, { grep });
+        this._outputChannel.appendLine(`Results: ${results.length} tests`);
+        for (const r of results) {
+          const icon = r.skipped ? '-' : r.passed ? '✓' : '✗';
+          this._outputChannel.appendLine(`  ${icon} ${r.name} (${r.duration}ms)${r.error ? ' — ' + r.error : ''}`);
         }
 
-        // Parse structured results and map to test items
-        this._outputChannel.appendLine(`Results:\n${resultText}`);
-        this._mapResults(run, fileItems, resultText);
+        // Map structured results directly to test items
+        for (const item of fileItems) {
+          const fullName = this._getFullTestName(item);
+          const result = results.find((r: any) => r.name === fullName) || results.find((r: any) => r.name === item.label);
+
+          if (!result || result.skipped) {
+            run.skipped(item);
+          } else if (result.passed) {
+            run.passed(item, result.duration);
+          } else {
+            run.failed(item, new vscode.TestMessage(result.error || 'Test failed'), result.duration);
+          }
+        }
       } catch (err: unknown) {
+        this._outputChannel.appendLine(`Error: ${(err as Error).message}`);
         for (const item of fileItems) {
           run.errored(item, new vscode.TestMessage((err as Error).message));
         }
@@ -242,76 +249,10 @@ export class TestExplorer {
     }
   }
 
-  private async _runViaPw(filePath: string, testNames?: string[]): Promise<string> {
-    const { spawn } = await import('node:child_process');
-
-    // Resolve pw from monorepo (packages/vscode/dist → ../../runner/dist/cli.js)
-    const pwPath = path.resolve(path.dirname(__filename), '..', '..', 'runner', 'dist', 'cli.js');
-    const parts = ['node', `"${pwPath}"`, 'test', `"${filePath}"`];
-    if (testNames && testNames.length > 0) {
-      const grepPattern = testNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-      parts.push('--grep', `"${grepPattern}"`);
-    }
-
-    const cmd = parts.join(' ');
-    this._outputChannel.appendLine(`[pw] ${cmd}`);
-
-    return new Promise((resolve) => {
-      let output = '';
-      const child = spawn(cmd, [], {
-        cwd: path.dirname(filePath),
-        shell: true,
-      });
-      child.stdout?.on('data', (data: Buffer) => { output += data.toString(); });
-      child.stderr?.on('data', (data: Buffer) => { this._outputChannel.appendLine(data.toString()); });
-      child.on('exit', () => resolve(output));
-    });
-  }
-
   private _getFileUri(item: vscode.TestItem): vscode.Uri | undefined {
     if (item.uri) return item.uri;
     if (item.parent) return this._getFileUri(item.parent);
     return undefined;
-  }
-
-  private _mapResults(run: vscode.TestRun, items: vscode.TestItem[], output: string) {
-    // Parse result lines: "  ✓ name (123ms)" or "  ✗ name (456ms)\n    error"
-    const resultLines = output.split('\n');
-    const results = new Map<string, { passed: boolean; duration: number; error?: string }>();
-
-    for (let i = 0; i < resultLines.length; i++) {
-      const passMatch = resultLines[i].match(/^\s*[✓✔]\s+(.+?)\s+\((\d+)ms\)/);
-      if (passMatch) {
-        results.set(passMatch[1], { passed: true, duration: parseInt(passMatch[2]) });
-        continue;
-      }
-      const failMatch = resultLines[i].match(/^\s*[✗✘]\s+(.+?)\s+\((\d+)ms\)/);
-      if (failMatch) {
-        const error = resultLines[i + 1]?.trim() || 'Test failed';
-        results.set(failMatch[1], { passed: false, duration: parseInt(failMatch[2]), error });
-        continue;
-      }
-      const skipMatch = resultLines[i].match(/^\s*-\s+(.+?)\s+\(skipped\)/);
-      if (skipMatch) {
-        results.set(skipMatch[1], { passed: true, duration: 0 });
-        continue;
-      }
-    }
-
-    // Map results to test items
-    for (const item of items) {
-      // Try full name first ("Suite > Test"), then just test name ("Test")
-      const fullName = this._getFullTestName(item);
-      const result = results.get(fullName) || results.get(item.label);
-
-      if (!result) {
-        run.skipped(item);
-      } else if (result.passed) {
-        run.passed(item, result.duration);
-      } else {
-        run.failed(item, new vscode.TestMessage(result.error || 'Test failed'), result.duration);
-      }
-    }
   }
 
   private _getFullTestName(item: vscode.TestItem): string {

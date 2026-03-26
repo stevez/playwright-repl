@@ -69,7 +69,8 @@
     "watch": "node build.mjs --watch"
   },
   "dependencies": {
-    "@playwright-repl/core": "workspace:*"
+    "@playwright-repl/core": "workspace:*",
+    "@playwright-repl/runner": "workspace:*"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",

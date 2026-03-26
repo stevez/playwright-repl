@@ -231,6 +231,9 @@ importers:
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
+      '@playwright-repl/runner':
+        specifier: workspace:*
+        version: link:../runner
     devDependencies:
       '@types/vscode':
         specifier: ^1.100.0

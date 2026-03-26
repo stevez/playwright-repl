@@ -29,6 +29,8 @@ export class BrowserManager {
   }
 
   isRunning() { return this._running; }
+  get bridge() { return this._bridge; }
+  get page() { return this._browserContext?.pages()[0]; }
 
   async launch(opts: LaunchOptions) {
     const _require = createRequire(__filename);
