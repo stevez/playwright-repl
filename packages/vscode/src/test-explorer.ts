@@ -51,11 +51,30 @@ export class TestExplorer {
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
     watcher.onDidCreate(uri => this._parseFile(uri));
     watcher.onDidChange(uri => this._parseFile(uri));
-    watcher.onDidDelete(uri => this._controller.items.delete(uri.toString()));
+    watcher.onDidDelete(uri => this._deleteFile(uri));
     this._watchers.push(watcher);
   }
 
   get controller() { return this._controller; }
+
+  private _deleteFile(uri: vscode.Uri) {
+    const remove = (items: vscode.TestItemCollection): boolean => {
+      let found = false;
+      items.forEach(item => {
+        if (item.id === uri.toString()) {
+          items.delete(item.id);
+          found = true;
+        } else if (item.children.size > 0) {
+          if (remove(item.children)) {
+            if (item.children.size === 0) items.delete(item.id);
+            found = true;
+          }
+        }
+      });
+      return found;
+    };
+    remove(this._controller.items);
+  }
 
   dispose() {
     this._controller.dispose();
@@ -82,15 +101,31 @@ export class TestExplorer {
       this._outputChannel.appendLine(`  Parsed ${uri.fsPath}: ${parsed.length} top-level items`);
       if (parsed.length === 0) return;
 
-      // Show relative path as label for better navigation
+      // Build folder hierarchy from workspace-relative path
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-      const label = workspaceFolder
+      const relativePath = workspaceFolder
         ? path.relative(workspaceFolder.uri.fsPath, uri.fsPath).replace(/\\/g, '/')
         : path.basename(uri.fsPath);
+      const parts = relativePath.split('/');
+      const fileName = parts.pop()!;
 
-      const fileItem = this._controller.createTestItem(uri.toString(), label, uri);
+      // Create or reuse folder items
+      let parent = this._controller.items;
+      let folderId = '';
+      for (const folder of parts) {
+        folderId += (folderId ? '/' : '') + folder;
+        const id = `folder:${folderId}`;
+        let folderItem = parent.get(id);
+        if (!folderItem) {
+          folderItem = this._controller.createTestItem(id, folder);
+          parent.add(folderItem);
+        }
+        parent = folderItem.children;
+      }
+
+      const fileItem = this._controller.createTestItem(uri.toString(), fileName, uri);
       this._buildTree(fileItem, parsed, uri);
-      this._controller.items.add(fileItem);
+      parent.add(fileItem);
     } catch (err: unknown) {
       this._outputChannel.appendLine(`  Error parsing ${uri.fsPath}: ${(err as Error).message}`);
     }
@@ -258,10 +293,12 @@ export class TestExplorer {
   private _getFullTestName(item: vscode.TestItem): string {
     const parts: string[] = [item.label];
     let parent = item.parent;
-    while (parent && parent.parent) { // skip file-level item
+    while (parent && parent.uri) { // stop at folder items (no uri)
       parts.unshift(parent.label);
       parent = parent.parent;
     }
+    // Remove the file name (first element after reversal)
+    if (parts.length > 1) parts.shift();
     return parts.join(' > ');
   }
 }
