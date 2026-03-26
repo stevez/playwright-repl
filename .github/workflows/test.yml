@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -58,8 +58,8 @@ jobs:
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
 
-      - name: Install Chrome for runner
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chrome
+      - name: Install Chrome + Chromium for runner
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chrome chromium
         working-directory: packages/runner
 
       - name: Run runner E2E tests (192 tests via pw-cli)
@@ -76,36 +76,3 @@ jobs:
       - name: Merge extension coverage
         run: pnpm run coverage:merge
         working-directory: packages/extension
-
-  test-windows:
-    name: test (windows, node 22)
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Install Chrome + Chromium
-        run: pnpm exec playwright install chrome chromium
-        working-directory: packages/runner
-
-      - name: Run runner E2E tests (192 tests via pw-cli)
-        run: node ../dist/pw-cli.js test --workers 2 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 10
-        env:
-          FORCE_COLOR: '1'
