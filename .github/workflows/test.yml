@@ -66,6 +66,8 @@ jobs:
         run: node ../dist/pw-cli.js test --workers 2
         working-directory: packages/runner/examples
         timeout-minutes: 10
+        env:
+          FORCE_COLOR: '1'
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
