@@ -103,14 +103,9 @@ jobs:
         run: pnpm exec playwright install chrome
         working-directory: packages/runner
 
-      - name: Run vanilla playwright test (diagnostic)
-        run: npx playwright test --workers 1 --reporter list
+      - name: Run runner E2E tests (192 tests via pw-cli)
+        run: node ../dist/pw-cli.js test --workers 2 --reporter list
         working-directory: packages/runner/examples
-        timeout-minutes: 5
-
-      - name: Run pw-cli test
-        run: node ../dist/pw-cli.js test --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           FORCE_COLOR: '1'
