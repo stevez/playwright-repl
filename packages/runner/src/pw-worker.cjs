@@ -95,8 +95,10 @@ async function ensureBridge() {
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
+  console.error('[pw-worker] bridge started on port ' + _bridge.port);
 
   const extPath = process.env.PW_EXT_PATH;
+  console.error('[pw-worker] launching Chrome with extension: ' + extPath);
   const pw = require('playwright-core');
   _context = await pw.chromium.launchPersistentContext('', {
     channel: 'chromium',
@@ -107,12 +109,15 @@ async function ensureBridge() {
       '--disable-background-timer-throttling',
     ],
   });
+  console.error('[pw-worker] Chrome launched');
 
   let sw = _context.serviceWorkers()[0];
   if (!sw) sw = await _context.waitForEvent('serviceworker', { timeout: 10000 });
+  console.error('[pw-worker] service worker found');
   await sw.evaluate(function(port) {
     chrome.storage.local.set({ bridgePort: port });
   }, _bridge.port);
+  console.error('[pw-worker] bridge port set, waiting for connection...');
 
   await _bridge.waitForConnection(10000);
   console.error('[pw-worker] bridge ready, port ' + _bridge.port + ' (pid ' + process.pid + ')');
