@@ -10,13 +10,12 @@ import { test as base, expect } from '@playwright/test';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
-// Resolve assets dir — try CWD/assets first, then look for playwright-tests/assets
-let ASSETS_DIR = path.resolve(process.cwd(), 'assets');
+import { fileURLToPath } from 'url';
+// Resolve assets dir relative to this file (works regardless of CWD)
+const __thisDir = path.dirname(fileURLToPath(import.meta.url));
+let ASSETS_DIR = path.resolve(__thisDir, 'assets');
 if (!fs.existsSync(ASSETS_DIR)) {
-  ASSETS_DIR = path.resolve(process.cwd(), 'playwright-tests/assets');
-}
-if (!fs.existsSync(ASSETS_DIR)) {
-  // Search up from CWD for a playwright-tests/assets directory
+  // Fallback: walk up from CWD
   let dir = process.cwd();
   while (dir !== path.dirname(dir)) {
     const candidate = path.join(dir, 'playwright-tests', 'assets');
