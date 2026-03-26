@@ -9,6 +9,7 @@ on:
 
 jobs:
   test:
+    name: test (${{ matrix.os }}, node 22)
     runs-on: ${{ matrix.os }}
 
     strategy:
