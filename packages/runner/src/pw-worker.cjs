@@ -89,44 +89,24 @@ let _context = null;
 async function ensureBridge() {
   if (_bridge) return;
 
-  console.error('[pw-worker] ensureBridge: importing core...');
   const { pathToFileURL } = require('url');
   const coreMain = require.resolve('@playwright-repl/core');
   const { BridgeServer } = await import(pathToFileURL(coreMain).href);
-  console.error('[pw-worker] ensureBridge: core imported');
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
-  console.error('[pw-worker] ensureBridge: bridge on port ' + _bridge.port);
 
   const extPath = process.env.PW_EXT_PATH;
-  const fs = require('fs');
-  console.error('[pw-worker] ensureBridge: ext=' + extPath + ' exists=' + fs.existsSync(extPath));
-  console.error('[pw-worker] ensureBridge: manifest=' + fs.existsSync(require('path').join(extPath, 'manifest.json')));
-  console.error('[pw-worker] ensureBridge: env.PLAYWRIGHT_BROWSERS_PATH=' + (process.env.PLAYWRIGHT_BROWSERS_PATH || 'not set'));
-  console.error('[pw-worker] ensureBridge: process.execPath=' + process.execPath);
-  console.error('[pw-worker] ensureBridge: platform=' + process.platform);
-
-  // Use @playwright/test (not playwright-core) — it knows where installed browsers are
   const pw = require('@playwright/test');
-  console.error('[pw-worker] ensureBridge: launching Chrome...');
-  try {
-    _context = await Promise.race([
-      pw.chromium.launchPersistentContext('', {
-        channel: 'chromium',
-        headless: true,
-        args: [
-          '--disable-extensions-except=' + extPath,
-          '--load-extension=' + extPath,
-          '--disable-background-timer-throttling',
-        ],
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Chrome launch timeout after 30s')), 30000)),
-    ]);
-  } catch (err) {
-    console.error('[pw-worker] ensureBridge: Chrome launch FAILED: ' + err.message);
-    throw err;
-  }
+  _context = await pw.chromium.launchPersistentContext('', {
+    channel: 'chromium',
+    headless: true,
+    args: [
+      '--disable-extensions-except=' + extPath,
+      '--load-extension=' + extPath,
+      '--disable-background-timer-throttling',
+    ],
+  });
 
   let sw = _context.serviceWorkers()[0];
   if (!sw) sw = await _context.waitForEvent('serviceworker', { timeout: 10000 });
@@ -339,11 +319,8 @@ function patchWorker(worker, params) {
     console.error('[pw-worker] bridge mode: ' + runPayload.file +
       (names.length ? ' (' + names.join(', ') + ')' : ''));
 
-    console.error('[pw-worker] compiling...');
     const compiled = await compile(runPayload.file);
-    console.error('[pw-worker] compiled, ' + compiled.length + ' chars');
     await ensureBridge();
-    console.error('[pw-worker] bridge ready, running...');
     return runOnBridge(worker, compiled, runPayload, idToTitle);
   };
 
