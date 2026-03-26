@@ -13,7 +13,6 @@ import path = require('path');
 
 let sharedContext: any = null;
 let sharedPage: any = null;
-let sharedContextOptions: string = '';
 let browserPatched = false;
 
 const origLoad = (Module as any)._load;
@@ -47,21 +46,15 @@ const origLoad = (Module as any)._load;
       const origNewContext = browser.newContext.bind(browser);
 
       browser.newContext = async function (contextOptions: any) {
-        const optionsKey = JSON.stringify(contextOptions || {});
-
-        if (!sharedContext || optionsKey !== sharedContextOptions) {
-          // Fresh context needed: first call or options changed (viewport, locale, etc.)
-          if (sharedContext) {
-            try { await sharedContext.close(); } catch {}
-          }
+        if (!sharedContext) {
           sharedContext = await origNewContext(contextOptions);
           sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
-          sharedContextOptions = optionsKey;
         } else {
-          // Reuse: same options — just reset page state
+          // Reuse: reset page state + viewport to Playwright default (1280×720)
           try {
             await sharedContext.clearCookies();
             await sharedContext.clearPermissions().catch(() => {});
+            await sharedPage.setViewportSize({ width: 1280, height: 720 });
             await sharedPage.goto('about:blank', { waitUntil: 'commit' });
           } catch {}
         }
