@@ -76,3 +76,41 @@ jobs:
       - name: Merge extension coverage
         run: pnpm run coverage:merge
         working-directory: packages/extension
+
+  test-windows:
+    name: test (windows, node 22)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Install Chrome
+        run: pnpm exec playwright install chrome
+        working-directory: packages/runner
+
+      - name: Run vanilla playwright test (diagnostic)
+        run: npx playwright test --workers 1 --reporter list
+        working-directory: packages/runner/examples
+        timeout-minutes: 5
+
+      - name: Run pw-cli test
+        run: node ../dist/pw-cli.js test --workers 1 --reporter list
+        working-directory: packages/runner/examples
+        timeout-minutes: 5
+        env:
+          FORCE_COLOR: '1'
