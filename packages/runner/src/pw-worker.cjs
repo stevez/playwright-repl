@@ -104,6 +104,7 @@ async function ensureBridge() {
   // Use @playwright/test (not playwright-core) — it knows where installed browsers are
   const pw = require('@playwright/test');
   _context = await pw.chromium.launchPersistentContext('', {
+    channel: 'chromium',
     headless: true,
     args: [
       '--disable-extensions-except=' + extPath,
