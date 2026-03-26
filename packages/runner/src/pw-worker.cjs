@@ -89,9 +89,11 @@ let _context = null;
 async function ensureBridge() {
   if (_bridge) return;
 
+  console.error('[pw-worker] importing BridgeServer...');
   const coreMain = require.resolve('@playwright-repl/core');
   const coreUrl = 'file:///' + coreMain.replace(/\\/g, '/');
   const { BridgeServer } = await import(coreUrl);
+  console.error('[pw-worker] BridgeServer imported');
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
@@ -101,7 +103,7 @@ async function ensureBridge() {
   console.error('[pw-worker] launching Chrome with extension: ' + extPath);
   const pw = require('playwright-core');
   _context = await pw.chromium.launchPersistentContext('', {
-    channel: 'chromium',
+    channel: process.env.PW_CHANNEL || 'chromium',
     headless: true,
     args: [
       '--disable-extensions-except=' + extPath,
