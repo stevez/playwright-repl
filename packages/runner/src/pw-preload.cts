@@ -50,9 +50,7 @@ const origLoad = (Module as any)._load;
         if (!sharedContext) {
           sharedContext = await origNewContext(contextOptions);
           sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
-          console.error('[pw] created shared context (worker ' + process.pid + ')');
         } else {
-          console.error('[pw] REUSING context (worker ' + process.pid + ')');
           try {
             await sharedContext.clearCookies();
             await sharedContext.clearPermissions().catch(() => {});
