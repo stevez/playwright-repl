@@ -40,8 +40,8 @@ jobs:
         run: pnpm run lint
         working-directory: packages/extension
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install chromium
+      - name: Install Playwright Chromium (with system deps)
+        run: pnpm exec playwright install --with-deps chromium
         working-directory: packages/extension
 
       - name: Run extension component tests
