@@ -64,8 +64,8 @@ jobs:
         run: node e2e/test-bridge-replay.js --include-snapshot --verbose
         working-directory: packages/cli
 
-      - name: Install Playwright Chromium (runner)
-        run: pnpm exec playwright install chromium
+      - name: Install Chrome for runner (extensions need real Chrome)
+        run: pnpm exec playwright install chrome
         working-directory: packages/runner
 
       - name: Run runner E2E tests (192 tests via pw-cli)
