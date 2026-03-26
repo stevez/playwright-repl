@@ -89,11 +89,9 @@ let _context = null;
 async function ensureBridge() {
   if (_bridge) return;
 
-  console.error('[pw-worker] importing BridgeServer...');
+  const { pathToFileURL } = require('url');
   const coreMain = require.resolve('@playwright-repl/core');
-  const coreUrl = 'file:///' + coreMain.replace(/\\/g, '/');
-  const { BridgeServer } = await import(coreUrl);
-  console.error('[pw-worker] BridgeServer imported');
+  const { BridgeServer } = await import(pathToFileURL(coreMain).href);
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
