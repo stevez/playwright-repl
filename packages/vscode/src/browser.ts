@@ -35,12 +35,14 @@ export class BrowserManager {
   async launch(opts: LaunchOptions) {
     const _require = createRequire(__filename);
 
-    // 1. Find the extension dist path (sibling package in monorepo)
+    // 1. Find Chrome extension: bundled (VSIX) first, then monorepo fallback
+    const bundledExt = path.resolve(path.dirname(__filename), '..', 'chrome-extension');
     const coreMain = _require.resolve('@playwright-repl/core');
     const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
-    const extPath = path.resolve(coreDir, '../extension/dist');
+    const monorepoExt = path.resolve(coreDir, '../extension/dist');
+    const extPath = fs.existsSync(path.join(bundledExt, 'manifest.json')) ? bundledExt : monorepoExt;
     if (!fs.existsSync(path.join(extPath, 'manifest.json')))
-      throw new Error(`Extension not built. Run "pnpm run build" first. Expected: ${extPath}`);
+      throw new Error(`Chrome extension not found. Run "pnpm run build" first.`);
     this._log.appendLine(`Extension: ${extPath}`);
 
     // 2. Start BridgeServer (WebSocket)
