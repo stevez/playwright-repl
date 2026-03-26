@@ -89,15 +89,20 @@ let _context = null;
 async function ensureBridge() {
   if (_bridge) return;
 
+  console.error('[pw-worker] ensureBridge: importing core...');
   const { pathToFileURL } = require('url');
   const coreMain = require.resolve('@playwright-repl/core');
   const { BridgeServer } = await import(pathToFileURL(coreMain).href);
+  console.error('[pw-worker] ensureBridge: core imported');
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
+  console.error('[pw-worker] ensureBridge: bridge on port ' + _bridge.port);
 
   const extPath = process.env.PW_EXT_PATH;
-  const pw = require('playwright-core');
+  console.error('[pw-worker] ensureBridge: launching Chrome, ext=' + extPath);
+  // Use @playwright/test (not playwright-core) — it knows where installed browsers are
+  const pw = require('@playwright/test');
   _context = await pw.chromium.launchPersistentContext('', {
     channel: 'chromium',
     headless: true,
