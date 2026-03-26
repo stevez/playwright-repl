@@ -13,22 +13,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { BridgeServer } from '@playwright-repl/core';
-import { createPageProxy, createExpect } from './proxy-page.js';
-import { installFramework } from './shim/framework.js';
 import type { RunOptions, TestResult } from './types.js';
 import { expect as pwExpect } from '@playwright/test';
 
 const __filename = fileURLToPath(import.meta.url);
-
-// ─── Framework (Node.js path) ──────────────────────────────────────────────
-
-let frameworkInstalled = false;
-
-function ensureFramework() {
-  if (frameworkInstalled) return;
-  installFramework();
-  frameworkInstalled = true;
-}
 
 // ─── Alias path (resolved once) ────────────────────────────────────────────
 
@@ -126,27 +114,9 @@ async function executeNode(
   nodePage?: any,
   cdpPage?: any,
 ): Promise<TestResult[]> {
-  const realPage = cdpPage || nodePage;
-  const useProxy = process.argv.includes('--proxy');
-  let page: any;
-  let expect: any;
-
-  if (useProxy) {
-    console.log('  [node] PROXY mode');
-    const bridgeRun = async (cmd: string) => {
-      console.log(`    [bridge →] ${cmd.substring(0, 120)}`);
-      const r = await bridge.run(cmd);
-      console.log(`    [bridge ←] ${r.isError ? 'ERR' : 'OK'} ${(r.text || '').substring(0, 80)}`);
-      if (r.isError) throw new Error(r.text || 'Bridge error');
-      return r;
-    };
-    page = createPageProxy(bridgeRun, nodePage, cdpPage);
-    expect = createExpect(bridgeRun);
-  } else {
-    console.log(`  [node] DIRECT mode`);
-    page = realPage;
-    expect = pwExpect;
-  }
+  console.log(`  [node] DIRECT mode`);
+  const page = cdpPage || nodePage;
+  const expect = pwExpect;
 
   // Collect registered tests
   const tests: { name: string; fn: (fixtures: any) => Promise<void>; skip: boolean }[] = [];
@@ -206,13 +176,6 @@ async function executeNode(
   (globalThis as any).__test = testFn;
   (globalThis as any).__expect = expect;
 
-  // __bridge sends commands to the SW for execution (used by compiler-transformed calls)
-  (globalThis as any).__bridge = async (cmd: string) => {
-    const r = await bridge.run(cmd);
-    if (r.isError) throw new Error(r.text || 'Bridge error');
-    // Don't return a value — bridge calls are fire-and-forget
-  };
-
   // Compile and import (registers tests, doesn't run them)
   const compiled = await compileNode(testFilePath);
   const tmpFile = path.join(os.tmpdir(), `pw-test-${Date.now()}.mjs`);
@@ -248,10 +211,6 @@ async function executeNode(
       const msg = (err as Error).message || String(err);
       console.error(`    [FAIL] ${t.name}\n      ${msg.split('\n').slice(0, 3).join('\n      ')}`);
       results.push({ name: t.name, file: testFilePath, passed: false, skipped: false, error: msg, duration: Date.now() - start });
-      // Cancel any pending bridge commands by navigating via Node page (bypasses bridge queue)
-      if (useProxy) {
-        try { await realPage.goto('about:blank', { timeout: 5000 }); } catch { /* ignore */ }
-      }
     }
   }
 
