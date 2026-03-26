@@ -65,7 +65,7 @@ jobs:
         working-directory: packages/cli
 
       - name: Run runner E2E tests (192 tests via pw-cli)
-        run: node ../dist/pw-cli.js test
+        run: node ../dist/pw-cli.js test --workers 2
         working-directory: packages/runner/examples
 
       - name: Run extension E2E tests
