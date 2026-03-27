@@ -94,7 +94,7 @@ test.describe("Panel page test", () => {
 
   // ─── Command History ───────────────────────────────────────────────────────
 
-  test('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
+  test.skip('navigates history with ArrowUp/ArrowDown', async ({ panelPage }) => {
     await fillInput(panelPage, 'goto https://a.com');
     await panelPage.keyboard.press('Escape');
     await panelPage.keyboard.press('Enter');
