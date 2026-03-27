@@ -118,8 +118,11 @@ async function ensureBridge(): Promise<void> {
 }
 
 async function closeBridge(): Promise<void> {
-  if (_context) await _context.close().catch(() => {});
-  if (_bridge) await _bridge.close().catch(() => {});
+  // Persistent context with extensions may hang on close (macOS/Windows).
+  // Use a timeout to prevent blocking the worker shutdown.
+  const timeout = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+  if (_context) await Promise.race([_context.close(), timeout(3000)]).catch(() => {});
+  if (_bridge) await Promise.race([_bridge.close(), timeout(1000)]).catch(() => {});
   _context = null;
   _bridge = null;
 }
