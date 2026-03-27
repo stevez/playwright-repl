@@ -78,8 +78,9 @@ async function main() {
     cli.on('close', (code) => resolve(code ?? 1));
   });
 
-  // 6. Cleanup
-  await context.close();
+  // 6. Cleanup (persistent context with extensions may hang on close on Windows/macOS)
+  const timeout = new Promise(r => setTimeout(r, 3000));
+  await Promise.race([context.close(), timeout]).catch(() => {});
 
   // 7. Report
   if (exitCode === 0) {
