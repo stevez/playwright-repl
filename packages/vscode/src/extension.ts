@@ -183,7 +183,7 @@ export class Extension implements RunHooks {
         if (httpPort)
           process.env.PW_BRIDGE_PORT = String(httpPort);
         this._lastReuseCDP = cdpEndpoint;
-        return { resetTestServer: needsReset };
+        return { resetTestServer: needsReset, reusingBrowser: true };
       }
     }
 
