@@ -168,15 +168,50 @@ export class Extension implements RunHooks {
     this._treeItemObserver = new TreeItemObserver(this._vscode, this._logger);
   }
 
+  private _lastReuseCDP: string | undefined;
+
   async onWillRunTests(config: TestConfig, debug: boolean) {
+    const showBrowser = this._settingsModel.showBrowser.get();
+    // Headed mode: use BrowserManager (reuse browser across REPL and tests)
+    if (showBrowser && !debug) {
+      await this._ensureBrowserManager();
+      if (this._browserManager?.isRunning()) {
+        const cdpEndpoint = 'http://127.0.0.1:9222';
+        const needsReset = this._lastReuseCDP !== cdpEndpoint;
+        process.env.PW_REUSE_CDP = cdpEndpoint;
+        this._lastReuseCDP = cdpEndpoint;
+        return { resetTestServer: needsReset };
+      }
+    }
+
+    // Headless / debug / fallback: original Playwright extension behavior
+    const needsReset = !!this._lastReuseCDP;
+    delete process.env.PW_REUSE_CDP;
+    this._lastReuseCDP = undefined;
     await this._reusedBrowser.onWillRunTests(config, debug);
-    return {
-      connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(),
-    };
+    return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(), resetTestServer: needsReset };
   }
 
   async onDidRunTests() {
+    // If BrowserManager owns the browser, keep it alive
+    if (this._browserManager?.isRunning())
+      return;
     await this._reusedBrowser.onDidRunTests();
+  }
+
+  private async _ensureBrowserManager() {
+    if (!this._browserManager) {
+      const outputChannel = this._vscode.window.createOutputChannel('Playwright IDE');
+      this._browserManager = new BrowserManager(outputChannel);
+    }
+    if (this._browserManager.isRunning())
+      return;
+    await this._browserManager.launch({
+      browser: 'chromium',
+      headless: false,
+    });
+    if (this._repl)
+      this._repl.setBrowserManager(this._browserManager);
   }
 
   reusedBrowserForTest(): ReusedBrowser {
@@ -308,19 +343,7 @@ export class Extension implements RunHooks {
       // ─── Playwright IDE: bridge-based commands ────────────────────────────
       vscode.commands.registerCommand('playwright-ide.launchBrowser', async () => {
         try {
-          if (!this._browserManager) {
-            const outputChannel = vscode.window.createOutputChannel('Playwright IDE');
-            this._browserManager = new BrowserManager(outputChannel);
-          }
-          if (this._browserManager.isRunning()) return;
-          const showBrowser = this._settingsModel.showBrowser.get();
-          await this._browserManager.launch({
-            browser: 'chromium',
-            headless: !showBrowser,
-          });
-          // Wire browser manager to REPL
-          if (this._repl)
-            this._repl.setBrowserManager(this._browserManager);
+          await this._ensureBrowserManager();
         } catch (e: unknown) {
           vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }

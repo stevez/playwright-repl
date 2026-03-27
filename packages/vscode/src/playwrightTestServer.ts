@@ -35,10 +35,14 @@ const _hasPreload = fs.existsSync(_preloadPath);
 function preloadEnv(): Record<string, string | undefined> {
   if (!_hasPreload) return {};
   const existing = process.env.NODE_OPTIONS || '';
-  return {
+  const env: Record<string, string | undefined> = {
     NODE_OPTIONS: `${existing} --require ${_preloadPath}`.trim(),
     PW_EXT_PATH: _extPath,
   };
+  // Forward CDP endpoint so pw-preload can reuse BrowserManager's browser
+  if (process.env.PW_REUSE_CDP)
+    env.PW_REUSE_CDP = process.env.PW_REUSE_CDP;
+  return env;
 }
 
 export type TestConfig = {

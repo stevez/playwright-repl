@@ -6,6 +6,10 @@
  *
  * Context reuse: Node-mode tests reuse one shared context/page per worker
  * instead of creating fresh ones per test (~575ms saving per test).
+ *
+ * When PW_REUSE_CDP is set (BrowserManager running), chromium.launch is
+ * replaced with chromium.connectOverCDP so tests reuse BrowserManager's
+ * headed browser instead of launching a new one.
  */
 
 import Module = require('module');
@@ -43,6 +47,49 @@ const origLoad = (Module as any)._load;
     const origLaunch = result.chromium.launch;
 
     result.chromium.launch = async function () {
+      const cdpEndpoint = process.env.PW_REUSE_CDP;
+
+      // When BrowserManager is running, connect to its browser via CDP
+      if (cdpEndpoint && result.chromium.connectOverCDP) {
+
+        const browser = await result.chromium.connectOverCDP(cdpEndpoint);
+
+        // Reuse existing context from BrowserManager
+        const origNewContext = browser.newContext.bind(browser);
+        browser.newContext = async function (contextOptions: any) {
+          if (!sharedContext) {
+            const contexts = browser.contexts();
+
+            if (contexts.length > 0) {
+              sharedContext = contexts[0];
+              sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+            } else {
+              sharedContext = await origNewContext(contextOptions);
+              sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+            }
+            defaultViewport = sharedPage.viewportSize();
+          } else {
+            try {
+              await sharedContext.clearCookies();
+              await sharedContext.clearPermissions().catch(() => {});
+              await sharedContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+              await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+              if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
+              await sharedPage.goto('about:blank', { waitUntil: 'commit' });
+            } catch {}
+          }
+          sharedContext.newPage = async () => sharedPage;
+          sharedContext.close = async () => {};
+          return sharedContext;
+        };
+
+        // Don't close BrowserManager's browser
+        browser.close = async () => {};
+        return browser;
+      }
+
+      // Normal path: launch new browser, reuse context across tests
+
       const browser = await origLaunch.apply(this, arguments);
       const origNewContext = browser.newContext.bind(browser);
 
@@ -52,7 +99,6 @@ const origLoad = (Module as any)._load;
           sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
           defaultViewport = sharedPage.viewportSize();
         } else {
-          // Reuse: reset page state + viewport to original default
           try {
             await sharedContext.clearCookies();
             await sharedContext.clearPermissions().catch(() => {});
