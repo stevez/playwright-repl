@@ -37,6 +37,7 @@ import { findTestEndPosition } from './babelHighlightUtil';
 import { BrowserManager } from './browser';
 import { Recorder } from './recorder';
 import { Picker } from './picker';
+import { createRequire } from 'node:module';
 import { PlaywrightRepl } from './repl';
 
 const stackUtils = new StackUtils({
@@ -833,11 +834,153 @@ export class Extension implements RunHooks {
     } else {
       // Force trace viewer update to surface check version errors.
       await this._models.selectedModel()?.updateTraceViewer(mode === 'run')?.willRunTests();
-      await model.runTests(request, testListener, testRun.token);
+
+      // Phase 6: Direct bridge execution for bridge-eligible tests
+      // Ensure BrowserManager is running before trying direct bridge
+      if (this._settingsModel.showBrowser.get())
+        await this._ensureBrowserManager();
+      let bridgeHandled = false;
+      try {
+        bridgeHandled = await this._tryDirectBridge(request, testRun);
+      } catch (e: unknown) {
+        this._logger.error(`[directBridge] error: ${(e as Error).stack || (e as Error).message}`);
+      }
+      if (!bridgeHandled)
+        await model.runTests(request, testListener, testRun.token);
     }
 
     if (browserDoesNotExist)
       await installBrowsers(this._vscode, model);
+  }
+
+  // ─── Phase 6: Direct bridge execution ──────────────────────────────────────
+
+  /**
+   * Try to run tests directly via BrowserManager's bridge, bypassing test-server.
+   * Returns true if ALL tests were handled by bridge, false if any need test-server.
+   */
+  private async _tryDirectBridge(
+    request: vscodeTypes.TestRunRequest,
+    testRun: vscodeTypes.TestRun,
+  ): Promise<boolean> {
+    // Only when BrowserManager is running (headed mode)
+    if (!this._browserManager?.isRunning() || !this._browserManager.bridge)
+      return false;
+
+    // Load bridge-utils at runtime (CJS module, can't be bundled by esbuild)
+    const _require = createRequire(__filename);
+    const bridgeUtils = _require('@playwright-repl/runner/dist/bridge-utils.cjs') as {
+      needsNode: (filePath: string) => boolean;
+      compile: (filePath: string) => Promise<string>;
+      parseAllResults: (text: string) => { status: string; duration: number; errors: { message: string }[] }[];
+    };
+
+    // Collect test items — only use direct bridge for leaf test items (not folders/files)
+    const items = request.include || [];
+    if (!items.length)
+      return false;
+
+    // Collect leaf test items from request — expand files/describes into their children
+    const fileToItems = new Map<string, vscodeTypes.TestItem[]>();
+
+    const collectLeaves = (item: vscodeTypes.TestItem) => {
+      if (item.children.size === 0) {
+        // Leaf test item
+        if (!item.uri) return;
+        const filePath = uriToPath(item.uri);
+        let group = fileToItems.get(filePath);
+        if (!group) { group = []; fileToItems.set(filePath, group); }
+        group.push(item);
+      } else {
+        // File or describe — recurse into children
+        item.children.forEach(child => collectLeaves(child));
+      }
+    };
+
+    for (const item of items)
+      collectLeaves(item);
+
+    if (fileToItems.size === 0)
+      return false;
+
+    // Check all files are bridge-eligible
+    for (const filePath of fileToItems.keys()) {
+      if (bridgeUtils.needsNode(filePath))
+        return false;
+    }
+
+    // Run bridge-eligible tests directly
+    const bridge = this._browserManager.bridge;
+
+    for (const [filePath, testItems] of fileToItems) {
+      // Compile test file
+      let compiled: string;
+      try {
+        compiled = await bridgeUtils.compile(filePath);
+      } catch (e: unknown) {
+        for (const testItem of testItems) {
+          testRun.started(testItem);
+          testRun.failed(testItem, [{ message: `Compile error: ${(e as Error).message}` }], 0);
+        }
+        continue;
+      }
+
+      // Build full test title paths (walk parent chain: describe > test)
+      // Stop at the file-level item (its label is a filename like *.spec.ts)
+      const fullNames: string[] = [];
+      for (const testItem of testItems) {
+        const parts: string[] = [];
+        let current: vscodeTypes.TestItem | undefined = testItem;
+        while (current) {
+          // Stop if this item's label looks like a filename
+          if (/\.(spec|test)\.[tj]sx?$/.test(current.label))
+            break;
+          parts.unshift(current.label);
+          current = current.parent;
+        }
+        fullNames.push(parts.join(' > '));
+      }
+
+      // Build grep pattern from full test names
+      const escapedNames = fullNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const grepPattern = '^(' + escapedNames.join('|') + ')$';
+
+      // Build script
+      let script = 'globalThis.__resetTestState();\n';
+      script += 'globalThis.__setGrepExact(' + JSON.stringify(grepPattern) + ');\n';
+      script += compiled + '\n';
+      script += 'await globalThis.__runTests();';
+
+      // Mark all tests as started
+      for (const testItem of testItems)
+        testRun.started(testItem);
+
+      // Execute via bridge
+      const result = await bridge.runScript(script, 'javascript');
+      const outputText = result.text || '';
+      testRun.appendOutput(outputText.replace(/\n/g, '\r\n'));
+      const results = bridgeUtils.parseAllResults(outputText);
+
+      // Map results back to test items
+      for (let i = 0; i < testItems.length; i++) {
+        const testItem = testItems[i];
+        const testResult = results[i];
+
+        if (!testResult || result.isError) {
+          testRun.failed(testItem, [{ message: result.text || 'Bridge execution failed' }], 0);
+          continue;
+        }
+
+        if (testResult.status === 'passed')
+          testRun.passed(testItem, testResult.duration);
+        else if (testResult.status === 'skipped')
+          testRun.skipped(testItem);
+        else
+          testRun.failed(testItem, testResult.errors.map(e => ({ message: e.message })), testResult.duration);
+      }
+    }
+
+    return true;
   }
 
   private _errorReportingListener(testRun: vscodeTypes.TestRun, testItemForGlobalErrors?: vscodeTypes.TestItem) {
