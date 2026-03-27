@@ -177,8 +177,11 @@ export class Extension implements RunHooks {
       await this._ensureBrowserManager();
       if (this._browserManager?.isRunning()) {
         const cdpEndpoint = 'http://127.0.0.1:9222';
+        const httpPort = this._browserManager.httpPort;
         const needsReset = this._lastReuseCDP !== cdpEndpoint;
         process.env.PW_REUSE_CDP = cdpEndpoint;
+        if (httpPort)
+          process.env.PW_BRIDGE_PORT = String(httpPort);
         this._lastReuseCDP = cdpEndpoint;
         return { resetTestServer: needsReset };
       }
@@ -187,6 +190,7 @@ export class Extension implements RunHooks {
     // Headless / debug / fallback: original Playwright extension behavior
     const needsReset = !!this._lastReuseCDP;
     delete process.env.PW_REUSE_CDP;
+    delete process.env.PW_BRIDGE_PORT;
     this._lastReuseCDP = undefined;
     await this._reusedBrowser.onWillRunTests(config, debug);
     return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(), resetTestServer: needsReset };

@@ -85,9 +85,19 @@ function needsNode(filePath: string): boolean {
 
 let _bridge: any = null;
 let _context: any = null;
+let _usingExternalBridge = false;
 
 async function ensureBridge(): Promise<void> {
   if (_bridge) return;
+
+  // If PW_BRIDGE_PORT is set, reuse BrowserManager's bridge via HTTP proxy
+  const externalPort = process.env.PW_BRIDGE_PORT;
+  if (externalPort) {
+    _bridge = new HttpBridgeClient(parseInt(externalPort, 10));
+    _usingExternalBridge = true;
+    console.error('[pw-worker] reusing external bridge on port ' + externalPort + ' (pid ' + process.pid + ')');
+    return;
+  }
 
   const coreMain = require.resolve('@playwright-repl/core');
   const { BridgeServer } = await import(pathToFileURL(coreMain).href);
@@ -118,6 +128,12 @@ async function ensureBridge(): Promise<void> {
 }
 
 async function closeBridge(): Promise<void> {
+  // External bridge is owned by BrowserManager — don't close it
+  if (_usingExternalBridge) {
+    _bridge = null;
+    _usingExternalBridge = false;
+    return;
+  }
   // Persistent context with extensions may hang on close (macOS/Windows).
   // Use a timeout to prevent blocking the worker shutdown.
   const timeout = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -125,6 +141,47 @@ async function closeBridge(): Promise<void> {
   if (_bridge) await Promise.race([_bridge.close(), timeout(1000)]).catch(() => {});
   _context = null;
   _bridge = null;
+}
+
+// ─── HTTP bridge client (calls BrowserManager's proxy) ───
+
+class HttpBridgeClient {
+  private _port: number;
+  constructor(port: number) { this._port = port; }
+
+  get port() { return this._port; }
+
+  async runScript(script: string, language: string = 'javascript'): Promise<{ text?: string; isError?: boolean }> {
+    return this._post('/run-script', { script, language });
+  }
+
+  async run(command: string): Promise<{ text?: string; isError?: boolean }> {
+    return this._post('/run', { command });
+  }
+
+  private _post(urlPath: string, body: Record<string, unknown>): Promise<{ text?: string; isError?: boolean }> {
+    const http = require('http');
+    const data = JSON.stringify(body);
+    return new Promise((resolve) => {
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port: this._port,
+        path: urlPath,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      }, (res: any) => {
+        let chunks = '';
+        res.on('data', (c: string) => chunks += c);
+        res.on('end', () => {
+          try { resolve(JSON.parse(chunks)); }
+          catch { resolve({ text: chunks, isError: true }); }
+        });
+      });
+      req.on('error', (e: Error) => resolve({ text: e.message, isError: true }));
+      req.write(data);
+      req.end();
+    });
+  }
 }
 
 // ─── Test name resolution ───

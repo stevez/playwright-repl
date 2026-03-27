@@ -39,9 +39,11 @@ function preloadEnv(): Record<string, string | undefined> {
     NODE_OPTIONS: `${existing} --require ${_preloadPath}`.trim(),
     PW_EXT_PATH: _extPath,
   };
-  // Forward CDP endpoint so pw-preload can reuse BrowserManager's browser
+  // Forward endpoints so workers can reuse BrowserManager's browser
   if (process.env.PW_REUSE_CDP)
     env.PW_REUSE_CDP = process.env.PW_REUSE_CDP;
+  if (process.env.PW_BRIDGE_PORT)
+    env.PW_BRIDGE_PORT = process.env.PW_BRIDGE_PORT;
   return env;
 }
 
