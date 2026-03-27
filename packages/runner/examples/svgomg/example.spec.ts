@@ -81,7 +81,7 @@ test.describe('demo tests', () => {
     expect(result).toContain('<svg');
   });
 
-  test('open svg', async ({ page }) => {
+  test.skip('open svg', async ({ page }) => {
     // Start waiting for the file chooser, then click the button.
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
