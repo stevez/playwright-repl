@@ -15,6 +15,7 @@
  */
 
 import path from 'path';
+import fs from 'fs';
 import { ConfigFindRelatedTestFilesReport, ConfigListFilesReport } from './listTests';
 import * as vscodeTypes from './vscodeTypes';
 import * as reporterTypes from './upstream/reporter';
@@ -25,6 +26,20 @@ import { escapeRegex, pathSeparator } from './utils';
 import { debugSessionName } from './debugSessionName';
 import type { TestModel } from './testModel';
 import { TestServerInterface } from './upstream/testServerInterface';
+
+// ─── pw-preload injection for context reuse + bridge mode ─────────────────────
+const _preloadPath = path.resolve(__dirname, '../../runner/dist/pw-preload.cjs');
+const _extPath = path.resolve(__dirname, '../chrome-extension');
+const _hasPreload = fs.existsSync(_preloadPath);
+
+function preloadEnv(): Record<string, string | undefined> {
+  if (!_hasPreload) return {};
+  const existing = process.env.NODE_OPTIONS || '';
+  return {
+    NODE_OPTIONS: `${existing} --require ${_preloadPath}`.trim(),
+    PW_EXT_PATH: _extPath,
+  };
+}
 
 export type TestConfig = {
   workspaceFolder: string;
@@ -317,6 +332,8 @@ export class PlaywrightTestServer {
           PW_TEST_SOURCE_TRANSFORM: this._model.config.version < kMinTestPausedVersion ? require.resolve('./debugTransform') : undefined,
           PW_TEST_SOURCE_TRANSFORM_SCOPE: this._model.config.version < kMinTestPausedVersion ? testDirs.join(pathSeparator) : undefined,
           PWDEBUG: 'console',
+          // Inject pw-preload for context reuse + bridge mode
+          ...preloadEnv(),
         },
         program: paths.cli,
         args: ['test-server', '-c', paths.config],
@@ -416,6 +433,8 @@ export class PlaywrightTestServer {
           FORCE_COLOR: '1',
           // Reset VSCode's options that affect nested Electron.
           ELECTRON_RUN_AS_NODE: undefined,
+          // Inject pw-preload for context reuse + bridge mode
+          ...preloadEnv(),
         };
       },
       dumpIO: false,
