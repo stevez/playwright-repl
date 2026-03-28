@@ -1,16 +1,32 @@
 {
   "name": "@playwright-repl/vscode",
   "displayName": "Playwright REPL",
-  "description": "Playwright REPL — fast test execution with live REPL, trace viewer, and bridge mode",
+  "description": "10x faster Playwright test execution with interactive REPL, assertion builder, and element picker",
   "icon": "images/playwright-logo.png",
   "version": "0.20.0",
   "private": true,
   "publisher": "playwright-repl",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stevez/playwright-repl"
+  },
   "engines": {
     "vscode": "^1.93.0"
   },
   "categories": [
-    "Testing"
+    "Testing",
+    "Debuggers"
+  ],
+  "keywords": [
+    "playwright",
+    "testing",
+    "e2e",
+    "browser",
+    "automation",
+    "repl",
+    "locator",
+    "assertion",
+    "recorder"
   ],
   "main": "./dist/extension.js",
   "l10n": "./l10n",
@@ -94,11 +110,6 @@
         "category": "Playwright REPL",
         "command": "playwright-repl.stopBrowser",
         "title": "Stop Browser"
-      },
-      {
-        "category": "Playwright REPL",
-        "command": "playwright-repl.openRepl",
-        "title": "Open REPL"
       },
       {
         "category": "Playwright REPL",

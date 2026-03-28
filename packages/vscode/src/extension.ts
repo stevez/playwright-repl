@@ -38,7 +38,6 @@ import { BrowserManager } from './browser';
 import { Recorder } from './recorder';
 import { Picker } from './picker';
 import { createRequire } from 'node:module';
-import { PlaywrightRepl } from './repl';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
 
@@ -101,7 +100,6 @@ export class Extension implements RunHooks {
   private _assertView!: AssertView;
   private _recorder?: Recorder;
   private _picker?: Picker;
-  private _repl?: PlaywrightRepl;
 
   private _modelRebuild?: { result: Promise<void>; token: vscodeTypes.CancellationTokenSource; needsAnother: boolean; };
 
@@ -219,8 +217,6 @@ export class Extension implements RunHooks {
       browser: 'chromium',
       headless: false,
     });
-    if (this._repl)
-      this._repl.setBrowserManager(this._browserManager);
     if (this._replView)
       this._replView.setBrowserManager(this._browserManager);
     if (this._locatorsView)
@@ -252,8 +248,6 @@ export class Extension implements RunHooks {
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
-    this._repl = new PlaywrightRepl();
-    this._repl.show();
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
     this._disposables = [
       this._debugHighlight,
@@ -377,14 +371,6 @@ export class Extension implements RunHooks {
       }),
       vscode.commands.registerCommand('playwright-repl.stopBrowser', () => {
         this._browserManager?.stop();
-      }),
-      vscode.commands.registerCommand('playwright-repl.openRepl', () => {
-        if (!this._repl || this._repl.disposed) {
-          this._repl = new PlaywrightRepl(this._browserManager);
-          if (this._browserManager)
-            this._repl.setBrowserManager(this._browserManager);
-        }
-        this._repl.show();
       }),
       vscode.commands.registerCommand('playwright-repl.startRecording', async () => {
         if (!this._browserManager?.isRunning()) {

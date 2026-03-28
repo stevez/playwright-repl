@@ -1,52 +1,114 @@
-# Playwright REPL — VS Code Extension
+# Playwright REPL for VS Code
 
-Interactive Playwright REPL inside VS Code, powered by bridge mode for fast execution.
+Interactive browser automation with **10x faster test execution**, a live REPL, and an assertion builder — all inside VS Code.
 
-## Architecture
+![Playwright REPL](images/hero.png)
 
-```
-VS Code REPL (pseudoterminal)
-  └─ BrowserManager
-       ├─ BridgeServer (WebSocket :9876)
-       └─ Chromium (Playwright's bundled, spawned with --load-extension)
-            └─ Dramaturg extension
-                 ├─ background.js → chrome.debugger (command execution)
-                 └─ offscreen.js ──WebSocket──→ BridgeServer
-```
+## Features
 
-Commands flow: VS Code REPL → BridgeServer → WebSocket → offscreen.js → background.js → chrome.debugger → browser.
+### Test Explorer with Bridge Execution
+Run Playwright tests directly through the bridge — **66ms per test** instead of 3+ seconds through the standard test runner. Works with individual tests and files. Folders fall back to the standard multi-worker path.
+
+![Test Explorer](images/test-explorer.png)
+
+### REPL Panel
+Interactive command panel in the bottom bar. Type Playwright keyword commands (`snapshot`, `click`, `fill`, `goto`) or JavaScript (`await page.title()`, `page.locator('h1').click()`).
+
+- Command history (up/down arrows)
+- Inline screenshot display
+- PDF save
+- Execution timing
+- Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
+
+![REPL](images/repl.png)
+
+### Locator Panel
+Pick elements from the browser and inspect their locator and ARIA snapshot.
+
+- **Pick arrow** — click to enter pick mode, click an element in the browser
+- **Highlight toggle** — highlight the picked element in the browser
+- **Editable locator** — modify and experiment
+- **ARIA snapshot** — accessibility tree for the picked element
+
+![Locator](images/locator.png)
+
+### Assert Builder
+Build and verify Playwright assertions interactively. Three-step workflow:
+
+1. **Pick Locator** — pick an element or type a locator manually
+2. **Select Matcher** — dropdown with 13 matchers, smart-filtered by element type
+3. **Verify** — run the assertion against the live page, see pass/fail instantly
+
+Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttached`, `toBeEnabled`, `toBeDisabled`, `toBeChecked`, `toHaveValue`, `toHaveAttribute`, `toHaveCount`, `toHaveURL`, `toHaveTitle`
+
+Supports negation (`not` checkbox) and editable assertions for tweaking.
+
+![Assert Builder](images/assert-builder.png)
+
+### Recorder
+Record browser interactions as Playwright commands. Click elements, fill forms, navigate — the recorder captures each action.
+
+### Browser Reuse
+REPL, Test Explorer, Recorder, and Picker all share the same headed browser. No extra browser windows. The browser stays open between test runs.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `Playwright REPL: Launch Browser` | Launch Chromium with bridge |
+| `Playwright REPL: Stop Browser` | Close browser and bridge |
+| `Playwright REPL: Open REPL` | Open the REPL terminal |
+| `Playwright REPL: Pick Locator` | Enter pick mode |
+| `Playwright REPL: Start Recording` | Start recording actions |
+| `Playwright REPL: Stop Recording` | Stop recording |
+| `Playwright REPL: Assert Builder` | Open Assert Builder and start pick |
+
+## Getting Started
+
+1. Install the extension
+2. Open a project with a `playwright.config.ts`
+3. Click **Launch Browser** or run a test (browser auto-launches if Show Browser is enabled)
+4. Use the **REPL**, **Locator**, and **Assert** panels in the bottom bar
+
+## Requirements
+
+- VS Code 1.86+
+- Node.js 18+
+- `@playwright/test` 1.59+ in your project
+
+## Panels
+
+The extension adds three panels to the bottom bar:
+
+| Panel | Purpose |
+|-------|---------|
+| **REPL** | Interactive command execution |
+| **Locator** | Element inspection + highlight |
+| **Assert** | Assertion building + verification |
+
+## Performance
+
+| Scenario | Standard | With Bridge |
+|----------|----------|-------------|
+| Single test | ~3.0s | **~66ms** (45x faster) |
+| File (7 tests) | ~5.0s | **~757ms** |
+| Watch mode re-run | ~4.0s | **~50ms** |
+
+Bridge execution skips the test-server subprocess entirely — compiles the test with esbuild and sends it directly to the browser.
 
 ## Development
 
 ```bash
 # Build
 cd packages/vscode
-node build.mjs
+pnpm run build
 
 # Watch mode
 node build.mjs --watch
 
 # Run (F5 in VS Code with the repo open)
-# Uses .vscode/launch.json "Launch Extension" config
 ```
 
-## Commands
+## License
 
-- **Playwright REPL: Launch Browser** — spawns Chromium with extension, starts bridge
-- **Playwright REPL: Open REPL** — opens the interactive terminal
-- **Playwright REPL: Run Test File** — runs current file with Playwright Test
-- **Playwright REPL: Stop Browser** — closes browser and bridge
-
-## Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `playwright-repl.browser` | `chromium` | Browser to launch (`chromium`, `chrome`, `msedge`) |
-| `playwright-repl.bridgePort` | `9876` | WebSocket bridge port |
-
-## Key Files
-
-- `src/extension.ts` — VS Code entry point, registers commands
-- `src/browser.ts` — BrowserManager: spawns Chromium, manages BridgeServer
-- `src/repl.ts` — Pseudoterminal REPL with command history
-- `build.mjs` — esbuild bundler config (CJS output, externals: vscode, @playwright-repl/core)
+Apache 2.0
