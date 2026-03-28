@@ -65,6 +65,27 @@ jobs:
         env:
           FORCE_COLOR: '1'
 
+      # ─── Benchmark: Playwright vs pw-cli (all examples, 1 worker) ─────────
+      - name: 'Benchmark: all examples via Playwright (1 worker)'
+        run: |
+          npx playwright test --workers 1 --reporter list 2>&1 | tee /tmp/pw-all.txt
+          EXEC=$(grep -E '^\s*(ok|✓|✗)' /tmp/pw-all.txt | grep -oE '\([0-9.]+m?s\)' | sed 's/[()]//g' | awk '{if(/ms$/){gsub(/ms/,"");t+=$1}else{gsub(/s/,"");t+=$1*1000}} END{printf "%.1f",t/1000}')
+          echo "⏱  Execution time (sum of per-test): ${EXEC}s"
+        working-directory: packages/runner/examples
+        timeout-minutes: 10
+        env:
+          FORCE_COLOR: '0'
+
+      - name: 'Benchmark: all examples via pw-cli (1 worker)'
+        run: |
+          node ../dist/pw-cli.js test --workers 1 --reporter list 2>&1 | tee /tmp/pwcli-all.txt
+          EXEC=$(grep -E '^\s*(ok|✓|✗)' /tmp/pwcli-all.txt | grep -oE '\([0-9.]+m?s\)' | sed 's/[()]//g' | awk '{if(/ms$/){gsub(/ms/,"");t+=$1}else{gsub(/s/,"");t+=$1*1000}} END{printf "%.1f",t/1000}')
+          echo "⏱  Execution time (sum of per-test): ${EXEC}s"
+        working-directory: packages/runner/examples
+        timeout-minutes: 10
+        env:
+          FORCE_COLOR: '0'
+
       # ─── Benchmark: Playwright vs pw-cli vs bridge (todomvc, 1 worker) ───
       - name: 'Benchmark: todomvc via Playwright (1 worker)'
         run: |
