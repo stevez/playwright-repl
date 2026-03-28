@@ -83,7 +83,6 @@ async function main() {
   specFiles.sort();
 
   // 7. Run each spec file via bridge
-  const startTime = Date.now();
   let passed = 0;
   let failed = 0;
   let skipped = 0;
@@ -133,10 +132,8 @@ async function main() {
     }
   }
 
-  const execTime = ((Date.now() - startTime) / 1000).toFixed(1);
   const totalTime = ((Date.now() - totalStart) / 1000).toFixed(1);
-  console.log(`\n  ${passed} passed, ${failed} failed, ${skipped} skipped`);
-  console.log(`  Test execution: ${execTime}s | Total (incl. browser launch): ${totalTime}s\n`);
+  console.log(`\n  ${passed} passed, ${failed} failed, ${skipped} skipped (${totalTime}s)\n`);
 
   // 8. Cleanup
   const timeout = new Promise(r => setTimeout(r, 3000));
