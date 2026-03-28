@@ -3,6 +3,8 @@
 // The panel is a separate context so it CAN see the SW in getTargets().
 import { SerializedValue } from '@/components/Console/types';
 import { CdpRemoteObject, fromCdpRemoteObject, CdpPropertyDescriptor } from '@/components/Console/cdpToSerialized';
+import { cdpSendCommand, cdpGetProperties, cdpCallFunctionOn, cdpEval, getTargetId } from '../../lib/sw-debugger-core';
+export { swDebugTargets } from '../../lib/sw-debugger-core';
 
 export type ScopeInfo = {
     type: string;
@@ -10,139 +12,32 @@ export type ScopeInfo = {
     objectId: string
 }
 
-let swTargetId: string | null = null;
-
-if (typeof chrome !== 'undefined') {
-    chrome.debugger.onDetach.addListener((source) => {
-        if (source.targetId === swTargetId) swTargetId = null;
-    });
-}
-
-/** Debug helper — call from console: (await import('/panel/lib/sw-debugger.js')).swDebugTargets() */
-export function swDebugTargets(): Promise<chrome.debugger.TargetInfo[]> {
-    return new Promise(resolve => chrome.debugger.getTargets(resolve));
-}
-
-function querySwTarget(): Promise<string | null> {
-    const swUrl = `chrome-extension://${chrome.runtime.id}/background.js`;
-    return new Promise(resolve => {
-        chrome.debugger.getTargets(targets => {
-            const sw = targets.find(t => t.type === 'worker' && t.url === swUrl);
-            resolve(sw?.id ?? null);
-        });
-    });
-}
-
-async function findSwTarget(): Promise<string | null> {
-    // Wake the SW and wait for it to confirm it's alive before polling
-    await chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});
-    // Poll until it appears as a debuggable target (up to ~1s)
-    for (let i = 0; i < 10; i++) {
-        const id = await querySwTarget();
-        if (id) return id;
-        await new Promise(r => setTimeout(r, 100));
-    }
-    return null;
-}
-
-async function ensureAttached(): Promise<string> {
-    // Fast path: already attached — skip ping/poll (critical when SW is debugger-paused)
-    if (swTargetId) return swTargetId;
-    const targetId = await findSwTarget();
-    if (!targetId) throw new Error('Background worker target not found. Try reloading the extension.');
-    if (swTargetId === targetId) return targetId;
-    await new Promise<void>((resolve, reject) => {
-        chrome.debugger.attach({ targetId }, '1.3', () => {
-            if (chrome.runtime.lastError) {
-                const msg = chrome.runtime.lastError.message ?? '';
-                // Extension already attached (persists after panel page closes) — reuse it
-                if (/already attached/i.test(msg)) { swTargetId = targetId; resolve(); }
-                else reject(new Error(msg));
-            } else {
-                chrome.debugger.sendCommand({ targetId }, 'Runtime.enable', {}, () => {});
-                swTargetId = targetId; resolve();
-            }
-        });
-    });
-    return targetId;
-}
-
 export async function swGetProperties(objectId: string): Promise<unknown> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            'Runtime.getProperties',
-            { objectId, ownProperties: true, generatePreview: true },
-            (result: any) => {
-                if (chrome.runtime.lastError) {
-                    swTargetId = null;
-                    reject(new Error(chrome.runtime.lastError.message));
-                    return;
-                }
-                resolve(result);
-            }
-        );
-    });
+    return cdpGetProperties(objectId);
 }
 
 export async function swCallFunctionOn(objectId: string, functionDeclaration: string): Promise<unknown> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            'Runtime.callFunctionOn',
-            { objectId, functionDeclaration, returnByValue: true, awaitPromise: false },
-            (result: any) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                    return;
-                }
-                resolve(result);
-            }
-        );
-    });
+    return cdpCallFunctionOn(objectId, functionDeclaration);
 }
 
 export async function swDebugEval(expression: string): Promise<unknown> {
-    const targetId = await ensureAttached();
-    // Wrap {…} in parens so V8 parses it as an object literal, not a block statement.
-    // This is the same approach Chrome DevTools and Node REPL use.
-    const expr = expression.trimStart().startsWith('{') ? `(${expression})` : expression;
-
     // When paused at a breakpoint, evaluate in the call frame scope (access to local variables)
-    const method = pausedCallFrameId ? 'Debugger.evaluateOnCallFrame' : 'Runtime.evaluate';
-    const params: Record<string, unknown> = {
-        expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console',
-    };
     if (pausedCallFrameId) {
-        params.callFrameId = pausedCallFrameId;
-    } else {
-        params.replMode = true;
+        const expr = expression.trimStart().startsWith('{') ? `(${expression})` : expression;
+        const result = await cdpSendCommand('Debugger.evaluateOnCallFrame', {
+            callFrameId: pausedCallFrameId,
+            expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console',
+        });
+        if (result?.exceptionDetails) {
+            const msg = result.exceptionDetails.exception?.description
+                ?? result.exceptionDetails.text ?? 'Unknown error';
+            throw new Error(msg);
+        }
+        return result;
     }
-
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            method,
-            params,
-            (result: any) => {
-                if (chrome.runtime.lastError) {
-                    swTargetId = null;
-                    reject(new Error(chrome.runtime.lastError.message));
-                    return;
-                }
-                if (result?.exceptionDetails) {
-                    const msg = result.exceptionDetails.exception?.description
-                        ?? result.exceptionDetails.text
-                        ?? 'Unknown error';
-                    reject(new Error(msg));
-                    return;
-                }
-                resolve(result);
-            }
-        );
-    });
+    // Normal eval — delegate to shared core (returns result.result, not the wrapper)
+    const raw = await cdpEval(expression);
+    return { result: raw };
 }
 
 type ConsoleCallback = (level: string, args: SerializedValue[]) => void;
@@ -164,54 +59,23 @@ export function onDebugPaused(callback: PauseCallback | null) {
 }
 
 export async function swDebuggerEnable(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.enable', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.enable');
 }
 
 export async function swDebuggerDisable(): Promise<void> {
     pausedCallFrameId = null;
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.disable', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.disable');
 }
 
 export async function swSetBreakpointByUrl(url: string, lineNumber: number): Promise<string> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            'Debugger.setBreakpointByUrl',
-            { url, lineNumber },
-            (result: any) => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                else resolve(result?.breakpointId ?? '');
-            }
-        );
-    });
+    const result = await cdpSendCommand('Debugger.setBreakpointByUrl', { url, lineNumber });
+    return result?.breakpointId ?? '';
 }
 
 /** Like swDebugEval but returns raw result (doesn't reject on exceptions). */
 export async function swDebugEvalRaw(expression: string): Promise<{ result?: any; exceptionDetails?: any }> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            'Runtime.evaluate',
-            { expression, awaitPromise: true, returnByValue: false, generatePreview: true, replMode: true },
-            (result: any) => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                else resolve(result);
-            }
-        );
+    return cdpSendCommand('Runtime.evaluate', {
+        expression, awaitPromise: true, returnByValue: false, generatePreview: true, replMode: true,
     });
 }
 
@@ -227,78 +91,31 @@ export async function swRemoveAllBreakpoints(): Promise<void> {
 }
 
 export async function swRemoveBreakpoint(breakpointId: string): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand(
-            { targetId },
-            'Debugger.removeBreakpoint',
-            { breakpointId },
-            () => {
-                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                else resolve();
-            }
-        );
-    });
+    await cdpSendCommand('Debugger.removeBreakpoint', { breakpointId });
 }
 
 export async function swDebugResume(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.resume', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.resume');
 }
 
 export async function swDebugPause(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.pause', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.pause');
 }
 
 export async function swDebugStepOver(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepOver', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.stepOver');
 }
 
 export async function swDebugStepInto(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepInto', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.stepInto');
 }
 
 export async function swDebugStepOut(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Debugger.stepOut', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Debugger.stepOut');
 }
 
 export async function swTerminateExecution(): Promise<void> {
-    const targetId = await ensureAttached();
-    return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, 'Runtime.terminateExecution', {}, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
-        });
-    });
+    await cdpSendCommand('Runtime.terminateExecution');
 }
 
 async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set<string>()): Promise<SerializedValue> {
@@ -328,7 +145,7 @@ async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set
 }
 
 chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
-    if (source.targetId !== swTargetId) return;
+    if (source.targetId !== getTargetId()) return;
 
     if (method === 'Debugger.paused') {
         if (params.callFrames?.length > 0) {

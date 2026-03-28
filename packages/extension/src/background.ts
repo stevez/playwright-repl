@@ -207,36 +207,7 @@ async function stopPicking(): Promise<{ ok: boolean }> {
 
 // ─── Bridge Command Execution ────────────────────────────────────────────────
 
-// ─── Self-debug eval (chrome.debugger → own SW target, bypasses MV3 CSP) ────
-
-let selfTargetId: string | null = null;
-
-async function ensureSelfAttached(): Promise<string> {
-  const swUrl = `chrome-extension://${chrome.runtime.id}/background.js`;
-  const targets = await new Promise<chrome.debugger.TargetInfo[]>(resolve =>
-    chrome.debugger.getTargets(resolve)
-  );
-  const sw = targets.find(t => t.type === 'worker' && t.url === swUrl);
-  if (!sw) throw new Error('Background worker target not found.');
-  if (selfTargetId === sw.id) return sw.id;
-  await new Promise<void>((resolve, reject) => {
-    chrome.debugger.attach({ targetId: sw.id }, '1.3', () => {
-      if (chrome.runtime.lastError) {
-        if (/already attached/i.test(chrome.runtime.lastError.message ?? '')) {
-          selfTargetId = sw.id; resolve();
-        } else reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        chrome.debugger.sendCommand({ targetId: sw.id }, 'Runtime.enable', {}, () => {});
-        selfTargetId = sw.id; resolve();
-      }
-    });
-  });
-  return sw.id;
-}
-
-chrome.debugger.onDetach.addListener((source) => {
-  if (source.targetId === selfTargetId) selfTargetId = null;
-});
+import { cdpEval, cdpCallFunctionOn } from './lib/sw-debugger-core';
 
 /** Format a CDP ObjectPreview into a readable string (similar to Node.js REPL output). */
 function formatCdpPreview(preview: any, depth = 0): string {
@@ -292,45 +263,9 @@ function formatCdpPreview(preview: any, depth = 0): string {
   return `{${inner}}`;
 }
 
-/** Call a function on a remote object and return the string result. */
-function callFunctionOn(targetId: string, objectId: string, fn: string): Promise<string | null> {
-  return new Promise(resolve => {
-    chrome.debugger.sendCommand(
-      { targetId },
-      'Runtime.callFunctionOn',
-      { objectId, functionDeclaration: fn, returnByValue: true },
-      (res: any) => resolve(res?.result?.value ?? null)
-    );
-  });
-}
-
 async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isError: boolean; image?: string }> {
   try {
-    const targetId = await ensureSelfAttached();
-    // Wrap {…} in parens so V8 parses it as an object literal, not a block statement.
-    const expr = jsExpr.trimStart().startsWith('{') ? `(${jsExpr})` : jsExpr;
-
-    const rawResult = await new Promise<any>((resolve, reject) => {
-      chrome.debugger.sendCommand(
-        { targetId },
-        'Runtime.evaluate',
-        { expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'bridge', replMode: true },
-        (res: any) => {
-          if (chrome.runtime.lastError) {
-            selfTargetId = null;
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (res?.exceptionDetails) {
-            const msg = res.exceptionDetails.exception?.description
-              ?? res.exceptionDetails.text ?? 'Unknown error';
-            reject(new Error(msg));
-          } else {
-            resolve(res?.result);
-          }
-        }
-      );
-    });
-
-    const r = rawResult;
+    const r = await cdpEval(jsExpr, 'bridge');
     if (!r || r.type === 'undefined') return formatBridgeResult(undefined);
     if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') return formatBridgeResult(r.value);
 
@@ -340,14 +275,16 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
       const fn = isMap
         ? 'function(){return [...this].map(([k,v])=>JSON.stringify(k)+" => "+JSON.stringify(v)).join(", ")}'
         : 'function(){return [...this].map(v=>JSON.stringify(v)).join(", ")}';
-      const inner = await callFunctionOn(targetId, r.objectId, fn);
+      const res = await cdpCallFunctionOn(r.objectId, fn);
+      const inner = res?.result?.value ?? null;
       if (inner !== null) return formatBridgeResult(`${r.description} {${inner}}`);
     }
 
     // Plain objects/arrays: use JSON.stringify for full nested representation
     if (r.objectId && (r.description === 'Object' || /^Array\(\d+\)$/.test(r.description ?? ''))) {
-      const json = await callFunctionOn(targetId, r.objectId,
+      const res = await cdpCallFunctionOn(r.objectId,
         'function(){try{return JSON.stringify(this)}catch{return null}}');
+      const json = res?.result?.value ?? null;
       if (json) return formatBridgeResult(json);
     }
 
