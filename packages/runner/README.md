@@ -33,7 +33,7 @@ pw:
 
 ## Benefits
 
-- **Consistent speed across OS** — ~100ms per test on Linux, macOS, and Windows (Playwright varies: 150ms Linux → 525ms Windows)
+- **1.5-2x faster** on all platforms, consistent ~100ms per test (Playwright varies: 150ms Linux → 525ms Windows)
 - **No context creation overhead** — reuses the same page, no `newPage()` per test
 - **Same test syntax** — standard `import { test, expect } from '@playwright/test'`, no code changes
 - **Automatic fallback** — tests using Node APIs (fs, route, etc.) fall back to Playwright's standard runner
