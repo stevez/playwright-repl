@@ -13,14 +13,16 @@
  */
 
 import { BridgeServer } from '@playwright-repl/core';
-import { chromium } from 'playwright';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
+const pw = _require('playwright-core');
+const { chromium } = pw;
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const headed = process.argv.includes('--headed');
 const EXTENSION_PATH = path.resolve(__dirname, '../../extension/dist');
 const TODOMVC_DIR = path.resolve(__dirname, '../examples/todomvc');
