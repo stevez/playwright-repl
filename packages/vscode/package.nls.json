@@ -23,6 +23,6 @@
   "configuration.playwright-repl.pickLocatorCopyToClipboard": "Automatically copy picked locator to clipboard.",
   "configuration.playwright-repl.updateSnapshots": "Update snapshots",
   "configuration.playwright-repl.updateSourceMethod": "Update source method",
-  "views.test.playwright-repl.locatorsView": "Locators",
+  "views.test.playwright-repl.locatorsView": "Locator",
   "views.test.playwright-repl.settingsView": "Playwright REPL"
 }

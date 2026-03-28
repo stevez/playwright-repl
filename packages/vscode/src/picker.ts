@@ -54,7 +54,14 @@ export class Picker {
       if (!this._picking) return;
 
       if (event.type === 'element-picked-raw') {
-        const info = event.info as { locator?: string };
+        const info = event.info as {
+          locator?: string;
+          tag?: string;
+          text?: string;
+          value?: string;
+          checked?: boolean;
+          attributes?: Record<string, string>;
+        };
         const locator = info?.locator;
         if (locator) {
           const fullLocator = `page.${locator}`;
@@ -68,13 +75,16 @@ export class Picker {
               ariaSnapshot = ariaResult.text;
           } catch {}
 
+          // Derive assertion from element info
+          const assertion = deriveAssertion(info, fullLocator);
+
           // Copy to clipboard if setting is enabled
           const copyOnPick = vscode.workspace.getConfiguration('playwright-repl').get('pickLocatorCopyToClipboard', false);
           if (copyOnPick)
             await vscode.env.clipboard.writeText(fullLocator);
 
           if (this._locatorsView)
-            this._locatorsView.showLocator(fullLocator, ariaSnapshot);
+            this._locatorsView.showLocator(fullLocator, ariaSnapshot, assertion);
         }
         this._stop();
       }
@@ -97,4 +107,35 @@ export class Picker {
     this._outputChannel.appendLine('Pick mode ended.');
   }
 
+}
+
+// ─── Assertion derivation ─────────────────────────────────────────────────
+
+function deriveAssertion(
+  info: { tag?: string; text?: string; value?: string; checked?: boolean; attributes?: Record<string, string> },
+  locator: string,
+): string {
+  const tag = info.tag?.toLowerCase() ?? '';
+  const inputType = (info.attributes?.type || '').toLowerCase();
+
+  // Checkbox/radio → checked assertion
+  if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio') && info.checked !== undefined) {
+    return info.checked
+      ? `await expect(${locator}).toBeChecked();`
+      : `await expect(${locator}).not.toBeChecked();`;
+  }
+
+  // Input/textarea/select → value assertion
+  if ((tag === 'input' || tag === 'textarea' || tag === 'select') && info.value !== undefined) {
+    return `await expect(${locator}).toHaveValue('${info.value.replace(/'/g, "\\'")}');`;
+  }
+
+  // Has text content → text assertion (skip if locator is getByText — redundant)
+  const text = info.text?.trim();
+  if (text && !/\.getByText\(/.test(locator)) {
+    return `await expect(${locator}).toContainText('${text.slice(0, 80).replace(/'/g, "\\'")}');`;
+  }
+
+  // Fallback → visible assertion
+  return `await expect(${locator}).toBeVisible();`;
 }

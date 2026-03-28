@@ -18,6 +18,7 @@ import { createAction, vscode } from './common';
 
 // @ts-check
 const locatorInput = document.getElementById('locator') as HTMLInputElement;
+const assertionInput = document.getElementById('assertion') as HTMLInputElement;
 const ariaTextArea = document.getElementById('ariaSnapshot') as HTMLTextAreaElement;
 const copyToClipboardCheckbox = document.getElementById('copyToClipboardCheckbox') as HTMLInputElement;
 
@@ -45,6 +46,9 @@ window.addEventListener('message', event => {
     locatorInput.value = params.locator.locator;
     locatorError.textContent = params.locator.error || '';
     locatorError.style.display = params.locator.error ? 'inherit' : 'none';
+    assertionInput.value = params.assertion || '';
+    const assertionSection = document.getElementById('assertionSection')!;
+    assertionSection.style.display = params.assertion ? 'flex' : 'none';
     ariaTextArea.value = params.ariaSnapshot.yaml;
     ariaSnapshotError.textContent = params.ariaSnapshot.error || '';
     ariaSnapshotError.style.display = params.ariaSnapshot.error ? 'inherit' : 'none';

@@ -168,7 +168,7 @@
       "panel": [
         {
           "id": "playwrightReplContainer",
-          "title": "Locators",
+          "title": "Locator",
           "icon": "images/playwright-logo.png"
         }
       ]

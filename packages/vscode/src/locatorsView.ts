@@ -26,6 +26,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _view: vscodeTypes.WebviewView | undefined;
   private _extensionUri: vscodeTypes.Uri;
   private _locator: { locator: string, error?: string } = { locator: '' };
+  private _assertion: string = '';
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
   private _settingsModel: SettingsModel;
   private _reusedBrowser: ReusedBrowser;
@@ -53,8 +54,9 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   }
 
   /** Allow external callers (e.g. our bridge picker) to show a locator. */
-  public showLocator(locator: string, ariaSnapshot?: string) {
+  public showLocator(locator: string, ariaSnapshot?: string, assertion?: string) {
     this._locator = { locator };
+    this._assertion = assertion || '';
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
     this._updateValues();
     void this._vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
@@ -124,6 +126,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
       method: 'update',
       params: {
         locator: this._locator,
+        assertion: this._assertion,
         ariaSnapshot: this._ariaSnapshot,
         hideAria: this._backendVersion && this._backendVersion < 1.50
       }
@@ -164,6 +167,12 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         </div>
         <input id="locator" placeholder="${vscode.l10n.t('Locator')}" aria-labelledby="locatorLabel">
         <p id="locatorError" class="error"></p>
+      </div>
+      <div id="assertionSection" class="section">
+        <div class="hbox">
+          <label>Assert</label>
+        </div>
+        <input id="assertion" placeholder="Pick an element to see assertion" readonly aria-label="Assertion">
       </div>
       <div id="ariaSection" class="section">
         <div class="hbox">
