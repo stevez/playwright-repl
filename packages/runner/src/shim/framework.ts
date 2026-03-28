@@ -58,17 +58,20 @@ function resetState() {
 
 // ─── Registration API ──────────────────────────────────────────────────────
 
-function test(name: string, fn: TestFn) {
+function test(name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) {
+  const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
   currentSuite.tests.push({ name, fn, only: false, skip: false });
 }
 
-test.only = (name: string, fn: TestFn) => {
+test.only = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
+  const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
   hasOnly = true;
   currentSuite.tests.push({ name, fn, only: true, skip: false });
 };
 
-test.skip = (nameOrCond: any, fn?: any) => {
+test.skip = (nameOrCond: any, fnOrOpts?: any, maybeFn?: any) => {
   if (typeof nameOrCond === 'string') {
+    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn;
     currentSuite.tests.push({ name: nameOrCond, fn, only: false, skip: true });
   } else if (nameOrCond) {
     throw new SkipError(); // conditional form inside test body
@@ -103,7 +106,8 @@ test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
 test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
 test.extend = (fixtures: Record<string, any>) => {
-  const extendedTest = (name: string, fn: TestFn) => {
+  const extendedTest = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
+    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
     currentSuite.tests.push({
       name, only: false, skip: false,
       fn: async (baseFixtures: any) => {
@@ -240,6 +244,7 @@ export function installFramework() {
   _g.__runTests = __runTests;
   _g.__resetTestState = resetState;
   _g.__setGrep = (pattern: string | null) => { grepPattern = pattern ? new RegExp(pattern, 'i') : null; };
+  _g.__setGrepExact = (pattern: string | null) => { grepPattern = pattern ? new RegExp(pattern) : null; };
   _g.__setTimeout = (ms: number) => { testTimeout = ms; };
   resetState();
 }

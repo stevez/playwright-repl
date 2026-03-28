@@ -47,18 +47,21 @@ function resetState() {
 
 // ─── Registration API ──────────────────────────────────────────────────────
 
-function test(name: string, fn: TestFn) {
+function test(name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) {
+  const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
   currentSuite.tests.push({ name, fn, only: false, skip: false });
 }
 
-test.only = (name: string, fn: TestFn) => {
+test.only = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
+  const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
   hasOnly = true;
   currentSuite.tests.push({ name, fn, only: true, skip: false });
 };
 
 class SkipError extends Error { constructor() { super('SKIP'); this.name = 'SkipError'; } }
-test.skip = (nameOrCond: any, fn?: any) => {
+test.skip = (nameOrCond: any, fnOrOpts?: any, maybeFn?: any) => {
   if (typeof nameOrCond === 'string') {
+    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn;
     currentSuite.tests.push({ name: nameOrCond, fn, only: false, skip: true });
   } else if (nameOrCond) {
     throw new SkipError();
@@ -90,7 +93,8 @@ test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
 test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
 test.extend = (fixtures: Record<string, any>) => {
-  const extendedTest = (name: string, fn: TestFn) => {
+  const extendedTest = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
+    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
     currentSuite.tests.push({
       name, only: false, skip: false,
       fn: async (baseFixtures: any) => {
