@@ -31,6 +31,18 @@ pw:
   (per-test overhead: ~100ms, consistent across OS)
 ```
 
+## Benefits
+
+- **Consistent speed across OS** — ~100ms per test on Linux, macOS, and Windows (Playwright varies: 150ms Linux → 525ms Windows)
+- **No context creation overhead** — reuses the same page, no `newPage()` per test
+- **Same test syntax** — standard `import { test, expect } from '@playwright/test'`, no code changes
+- **Automatic fallback** — tests using Node APIs (fs, route, etc.) fall back to Playwright's standard runner
+
+### Trade-offs
+
+- **No test isolation** — tests share state (localStorage, cookies). Tests must clean up after themselves
+- **Bridge mode limitations** — no `page.route()`, `page.waitForEvent()`, `page.$eval()`
+
 ## CLI Usage
 
 ```bash
