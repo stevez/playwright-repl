@@ -34,14 +34,7 @@ export class SidePanelPage {
 
   /** Wait until the editor contains the expected substring. */
   async waitForEditorText(substring: string, timeout = 10000) {
-    await this.page.waitForFunction(
-      ({ sel, text }) => {
-        const el = document.querySelector(sel);
-        return el?.textContent?.includes(text) ?? false;
-      },
-      { sel: '[data-testid="editor"] [role="textbox"]', text: substring },
-      { timeout },
-    );
+     await expect(this.editor).toContainText(substring, { timeout, useInnerText: false });
   }
 
   // ─── Console Input ─────────────────────────────────────────────────────────

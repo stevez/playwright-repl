@@ -6,13 +6,13 @@
  * panel → swDebugEval → background service worker (playwright-crx).
  */
 
-import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { test as base, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import { collectClientCoverage } from 'nextcov/playwright';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export { expect } from '@playwright/test';
+export { expect };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
@@ -110,13 +110,9 @@ export async function sendCommand(
   await panelPage.keyboard.press('Escape'); // close autocomplete
   await panelPage.keyboard.press('Enter');
 
-  await panelPage.waitForFunction(
-    ({ sel, n }) => document.querySelectorAll(sel).length > n,
-    { sel: RESULT_SELECTOR, n: prevCount },
-    { timeout: 15000 },
-  );
-
-  const last = panelPage.locator(RESULT_SELECTOR).last();
+  // Wait for a new result element to appear (auto-retry via Playwright locator)
+  const last = panelPage.locator(RESULT_SELECTOR).nth(prevCount);
+  await expect(last).toBeAttached({ timeout: 15000 });
   const type = await last.getAttribute('data-type');
 
   if (type === 'screenshot') {

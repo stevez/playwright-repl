@@ -25,6 +25,11 @@ test.describe('Recording flow', () => {
   // ─── PW mode ─────────────────────────────────────────────────────────────
 
   test.describe('PW mode', () => {
+    test.beforeEach(async ({ sidePanel }) => {
+      // Ensure PW mode (may have been set to JS by a previous test in this worker)
+      await sidePanel.switchMode('pw');
+    });
+
     test('record button toggles to Stop and goto appears', async ({ sidePanel }) => {
       await sidePanel.recordBtn.click();
       await expect(sidePanel.recordBtn).toHaveClass(/recording/, { timeout: 10000 });
