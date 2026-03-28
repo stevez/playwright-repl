@@ -1,6 +1,6 @@
 # Playwright REPL for VS Code
 
-Interactive browser automation with **10x faster test execution**, a live REPL, and an assertion builder — all inside VS Code.
+Interactive browser automation with **faster test execution**, a live REPL, and an assertion builder — all inside VS Code.
 
 ![Playwright REPL](images/hero.png)
 
@@ -88,13 +88,14 @@ The extension adds three panels to the bottom bar:
 
 ## Performance
 
-| Scenario | Standard | With Bridge |
-|----------|----------|-------------|
-| Single test | ~3.0s | **~66ms** (45x faster) |
-| File (7 tests) | ~5.0s | **~757ms** |
-| Watch mode re-run | ~4.0s | **~50ms** |
+Bridge execution skips the test-server subprocess entirely — compiles the test with esbuild and sends it directly to the browser. No `newPage()` overhead per test.
 
-Bridge execution skips the test-server subprocess entirely — compiles the test with esbuild and sends it directly to the browser.
+| Scenario | Standard Playwright | Bridge (direct) |
+|----------|----------|-------------|
+| Single test | ~300ms (Linux), ~800ms (Windows) | **~100ms** |
+| todomvc (26 tests) | 8-10s (Linux), 31s (Windows) | **4-5s** |
+
+The speedup varies by platform because Playwright creates a new browser context per test. On Windows, `newPage()` takes ~525ms (OS process creation overhead); on Linux ~150ms. Bridge mode reuses the same page, so performance is consistent across platforms.
 
 ## Development
 

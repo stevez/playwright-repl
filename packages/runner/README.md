@@ -1,6 +1,6 @@
 # @playwright-repl/runner
 
-Playwright test runner with 10x faster execution via bridge mode (playwright-crx).
+Playwright test runner with faster execution via context reuse and bridge mode.
 
 ## Quick Start
 
@@ -11,22 +11,24 @@ pw test
 
 ## Benchmark
 
-| | Standard Playwright | pw |
-|---|---|---|
-| 23 todomvc tests | 26.1s | ~2s |
-| Per test avg | ~1.1s | ~60ms |
-| Speed | baseline | **~10x faster** |
+CI results (todomvc, 26 tests, 1 worker):
 
-## How It Works
+| Runner | Ubuntu | macOS | Windows |
+|--------|--------|-------|---------|
+| Playwright | 10.6s | 8.1s | 31.3s |
+| pw-cli | 5.8s | 6.9s | 6.0s |
+| Bridge direct | 4.8s | 4.3s | 3.6s |
 
-Standard Playwright sends each browser command over CDP (Chrome DevTools Protocol) — one round-trip per action. pw uses playwright-crx running inside Chrome, executing commands in-process with zero round-trips.
+The speedup comes from **skipping per-test context creation**. Playwright creates a new browser context + page for each test (for isolation). `pw` reuses the same page across tests, making per-test overhead consistent regardless of OS.
 
 ```
 Standard Playwright:
-  Node.js ──CDP──CDP──CDP──→ Chrome    (many round-trips)
+  Test runner → new context → new page → CDP commands → close page
+  (per-test overhead: 150-525ms depending on OS)
 
 pw:
-  Node.js ──bridge──→ playwright-crx    (one message, executes in-process)
+  Test runner → bridge → reuse page → CDP commands
+  (per-test overhead: ~100ms, consistent across OS)
 ```
 
 ## CLI Usage
@@ -92,10 +94,24 @@ Tests that use Node APIs (fs, process.env, .route(), etc.) automatically fall ba
 
 ### Bridge Mode Limitations
 
-Bridge-mode tests (simple, no Node APIs) run ~10x faster but don't support:
+Bridge-mode tests (simple, no Node APIs) run faster but don't support:
 
 - `page.route()` / `page.waitForEvent()` / `page.waitForResponse()` — non-serializable callbacks
 - `page.$eval()` / `page.$$eval()` — callback-based APIs
+
+## CI Setup
+
+The runner needs both **Chromium** and **Chrome** browsers installed:
+
+```bash
+# Install browsers (CI)
+npx playwright install chromium chrome
+
+# Linux (with system deps)
+npx playwright install --with-deps chromium chrome
+```
+
+Both are required because `pw-cli` uses playwright-crx which runs inside Chrome with the extension loaded, while standard Playwright tests use Chromium.
 
 ## Development
 
