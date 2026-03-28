@@ -66,14 +66,7 @@ jobs:
           FORCE_COLOR: '1'
 
       # ─── Benchmark: Playwright vs pw-cli (all examples, 2 workers) ────────
-      - name: 'Benchmark: all examples via Playwright (2 workers)'
-        run: npx playwright test --workers 2 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 10
-        env:
-          FORCE_COLOR: '1'
-
-      # ─── Benchmark: Playwright vs pw-cli vs bridge (todomvc, 1 worker) ───
+      # ─── Benchmark: Playwright vs pw-cli vs bridge (1 worker) ─────────────
       - name: 'Benchmark: todomvc via Playwright (1 worker)'
         run: |
           npx playwright test todomvc/ --workers 1 --reporter list 2>&1 | tee /tmp/pw-bench.txt
