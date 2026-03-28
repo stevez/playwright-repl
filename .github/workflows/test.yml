@@ -58,12 +58,46 @@ jobs:
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
 
-      - name: Run runner E2E tests (192 tests via pw-cli)
+      - name: Run runner E2E tests via pw-cli
         run: node ../dist/pw-cli.js test --workers 2 --reporter list
         working-directory: packages/runner/examples
         timeout-minutes: 10
         env:
           FORCE_COLOR: '1'
+
+      # ─── Benchmark: Playwright vs pw-cli (all examples, 2 workers) ────────
+      - name: 'Benchmark: all examples via Playwright (2 workers)'
+        run: npx playwright test --workers 2 --reporter list
+        working-directory: packages/runner/examples
+        timeout-minutes: 10
+        env:
+          FORCE_COLOR: '1'
+
+      # ─── Benchmark: Playwright vs pw-cli vs bridge (todomvc, 1 worker) ───
+      - name: 'Benchmark: todomvc via Playwright (1 worker)'
+        run: |
+          npx playwright test todomvc/ --workers 1 --reporter list 2>&1 | tee /tmp/pw-bench.txt
+          EXEC=$(grep -E '^\s*(ok|✓|✗)' /tmp/pw-bench.txt | grep -oE '\([0-9.]+m?s\)' | sed 's/[()]//g' | awk '{if(/ms$/){gsub(/ms/,"");t+=$1}else{gsub(/s/,"");t+=$1*1000}} END{printf "%.1f",t/1000}')
+          echo "⏱  Execution time (sum of per-test): ${EXEC}s"
+        working-directory: packages/runner/examples
+        timeout-minutes: 5
+        env:
+          FORCE_COLOR: '0'
+
+      - name: 'Benchmark: todomvc via pw-cli (1 worker)'
+        run: |
+          node ../dist/pw-cli.js test todomvc/ --workers 1 --reporter list 2>&1 | tee /tmp/pwcli-bench.txt
+          EXEC=$(grep -E '^\s*(ok|✓|✗)' /tmp/pwcli-bench.txt | grep -oE '\([0-9.]+m?s\)' | sed 's/[()]//g' | awk '{if(/ms$/){gsub(/ms/,"");t+=$1}else{gsub(/s/,"");t+=$1*1000}} END{printf "%.1f",t/1000}')
+          echo "⏱  Execution time (sum of per-test): ${EXEC}s"
+        working-directory: packages/runner/examples
+        timeout-minutes: 5
+        env:
+          FORCE_COLOR: '0'
+
+      - name: 'Benchmark: todomvc via bridge direct'
+        run: node e2e/benchmark-bridge.js
+        working-directory: packages/runner
+        timeout-minutes: 5
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
