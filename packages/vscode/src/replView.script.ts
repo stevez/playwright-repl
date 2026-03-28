@@ -57,6 +57,17 @@ window.addEventListener('message', event => {
     img.style.margin = '4px 0';
     output.appendChild(img);
     output.scrollTop = output.scrollHeight;
+  } else if (method === 'pdf') {
+    const row = document.createElement('div');
+    row.className = 'line line-info';
+    row.textContent = 'PDF generated. ';
+    const btn = document.createElement('button');
+    btn.textContent = 'Save PDF';
+    btn.style.cssText = 'cursor:pointer; background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:2px 8px; border-radius:2px;';
+    btn.onclick = () => vscode.postMessage({ method: 'savePdf', params: { dataUri: params.dataUri } });
+    row.appendChild(btn);
+    output.appendChild(row);
+    output.scrollTop = output.scrollHeight;
   } else if (method === 'clear') {
     output.textContent = '';
   } else if (method === 'processing') {

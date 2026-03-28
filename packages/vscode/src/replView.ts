@@ -5,7 +5,24 @@
 import { DisposableBase } from './disposableBase';
 import { getNonce, html } from './utils';
 import type { BrowserManager } from './browser';
+import { createRequire } from 'node:module';
 import * as vscodeTypes from './vscodeTypes';
+
+// Lazy-loaded core module (ESM, loaded at runtime via createRequire)
+let _core: {
+  COMMANDS: Record<string, { desc: string; usage?: string; examples?: string[] }>;
+  CATEGORIES: Record<string, string[]>;
+  ALIASES: Record<string, string>;
+  refToLocator: (yaml: string, ref: string) => { js: string; pw: string } | null;
+} | undefined;
+
+function core() {
+  if (!_core) {
+    const _require = createRequire(__filename);
+    _core = _require('@playwright-repl/core');
+  }
+  return _core!;
+}
 
 export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewProvider {
   private _vscode: vscodeTypes.VSCode;
@@ -13,6 +30,8 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
   private _extensionUri: vscodeTypes.Uri;
   private _browserManager: BrowserManager | undefined;
   private _history: string[] = [];
+  private _lastSnapshot: string = '';
+  private _commandCount = 0;
 
   constructor(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri) {
     super();
@@ -44,6 +63,8 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
         await this._execute(data.params.command);
       } else if (data.method === 'getHistory') {
         void this._view?.webview.postMessage({ method: 'history', params: { history: this._history } });
+      } else if (data.method === 'savePdf') {
+        await this._savePdf(data.params.dataUri);
       }
     }));
 
@@ -68,11 +89,23 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     }
 
     this._setProcessing(true);
+    this._commandCount++;
+    const start = Date.now();
     try {
       const result = await this._browserManager.runCommand(command) as { text?: string; isError?: boolean; image?: string };
-      if (result.image) {
+      const elapsed = Date.now() - start;
+
+      // Cache snapshot for locator command
+      if (/^(snapshot|snap|s)(\s|$)/.test(command) && result.text && !result.isError)
+        this._lastSnapshot = result.text;
+
+      // PDF — offer save
+      if (result.image?.startsWith('data:application/pdf')) {
+        this._appendPdf(result.image);
+      } else if (result.image) {
         this._appendImage(result.image);
       }
+
       if (result.text) {
         // Strip markdown section headers
         const text = result.text.replace(/^### \w[\w ]*\n/gm, '');
@@ -81,6 +114,9 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
       if (!result.text && !result.image) {
         this._appendOutput('Done.', 'info');
       }
+
+      // Show timing
+      this._appendOutput(`(${elapsed}ms)`, 'info');
     } catch (err: unknown) {
       this._appendOutput(`Error: ${(err as Error).message}`, 'error');
     }
@@ -88,28 +124,99 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
   }
 
   private _handleLocal(command: string): boolean {
-    if (command === 'help' || command === '.help') {
-      this._appendOutput(
-        'Keyword commands:\n  snapshot, goto, click, fill, press, hover, select, check, eval, ...\n' +
-        'JavaScript:\n  await page.title(), page.locator("h1").textContent(), ...\n' +
-        'Type "help <command>" for details. Use eval for browser-side JS.',
-        'info',
-      );
-      return true;
-    }
-    if (command === '.clear') {
+    const trimmed = command.trim();
+
+    // .clear — clear output
+    if (trimmed === '.clear') {
       void this._view?.webview.postMessage({ method: 'clear' });
       return true;
     }
-    if (command === '.history') {
+
+    // help / .help — categorized command list
+    if (trimmed === 'help' || trimmed === '.help') {
+      const { CATEGORIES } = core();
+      const lines = Object.entries(CATEGORIES)
+        .map(([cat, cmds]) => `  ${cat}: ${cmds.join(', ')}`)
+        .join('\n');
+      this._appendOutput(`Available commands:\n${lines}\n\nType "help <command>" for details.`, 'info');
+      return true;
+    }
+
+    // help <command> — detailed command help
+    if (trimmed.startsWith('help ')) {
+      const cmd = trimmed.slice(5).trim();
+      const { COMMANDS } = core();
+      const info = COMMANDS[cmd];
+      if (!info) {
+        this._appendOutput(`Unknown command: "${cmd}". Type "help" for available commands.`, 'error');
+        return true;
+      }
+      const parts = [`${cmd} — ${info.desc}`];
+      if (info.usage) parts.push(`Usage: ${info.usage}`);
+      if (info.examples?.length) {
+        parts.push('Examples:');
+        for (const ex of info.examples) parts.push(`  ${ex}`);
+      }
+      this._appendOutput(parts.join('\n'), 'info');
+      return true;
+    }
+
+    // .history / .history clear
+    if (trimmed === '.history') {
       this._appendOutput(this._history.length ? this._history.slice().reverse().join('\n') : '(no history)', 'info');
       return true;
     }
-    if (command === '.history clear') {
+    if (trimmed === '.history clear') {
       this._history.length = 0;
       this._appendOutput('History cleared.', 'info');
       return true;
     }
+
+    // .aliases — show command aliases
+    if (trimmed === '.aliases') {
+      const { ALIASES } = core();
+      const grouped: Record<string, string[]> = {};
+      for (const [alias, cmd] of Object.entries(ALIASES)) {
+        if (!grouped[cmd]) grouped[cmd] = [];
+        grouped[cmd].push(alias);
+      }
+      const lines = Object.entries(grouped)
+        .map(([cmd, aliases]) => `  ${aliases.join(', ')} → ${cmd}`)
+        .join('\n');
+      this._appendOutput(`Aliases:\n${lines}`, 'info');
+      return true;
+    }
+
+    // .status — connection status
+    if (trimmed === '.status') {
+      const running = this._browserManager?.isRunning() ?? false;
+      const bridge = this._browserManager?.bridge?.connected ?? false;
+      this._appendOutput(
+        `Browser: ${running ? 'running' : 'stopped'}\n` +
+        `Bridge: ${bridge ? 'connected' : 'disconnected'}\n` +
+        `Commands: ${this._commandCount}`,
+        'info',
+      );
+      return true;
+    }
+
+    // locator <ref> — convert ref to locator from last snapshot
+    if (trimmed.startsWith('locator ')) {
+      const ref = trimmed.slice(8).trim();
+      if (!this._lastSnapshot) {
+        this._appendOutput('No snapshot cached. Run "snapshot" first.', 'error');
+        return true;
+      }
+      const { refToLocator } = core();
+      const result = refToLocator(this._lastSnapshot, ref);
+      if (!result) {
+        this._appendOutput(`Ref "${ref}" not found in last snapshot. Run "snapshot" to refresh.`, 'error');
+        return true;
+      }
+      this._appendOutput(`js: page.${result.js}\npw: ${result.pw}`, 'output');
+      return true;
+    }
+
     return false;
   }
 
@@ -119,6 +226,23 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
 
   private _appendImage(dataUri: string) {
     void this._view?.webview.postMessage({ method: 'image', params: { dataUri } });
+  }
+
+  private _appendPdf(dataUri: string) {
+    void this._view?.webview.postMessage({ method: 'pdf', params: { dataUri } });
+  }
+
+  private async _savePdf(dataUri: string) {
+    const uri = await this._vscode.window.showSaveDialog({
+      filters: { 'PDF': ['pdf'] },
+      defaultUri: this._vscode.Uri.file('page.pdf'),
+    });
+    if (!uri) return;
+    const base64 = dataUri.split(',')[1];
+    if (!base64) return;
+    const buffer = Buffer.from(base64, 'base64');
+    await this._vscode.workspace.fs.writeFile(uri, buffer);
+    this._appendOutput(`Saved to ${uri.fsPath}`, 'info');
   }
 
   private _setProcessing(processing: boolean) {

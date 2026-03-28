@@ -1,12 +1,25 @@
 import * as vscode from 'vscode';
 import type { BrowserManager } from './browser.js';
+import { createRequire } from 'node:module';
 
 // ─── ANSI helpers ──────────────────────────────────────────────────────────
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
 const DIM = '\x1b[2m';
+const CYAN = '\x1b[36m';
 const RESET = '\x1b[0m';
+
+// ─── Lazy-loaded core module ──────────────────────────────────────────────
+
+let _core: any;
+function core() {
+  if (!_core) {
+    const _require = createRequire(__filename);
+    _core = _require('@playwright-repl/core');
+  }
+  return _core;
+}
 
 // ─── PlaywrightRepl ────────────────────────────────────────────────────────
 
@@ -19,6 +32,8 @@ export class PlaywrightRepl {
   private _historyIndex = -1;
   private _browserManager: BrowserManager | undefined;
   private _processing = false;
+  private _lastSnapshot = '';
+  private _commandCount = 0;
   disposed = false;
 
   constructor(browserManager?: BrowserManager) {
@@ -152,27 +167,91 @@ export class PlaywrightRepl {
   }
 
   private _handleLocal(command: string): boolean {
-    if (command === 'help' || command === '.help') {
-      this._write(`${DIM}Keyword commands:${RESET}`);
-      this._write('  snapshot, goto, click, fill, press, hover, select, check, eval, ...');
-      this._write(`${DIM}JavaScript:${RESET}`);
-      this._write('  await page.title(), page.locator("h1").textContent(), ...');
-      this._write(`${DIM}Type "help <command>" for details. Use eval for browser-side JS.${RESET}`);
-      return true;
-    }
-    if (command === '.clear') {
+    const trimmed = command.trim();
+
+    if (trimmed === '.clear') {
       this._writeEmitter.fire('\x1b[2J\x1b[H');
       return true;
     }
-    if (command === '.history') {
+
+    if (trimmed === 'help' || trimmed === '.help') {
+      const { CATEGORIES } = core();
+      const lines = Object.entries(CATEGORIES)
+        .map(([cat, cmds]: [string, string[]]) => `  ${cat}: ${(cmds as string[]).join(', ')}`)
+        .join('\n');
+      this._write(`${CYAN}Available commands:${RESET}\n${lines}\n\nType "help <command>" for details.`);
+      return true;
+    }
+
+    if (trimmed.startsWith('help ')) {
+      const cmd = trimmed.slice(5).trim();
+      const { COMMANDS } = core();
+      const info = COMMANDS[cmd];
+      if (!info) {
+        this._write(`${RED}Unknown command: "${cmd}". Type "help" for available commands.${RESET}`);
+        return true;
+      }
+      const parts = [`${cmd} — ${info.desc}`];
+      if (info.usage) parts.push(`Usage: ${info.usage}`);
+      if (info.examples?.length) {
+        parts.push('Examples:');
+        for (const ex of info.examples) parts.push(`  ${ex}`);
+      }
+      this._write(parts.join('\n'));
+      return true;
+    }
+
+    if (trimmed === '.history') {
       this._write(this._history.length ? this._history.slice().reverse().join('\n') : '(no history)');
       return true;
     }
-    if (command === '.history clear') {
+    if (trimmed === '.history clear') {
       this._history.length = 0;
       this._write('History cleared.');
       return true;
     }
+
+    if (trimmed === '.aliases') {
+      const { ALIASES } = core();
+      const grouped: Record<string, string[]> = {};
+      for (const [alias, cmd] of Object.entries(ALIASES) as [string, string][]) {
+        if (!grouped[cmd]) grouped[cmd] = [];
+        grouped[cmd].push(alias);
+      }
+      const lines = Object.entries(grouped)
+        .map(([cmd, aliases]) => `  ${aliases.join(', ')} → ${cmd}`)
+        .join('\n');
+      this._write(`${CYAN}Aliases:${RESET}\n${lines}`);
+      return true;
+    }
+
+    if (trimmed === '.status') {
+      const running = this._browserManager?.isRunning() ?? false;
+      const bridge = this._browserManager?.bridge?.connected ?? false;
+      this._write(
+        `Browser: ${running ? `${GREEN}running${RESET}` : `${RED}stopped${RESET}`}\n` +
+        `Bridge: ${bridge ? `${GREEN}connected${RESET}` : `${RED}disconnected${RESET}`}\n` +
+        `Commands: ${this._commandCount}`
+      );
+      return true;
+    }
+
+    if (trimmed.startsWith('locator ')) {
+      const ref = trimmed.slice(8).trim();
+      if (!this._lastSnapshot) {
+        this._write(`${RED}No snapshot cached. Run "snapshot" first.${RESET}`);
+        return true;
+      }
+      const { refToLocator } = core();
+      const result = refToLocator(this._lastSnapshot, ref);
+      if (!result) {
+        this._write(`${RED}Ref "${ref}" not found in last snapshot. Run "snapshot" to refresh.${RESET}`);
+        return true;
+      }
+      this._write(`js: page.${result.js}\npw: ${result.pw}`);
+      return true;
+    }
+
     return false;
   }
 
@@ -191,9 +270,18 @@ export class PlaywrightRepl {
       return;
     }
 
+    this._commandCount++;
+    const start = Date.now();
     try {
       const result = await this._browserManager.runCommand(command);
+      const elapsed = Date.now() - start;
+
+      // Cache snapshot for locator command
+      if (/^(snapshot|snap|s)(\s|$)/.test(command) && result.text && !result.isError)
+        this._lastSnapshot = result.text;
+
       if (!result.text) {
+        this._writeEmitter.fire(`${DIM}Done. (${elapsed}ms)${RESET}\r\n`);
         this._processing = false;
         return;
       }
@@ -204,6 +292,7 @@ export class PlaywrightRepl {
       for (const line of lines) {
         this._writeEmitter.fire(`${color}${line}${color ? RESET : ''}\r\n`);
       }
+      this._writeEmitter.fire(`${DIM}(${elapsed}ms)${RESET}\r\n`);
     } catch (err: unknown) {
       this._writeEmitter.fire(`${RED}Error: ${(err as Error).message}${RESET}\r\n`);
     }
