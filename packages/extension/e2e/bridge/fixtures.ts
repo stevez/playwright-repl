@@ -32,12 +32,10 @@ type BridgeContext = {
   testUrl: string;
 };
 
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 export const test = base.extend<
-  {},
+  { bridge: BridgeServer; testUrl: string },
   { bridgeContext: BridgeContext }
 >({
-/* eslint-enable @typescript-eslint/no-empty-object-type */
   // Worker-scoped: BridgeServer + browser + HTTP server, reused across all tests in a worker
   bridgeContext: [async ({}, use) => {
     // 1. Start local HTTP server for test pages
@@ -107,4 +105,12 @@ export const test = base.extend<
     httpServer.close();
   }, { scope: 'worker' }],
 
+  // Test-scoped aliases for cleaner test code
+  bridge: async ({ bridgeContext }, use) => {
+    await use(bridgeContext.bridge);
+  },
+
+  testUrl: async ({ bridgeContext }, use) => {
+    await use(bridgeContext.testUrl);
+  },
 });

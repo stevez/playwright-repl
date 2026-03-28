@@ -6,82 +6,61 @@
  * content script captures event → chrome.runtime.sendMessage → editor.
  */
 
-import { test, expect, waitForEditorText } from './fixtures.js';
+import { test, expect } from './fixtures.js';
 
 test.describe('Recording flow', () => {
-  test.beforeEach(async ({ panelPage, extensionId, testPage }) => {
-    await panelPage.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+  test.beforeEach(async ({ sidePanel, extensionId, testPage }) => {
+    await sidePanel.goto(extensionId);
 
     // Bring test page to front and attach the extension to it
     await testPage.bringToFront();
-    await panelPage.evaluate(() =>
-      new Promise(resolve =>
-        chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) =>
-          tab?.id
-            ? chrome.runtime.sendMessage({ type: 'attach', tabId: tab.id }, resolve)
-            : resolve({ ok: false })
-        )
-      )
-    );
+    await sidePanel.attachToActiveTab();
   });
 
   // Stop recording after each test to avoid state leaking between tests
-  test.afterEach(async ({ panelPage }) => {
-    const btn = panelPage.getByTestId('record-btn');
-    const isRecording = await btn.evaluate(el => el.classList.contains('recording'));
-    if (isRecording) await btn.click();
+  test.afterEach(async ({ sidePanel }) => {
+    if (await sidePanel.isRecording()) await sidePanel.stopRecording();
   });
 
   // ─── PW mode ─────────────────────────────────────────────────────────────
 
   test.describe('PW mode', () => {
-    test('record button toggles to Stop and goto appears', async ({ panelPage }) => {
-      const btn = panelPage.getByTestId('record-btn');
-
-      await btn.click();
-      await expect(btn).toHaveClass(/recording/, { timeout: 10000 });
-      await expect(btn).toHaveAttribute('title', 'Stop recording');
+    test('record button toggles to Stop and goto appears', async ({ sidePanel }) => {
+      await sidePanel.recordBtn.click();
+      await expect(sidePanel.recordBtn).toHaveClass(/recording/, { timeout: 10000 });
+      await expect(sidePanel.recordBtn).toHaveAttribute('title', 'Stop recording');
 
       // goto should be pre-populated with the fixture URL
-      await waitForEditorText(panelPage, 'goto "');
+      await sidePanel.waitForEditorText('goto "');
     });
 
-    test('clicking a button records a click action', async ({ panelPage, testPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'goto "');
+    test('clicking a button records a click action', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
 
       await testPage.bringToFront();
       await testPage.getByRole('button', { name: 'Submit' }).click();
 
-      // No bringToFront — waitForFunction works via CDP regardless of which tab
-      // is active, and keeping the test page in front avoids Chrome throttling
-      // the recorder's JS in the background tab.
-      await waitForEditorText(panelPage, 'click button "Submit"');
+      await sidePanel.waitForEditorText('click button "Submit"');
     });
 
-    test('filling a text input records a fill action', async ({ panelPage, testPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'goto "');
+    test('filling a text input records a fill action', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
 
       await testPage.bringToFront();
       await testPage.getByLabel('Name').fill('Alice');
       // Press Tab to commit the fill (recorder batches fill on blur/navigation)
       await testPage.getByLabel('Name').press('Tab');
 
-      await waitForEditorText(panelPage, 'fill');
+      await sidePanel.waitForEditorText('fill');
     });
 
-    test('checking a checkbox records a check action', async ({ panelPage, testPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'goto "');
+    test('checking a checkbox records a check action', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
 
       await testPage.bringToFront();
       await testPage.getByLabel('Accept terms').click();
 
-      await waitForEditorText(panelPage, 'check');
+      await sidePanel.waitForEditorText('check');
     });
 
     // Fixture CSS: .todo-item .destroy { display: none }
@@ -89,97 +68,71 @@ test.describe('Recording flow', () => {
     // Delete buttons are hidden until parent is hovered.
     // Recorder must detect this via CSS inspection and emit hover before click.
 
-    test('hover-revealed button: records hover + click (multiple items)', async ({ panelPage, testPage }) => {
-      // 1. Start recording
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'goto "');
+    test('hover-revealed button: records hover + click (multiple items)', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
 
-      // 2. Simulate: hover a todo item → click its hidden Delete button
       await testPage.bringToFront();
       await testPage.locator('.todo-item', { hasText: 'shopping' }).hover();
       await testPage.locator('.todo-item', { hasText: 'shopping' }).getByRole('button', { name: 'Delete' }).click();
 
-      // 3. Verify recorded output includes hover + click, no .nth() disambiguation
-      await waitForEditorText(panelPage, 'click button "Delete"');
-      const editorText = await panelPage.getByTestId('editor').getByRole('textbox').textContent() ?? '';
+      await sidePanel.waitForEditorText('click button "Delete"');
+      const editorText = await sidePanel.getEditorText();
       expect(editorText).toContain('hover');
       expect(editorText).toContain('click');
       expect(editorText).not.toContain('.nth(');
       expect(editorText).not.toContain('.first()');
     });
 
-    test('hover-revealed button: records hover + click (single item)', async ({ panelPage, testPage }) => {
-      // 1. Start recording
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'goto "');
+    test('hover-revealed button: records hover + click (single item)', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
 
-      // 2. Simulate: hover the only todo item → click its Delete button
-      //    Edge case — only 1 Delete button exists, so CSS inspection is needed
       await testPage.bringToFront();
       await testPage.locator('.single-todo .todo-item').hover();
       await testPage.locator('.single-todo .todo-item').getByRole('button', { name: 'Delete' }).click();
 
-      // 3. Verify hover is still recorded despite only one button existing
-      await waitForEditorText(panelPage, 'click button "Delete"');
-      const editorText = await panelPage.getByTestId('editor').getByRole('textbox').textContent() ?? '';
+      await sidePanel.waitForEditorText('click button "Delete"');
+      const editorText = await sidePanel.getEditorText();
       expect(editorText).toContain('hover');
       expect(editorText).toContain('click');
     });
 
-    test('stop recording resets button state', async ({ panelPage }) => {
-      const btn = panelPage.getByTestId('record-btn');
+    test('stop recording resets button state', async ({ sidePanel }) => {
+      await sidePanel.recordBtn.click();
+      await expect(sidePanel.recordBtn).toHaveClass(/recording/, { timeout: 10000 });
 
-      // Start
-      await btn.click();
-      await expect(btn).toHaveClass(/recording/, { timeout: 10000 });
-
-      // Stop
-      await btn.click();
-      await expect(btn).not.toHaveClass(/recording/);
-      await expect(btn).toHaveAttribute('title', 'Start Recording');
+      await sidePanel.stopRecording();
+      await expect(sidePanel.recordBtn).toHaveAttribute('title', 'Start Recording');
     });
   });
 
   // ─── JS mode ─────────────────────────────────────────────────────────────
 
   test.describe('JS mode', () => {
-    test.beforeEach(async ({ panelPage }) => {
-      // Switch to JS mode
-      await panelPage.getByTestId('mode-toggle').getByText('JS').click();
-      await expect(panelPage.getByTestId('mode-toggle').getByText('JS'))
-        .toHaveAttribute('data-active', '');
+    test.beforeEach(async ({ sidePanel }) => {
+      await sidePanel.switchMode('js');
     });
 
-    test('record inserts goto with JS syntax', async ({ panelPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-
-      await waitForEditorText(panelPage, 'await page.goto(');
+    test('record inserts goto with JS syntax', async ({ sidePanel }) => {
+      await sidePanel.startRecording('await page.goto(');
     });
 
-    test('clicking a button records JS click action', async ({ panelPage, testPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'await page.goto(');
+    test('clicking a button records JS click action', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording('await page.goto(');
 
       await testPage.bringToFront();
       await testPage.getByRole('button', { name: 'Submit' }).click();
 
-      await waitForEditorText(panelPage, '.click()');
+      await sidePanel.waitForEditorText('.click()');
     });
 
-    test('filling a text input records JS fill action', async ({ panelPage, testPage }) => {
-      await panelPage.getByTestId('record-btn').click();
-      await expect(panelPage.getByTestId('record-btn')).toHaveClass(/recording/, { timeout: 10000 });
-      await waitForEditorText(panelPage, 'await page.goto(');
+    test('filling a text input records JS fill action', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording('await page.goto(');
 
       await testPage.bringToFront();
       await testPage.getByLabel('Name').fill('Bob');
       await testPage.getByLabel('Name').press('Tab');
 
-      await waitForEditorText(panelPage, '.fill(');
+      await sidePanel.waitForEditorText('.fill(');
     });
   });
 });
