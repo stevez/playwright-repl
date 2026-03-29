@@ -17,12 +17,13 @@ const require = createRequire(__filename);
 
 const pwCliPath = require.resolve('@playwright/test/cli');
 const preloadPath = path.resolve(path.dirname(__filename), 'pw-preload.cjs');
-// Chrome extension: bundled in dist/chrome-extension/ (npm), or resolve from workspace (dev)
-const bundledExt = path.resolve(path.dirname(__filename), 'chrome-extension');
+// Chrome extension: bundled in dist/chrome-extension/ (npm), or monorepo fallback (dev)
 import fs from 'node:fs';
+const bundledExt = path.resolve(path.dirname(__filename), 'chrome-extension');
+const monorepoExt = path.resolve(path.dirname(__filename), '../../extension/dist');
 const extPath = fs.existsSync(path.join(bundledExt, 'manifest.json'))
   ? bundledExt
-  : path.resolve(path.dirname(require.resolve('@playwright-repl/extension/package.json')), 'dist');
+  : monorepoExt;
 
 const args = process.argv.slice(2);
 if (args.length === 0 || (args[0] && args[0].startsWith('-'))) {
