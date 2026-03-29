@@ -58,13 +58,6 @@ jobs:
         run: node e2e/test-bridge-replay.js
         working-directory: packages/cli
 
-      - name: Run runner E2E tests via pw-cli
-        run: node ../dist/pw-cli.js test --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 10
-        env:
-          FORCE_COLOR: '1'
-
       # ─── Benchmark: Playwright vs pw-cli (all examples, 1 worker) ─────────
       - name: 'Benchmark: all examples via Playwright (1 worker)'
         run: npx playwright test --workers 1 --reporter list
