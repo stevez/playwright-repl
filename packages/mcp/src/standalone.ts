@@ -2,8 +2,9 @@
  * Standalone runner — launches a browser via Engine (in-process Playwright).
  */
 
-import { Engine, parseInput, resolveArgs, filterResponse } from '@playwright-repl/core';
+import { parseInput, resolveArgs, filterResponse } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
+import { Engine } from 'playwright-repl';
 import type { RunnerModule, SnapshotCache } from './types.js';
 
 const INCLUDE_SNAPSHOT = { includeSnapshot: true } as const;

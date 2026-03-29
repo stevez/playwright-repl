@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { EngineResult } from './engine.js';
+import type { EngineResult } from './types.js';
 
 export class BridgeServer {
     private wss!: WebSocketServer;

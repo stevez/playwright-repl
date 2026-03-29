@@ -8,8 +8,12 @@
  *   import { Engine, parseInput, SessionRecorder } from 'playwright-repl';
  */
 
-// Re-export core
-export { parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, Engine } from '@playwright-repl/core';
+// Re-export core utilities
+export { parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems } from '@playwright-repl/core';
+
+// Engine (moved from core to cli)
+export { Engine } from './engine.js';
+export type { EngineOpts, EngineResult, ParsedArgs } from './engine.js';
 
 // CLI-specific
 export { SessionRecorder, SessionPlayer } from './recorder.js';

@@ -13,36 +13,10 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import url from 'node:url';
-import { replVersion } from './resolve.js';
+import { replVersion } from '@playwright-repl/core';
+import type { EngineOpts, EngineResult, ParsedArgs } from '@playwright-repl/core';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface EngineOpts {
-  headed?: boolean;
-  browser?: string;
-  connect?: number | boolean;
-  extension?: boolean;
-  spawn?: boolean;
-  port?: number;
-  cdpPort?: number;
-  persistent?: boolean;
-  profile?: string;
-  cwd?: string;
-  [key: string]: unknown;
-}
-
-export interface EngineResult {
-  text?: string;
-  image?: string;
-  isError?: boolean;
-}
-
-export interface ParsedArgs {
-  _: string[];
-  cwd?: string;
-  nth?: string | number;
-  [key: string]: unknown;
-}
+export type { EngineOpts, EngineResult, ParsedArgs };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface PlaywrightDeps {
@@ -124,7 +98,7 @@ export class Engine {
       const cdpPort = opts.cdpPort || 9222;
 
       // 1. Start CommandServer for panel HTTP commands.
-      const { CommandServer } = await import('./extension-server.js');
+      const { CommandServer } = await import('@playwright-repl/core');
       const cmdServer = new CommandServer(this);
       await cmdServer.start(serverPort);
       this._commandServer = cmdServer;

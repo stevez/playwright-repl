@@ -1,5 +1,5 @@
 /**
- * @playwright-repl/core — shared engine, parser, and utilities.
+ * @playwright-repl/core — shared parser, utilities, and bridge server.
  */
 
 export { minimist, replVersion, COMMANDS, CATEGORIES, JS_CATEGORIES, UPDATE_COMMANDS } from './resolve.js';
@@ -13,8 +13,7 @@ export {
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
-export { Engine } from './engine.js';
-export type { EngineOpts, EngineResult, ParsedArgs } from './engine.js';
+export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
 export { CommandServer, resolveArgs } from './extension-server.js';
 export { filterResponse } from './filter.js';
 export { BridgeServer } from './bridge-server.js';

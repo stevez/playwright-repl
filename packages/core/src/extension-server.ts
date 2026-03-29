@@ -19,7 +19,7 @@ import {
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
-import type { ParsedArgs, EngineResult } from './engine.js';
+import type { ParsedArgs, EngineResult } from './types.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

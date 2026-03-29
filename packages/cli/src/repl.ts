@@ -10,12 +10,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
-  Engine, CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
+  CommandServer, BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
   filterResponse as filterResponseBase, resolveArgs,
 } from '@playwright-repl/core';
-import type { EngineOpts, ParsedArgs, EngineResult } from '@playwright-repl/core';
+import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
+import { Engine } from './engine.js';
 import { SessionManager } from './recorder.js';
-import type { CompletionItem } from '@playwright-repl/core';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@
  */
 
 import { minimist, COMMANDS } from './resolve.js';
-import type { ParsedArgs } from './engine.js';
+import type { ParsedArgs } from './types.js';
 
 // ─── Command aliases ─────────────────────────────────────────────────────────
 

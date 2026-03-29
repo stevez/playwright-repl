@@ -12,18 +12,14 @@ const mockStart = vi.fn().mockResolvedValue(undefined);
 const mockClose = vi.fn();
 const mockRun = vi.fn().mockResolvedValue({ text: '### Result\nOK' });
 
-vi.mock('@playwright-repl/core', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    Engine: vi.fn(function () {
-      this.start = mockStart;
-      this.close = mockClose;
-      this.run = mockRun;
-      this.connected = true;
-    }),
-  };
-});
+vi.mock('../src/engine.js', () => ({
+  Engine: vi.fn(function () {
+    this.start = mockStart;
+    this.close = mockClose;
+    this.run = mockRun;
+    this.connected = true;
+  }),
+}));
 
 vi.mock('node:readline', () => ({
   default: {
@@ -38,7 +34,7 @@ vi.mock('node:readline', () => ({
   },
 }));
 
-import { Engine } from '@playwright-repl/core';
+import { Engine } from '../src/engine.js';
 import { startRepl } from '../src/repl.js';
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
