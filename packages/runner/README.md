@@ -1,140 +1,110 @@
 # @playwright-repl/runner
 
-Playwright test runner with faster execution via context reuse and bridge mode.
+Drop-in replacement for `npx playwright test` with context reuse. Keeps the browser open between tests — no teardown/recreate per test.
 
 ## Quick Start
 
 ```bash
-cd your-playwright-project
-pw test
+npm install -D @playwright-repl/runner
 ```
 
-## Benchmark
-
-CI results (todomvc, 26 tests, 1 worker):
-
-| Runner | Ubuntu | macOS | Windows |
-|--------|--------|-------|---------|
-| Playwright | 10.6s | 8.1s | 31.3s |
-| pw-cli | 5.8s | 6.9s | 6.0s |
-| Bridge direct | 4.8s | 4.3s | 3.6s |
-
-The speedup comes from **skipping per-test context creation**. Playwright creates a new browser context + page for each test (for isolation). `pw` reuses the same page across tests, making per-test overhead consistent regardless of OS.
-
-```
-Standard Playwright:
-  Test runner → new context → new page → CDP commands → close page
-  (per-test overhead: 150-525ms depending on OS)
-
-pw:
-  Test runner → bridge → reuse page → CDP commands
-  (per-test overhead: ~100ms, consistent across OS)
-```
-
-## Benefits
-
-- **1.5-2x faster** on all platforms, consistent ~100ms per test (Playwright varies: 150ms Linux → 525ms Windows)
-- **No context creation overhead** — reuses the same page, no `newPage()` per test
-- **Same test syntax** — standard `import { test, expect } from '@playwright/test'`, no code changes
-- **Automatic fallback** — tests using Node APIs (fs, route, etc.) fall back to Playwright's standard runner
-
-### Trade-offs
-
-- **No test isolation** — tests share state (localStorage, cookies). Tests must clean up after themselves
-- **Bridge mode limitations** — no `page.route()`, `page.waitForEvent()`, `page.$eval()`
-
-## CLI Usage
+Replace `npx playwright test` with `pw test`:
 
 ```bash
-pw test [options] [test-filter...]
+pw test                         # run all tests
+pw test todomvc/                # run tests in a folder
+pw test --workers 1             # single worker
+pw test --reporter list         # custom reporter
 ```
 
-### Options
+All Playwright CLI flags work — `pw` passes them through.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-c, --config <file>` | Playwright config file | `playwright.config.ts` |
-| `-g, --grep <pattern>` | Filter tests by name | |
-| `--headed` | Run with visible browser | headless |
-| `--workers <n>` | Number of workers | 1 |
-| `--timeout <ms>` | Per-test timeout | 30000 |
-| `--retries <n>` | Retry failed tests | 0 |
+## How It Works
 
-### Examples
+Standard Playwright creates a new browser context for every test. `pw test` reuses the same persistent browser context across tests in the same worker.
+
+- **Bridge mode** — compiles the test with esbuild, sends it to the Chrome extension for in-browser execution
+- **Node mode** — falls back to standard Playwright for tests that use Node-only APIs (fs, net, etc.)
+- **Automatic routing** — static analysis detects which mode each test needs
+
+## pw Commands
 
 ```bash
-# Run all tests
-pw test
+pw test [files...]                       # run Playwright tests with context reuse
+pw launch --port 9222                    # launch Chrome with extension + CDP port
+pw launch --port 9222 --bridge-port 9877 # custom bridge port
+pw launch --port 9222 --headless         # headless mode
+pw repl --port 9222                      # Node REPL with Playwright globals
+pw repl --port 9222 script.js            # run script, exit (browser stays alive)
+pw repl-extension --bridge-port 9877     # REPL via extension bridge
+pw close --port 9222                     # close browser
+```
 
-# Run specific file
-pw test tests/login.spec.ts
+### pw repl
 
-# Filter by name
-pw test --grep "login"
+Lightweight Node REPL with `page`, `context`, `browser`, and `expect` as globals. Powered by `node:repl` — full JavaScript with tab completion and history.
 
-# Headed mode (see the browser)
-pw test --headed
+```bash
+pw launch --port 9222
+pw repl --port 9222
+```
 
-# With config
-pw test --config playwright.config.ts
+```
+pw> await page.goto('https://example.com')
+pw> await page.title()
+Example Domain
+(3.2ms)
+pw> await page.locator('a').count()
+1
+(12.4ms)
+pw> 1 + 1
+2
+```
+
+### pw repl-extension
+
+REPL that routes commands through the Chrome extension bridge. Useful for testing the extension path.
+
+```bash
+pw launch --port 9222 --bridge-port 9877
+pw repl-extension --bridge-port 9877
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--port <n>` | Chrome CDP port (default: 9222) |
+| `--bridge-port <n>` | BridgeServer WebSocket port (default: 9877) |
+| `--headless` | Launch browser in headless mode |
+
+All `pw test` options are passed through to Playwright.
+
+## CI Setup
+
+```yaml
+- name: Install
+  run: npm ci
+
+- name: Install browsers
+  run: npx playwright install --with-deps chromium
+
+- name: Run tests
+  run: npx pw test
 ```
 
 ## Compatibility
 
-Tests are standard Playwright — same `import { test, expect } from '@playwright/test'`, same API, same config. No code changes needed.
+Works with standard `@playwright/test` tests. No changes needed to your test files.
 
-### Supported
+**Supported:** All Playwright test features — fixtures, assertions, test.describe, test.beforeEach, etc.
 
-- `test`, `test.describe`, `test.only`, `test.skip`
-- `test.beforeEach`, `test.afterEach`, `test.beforeAll`, `test.afterAll`
-- `test.extend()` — custom fixtures
-- `page.*` — all Playwright page methods
-- `expect()` — all async matchers
-- `playwright.config.ts` — testDir, timeout, retries
-- TypeScript
-
-### Node Mode (full Playwright compatibility)
-
-Tests that use Node APIs (fs, process.env, .route(), etc.) automatically fall back to Playwright's standard runner with full support for:
-
-- Parallel workers (`--workers > 1`)
-- `test.use()` — per-test config
-- Projects
-- Custom reporters (HTML, JSON)
-- Global setup/teardown
-- Trace recording
-
-### Bridge Mode Limitations
-
-Bridge-mode tests (simple, no Node APIs) run faster but don't support:
-
-- `page.route()` / `page.waitForEvent()` / `page.waitForResponse()` — non-serializable callbacks
-- `page.$eval()` / `page.$$eval()` — callback-based APIs
-
-## CI Setup
-
-The runner needs both **Chromium** and **Chrome** browsers installed:
-
-```bash
-# Install browsers (CI)
-npx playwright install chromium chrome
-
-# Linux (with system deps)
-npx playwright install --with-deps chromium chrome
-```
-
-Both are required because `pw-cli` uses playwright-crx which runs inside Chrome with the extension loaded, while standard Playwright tests use Chromium.
+**Bridge mode limitations:** Tests that use Node-only APIs (`fs`, `net`, `child_process`) automatically fall back to Node mode.
 
 ## Development
 
 ```bash
-# Build
-pnpm --filter @playwright-repl/runner run build
-
-# Run examples
-cd examples
-node ../dist/cli.js test
-
-# Run single test
-node ../dist/cli.js test todomvc/adding-todos/should-add-single-todo.spec.ts
+cd packages/runner
+pnpm run build
+pnpm run test
 ```

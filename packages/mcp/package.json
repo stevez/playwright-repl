@@ -1,5 +1,6 @@
 {
     "name": "@playwright-repl/mcp",
+    "description": "MCP server — AI agents control your real Chrome browser",
     "version": "0.20.0",
     "type": "module",
     "bin": {

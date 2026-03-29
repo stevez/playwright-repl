@@ -1,62 +1,20 @@
 # @playwright-repl/core
 
-Shared engine, parser, and utilities for the playwright-repl monorepo.
+Shared parser, servers, and utilities for the playwright-repl ecosystem.
 
-Used by [`playwright-repl`](../cli/README.md) (CLI) and [`@playwright-repl/mcp`](../mcp/README.md) (MCP server).
+Used by [`playwright-repl`](../cli/README.md) (CLI), [`@playwright-repl/runner`](../runner/README.md) (runner), and [`@playwright-repl/mcp`](../mcp/README.md) (MCP server).
 
 ## Install
 
 ```bash
-npm install @playwright-repl/core playwright
+npm install @playwright-repl/core
 ```
-
-> Requires `playwright >= 1.59.0-alpha` (includes `lib/mcp/browser/` engine internals).
 
 ## Key Exports
 
-### `Engine`
-
-Runs Playwright's browser backend in-process. No daemon, no socket — commands execute directly.
-
-```typescript
-import { Engine } from '@playwright-repl/core';
-
-const engine = new Engine();
-await engine.start({ headed: true });
-
-const result = await engine.run({ _: ['goto', 'https://example.com'] });
-console.log(result.text);
-
-const snap = await engine.run({ _: ['snapshot'] });
-console.log(snap.text);
-
-await engine.close();
-```
-
-**`EngineOpts`** (passed to `start()`):
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `headed` | `boolean` | Visible browser window |
-| `browser` | `string` | `chrome`, `firefox`, `webkit`, `msedge` |
-| `persistent` | `boolean` | Persistent browser profile |
-| `profile` | `string` | Profile directory path |
-
-**`EngineResult`**:
-
-```typescript
-interface EngineResult {
-  text?: string;   // Text output (accessibility tree, command result, error message)
-  image?: string;  // Base64 data URL for screenshot commands
-  isError?: boolean;
-}
-```
-
----
-
 ### `BridgeServer`
 
-WebSocket server that the Dramaturg Chrome extension connects to. Used by the CLI (`--bridge`) and MCP server.
+WebSocket server that the Dramaturg Chrome extension connects to. Used by the CLI (`--bridge`), MCP server, and `pw repl-extension`.
 
 ```typescript
 import { BridgeServer } from '@playwright-repl/core';
@@ -80,12 +38,27 @@ await bridge.close();
 | Method | Description |
 |--------|-------------|
 | `start(port?)` | Start WebSocket server (default port `9876`) |
-| `run(command)` | Send a command string to the extension, returns `EngineResult` |
+| `run(command)` | Send a command to the extension, returns `EngineResult` |
+| `runScript(script, language)` | Send a multi-line script (`'pw'` or `'javascript'`) |
 | `waitForConnection(timeoutMs?)` | Wait until extension connects (default 30s) |
 | `onConnect(fn)` | Callback when extension connects |
 | `onDisconnect(fn)` | Callback when extension disconnects |
-| `connected` | `boolean` — whether extension is currently connected |
+| `connected` | `boolean` — whether extension is connected |
 | `close()` | Shut down the server |
+
+---
+
+### `CommandServer`
+
+HTTP server for external command execution. Used by `--server` mode (AI agents) and extension mode.
+
+**Endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /run` | Execute a command via `engine.run()` |
+| `POST /select-tab` | Switch active page by URL |
+| `GET /health` | Server status check |
 
 ---
 
@@ -123,17 +96,33 @@ const items = buildCompletionItems();
 
 ---
 
+## Types
+
+```typescript
+interface EngineResult {
+  text?: string;     // Text output (accessibility tree, command result, error)
+  image?: string;    // Base64 data URL (screenshot commands)
+  isError?: boolean;
+}
+
+interface ParsedArgs {
+  _: string[];       // Positional arguments
+  [key: string]: unknown;  // Named flags
+}
+```
+
 ## File Structure
 
 ```
 src/
-├── engine.ts           # In-process Playwright backend (Engine class)
-├── bridge-server.ts    # WebSocket bridge server (BridgeServer class)
-├── extension-server.ts # HTTP command server (CommandServer class — internal)
+├── bridge-server.ts    # WebSocket bridge server (BridgeServer)
+├── extension-server.ts # HTTP command server (CommandServer)
 ├── parser.ts           # Command parsing + alias resolution
-├── page-scripts.ts     # Text locators + assertion helpers (serializable fns)
+├── page-scripts.ts     # Text locators + assertion helpers
 ├── completion-data.ts  # Autocomplete items for all commands
+├── filter.ts           # Response filtering
 ├── resolve.ts          # COMMANDS map, minimist re-export, version
 ├── colors.ts           # ANSI color helpers
+├── types.ts            # Shared type definitions
 └── index.ts            # Public exports
 ```

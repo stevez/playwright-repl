@@ -1,6 +1,6 @@
-# playwright-repl (CLI)
+# playwright-repl
 
-Interactive terminal REPL for browser automation powered by Playwright. Type a command, see the result instantly — no code, no boilerplate.
+Interactive terminal REPL for browser automation powered by Playwright. Type a command, see the result — no code, no boilerplate.
 
 ```bash
 npm install -g playwright-repl
@@ -9,9 +9,9 @@ playwright-repl --headed
 
 ```
 pw> goto https://demo.playwright.dev/todomvc/
-pw> fill "What needs to be done?" "Buy groceries"
+pw> fill "What needs to be done?" Buy groceries
 pw> press Enter
-pw> verify-text "1 item left"
+pw> verify text 1 item left
 pw> screenshot
 ```
 
@@ -26,10 +26,10 @@ npx playwright install
 
 ## Connection Modes
 
-| Mode | Flag | Browser Source | Use Case |
-|------|------|---------------|----------|
-| **Standalone** | *(default)* | Launches new Chromium via Playwright | General automation, CI |
-| **Bridge** | `--bridge` | Your real Chrome (via extension) | Drive your existing session — cookies and logins intact |
+| Mode | Flag | How it works |
+|------|------|--------------|
+| **Standalone** | *(default)* | Launches Chromium via Playwright |
+| **Bridge** | `--bridge` | Connects to your real Chrome via Dramaturg extension — cookies and logins intact |
 
 ### Standalone
 
@@ -44,18 +44,18 @@ playwright-repl --persistent   # keeps profile between sessions
 
 ### Bridge
 
-The bridge mode starts an interactive REPL that acts as a **remote console for the Chrome extension** — your terminal becomes the command input for the extension's browser session. Commands run inside your real Chrome with your existing cookies and logins.
+The bridge mode turns your terminal into a remote console for the Chrome extension. Commands run inside your real Chrome with your existing cookies and logins.
 
 ```bash
-playwright-repl --bridge                      # start bridge server, wait for extension to connect
+playwright-repl --bridge                      # start bridge server, wait for extension
 playwright-repl --bridge --replay script.pw   # replay a script via bridge
 playwright-repl --bridge --replay examples/   # replay all .pw files
 playwright-repl --bridge --bridge-port 9877   # custom port (default 9876)
 ```
 
-The extension connects automatically — no need to open the side panel. Once connected, all commands run against the active tab in your real browser.
+The extension connects automatically — no need to open the side panel.
 
-> Requires the playwright-repl Chrome extension — see [packages/extension/README.md](../extension/README.md) for setup.
+> Requires the [Dramaturg Chrome extension](../extension/README.md).
 
 ## Usage
 
@@ -86,10 +86,10 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 
 | Mode | Standalone | Bridge |
 |------|:---:|:---:|
-| **Keyword** — `click "Sign in"`, `goto https://...` | ✅ | ✅ |
-| **Playwright API / JS** — `await page.title()`, `1 + 1` | ❌ | ✅ auto-detected |
+| **Keyword** — `click "Sign in"`, `goto https://...` | Yes | Yes |
+| **Playwright API / JS** — `await page.title()`, `1 + 1` | No | Yes (auto-detected) |
 
-Bridge mode auto-detects Playwright API and JavaScript expressions — just type them directly. For DOM access use `await page.evaluate(() => document.title)`. For the full keyword command list, see [Command Reference](#command-reference).
+Bridge mode auto-detects Playwright API and JavaScript expressions. For DOM access use `await page.evaluate(() => document.title)`. For keyword commands, see [Command Reference](#command-reference).
 
 ## CLI Options
 
@@ -127,7 +127,7 @@ Bridge mode auto-detects Playwright API and JavaScript expressions — just type
 
 ## Recording & Replay
 
-Record your browser interactions and replay them later — great for regression tests, onboarding demos, or CI smoke tests.
+Record browser interactions and replay them later — great for regression tests, onboarding demos, or CI smoke tests.
 
 ### Record
 
@@ -139,9 +139,9 @@ playwright-repl --record my-test.pw --headed
 pw> .record my-test
 ⏺ Recording to my-test.pw
 pw> goto https://demo.playwright.dev/todomvc/
-pw> fill "What needs to be done?" "Buy groceries"
+pw> fill "What needs to be done?" Buy groceries
 pw> press Enter
-pw> verify-text "1 item left"
+pw> verify text 1 item left
 pw> .save
 ✓ Saved 4 commands to my-test.pw
 ```
@@ -162,7 +162,7 @@ playwright-repl --replay examples/ --silent
 pw> .replay my-test.pw
 ```
 
-Multi-file replay runs all files sequentially, writes a `replay-<timestamp>.log` with per-command results, and prints a pass/fail summary. Exit code 0 if all pass, 1 if any fail.
+Multi-file replay runs all files sequentially, writes a `replay-<timestamp>.log`, and prints a pass/fail summary. Exit code 0 if all pass, 1 if any fail.
 
 ### .pw File Format
 
@@ -173,10 +173,10 @@ Plain text — human-readable, diffable, version-controllable:
 # App: https://demo.playwright.dev/todomvc/
 
 goto https://demo.playwright.dev/todomvc/
-fill "What needs to be done?" "Buy groceries"
+fill "What needs to be done?" Buy groceries
 press Enter
-verify-text "Buy groceries"
-verify-text "1 item left"
+verify text Buy groceries
+verify text 1 item left
 ```
 
 ## Examples
@@ -200,7 +200,7 @@ playwright-repl --replay examples/ --silent
 ## Requirements
 
 - Node.js >= 20
-- `playwright` >= 1.59.0-alpha (browser binaries only needed for standalone mode)
+- `playwright` >= 1.59
 
 ---
 
@@ -273,11 +273,11 @@ pw> highlight --clear                # dismiss the highlight overlay
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `verify-text <text>` | `vt` | Verify text is visible on page |
-| `verify-no-text <text>` | `vnt` | Verify text is not visible |
-| `verify-element <role> <name>` | `ve` | Verify element exists by role and name |
-| `verify-value <ref> <value>` | `vv` | Verify input/select/checkbox value |
-| `verify-list <ref> <items>` | `vl` | Verify list contains expected items |
+| `verify text <text>` | `vt` | Verify text is visible on page |
+| `verify no-text <text>` | `vnt` | Verify text is not visible |
+| `verify element <role> <name>` | `ve` | Verify element exists by role and name |
+| `verify value <ref> <value>` | `vv` | Verify input/select/checkbox value |
+| `verify list <ref> <items>` | `vl` | Verify list contains expected items |
 
 ### Tabs
 

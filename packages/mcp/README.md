@@ -140,7 +140,7 @@ Dramaturg is the other half of the system — it's what gives the MCP server acc
 
 ### What the extension does
 
-- **Runs Playwright inside Chrome** — uses `playwright-crx` and `chrome.debugger` to execute commands directly in your existing session, no separate browser needed. Because Playwright runs inside the browser rather than relaying through an external process, the entire AI → command → result loop is faster.
+- **Runs Playwright inside Chrome** — uses `playwright-crx` and `chrome.debugger` to execute commands directly in your existing session, no separate browser needed.
 - **Connects automatically** — a persistent offscreen document maintains the WebSocket connection to the MCP server; reconnects if the connection drops. No side panel needed.
 - **Auto-attaches** — on the first command, automatically attaches to the active Chrome tab
 - **Executes commands** — receives `run_command` calls from the AI and runs them against the active tab
