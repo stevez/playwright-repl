@@ -203,9 +203,6 @@ importers:
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
-      '@playwright-repl/extension':
-        specifier: workspace:*
-        version: link:../extension
       acorn:
         specifier: ^8.16.0
         version: 8.16.0
