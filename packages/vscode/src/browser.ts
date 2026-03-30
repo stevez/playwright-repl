@@ -14,6 +14,7 @@ export interface LaunchOptions {
   browser: string;
   bridgePort?: number;
   headless?: boolean;
+  workspaceFolder?: string;
 }
 
 // ─── BrowserManager ────────────────────────────────────────────────────────
@@ -42,11 +43,15 @@ export class BrowserManager {
   get cdpUrl() { return this._cdpUrl; }
 
   async launch(opts: LaunchOptions) {
-    const _require = createRequire(__filename);
+    const _extRequire = createRequire(__filename);
+    // Resolve playwright from the user's project when possible, falling back to bundled
+    const _require = opts.workspaceFolder
+      ? createRequire(path.join(opts.workspaceFolder, 'package.json'))
+      : _extRequire;
 
     // 1. Find Chrome extension: bundled (VSIX) first, then monorepo fallback
     const bundledExt = path.resolve(path.dirname(__filename), '..', 'chrome-extension');
-    const coreMain = _require.resolve('@playwright-repl/core');
+    const coreMain = _extRequire.resolve('@playwright-repl/core');
     const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
     const monorepoExt = path.resolve(coreDir, '../extension/dist');
     const extPath = fs.existsSync(path.join(bundledExt, 'manifest.json')) ? bundledExt : monorepoExt;

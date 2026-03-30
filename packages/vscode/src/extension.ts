@@ -177,7 +177,7 @@ export class Extension implements RunHooks {
     const showBrowser = this._settingsModel.showBrowser.get();
     // Headed mode: use BrowserManager (reuse browser across REPL and tests)
     if (showBrowser && !debug) {
-      await this._ensureBrowserManager();
+      await this._ensureBrowserManager(config.workspaceFolder);
       if (this._browserManager?.isRunning() && this._browserManager.cdpUrl) {
         const cdpUrl = this._browserManager.cdpUrl;
         const httpPort = this._browserManager.httpPort;
@@ -204,7 +204,7 @@ export class Extension implements RunHooks {
     await this._reusedBrowser.onDidRunTests();
   }
 
-  private async _ensureBrowserManager() {
+  private async _ensureBrowserManager(workspaceFolder?: string) {
     if (!this._browserManager) {
       this._browserManager = new BrowserManager(this._logger);
     }
@@ -213,6 +213,7 @@ export class Extension implements RunHooks {
     await this._browserManager.launch({
       browser: 'chromium',
       headless: false,
+      workspaceFolder,
     });
     if (this._replView)
       this._replView.setBrowserManager(this._browserManager);
