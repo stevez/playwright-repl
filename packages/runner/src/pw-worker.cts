@@ -32,14 +32,23 @@ async function ensureBridge(): Promise<void> {
     return;
   }
 
-  const coreMain = require.resolve('@playwright-repl/core');
+  // Resolve from user's project to avoid duplicate module instances
+  const { createRequire } = require('module');
+  const projectRequire = createRequire(path.join(process.cwd(), 'package.json'));
+
+  let coreMain: string;
+  try {
+    coreMain = projectRequire.resolve('@playwright-repl/core');
+  } catch {
+    coreMain = require.resolve('@playwright-repl/core');
+  }
   const { BridgeServer } = await import(pathToFileURL(coreMain).href);
 
   _bridge = new BridgeServer();
   await _bridge.start(0);
 
   const extPath = process.env.PW_EXT_PATH;
-  const pw = require('@playwright/test');
+  const pw = projectRequire('@playwright/test');
   _context = await pw.chromium.launchPersistentContext('', {
     channel: 'chromium',
     headless: true,

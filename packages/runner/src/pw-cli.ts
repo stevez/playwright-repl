@@ -2,23 +2,31 @@
 /**
  * pw — drop-in replacement for npx playwright test
  *
- * 1. Spawns Playwright CLI with custom worker via --require preload
- * 2. Each worker lazily launches its own browser + bridge (reused across test groups)
- * 3. Worker compiles test → sends to bridge (one call) → results back
+ * Routes test files:
+ * - Bridge-eligible files → direct bridge execution (fast, no test runner overhead)
+ * - Node-mode files → standard `npx playwright test` (full compatibility)
+ *
+ * When no bridge is available, all tests go through standard Playwright.
  */
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
-const require = createRequire(__filename);
+const _require = createRequire(__filename);
 
-const pwCliPath = require.resolve('@playwright/test/cli');
-const preloadPath = path.resolve(path.dirname(__filename), 'pw-preload.cjs');
+// Resolve Playwright CLI from the user's project to avoid duplicate module instances
+const projectRequire = createRequire(path.join(process.cwd(), 'package.json'));
+let pwCliPath: string;
+try {
+  pwCliPath = projectRequire.resolve('@playwright/test/cli');
+} catch {
+  pwCliPath = _require.resolve('@playwright/test/cli');
+}
 // Chrome extension: bundled in dist/chrome-extension/ (npm), or monorepo fallback (dev)
-import fs from 'node:fs';
 const bundledExt = path.resolve(path.dirname(__filename), 'chrome-extension');
 const monorepoExt = path.resolve(path.dirname(__filename), '../../extension/dist');
 const extPath = fs.existsSync(path.join(bundledExt, 'manifest.json'))
@@ -60,14 +68,14 @@ if (args.length === 0 || (args[0] && args[0].startsWith('-'))) {
   args.unshift('test');
 }
 
-const existingNodeOptions = process.env.NODE_OPTIONS || '';
+// Run tests via standard Playwright — no preload, no Module._load hooks.
+// Bridge mode is handled by the VS Code extension's _tryDirectBridge.
 const child = spawn(process.execPath, [pwCliPath, ...args], {
   stdio: 'inherit',
   cwd: process.cwd(),
   env: {
     ...process.env,
     PW_EXT_PATH: extPath,
-    NODE_OPTIONS: `${existingNodeOptions} --require ${preloadPath}`.trim(),
   },
 });
 

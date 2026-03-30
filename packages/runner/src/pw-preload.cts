@@ -1,15 +1,15 @@
 /**
  * Preloaded via NODE_OPTIONS --require.
- * Intercepts:
- * 1. require('workerMain') → patches with bridge/Node routing
- * 2. chromium.launch → patches browser.newContext for context reuse
  *
- * Context reuse: Node-mode tests reuse one shared context/page per worker
- * instead of creating fresh ones per test (~575ms saving per test).
+ * Patches Playwright's chromium.launch for:
+ * 1. Context reuse — shared context/page across tests in a worker
+ * 2. CDP reuse — connectOverCDP when PW_REUSE_CDP is set
  *
- * When PW_REUSE_CDP is set (BrowserManager running), chromium.launch is
- * replaced with chromium.connectOverCDP so tests reuse BrowserManager's
- * headed browser instead of launching a new one.
+ * Also patches workerMain to route bridge-eligible tests to the bridge.
+ *
+ * Uses process 'loaded' event to patch AFTER all modules are initialized,
+ * avoiding Module._load hooks that interfere with Playwright's test file
+ * loading context (which causes "two different versions" errors).
  */
 
 import Module = require('module');
@@ -18,89 +18,86 @@ import path = require('path');
 let sharedContext: any = null;
 let sharedPage: any = null;
 let defaultViewport: { width: number; height: number } | null = null;
-let browserPatched = false;
 
+// ─── workerMain interception (must use Module._load for this) ────────────────
+// Only intercept 'workerMain', pass everything else through immediately.
 const origLoad = (Module as any)._load;
+let workerPatched = false;
 
 (Module as any)._load = function (request: string, parent: unknown) {
-  if (typeof request === 'string' && request.includes('workerMain')) {
+  // Only intercept workerMain — everything else passes through untouched
+  if (!workerPatched && typeof request === 'string' && request.includes('workerMain')) {
+    workerPatched = true;
+    // Remove hook BEFORE loading workerMain so test file loading
+    // goes through the original Module._load (no foreign stack frames)
+    (Module as any)._load = origLoad;
+
     const realModule = origLoad.call(this, request, parent);
     const origCreate = realModule.create;
 
     return {
       create(params: unknown) {
         const worker = origCreate(params);
-        const bridge = require(path.resolve(__dirname, 'pw-worker.cjs'));
+        const bridge = origLoad.call(this, path.resolve(__dirname, 'pw-worker.cjs'), module);
         bridge.patchWorker(worker, params);
         return worker;
       },
     };
   }
 
-  const result = origLoad.apply(this, arguments);
+  // Pass through — hook is still active but only until workerMain is found
+  return origLoad.apply(this, arguments);
+};
 
-  // Patch chromium.launch to reuse context across tests in the same worker
-  if (!browserPatched && typeof result === 'object' && result !== null &&
-      result.chromium && result.chromium.launch && !result.chromium.launch._pwReusePatched) {
-    browserPatched = true;
-    result.chromium.launch._pwReusePatched = true;
-    const origLaunch = result.chromium.launch;
+// ─── chromium.launch patching (deferred, no Module._load) ────────────────────
+// Use setImmediate to patch after all --require scripts and the main module
+// have loaded. By this time, @playwright/test is in the module cache.
+setImmediate(() => {
+  let pw: any;
+  try {
+    // Resolve from user's project to avoid duplicate module instances
+    const { createRequire } = require('module');
+    const projectRequire = createRequire(path.join(process.cwd(), 'package.json'));
+    pw = projectRequire('@playwright/test');
+  } catch {
+    try {
+      pw = require('@playwright/test');
+    } catch {
+      return; // @playwright/test not available, nothing to patch
+    }
+  }
 
-    result.chromium.launch = async function () {
-      const cdpEndpoint = process.env.PW_REUSE_CDP;
+  if (!pw?.chromium?.launch || pw.chromium.launch._pwReusePatched)
+    return;
 
-      // When BrowserManager is running, connect to its browser via CDP
-      if (cdpEndpoint && result.chromium.connectOverCDP) {
+  pw.chromium.launch._pwReusePatched = true;
+  const origLaunch = pw.chromium.launch;
 
-        const browser = await result.chromium.connectOverCDP(cdpEndpoint);
+  pw.chromium.launch = async function () {
+    const cdpEndpoint = process.env.PW_REUSE_CDP;
 
-        // Reuse existing context from BrowserManager
-        const origNewContext = browser.newContext.bind(browser);
-        browser.newContext = async function (contextOptions: any) {
-          if (!sharedContext) {
-            const contexts = browser.contexts();
-
-            if (contexts.length > 0) {
-              sharedContext = contexts[0];
-              sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
-            } else {
-              sharedContext = await origNewContext(contextOptions);
-              sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
-            }
-            defaultViewport = sharedPage.viewportSize();
-          } else {
-            try {
-              await sharedContext.clearCookies();
-              await sharedContext.clearPermissions().catch(() => {});
-              await sharedContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-              await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-              if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
-              await sharedPage.evaluate(() => {
-                try { localStorage.clear(); } catch {}
-                try { sessionStorage.clear(); } catch {}
-              }).catch(() => {});
-              await sharedPage.goto('about:blank', { waitUntil: 'commit' });
-            } catch {}
-          }
-          sharedContext.newPage = async () => sharedPage;
-          sharedContext.close = async () => {};
-          return sharedContext;
-        };
-
-        // Don't close BrowserManager's browser
-        browser.close = async () => {};
-        return browser;
+    // When BrowserManager is running, connect to its browser via CDP
+    if (cdpEndpoint && pw.chromium.connectOverCDP) {
+      let browser;
+      try {
+        browser = await pw.chromium.connectOverCDP(cdpEndpoint);
+      } catch {
+        // Browser not running — fall back to normal launch
+        return origLaunch.apply(this, arguments);
       }
 
-      // Normal path: launch new browser, reuse context across tests
-
-      const browser = await origLaunch.apply(this, arguments);
+      // Reuse existing context from BrowserManager
       const origNewContext = browser.newContext.bind(browser);
-
       browser.newContext = async function (contextOptions: any) {
         if (!sharedContext) {
-          sharedContext = await origNewContext(contextOptions);
-          sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+          const contexts = browser.contexts();
+          if (contexts.length > 0) {
+            sharedContext = contexts[0];
+            sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+          } else {
+            sharedContext = await origNewContext(contextOptions);
+            sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+          }
           defaultViewport = sharedPage.viewportSize();
         } else {
           try {
@@ -121,9 +118,39 @@ const origLoad = (Module as any)._load;
         return sharedContext;
       };
 
+      // Don't close BrowserManager's browser
+      browser.close = async () => {};
       return browser;
-    };
-  }
+    }
 
-  return result;
-};
+    // Normal path: launch new browser, reuse context across tests
+    const browser = await origLaunch.apply(this, arguments);
+    const origNewContext = browser.newContext.bind(browser);
+
+    browser.newContext = async function (contextOptions: any) {
+      if (!sharedContext) {
+        sharedContext = await origNewContext(contextOptions);
+        sharedPage = sharedContext.pages()[0] || await sharedContext.newPage();
+        defaultViewport = sharedPage.viewportSize();
+      } else {
+        try {
+          await sharedContext.clearCookies();
+          await sharedContext.clearPermissions().catch(() => {});
+          await sharedContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+          await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+          if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
+          await sharedPage.evaluate(() => {
+            try { localStorage.clear(); } catch {}
+            try { sessionStorage.clear(); } catch {}
+          }).catch(() => {});
+          await sharedPage.goto('about:blank', { waitUntil: 'commit' });
+        } catch {}
+      }
+      sharedContext.newPage = async () => sharedPage;
+      sharedContext.close = async () => {};
+      return sharedContext;
+    };
+
+    return browser;
+  };
+});
