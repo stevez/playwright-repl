@@ -143,7 +143,7 @@ export class Extension implements RunHooks {
       borderColor: { id: 'editor.wordHighlightStrongBorder' },
     });
 
-    this._logger = this._vscode.window.createOutputChannel('Playwright', { log: true });
+    this._logger = this._vscode.window.createOutputChannel('Playwright REPL', { log: true });
     this._settingsModel = new SettingsModel(vscode, context);
     this._reusedBrowser = new ReusedBrowser(this._vscode, this._logger, this._settingsModel, this._envProvider.bind(this));
     this._debugHighlight = new DebugHighlight(vscode, this._reusedBrowser, this._logger);
@@ -206,8 +206,7 @@ export class Extension implements RunHooks {
 
   private async _ensureBrowserManager() {
     if (!this._browserManager) {
-      const outputChannel = this._vscode.window.createOutputChannel('Playwright REPL');
-      this._browserManager = new BrowserManager(outputChannel);
+      this._browserManager = new BrowserManager(this._logger);
     }
     if (this._browserManager.isRunning())
       return;
