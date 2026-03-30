@@ -19,10 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const _require = createRequire(import.meta.url);
-// Resolve playwright-core via @playwright/test (runner doesn't depend on playwright-core directly)
-const pwTestPath = _require.resolve('@playwright/test');
-const pwRequire = createRequire(pwTestPath);
-const { chromium } = pwRequire('playwright-core');
+const { chromium } = _require('@playwright/test');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const headed = process.argv.includes('--headed');
