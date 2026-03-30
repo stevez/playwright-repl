@@ -30,7 +30,7 @@
     "@playwright/test": ">=1.57.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.0-alpha-2026-02-21",
+    "@playwright/test": "^1.58.0",
     "typescript": "^5.0.0"
   }
 }
