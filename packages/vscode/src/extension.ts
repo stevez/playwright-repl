@@ -895,10 +895,19 @@ export class Extension implements RunHooks {
       parseAllResults: (text: string) => { status: string; duration: number; errors: { message: string }[] }[];
     };
 
-    // Collect test items — only use direct bridge for leaf test items (not folders/files)
+    // Collect test items — only use direct bridge for leaf test items (not folders)
     const items = request.include || [];
     if (!items.length)
       return false;
+
+    // If any top-level item is not a test file, fall back to test runner.
+    // Folders and non-test items are best handled by the standard multi-worker path.
+    for (const item of items) {
+      if (!item.uri)
+        return false;
+      if (!/\.(spec|test)\.[tj]sx?$/.test(item.uri.fsPath))
+        return false;
+    }
 
     // Collect leaf test items from request — expand files/describes into their children
     const fileToItems = new Map<string, vscodeTypes.TestItem[]>();
