@@ -171,30 +171,28 @@ export class Extension implements RunHooks {
     this._treeItemObserver = new TreeItemObserver(this._vscode, this._logger);
   }
 
-  private _lastReuseCDP: string | undefined;
+  private _lastCdpUrl: string | undefined;
 
   async onWillRunTests(config: TestConfig, debug: boolean) {
     const showBrowser = this._settingsModel.showBrowser.get();
     // Headed mode: use BrowserManager (reuse browser across REPL and tests)
     if (showBrowser && !debug) {
       await this._ensureBrowserManager();
-      if (this._browserManager?.isRunning()) {
-        const cdpEndpoint = 'http://127.0.0.1:9222';
+      if (this._browserManager?.isRunning() && this._browserManager.cdpUrl) {
+        const cdpUrl = this._browserManager.cdpUrl;
         const httpPort = this._browserManager.httpPort;
-        const needsReset = this._lastReuseCDP !== cdpEndpoint;
-        process.env.PW_REUSE_CDP = cdpEndpoint;
+        const needsReset = this._lastCdpUrl !== cdpUrl;
+        this._lastCdpUrl = cdpUrl;
         if (httpPort)
           process.env.PW_BRIDGE_PORT = String(httpPort);
-        this._lastReuseCDP = cdpEndpoint;
-        return { resetTestServer: needsReset, reusingBrowser: true };
+        return { connectWsEndpoint: cdpUrl, resetTestServer: needsReset, reusingBrowser: true };
       }
     }
 
     // Headless / debug / fallback: original Playwright extension behavior
-    const needsReset = !!this._lastReuseCDP;
-    delete process.env.PW_REUSE_CDP;
+    const needsReset = !!this._lastCdpUrl;
     delete process.env.PW_BRIDGE_PORT;
-    this._lastReuseCDP = undefined;
+    this._lastCdpUrl = undefined;
     await this._reusedBrowser.onWillRunTests(config, debug);
     return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(), resetTestServer: needsReset };
   }
@@ -1297,7 +1295,7 @@ test('test', async ({ page }) => {
   }
 
   private _asPosition(location: { line: number, column: number }): vscodeTypes.Position {
-    return new this._vscode.Position(Math.max(location.line - 1, 0), location.column - 1);
+    return new this._vscode.Position(Math.max(location.line - 1, 0), Math.max(location.column - 1, 0));
   }
 
   private _asLocation(location: reporterTypes.Location): vscodeTypes.Location {

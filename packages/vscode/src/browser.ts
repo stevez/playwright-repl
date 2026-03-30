@@ -21,11 +21,14 @@ export interface LaunchOptions {
 export class BrowserManager {
   private _bridge: BridgeServer | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _browserServer: any = undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _browserContext: any = undefined;
   private _running = false;
   private _log: vscode.OutputChannel;
   private _httpServer: Server | null = null;
   private _httpPort: number | null = null;
+  private _cdpUrl: string | undefined;
 
   constructor(outputChannel: vscode.OutputChannel) {
     this._log = outputChannel;
@@ -35,6 +38,8 @@ export class BrowserManager {
   get bridge() { return this._bridge; }
   get page() { return this._browserContext?.pages()[0]; }
   get httpPort() { return this._httpPort; }
+  get wsEndpoint() { return this._browserServer?.wsEndpoint(); }
+  get cdpUrl() { return this._cdpUrl; }
 
   async launch(opts: LaunchOptions) {
     const _require = createRequire(__filename);
@@ -55,17 +60,11 @@ export class BrowserManager {
     this._bridge = bridge;
     this._log.appendLine(`BridgeServer on port ${bridge.port}`);
 
-    // 3. Launch Chromium with extension via Playwright
+    // 3. Launch Chrome with extension via launchServer + _userDataDir
+    //    This gives us both persistent context (extensions work) AND wsEndpoint (tests can connect)
     const pw = _require('playwright-core');
     const headless = opts.headless ?? false;
     this._log.appendLine(`Launching Chromium (${headless ? 'headless' : 'headed'})...`);
-
-    // Clean env: strip Electron/VS Code vars that interfere with Chromium
-    const cleanEnv = Object.fromEntries(
-      Object.entries(process.env).filter(([k]) =>
-        !k.startsWith('ELECTRON_') && !k.startsWith('VSCODE_') && k !== 'ORIGINAL_XDG_CURRENT_DESKTOP'
-      ),
-    );
 
     // Create user data dir with DevTools prefs (dock to bottom)
     const os = await import('node:os');
@@ -76,9 +75,11 @@ export class BrowserManager {
       devtools: { preferences: { currentDockState: '"bottom"' } },
     }));
 
-    this._browserContext = await pw.chromium.launchPersistentContext(userDataDir, {
+    this._browserServer = await pw.chromium.launchServer({
       channel: 'chromium',
       headless,
+      _userDataDir: userDataDir,
+      _sharedBrowser: true,
       args: [
         `--disable-extensions-except=${extPath}`,
         `--load-extension=${extPath}`,
@@ -89,27 +90,108 @@ export class BrowserManager {
         '--auto-open-devtools-for-tabs',
         '--remote-debugging-port=9222',
       ],
-      env: cleanEnv,
+    } as any);
+    this._log.appendLine(`Chromium launched. wsEndpoint: ${this._browserServer.wsEndpoint()}`);
+
+    this._browserServer.on('close', () => {
+      this._log.appendLine('Browser server closed.');
+      this._running = false;
+      this._browserServer = undefined;
+      this._browserContext = undefined;
     });
-    this._log.appendLine('Chromium launched.');
 
-    // 4. Set bridge port via service worker so extension knows where to connect
-    let sw = this._browserContext.serviceWorkers()[0];
-    if (!sw) sw = await this._browserContext.waitForEvent('serviceworker', { timeout: 10000 });
-    await sw.evaluate((port: number) => {
-      chrome.storage.local.set({ bridgePort: port });
-    }, bridge.port);
-    this._log.appendLine(`Bridge port ${bridge.port} set via service worker.`);
+    // 4. Connect to get browser context for REPL
+    const browser = await pw.chromium.connect(this._browserServer.wsEndpoint());
+    this._browserContext = browser.contexts()[0];
 
-    // 5. Navigate initial page so extension can attach
-    const page = this._browserContext.pages()[0];
-    if (page) await page.goto('https://www.google.com');
+    // 5. Set bridge port via CDP on the extension's service worker
+    await new Promise<void>(resolve => setTimeout(resolve, 2000));
+    try {
+      const http = await import('node:http');
+      const targets = await new Promise<any[]>((resolve, reject) => {
+        http.get('http://127.0.0.1:9222/json', res => {
+          let data = '';
+          res.on('data', (chunk: string) => data += chunk);
+          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+        }).on('error', reject);
+      });
+      const swTarget = targets.find((t: any) => t.type === 'service_worker' && t.url.includes('chrome-extension://'));
+      if (swTarget) {
+        this._log.appendLine(`Found service worker: ${swTarget.url}`);
+        const WebSocket = _require('ws') as typeof import('ws').default;
+        const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
+        await new Promise<void>((res, rej) => {
+          cdpWs.on('open', () => {
+            cdpWs.send(JSON.stringify({
+              id: 1,
+              method: 'Runtime.evaluate',
+              params: { expression: `chrome.storage.local.set({ bridgePort: ${bridge.port} })` }
+            }));
+            cdpWs.on('message', () => { cdpWs.close(); res(); });
+          });
+          cdpWs.on('error', rej);
+          setTimeout(() => { cdpWs.close(); rej(new Error('CDP timeout')); }, 5000);
+        });
+        this._log.appendLine(`Bridge port ${bridge.port} set via CDP.`);
+      }
+      // Also fetch the CDP WebSocket URL for test runner
+      const versionData = await new Promise<any>((resolve, reject) => {
+        http.get('http://127.0.0.1:9222/json/version', res => {
+          let data = '';
+          res.on('data', (chunk: string) => data += chunk);
+          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+        }).on('error', reject);
+      });
+      if (versionData.webSocketDebuggerUrl) {
+        this._cdpUrl = versionData.webSocketDebuggerUrl;
+        this._log.appendLine(`CDP URL: ${this._cdpUrl}`);
+      }
+    } catch (e: unknown) {
+      this._log.appendLine('CDP bridge port injection failed: ' + (e as Error).message);
+    }
 
-    // 6. Wait for offscreen document to connect via WebSocket
+    // 6. Wait for extension to connect
     this._log.appendLine('Waiting for extension to connect...');
     await bridge.waitForConnection(30000);
 
-    // 7. Start HTTP proxy so test workers can call bridge from separate processes
+    // 7. Reopen DevTools so the extension's devtools_page can register its panel
+    //    (--auto-open-devtools-for-tabs opens DevTools before the extension is ready)
+    try {
+      const http = await import('node:http');
+      const targets = await new Promise<any[]>((resolve, reject) => {
+        http.get('http://127.0.0.1:9222/json', res => {
+          let data = '';
+          res.on('data', (chunk: string) => data += chunk);
+          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+        }).on('error', reject);
+      });
+      const pageTarget = targets.find((t: any) => t.type === 'page');
+      if (pageTarget) {
+        const WS = _require('ws') as any;
+        const ws = new WS(pageTarget.webSocketDebuggerUrl);
+        await new Promise<void>((res, rej) => {
+          ws.on('open', () => {
+            // Close then open DevTools
+            ws.send(JSON.stringify({ id: 1, method: 'Page.disable' }));
+            ws.send(JSON.stringify({ id: 2, method: 'Inspector.disable' }));
+            setTimeout(() => {
+              ws.send(JSON.stringify({ id: 3, method: 'Inspector.enable' }));
+              ws.on('message', (msg: Buffer) => {
+                const data = JSON.parse(msg.toString());
+                if (data.id === 3) { ws.close(); res(); }
+              });
+            }, 200);
+          });
+          ws.on('error', rej);
+          setTimeout(() => { ws.close(); rej(new Error('DevTools reopen timeout')); }, 5000);
+        });
+        this._log.appendLine('DevTools reopened for extension panel.');
+      }
+    } catch (e: unknown) {
+      this._log.appendLine('DevTools reopen failed: ' + (e as Error).message);
+    }
+
+    // 8. Start HTTP proxy so test workers can call bridge from separate processes
     await this._startHttpProxy();
     this._log.appendLine(`HTTP proxy on port ${this._httpPort}`);
 
@@ -128,8 +210,11 @@ export class BrowserManager {
       this._bridge = undefined;
     }
     if (this._browserContext) {
-      await this._browserContext.close().catch(() => {});
       this._browserContext = undefined;
+    }
+    if (this._browserServer) {
+      await this._browserServer.close().catch(() => {});
+      this._browserServer = undefined;
     }
     this._running = false;
   }

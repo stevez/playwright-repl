@@ -27,21 +27,25 @@ import { debugSessionName } from './debugSessionName';
 import type { TestModel } from './testModel';
 import { TestServerInterface } from './upstream/testServerInterface';
 
-// ─── pw-preload injection for context reuse + bridge mode ─────────────────────
-const _preloadPath = path.resolve(__dirname, '../../runner/dist/pw-preload.cjs');
+// ─── preload injection for CDP browser reuse + bridge mode ──────────────────
+// Use forward slashes — backslashes get stripped inside NODE_OPTIONS on Windows
+const _cdpPreloadPath = path.join(__dirname, 'cdpPreload.cjs').replace(/\\/g, '/');
+const _bridgePreloadPath = path.resolve(__dirname, '../../runner/dist/pw-preload.cjs').replace(/\\/g, '/');
 const _extPath = path.resolve(__dirname, '../chrome-extension');
-const _hasPreload = fs.existsSync(_preloadPath);
 
 function preloadEnv(): Record<string, string | undefined> {
-  if (!_hasPreload) return {};
+  const requires: string[] = [];
+  if (fs.existsSync(_cdpPreloadPath))
+    requires.push(_cdpPreloadPath);
+  if (fs.existsSync(_bridgePreloadPath))
+    requires.push(_bridgePreloadPath);
+  if (!requires.length) return {};
   const existing = process.env.NODE_OPTIONS || '';
+  const requireArgs = requires.map(p => `--require ${p}`).join(' ');
   const env: Record<string, string | undefined> = {
-    NODE_OPTIONS: `${existing} --require ${_preloadPath}`.trim(),
+    NODE_OPTIONS: `${existing} ${requireArgs}`.trim(),
     PW_EXT_PATH: _extPath,
   };
-  // Forward endpoints so workers can reuse BrowserManager's browser
-  if (process.env.PW_REUSE_CDP)
-    env.PW_REUSE_CDP = process.env.PW_REUSE_CDP;
   if (process.env.PW_BRIDGE_PORT)
     env.PW_BRIDGE_PORT = process.env.PW_BRIDGE_PORT;
   return env;
