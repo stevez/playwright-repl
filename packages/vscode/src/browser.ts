@@ -24,6 +24,8 @@ export class BrowserManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _browserServer: any = undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _browser: any = undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _browserContext: any = undefined;
   private _running = false;
   private _log: vscode.OutputChannel;
@@ -101,15 +103,19 @@ export class BrowserManager {
     this._log.appendLine(`Chromium launched. wsEndpoint: ${this._browserServer.wsEndpoint()}`);
 
     this._browserServer.on('close', () => {
-      this._log.appendLine('Browser server closed.');
+      this._log.appendLine('Browser closed by user.');
       this._running = false;
       this._browserServer = undefined;
       this._browserContext = undefined;
+      // Clean up bridge and HTTP proxy in background
+      this.stop().catch(() => {});
     });
 
     // 4. Connect to get browser context for REPL
-    const browser = await pw.chromium.connect(this._browserServer.wsEndpoint());
-    this._browserContext = browser.contexts()[0];
+    // Store browser ref to prevent GC from dropping the connection
+    // (launchServer kills Chrome when no clients are connected)
+    this._browser = await pw.chromium.connect(this._browserServer.wsEndpoint());
+    this._browserContext = this._browser.contexts()[0];
 
     // 5. Set bridge port via CDP on the extension's service worker
     await new Promise<void>(resolve => setTimeout(resolve, 2000));
@@ -215,6 +221,9 @@ export class BrowserManager {
     if (this._bridge) {
       await this._bridge.close().catch(() => {});
       this._bridge = undefined;
+    }
+    if (this._browser) {
+      this._browser = undefined;
     }
     if (this._browserContext) {
       this._browserContext = undefined;

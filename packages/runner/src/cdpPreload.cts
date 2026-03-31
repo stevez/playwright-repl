@@ -8,39 +8,45 @@
  * Safe no-op when connect() is called with a normal Playwright wsEndpoint.
  */
 
-import path = require('path');
+import Module = require('module');
 
-// Patch after modules are loaded — no Module._load hooks needed.
-setImmediate(() => {
-  let pw: any;
-  try {
-    const { createRequire } = require('module');
-    const projectRequire = createRequire(path.join(process.cwd(), 'package.json'));
-    pw = projectRequire('@playwright/test');
-  } catch {
-    try {
-      pw = require('@playwright/test');
-    } catch {
-      return;
-    }
+const origLoad = (Module as any)._load;
+let patched = false;
+
+(Module as any)._load = function (request: string, parent: unknown) {
+  const mod = origLoad.apply(this, arguments);
+
+  // Intercept playwright-core or @playwright/test to patch chromium.connect
+  if (!patched && (request === 'playwright-core' || request === '@playwright/test') && mod?.chromium?.connect && !mod.chromium.__pwReplPatched) {
+    patched = true;
+    (Module as any)._load = origLoad; // remove hook immediately
+
+    const origConnect = mod.chromium.connect.bind(mod.chromium);
+
+    mod.chromium.connect = async function(optionsOrWsEndpoint: any) {
+      const wsEndpoint = typeof optionsOrWsEndpoint === 'string'
+        ? optionsOrWsEndpoint
+        : optionsOrWsEndpoint?.wsEndpoint;
+
+      // Only intercept CDP URLs (from --remote-debugging-port)
+      if (!wsEndpoint || !wsEndpoint.includes('/devtools/browser/'))
+        return origConnect(optionsOrWsEndpoint);
+
+      const browser = await mod.chromium.connectOverCDP(wsEndpoint);
+      // Don't let the test runner kill our shared browser.
+      // Override both public close() and internal _close() to prevent
+      // the browser from being killed when the worker process exits.
+      browser.close = async () => {};
+      if (browser._close) browser._close = async () => {};
+      if (browser.disconnect) browser.disconnect = async () => {};
+      // Prevent the browser process from being killed via the connection
+      const conn = browser._connection || browser._browserConnection;
+      if (conn?.close) conn.close = () => {};
+      return browser;
+    };
+
+    mod.chromium.__pwReplPatched = true;
   }
 
-  if (!pw?.chromium?.connect || pw.chromium.__pwReplPatched)
-    return;
-
-  const origConnect = pw.chromium.connect.bind(pw.chromium);
-
-  pw.chromium.connect = async function(optionsOrWsEndpoint: any) {
-    const wsEndpoint = typeof optionsOrWsEndpoint === 'string'
-      ? optionsOrWsEndpoint
-      : optionsOrWsEndpoint?.wsEndpoint;
-
-    // Only intercept CDP URLs (from --remote-debugging-port)
-    if (!wsEndpoint || !wsEndpoint.includes('/devtools/browser/'))
-      return origConnect(optionsOrWsEndpoint);
-
-    return pw.chromium.connectOverCDP(wsEndpoint);
-  };
-
-  pw.chromium.__pwReplPatched = true;
-});
+  return mod;
+};
