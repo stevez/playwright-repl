@@ -96,7 +96,6 @@ export class BrowserManager {
         '--no-default-browser-check',
         '--disable-background-timer-throttling',
         '--disable-infobars',
-        '--auto-open-devtools-for-tabs',
         '--remote-debugging-port=9222',
       ],
     } as any);
@@ -167,44 +166,7 @@ export class BrowserManager {
     this._log.appendLine('Waiting for extension to connect...');
     await bridge.waitForConnection(30000);
 
-    // 7. Reopen DevTools so the extension's devtools_page can register its panel
-    //    (--auto-open-devtools-for-tabs opens DevTools before the extension is ready)
-    try {
-      const http = await import('node:http');
-      const targets = await new Promise<any[]>((resolve, reject) => {
-        http.get('http://127.0.0.1:9222/json', res => {
-          let data = '';
-          res.on('data', (chunk: string) => data += chunk);
-          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
-        }).on('error', reject);
-      });
-      const pageTarget = targets.find((t: any) => t.type === 'page');
-      if (pageTarget) {
-        const WS = _extRequire('ws') as any;
-        const ws = new WS(pageTarget.webSocketDebuggerUrl);
-        await new Promise<void>((res, rej) => {
-          ws.on('open', () => {
-            // Close then open DevTools
-            ws.send(JSON.stringify({ id: 1, method: 'Page.disable' }));
-            ws.send(JSON.stringify({ id: 2, method: 'Inspector.disable' }));
-            setTimeout(() => {
-              ws.send(JSON.stringify({ id: 3, method: 'Inspector.enable' }));
-              ws.on('message', (msg: Buffer) => {
-                const data = JSON.parse(msg.toString());
-                if (data.id === 3) { ws.close(); res(); }
-              });
-            }, 200);
-          });
-          ws.on('error', rej);
-          setTimeout(() => { ws.close(); rej(new Error('DevTools reopen timeout')); }, 5000);
-        });
-        this._log.appendLine('DevTools reopened for extension panel.');
-      }
-    } catch (e: unknown) {
-      this._log.appendLine('DevTools reopen failed: ' + (e as Error).message);
-    }
-
-    // 8. Start HTTP proxy so test workers can call bridge from separate processes
+    // 7. Start HTTP proxy so test workers can call bridge from separate processes
     await this._startHttpProxy();
     this._log.appendLine(`HTTP proxy on port ${this._httpPort}`);
 

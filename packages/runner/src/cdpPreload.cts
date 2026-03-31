@@ -33,15 +33,16 @@ let patched = false;
         return origConnect(optionsOrWsEndpoint);
 
       const browser = await mod.chromium.connectOverCDP(wsEndpoint);
-      // Don't let the test runner kill our shared browser.
-      // Override both public close() and internal _close() to prevent
-      // the browser from being killed when the worker process exits.
+
+      // Reuse the persistent context so tests run in the same window
+      browser._newContextForReuse = async function() {
+        const contexts = browser.contexts();
+        return contexts[0] || await browser.newContext();
+      };
+      browser._disconnectFromReusedContext = async function() {};
+
+      // Don't let the test runner kill our shared browser
       browser.close = async () => {};
-      if (browser._close) browser._close = async () => {};
-      if (browser.disconnect) browser.disconnect = async () => {};
-      // Prevent the browser process from being killed via the connection
-      const conn = browser._connection || browser._browserConnection;
-      if (conn?.close) conn.close = () => {};
       return browser;
     };
 
