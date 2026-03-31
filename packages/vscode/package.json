@@ -2,7 +2,11 @@
   "name": "@playwright-repl/vscode",
   "displayName": "Playwright REPL",
   "description": "Playwright REPL for VS Code — Test Explorer, REPL, assert builder, and element picker",
-  "icon": "images/playwright-logo.png",
+  "icon": "images/dramaturg-icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "version": "0.21.0",
   "private": true,
   "publisher": "playwright-repl",

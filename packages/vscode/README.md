@@ -2,7 +2,23 @@
 
 Interactive browser automation inside VS Code — Test Explorer, live REPL, assertion builder, and element picker.
 
-<!-- TODO: hero.png — overview screenshot -->
+![Playwright REPL](images/hero.png)
+
+## Built on Playwright Test for VS Code
+
+This extension is built upon Microsoft's official [Playwright Test for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) extension (Apache 2.0). Both extensions can coexist — you can keep the official one installed and use this alongside it. They share the same `playwright.config.ts` and test files.
+
+**What's new:**
+- REPL panel — interactive command execution with keyword commands and JavaScript
+- Locator panel — pick elements, inspect locators and ARIA snapshots
+- Assert Builder — build and verify 13 Playwright assertion matchers interactively
+- Recorder — capture browser interactions as test commands
+- Bridge execution — browser-only tests bypass the test runner for near-instant feedback
+
+**What's the same:**
+- Test Explorer — same familiar interface for discovering and running tests
+- Debugger — step through tests with breakpoints
+- Trace Viewer — inspect test traces and screenshots
 
 ## Performance
 
@@ -16,7 +32,7 @@ Node tests that need `fs`, `net`, etc. fall back to the standard Playwright test
 
 Run Playwright tests with a persistent browser and context reuse. Works with individual tests and files. Folders fall back to the standard multi-worker path.
 
-<!-- TODO: update test-explorer.png with fresh screenshot -->
+![Test Explorer](images/test-explorer.png)
 
 ### REPL Panel
 
@@ -28,7 +44,7 @@ Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, 
 - Execution timing
 - Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
 
-<!-- TODO: repl.png -->
+![REPL](images/repl.png)
 
 ### Locator Panel
 
@@ -39,7 +55,7 @@ Pick elements from the browser and inspect their locator and ARIA snapshot.
 - **Editable locator** — modify and experiment
 - **ARIA snapshot** — accessibility tree for the picked element
 
-<!-- TODO: locator.png -->
+![Locator](images/locator.png)
 
 ### Assert Builder
 
@@ -53,11 +69,11 @@ Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttac
 
 Supports negation (`not` checkbox) and editable assertions.
 
-<!-- TODO: assert-builder.png -->
+![Assert Builder](images/assert-builder.png)
 
 ### Recorder
 
-Record browser interactions as Playwright commands. Click elements, fill forms, navigate — the recorder captures each action as `.pw` keyword commands or Playwright JavaScript.
+Record browser interactions as Playwright JavaScript. Click elements, fill forms, navigate — the recorder captures each action as executable test code.
 
 ### Browser Reuse
 
