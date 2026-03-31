@@ -14,23 +14,26 @@ function DevToolsConsole() {
   // Auto-attach to the inspected tab, re-attach when user switches back
   useEffect(() => {
     const inspectedTabId = chrome.devtools?.inspectedWindow?.tabId;
+
+    async function doAttach(tabId: number) {
+      const [res, tab] = await Promise.all([
+        attachToTab(tabId),
+        chrome.tabs.get(tabId).catch(() => null),
+      ]);
+      if (res.ok && res.url) {
+        const idx = (tab?.index ?? 0) + 1;
+        dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId });
+        dispatch({ type: 'ADD_LINE', line: { text: `Attached to tab ${idx}: ${res.url}`, type: 'info' } });
+      }
+    }
+
     if (inspectedTabId) {
-      attachToTab(inspectedTabId).then(res => {
-        if (res.ok && res.url) {
-          dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId: inspectedTabId });
-          dispatch({ type: 'ADD_LINE', line: { text: `Attached to ${res.url}`, type: 'info' } });
-        }
-      }).catch(e => console.warn('[pw-repl] auto-attach failed:', e));
+      doAttach(inspectedTabId).catch(e => console.warn('[pw-repl] auto-attach failed:', e));
     }
 
     const onActivated = (info: chrome.tabs.TabActiveInfo) => {
       if (!inspectedTabId || info.tabId !== inspectedTabId) return;
-      attachToTab(inspectedTabId).then(res => {
-        if (res.ok && res.url) {
-          dispatch({ type: 'ATTACH_SUCCESS', url: res.url, tabId: inspectedTabId });
-          dispatch({ type: 'ADD_LINE', line: { text: `Attached to ${res.url}`, type: 'info' } });
-        }
-      }).catch(e => console.warn('[pw-repl] re-attach failed:', e));
+      doAttach(inspectedTabId).catch(e => console.warn('[pw-repl] re-attach failed:', e));
     };
     chrome.tabs.onActivated.addListener(onActivated);
 
