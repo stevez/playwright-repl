@@ -2,7 +2,7 @@
 
 Interactive browser automation inside VS Code — Test Explorer, live REPL, assertion builder, and element picker.
 
-![Playwright REPL](images/hero.png)
+<!-- TODO: hero.png — overview screenshot -->
 
 ## Performance
 
@@ -16,7 +16,7 @@ Node tests that need `fs`, `net`, etc. fall back to the standard Playwright test
 
 Run Playwright tests with a persistent browser and context reuse. Works with individual tests and files. Folders fall back to the standard multi-worker path.
 
-![Test Explorer](images/test-explorer.png)
+<!-- TODO: update test-explorer.png with fresh screenshot -->
 
 ### REPL Panel
 
@@ -28,7 +28,7 @@ Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, 
 - Execution timing
 - Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
 
-![REPL](images/repl.png)
+<!-- TODO: repl.png -->
 
 ### Locator Panel
 
@@ -39,7 +39,7 @@ Pick elements from the browser and inspect their locator and ARIA snapshot.
 - **Editable locator** — modify and experiment
 - **ARIA snapshot** — accessibility tree for the picked element
 
-![Locator](images/locator.png)
+<!-- TODO: locator.png -->
 
 ### Assert Builder
 
@@ -53,7 +53,7 @@ Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttac
 
 Supports negation (`not` checkbox) and editable assertions.
 
-![Assert Builder](images/assert-builder.png)
+<!-- TODO: assert-builder.png -->
 
 ### Recorder
 
@@ -96,9 +96,9 @@ REPL, Test Explorer, Recorder, and Picker all share the same headed browser via 
 
 ## Requirements
 
-- VS Code 1.86+
+- VS Code 1.93+
 - Node.js 18+
-- `@playwright/test` 1.59+ in your project
+- `@playwright/test` 1.58+ in your project
 
 ## Panels
 
