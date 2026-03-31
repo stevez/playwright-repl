@@ -81,10 +81,6 @@ export async function handleLaunch(argv: string[]): Promise<void> {
   }, bridgePort);
   console.log(`Bridge port ${bridgePort} set via service worker`);
 
-  // 3. Navigate initial page
-  const page = browserContext.pages()[0];
-  if (page) await page.goto('https://www.google.com');
-
   console.log(`Ready! CDP: ${port} | Bridge: ${bridgePort}`);
   console.log('Extension will connect when BridgeServer starts (pw repl-extension).');
 
