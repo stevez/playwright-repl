@@ -29,11 +29,12 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     function isInternalUrl(url: string | undefined) {
         if (!url) return true;
-        return url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:');
+        return url.startsWith('chrome://') || url.startsWith('chrome-extension://');
     }
 
     function getTabLabel(tab: chrome.tabs.Tab): string {
         try {
+            if (tab.url?.startsWith('about:')) return tab.url;
             const url = new URL(tab.url!);
             if (url.protocol === 'chrome:') return `chrome://${url.hostname}`;
             return url.hostname;
@@ -45,11 +46,11 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     async function loadTabs() {
         if (!chrome.tabs?.query) return;
         const tabs = await chrome.tabs.query({});
-        // Keep chrome:// tabs (to preserve tab order) but exclude other extensions' and about: tabs.
-        // Allow our own extension pages (newtab) but exclude the panel/popup itself.
+        // Keep chrome:// tabs (to preserve tab order) but exclude other extensions' pages.
+        // Allow our own extension pages but exclude the panel/popup itself.
         const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
         const panelUrl = `${ownOrigin}panel/panel.html`;
-        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith('about:') && !t.url.startsWith(panelUrl) && (!t.url.startsWith('chrome-extension://') || t.url.startsWith(ownOrigin))));
+        setAvailableTabs(tabs.filter(t => t?.url && !t.url.startsWith(panelUrl) && (!t.url.startsWith('chrome-extension://') || t.url.startsWith(ownOrigin))));
     }
 
     async function checkActiveTab() {

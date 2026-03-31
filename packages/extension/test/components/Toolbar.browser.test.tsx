@@ -658,7 +658,7 @@ describe('Toolbar component tests', () => {
       });
     });
 
-    it('filters out chrome-extension:// and about: tabs but keeps chrome:// tabs', async () => {
+    it('filters out chrome-extension:// tabs but keeps chrome:// and about: tabs', async () => {
       (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue([
         { id: 1, url: 'https://example.com', title: 'Example' },
         { id: 2, url: 'chrome://newtab/', title: 'New Tab' },
@@ -672,13 +672,13 @@ describe('Toolbar component tests', () => {
 
       await vi.waitFor(() => {
         const options = select.querySelectorAll('option');
-        // placeholder + example.com + chrome://newtab (chrome-extension:// and about: excluded)
-        expect(options.length).toBe(3);
+        // placeholder + example.com + chrome://newtab + about:blank (chrome-extension:// excluded)
+        expect(options.length).toBe(4);
         const values = Array.from(options).map(o => (o as HTMLOptionElement).value);
         expect(values).not.toContain('3'); // chrome-extension:// tab excluded
-        expect(values).not.toContain('4'); // about:blank excluded
         expect(values).toContain('1');     // https://example.com included
         expect(values).toContain('2');     // chrome://newtab included
+        expect(values).toContain('4');     // about:blank included
       });
     });
   });

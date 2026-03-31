@@ -1076,7 +1076,7 @@ describe('tab operations', () => {
     it('tabNew without URL', async () => {
         const result = await tabNew({}, undefined);
         expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({
-            url: 'chrome-extension://test-id/newtab/newtab.html',
+            url: 'about:blank',
             windowId: 10,
         });
         expect(result).toBe('Opened new tab');

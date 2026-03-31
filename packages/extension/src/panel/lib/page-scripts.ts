@@ -581,7 +581,7 @@ export async function tabList(_page) {
 }
 
 export async function tabNew(_page, url) {
-  const tabUrl = url || chrome.runtime.getURL('newtab/newtab.html');
+  const tabUrl = url || 'about:blank';
   const activeTabId = globalThis.activeTabId;
   const windowId = activeTabId ? (await chrome.tabs.get(activeTabId)).windowId : undefined;
   await chrome.tabs.create(windowId !== undefined ? { url: tabUrl, windowId } : { url: tabUrl });

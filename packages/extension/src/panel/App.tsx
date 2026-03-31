@@ -68,7 +68,7 @@ function App() {
       const tab = tabs[0];
       const url = tab?.url ?? '';
       const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
-      if (tab?.id && !url.startsWith('chrome://') && !url.startsWith('about:') &&
+      if (tab?.id && !url.startsWith('chrome://') &&
           (!url.startsWith('chrome-extension://') || url.startsWith(ownOrigin))) {
         doAttach(tab.id);
       }
@@ -77,7 +77,6 @@ function App() {
     const onActivated = async (info: chrome.tabs.TabActiveInfo) => {
       const tab = await chrome.tabs.get(info.tabId).catch(() => null);
       const url = tab?.url ?? '';
-      if (url.startsWith('about:')) return;
       if (url.startsWith('chrome-extension://') && !url.startsWith(`chrome-extension://${chrome.runtime.id}/`)) return;
       if (url.startsWith('chrome://')) {
         attachedTabRef.current = null;
@@ -96,7 +95,7 @@ function App() {
         if (changeInfo.url) dispatch({ type: 'UPDATE_URL', url: changeInfo.url });
         return;
       }
-      if (changeInfo.url && !changeInfo.url.startsWith('chrome://') && !changeInfo.url.startsWith('about:') &&
+      if (changeInfo.url && !changeInfo.url.startsWith('chrome://') &&
           (!changeInfo.url.startsWith('chrome-extension://') || changeInfo.url.startsWith(`chrome-extension://${chrome.runtime.id}/`))) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id === tabId) doAttach(tabId);
