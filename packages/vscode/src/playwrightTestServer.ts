@@ -331,7 +331,7 @@ export class PlaywrightTestServer {
           PW_TEST_SOURCE_TRANSFORM: this._model.config.version < kMinTestPausedVersion ? require.resolve('./debugTransform') : undefined,
           PW_TEST_SOURCE_TRANSFORM_SCOPE: this._model.config.version < kMinTestPausedVersion ? testDirs.join(pathSeparator) : undefined,
           PWDEBUG: 'console',
-          // Inject pw-preload for context reuse + bridge mode
+          // Inject CDP preload for browser reuse
           ...preloadEnv(),
         },
         program: paths.cli,
@@ -432,7 +432,7 @@ export class PlaywrightTestServer {
           FORCE_COLOR: '1',
           // Reset VSCode's options that affect nested Electron.
           ELECTRON_RUN_AS_NODE: undefined,
-          // Inject pw-preload for context reuse + bridge mode
+          // Inject CDP preload for browser reuse
           ...preloadEnv(),
         };
       },

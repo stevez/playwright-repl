@@ -1,8 +1,7 @@
 /**
  * bridge-utils — shared utilities for bridge-mode test execution.
  *
- * Used by both pw-worker (in test-server workers) and VS Code extension
- * (direct bridge execution in Phase 6).
+ * Used by the VS Code extension for direct bridge execution.
  */
 
 import fs = require('fs');

@@ -1,7 +1,7 @@
 {
   "name": "@playwright-repl/runner",
   "version": "0.20.0",
-  "description": "Drop-in Playwright test runner with context reuse",
+  "description": "Playwright test utilities — bridge-mode compilation, node detection, and CLI subcommands",
   "type": "module",
   "bin": {
     "pw": "./dist/pw-cli.js"
