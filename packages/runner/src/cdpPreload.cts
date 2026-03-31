@@ -7,28 +7,33 @@
  *
  * Safe no-op when connect() is called with a normal Playwright wsEndpoint.
  */
-'use strict';
 
-const Module = require('module');
-const origLoad = Module._load;
-let patched = false;
+import path = require('path');
 
-Module._load = function(request, parent, isMain) {
-  const mod = origLoad.apply(this, arguments);
-  if (!patched && request === 'playwright-core') {
-    if (mod.chromium && !mod.chromium.__pwReplPatched) {
-      patchBrowserType(mod.chromium);
-      patched = true;
-      Module._load = origLoad; // remove hook after patching
+// Patch after modules are loaded — no Module._load hooks needed.
+// The test server loads @playwright/test synchronously, then waits for
+// WebSocket commands. connect() is only called during runTests (async),
+// so setImmediate fires before any connect() call.
+setImmediate(() => {
+  let pw: any;
+  try {
+    const { createRequire } = require('module');
+    const projectRequire = createRequire(path.join(process.cwd(), 'package.json'));
+    pw = projectRequire('@playwright/test');
+  } catch {
+    try {
+      pw = require('@playwright/test');
+    } catch {
+      return;
     }
   }
-  return mod;
-};
 
-function patchBrowserType(browserType) {
-  const origConnect = browserType.connect.bind(browserType);
+  if (!pw?.chromium?.connect || pw.chromium.__pwReplPatched)
+    return;
 
-  browserType.connect = async function(optionsOrWsEndpoint) {
+  const origConnect = pw.chromium.connect.bind(pw.chromium);
+
+  pw.chromium.connect = async function(optionsOrWsEndpoint: any) {
     const wsEndpoint = typeof optionsOrWsEndpoint === 'string'
       ? optionsOrWsEndpoint
       : optionsOrWsEndpoint?.wsEndpoint;
@@ -37,7 +42,7 @@ function patchBrowserType(browserType) {
     if (!wsEndpoint || !wsEndpoint.includes('/devtools/browser/'))
       return origConnect(optionsOrWsEndpoint);
 
-    const browser = await browserType.connectOverCDP(wsEndpoint);
+    const browser = await pw.chromium.connectOverCDP(wsEndpoint);
 
     // Return the persistent context (which has extensions loaded)
     // instead of creating a new isolated context.
@@ -52,5 +57,5 @@ function patchBrowserType(browserType) {
     return browser;
   };
 
-  browserType.__pwReplPatched = true;
-}
+  pw.chromium.__pwReplPatched = true;
+});

@@ -28,8 +28,11 @@ import type { TestModel } from './testModel';
 import { TestServerInterface } from './upstream/testServerInterface';
 
 // ─── preload injection for CDP browser reuse ────────────────────────────────
-// Use forward slashes — backslashes get stripped inside NODE_OPTIONS on Windows
-const _cdpPreloadPath = path.join(__dirname, 'cdpPreload.cjs').replace(/\\/g, '/');
+// Resolve from runner package; use forward slashes (backslashes stripped in NODE_OPTIONS on Windows)
+let _cdpPreloadPath = '';
+try {
+  _cdpPreloadPath = require.resolve('@playwright-repl/runner/dist/cdpPreload.cjs').replace(/\\/g, '/');
+} catch {}
 
 function preloadEnv(): Record<string, string | undefined> {
   if (!fs.existsSync(_cdpPreloadPath))

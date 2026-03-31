@@ -44,9 +44,6 @@ if (watch) {
 } else {
   await esbuild.build(options);
 
-  // Copy CDP preload (standalone CJS, not bundled)
-  fs.copyFileSync('src/cdpPreload.cjs', 'dist/cdpPreload.cjs');
-
   // Copy Chrome extension dist into VSIX bundle
   const src = path.resolve('..', 'extension', 'dist');
   const dest = path.resolve('chrome-extension');
