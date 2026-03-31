@@ -35,7 +35,7 @@ try {
 } catch {}
 
 function preloadEnv(): Record<string, string | undefined> {
-  if (!fs.existsSync(_cdpPreloadPath))
+  if (!_cdpPreloadPath)
     return {};
   const existing = process.env.NODE_OPTIONS || '';
   return {

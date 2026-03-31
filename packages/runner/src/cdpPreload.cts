@@ -3,7 +3,7 @@
  *
  * Patches chromium.connect() to use connectOverCDP() when the wsEndpoint
  * is a CDP URL (contains /devtools/browser/). This allows the test runner
- * to reuse the existing browser with extensions loaded via --load-extension.
+ * to reuse the existing browser process without version mismatch errors.
  *
  * Safe no-op when connect() is called with a normal Playwright wsEndpoint.
  */
@@ -11,9 +11,6 @@
 import path = require('path');
 
 // Patch after modules are loaded — no Module._load hooks needed.
-// The test server loads @playwright/test synchronously, then waits for
-// WebSocket commands. connect() is only called during runTests (async),
-// so setImmediate fires before any connect() call.
 setImmediate(() => {
   let pw: any;
   try {
@@ -42,19 +39,7 @@ setImmediate(() => {
     if (!wsEndpoint || !wsEndpoint.includes('/devtools/browser/'))
       return origConnect(optionsOrWsEndpoint);
 
-    const browser = await pw.chromium.connectOverCDP(wsEndpoint);
-
-    // Return the persistent context (which has extensions loaded)
-    // instead of creating a new isolated context.
-    browser._newContextForReuse = async function() {
-      const contexts = browser.contexts();
-      return contexts[0] || await browser.newContext();
-    };
-
-    // No-op: don't disconnect from the persistent context after each test
-    browser._disconnectFromReusedContext = async function() {};
-
-    return browser;
+    return pw.chromium.connectOverCDP(wsEndpoint);
   };
 
   pw.chromium.__pwReplPatched = true;

@@ -67,8 +67,10 @@ export class BrowserManager {
 
     // 3. Launch Chrome with extension via launchServer + _userDataDir
     //    This gives us both persistent context (extensions work) AND wsEndpoint (tests can connect)
-    const pw = _require('playwright-core');
+    const pwPath = _require.resolve('@playwright/test');
+    const pw = _require('@playwright/test');
     const headless = opts.headless ?? false;
+    this._log.appendLine(`@playwright/test: ${pwPath}`);
     this._log.appendLine(`Launching Chromium (${headless ? 'headless' : 'headed'})...`);
 
     // Create user data dir with DevTools prefs (dock to bottom)
@@ -123,7 +125,7 @@ export class BrowserManager {
       const swTarget = targets.find((t: any) => t.type === 'service_worker' && t.url.includes('chrome-extension://'));
       if (swTarget) {
         this._log.appendLine(`Found service worker: ${swTarget.url}`);
-        const WebSocket = _require('ws') as typeof import('ws').default;
+        const WebSocket = _extRequire('ws') as any;
         const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
         await new Promise<void>((res, rej) => {
           cdpWs.on('open', () => {
@@ -172,7 +174,7 @@ export class BrowserManager {
       });
       const pageTarget = targets.find((t: any) => t.type === 'page');
       if (pageTarget) {
-        const WS = _require('ws') as any;
+        const WS = _extRequire('ws') as any;
         const ws = new WS(pageTarget.webSocketDebuggerUrl);
         await new Promise<void>((res, rej) => {
           ws.on('open', () => {

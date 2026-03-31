@@ -210,10 +210,13 @@ export class Extension implements RunHooks {
     }
     if (this._browserManager.isRunning())
       return;
+    // Resolve workspace folder: explicit arg > VS Code workspace
+    const resolvedFolder = workspaceFolder
+      || this._vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     await this._browserManager.launch({
       browser: 'chromium',
       headless: false,
-      workspaceFolder,
+      workspaceFolder: resolvedFolder,
     });
     if (this._replView)
       this._replView.setBrowserManager(this._browserManager);
@@ -362,7 +365,8 @@ export class Extension implements RunHooks {
       // ─── Playwright REPL: bridge-based commands ────────────────────────────
       vscode.commands.registerCommand('playwright-repl.launchBrowser', async () => {
         try {
-          await this._ensureBrowserManager();
+          const workspaceFolder = this._vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          await this._ensureBrowserManager(workspaceFolder);
         } catch (e: unknown) {
           vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }
