@@ -232,11 +232,11 @@ importers:
         specifier: ^7.23.2
         version: 7.29.0
       '@playwright-repl/core':
-        specifier: 0.21.2
-        version: 0.21.2
+        specifier: ^0.21.3
+        version: 0.21.3
       '@playwright-repl/runner':
-        specifier: 0.21.2
-        version: 0.21.2(@playwright/test@1.58.2)
+        specifier: ^0.21.3
+        version: 0.21.3(@playwright/test@1.58.2)
       stack-utils:
         specifier: ^2.0.6
         version: 2.0.6
@@ -1075,15 +1075,15 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@playwright-repl/core@0.21.2':
-    resolution: {integrity: sha512-ARwR2prMf4np6n6QvF4HrtkZsiQ/qY1uju9Az4QZXn8xQIsunRvtxEalcQpeS+m2LDkbWhn0254+7MDmrv0nng==}
+  '@playwright-repl/core@0.21.3':
+    resolution: {integrity: sha512-F1VdFaey6IxAGvV3Cqw/2zJjwlMpgPuabYDRjc0SXBlVGlV6dVE6h6YwQCeLo5Tf1eBPchTzfRPETOvJZENOag==}
 
   '@playwright-repl/playwright-crx@0.15.3':
     resolution: {integrity: sha512-sxcJMHhCf/4uLXoB5J1dd1riRWc7BoO/VcOtqixL41jqMcYewrX2photoyoUqbbqlS+uriNP2SyeCyhSLTg36Q==}
     engines: {node: '>=18'}
 
-  '@playwright-repl/runner@0.21.2':
-    resolution: {integrity: sha512-ofDOFL3j9OnlAp05OERC7JOw94ulLUFeDFwVduS0bR902H/rAOsypw2LRyaecQMX9xfVLfbllStRgQAOar5c5Q==}
+  '@playwright-repl/runner@0.21.3':
+    resolution: {integrity: sha512-NHKrDI3fH/jgwOc0qHtzTqri9d8iB3/iDmWxekdMy/zFwjDmeKCGx8K5JfQIyGY8u2n3x4htim9Rq6y9PWok4g==}
     hasBin: true
     peerDependencies:
       '@playwright/test': '>=1.57.0'
@@ -4286,7 +4286,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@playwright-repl/core@0.21.2':
+  '@playwright-repl/core@0.21.3':
     dependencies:
       js-yaml: 4.1.1
       minimist: 1.2.8
@@ -4297,14 +4297,17 @@ snapshots:
 
   '@playwright-repl/playwright-crx@0.15.3': {}
 
-  '@playwright-repl/runner@0.21.2(@playwright/test@1.58.2)':
+  '@playwright-repl/runner@0.21.3(@playwright/test@1.58.2)':
     dependencies:
-      '@playwright-repl/core': link:packages/core
+      '@playwright-repl/core': 0.21.3
       '@playwright/test': 1.58.2
       acorn: 8.16.0
       acorn-walk: 8.3.5
       esbuild: 0.25.12
       magic-string: 0.30.21
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@playwright/test@1.58.2':
     dependencies:

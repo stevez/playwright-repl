@@ -39,7 +39,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@playwright-repl/core": "0.21.3",
+    "@playwright-repl/core": "workspace:*",
     "playwright": "1.59.0-alpha-2026-02-21",
     "playwright-core": "1.59.0-alpha-2026-02-21"
   },
