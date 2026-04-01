@@ -1,84 +1,93 @@
 #!/usr/bin/env node
 /**
- * Publish VS Code extension to marketplace.
+ * Package/publish VS Code extension using @vercel/nft.
  *
- * Why a temp directory?  vsce uses npm internally and follows workspace
- * symlinks, pulling the entire monorepo into the VSIX.  Copying to a
- * standalone directory gives npm a clean install with no symlinks.
+ * 1. Build monorepo + extension
+ * 2. nft-build: trace deps, assemble .vsce-build/
+ * 3. vsce package --no-dependencies (creates VSIX without node_modules)
+ * 4. Append nft-traced node_modules to VSIX
+ * 5. Optionally publish to marketplace
  *
  * Usage:
- *   node scripts/publish-vscode.mjs          # package only (creates .vsix)
- *   node scripts/publish-vscode.mjs publish  # package + publish to marketplace
+ *   node publish.mjs          # package only (creates .vsix)
+ *   node publish.mjs publish  # package + publish to marketplace
  */
 
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import AdmZip from 'adm-zip';
 
 const VSCODE_PKG = import.meta.dirname;
 const ROOT = path.resolve(VSCODE_PKG, '..', '..');
-const publish = process.argv.includes('publish');
+const BUILD = path.join(VSCODE_PKG, '.vsce-build');
+const doPublish = process.argv.includes('publish');
 
 function run(cmd, opts = {}) {
   console.log(`\n> ${cmd}`);
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
-// ─── 1. Build monorepo ────────────────────────────────────────────────────
-console.log('=== Building monorepo ===');
+// ─── 1. Build ────────────────────────────────────────────────────────────
+console.log('=== Step 1: Build ===');
 run('pnpm run build', { cwd: ROOT });
 run('node build.mjs', { cwd: VSCODE_PKG });
 
-// ─── 2. Copy to temp directory ────────────────────────────────────────────
-const tmpDir = path.join(os.tmpdir(), 'vscode-publish');
-if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true });
-fs.mkdirSync(tmpDir, { recursive: true });
+// ─── 2. nft-build ────────────────────────────────────────────────────────
+console.log('\n=== Step 2: Trace dependencies ===');
+run('node nft-build.mjs', { cwd: VSCODE_PKG });
 
-const items = [
-  'dist', 'chrome-extension', 'images', 'media', 'l10n',
-  'package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE',
-  '.vscodeignore',
-  // localization files
-  ...fs.readdirSync(VSCODE_PKG).filter(f => f.startsWith('package.nls')),
-];
+// ─── 3. vsce package ─────────────────────────────────────────────────────
+console.log('\n=== Step 3: Package VSIX ===');
+run('npx @vscode/vsce package --no-dependencies', { cwd: BUILD });
 
-for (const item of items) {
-  const src = path.join(VSCODE_PKG, item);
-  if (!fs.existsSync(src)) continue;
-  const dest = path.join(tmpDir, item);
-  fs.cpSync(src, dest, { recursive: true });
-}
+// ─── 4. Append node_modules to VSIX ─────────────────────────────────────
+console.log('\n=== Step 4: Append node_modules ===');
+const vsixName = fs.readdirSync(BUILD).find(f => f.endsWith('.vsix'));
+if (!vsixName) throw new Error('No .vsix file found');
+const vsixPath = path.join(BUILD, vsixName);
 
-// ─── 3. Resolve workspace:* refs to real versions ────────────────────────
-const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, 'package.json'), 'utf8'));
-for (const [name, ver] of Object.entries(pkg.dependencies || {})) {
-  if (ver.startsWith('workspace:')) {
-    const depPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name.split('/').pop(), 'package.json'), 'utf8'));
-    pkg.dependencies[name] = depPkg.version;
+const zip = new AdmZip(vsixPath);
+
+// Add node_modules files
+const nmDir = path.join(BUILD, 'node_modules');
+let added = 0;
+(function walk(dir) {
+  for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fp = path.join(dir, f.name);
+    if (f.isDirectory()) walk(fp);
+    else {
+      const arcname = 'extension/' + path.relative(BUILD, fp).split(path.sep).join('/');
+      zip.addLocalFile(fp, path.dirname(arcname));
+      added++;
+    }
+  }
+})(nmDir);
+
+// Fix Content_Types — add .mjs if missing
+const ctEntry = zip.getEntry('[Content_Types].xml');
+if (ctEntry) {
+  let ct = ctEntry.getData().toString('utf8');
+  if (!ct.includes('.mjs')) {
+    ct = ct.replace('</Types>', '<Default Extension=".mjs" ContentType="application/javascript"/></Types>');
+    zip.updateFile(ctEntry, Buffer.from(ct));
   }
 }
-fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 
-console.log(`\n=== Copied to ${tmpDir} ===`);
+zip.writeZip(vsixPath);
+console.log(`Added ${added} files to VSIX`);
 
-// ─── 4. npm install (clean, no symlinks) ──────────────────────────────────
-console.log('\n=== Installing dependencies ===');
-run('npm install --production', { cwd: tmpDir });
+const size = fs.statSync(vsixPath).size;
+console.log(`VSIX: ${(size / 1024 / 1024).toFixed(1)} MB`);
 
-// ─── 5. Package / Publish ─────────────────────────────────────────────────
-if (publish) {
-  console.log('\n=== Publishing to VS Code Marketplace ===');
-  run('npx @vscode/vsce publish', { cwd: tmpDir });
+// ─── 5. Copy VSIX / Publish ─────────────────────────────────────────────
+fs.cpSync(vsixPath, path.join(VSCODE_PKG, vsixName));
+
+if (doPublish) {
+  console.log('\n=== Step 5: Publish ===');
+  run(`npx @vscode/vsce publish -i ${vsixName}`, { cwd: BUILD });
 } else {
-  console.log('\n=== Packaging VSIX ===');
-  run('npx @vscode/vsce package', { cwd: tmpDir });
-  // Copy VSIX back to packages/vscode
-  const vsix = fs.readdirSync(tmpDir).find(f => f.endsWith('.vsix'));
-  if (vsix) {
-    fs.cpSync(path.join(tmpDir, vsix), path.join(VSCODE_PKG, vsix));
-    console.log(`\nVSIX: packages/vscode/${vsix}`);
-  }
+  console.log(`\nVSIX: packages/vscode/${vsixName}`);
 }
 
 console.log('\nDone!');
