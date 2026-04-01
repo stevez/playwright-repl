@@ -1,6 +1,6 @@
 {
   "name": "@playwright-repl/runner",
-  "version": "0.21.2",
+  "version": "0.21.3",
   "description": "Playwright test utilities — bridge-mode compilation, node detection, and CLI subcommands",
   "type": "module",
   "bin": {
@@ -21,7 +21,7 @@
     "test:benchmark": "echo '--- Standard Playwright ---' && npx playwright test --workers=1 && echo '--- pw ---' && node dist/pw-cli.js test"
   },
   "dependencies": {
-    "@playwright-repl/core": "workspace:*",
+    "@playwright-repl/core": "0.21.3",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
     "esbuild": "^0.25.0",

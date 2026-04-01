@@ -1,6 +1,6 @@
 {
   "name": "playwright-repl",
-  "version": "0.21.2",
+  "version": "0.21.3",
   "description": "Interactive REPL for Playwright — keyword commands, recording, and replay",
   "type": "module",
   "bin": {
@@ -39,7 +39,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@playwright-repl/core": "workspace:*",
+    "@playwright-repl/core": "0.21.3",
     "playwright": "1.59.0-alpha-2026-02-21",
     "playwright-core": "1.59.0-alpha-2026-02-21"
   },

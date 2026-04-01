@@ -7,7 +7,7 @@
     "color": "#ffffff",
     "theme": "light"
   },
-  "version": "0.21.2",
+  "version": "0.21.3",
   "private": true,
   "publisher": "playwright-repl",
   "repository": {
@@ -253,8 +253,8 @@
     "@babel/plugin-proposal-decorators": "^7.24.7",
     "@babel/preset-typescript": "^7.23.2",
     "@babel/traverse": "^7.23.2",
-    "@playwright-repl/core": "workspace:*",
-    "@playwright-repl/runner": "workspace:*",
+    "@playwright-repl/core": "^0.21.3",
+    "@playwright-repl/runner": "^0.21.3",
     "stack-utils": "^2.0.6",
     "which": "^4.0.0",
     "ws": "^8.17.1"

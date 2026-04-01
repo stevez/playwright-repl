@@ -1,7 +1,7 @@
 {
     "name": "@playwright-repl/mcp",
     "description": "MCP server — AI agents control your real Chrome browser",
-    "version": "0.21.2",
+    "version": "0.21.3",
     "type": "module",
     "bin": {
         "playwright-repl-mcp": "./dist/index.js"
@@ -18,8 +18,8 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.10.0",
-        "@playwright-repl/core": "workspace:*",
-        "playwright-repl": "workspace:*",
+        "@playwright-repl/core": "0.21.3",
+        "playwright-repl": "0.21.3",
         "zod": "^3.24.0"
     }
 }
