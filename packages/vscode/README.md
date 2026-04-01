@@ -39,6 +39,8 @@ Run Playwright tests with a persistent browser and context reuse. Works with ind
 Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, `click`, `fill`, `goto`) or JavaScript (`await page.title()`, `page.locator('h1').click()`).
 
 - Command history (up/down arrows)
+- `.clear` or `Ctrl+L` to clear console output
+- `.history` to show command history, `.history clear` to reset
 - Inline screenshot display
 - PDF save
 - Execution timing
