@@ -44,8 +44,11 @@ function detectCursorContext(editor: vscode.TextEditor): CursorContext {
     if (braceDepth < 0 && /(?:^|\s)test\s*\(/.test(line)) {
       // We're inside a test() callback
       const currentLine = doc.lineAt(cursorLine).text;
-      const indentation = currentLine.match(/^(\s*)/)?.[1].length ?? 4;
-      return { inside: true, indentation, insertLine: cursorLine + 1 };
+      const isEmpty = currentLine.trim() === '';
+      const indentation = isEmpty
+        ? (doc.lineAt(cursorLine > 0 ? cursorLine - 1 : 0).text.match(/^(\s*)/)?.[1].length ?? 4)
+        : (currentLine.match(/^(\s*)/)?.[1].length ?? 4);
+      return { inside: true, indentation, insertLine: isEmpty ? cursorLine : cursorLine + 1 };
     }
   }
 

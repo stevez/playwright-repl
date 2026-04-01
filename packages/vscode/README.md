@@ -44,7 +44,7 @@ Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, 
 - Execution timing
 - Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
 
-<img src="images/repl.png" width="75%">
+<img src="images/repl.gif" width="75%">
 
 ### Locator Panel
 
@@ -55,7 +55,7 @@ Pick elements from the browser and inspect their locator and ARIA snapshot.
 - **Editable locator** — modify and experiment
 - **ARIA snapshot** — accessibility tree for the picked element
 
-<img src="images/locator.png" width="75%">
+<img src="images/locator.gif" width="75%">
 
 ### Assert Builder
 
@@ -69,11 +69,13 @@ Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttac
 
 Supports negation (`not` checkbox) and editable assertions.
 
-<img src="images/assert-builder.png" width="75%">
+<img src="images/assert.gif" width="75%">
 
 ### Recorder
 
 Record browser interactions as Playwright JavaScript. Click elements, fill forms, navigate — the recorder captures each action as executable test code.
+
+<img src="images/recording.gif" width="75%">
 
 ### Browser Reuse
 
