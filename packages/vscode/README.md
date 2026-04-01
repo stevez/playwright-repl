@@ -79,6 +79,21 @@ Record browser interactions as Playwright JavaScript. Click elements, fill forms
 
 <img src="images/recording.gif" width="75%">
 
+### Browser REPL
+
+The [Dramaturg](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa) Chrome extension adds an interactive REPL directly in the browser — available as a side panel or a DevTools tab.
+
+- Auto-detects keyword commands (`.pw`) or Playwright API / JavaScript
+- Expandable object tree — inspect results like Chrome DevTools
+- Auto-attach to the active page — switch tabs and the REPL follows
+- Inline screenshot preview and YAML accessibility tree viewer
+- Command history and autocomplete
+- Available as a side panel or a DevTools tab
+
+The VS Code extension automatically installs Dramaturg in the launched browser. For standalone use or more features, install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa).
+
+<img src="images/browser-repl.gif" width="75%">
+
 ### Browser Reuse
 
 REPL, Test Explorer, Recorder, and Picker all share the same headed browser via CDP. No extra browser windows — tests run in the persistent context where the Chrome extension lives. The browser stays open between test runs with zero context setup overhead.
