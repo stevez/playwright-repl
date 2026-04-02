@@ -1,32 +1,30 @@
-# Playwright REPL for VS Code
+# The fastest way to write and debug Playwright tests
 
-Interactive browser automation inside VS Code — Test Explorer, live REPL, assertion builder, and element picker.
+Run commands live in the browser, pick locators, build assertions interactively, and run tests with near-instant feedback — all without leaving VS Code.
 
 <img src="https://raw.githubusercontent.com/stevez/playwright-repl/main/packages/vscode/images/hero.png" width="75%">
+
+<!-- TODO: Replace hero.png with a GIF showing: type `goto https://example.com` → page loads → `snapshot` → result appears -->
 
 ## Built on Playwright Test for VS Code
 
 This extension is built upon Microsoft's official [Playwright Test for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) extension (Apache 2.0). Both extensions can coexist — you can keep the official one installed and use this alongside it. They share the same `playwright.config.ts` and test files.
 
-**What's new:**
+**Added on top of Playwright Test for VS Code:**
 - REPL panel — interactive command execution with keyword commands and JavaScript
 - Locator panel — pick elements, inspect locators and ARIA snapshots
 - Assert Builder — build and verify 13 Playwright assertion matchers interactively
 - Recorder — capture browser interactions as test commands
 - Bridge execution — browser-only tests bypass the test runner for near-instant feedback
 
-**What's the same:**
-- Test Explorer — same familiar interface for discovering and running tests
-- Debugger — step through tests with breakpoints
-- Trace Viewer — inspect test traces and screenshots
+**Everything you already know still works:**
+- Test Explorer, Debugger, and Trace Viewer — unchanged, same familiar interface
 
 ## Performance
 
-With Show Browser enabled, browser-only tests bypass the Playwright test runner entirely — the script is sent directly to the browser via the extension bridge, eliminating the per-run overhead (worker startup, TypeScript compilation, fixture setup). This gives near-instant feedback when iterating on individual tests.
+With Show Browser enabled, browser-only tests bypass the Playwright test runner entirely — the script is sent directly to the browser via the extension bridge, eliminating per-run overhead (worker startup, TypeScript compilation, fixture setup). In benchmarks on Windows, this saves ~2.4s per run, giving near-instant feedback when iterating on individual tests.
 
 Node tests that need `fs`, `net`, etc. fall back to the standard Playwright test runner with CDP browser reuse. Headless mode uses standard Playwright with parallel workers.
-
-> **Note:** Bridge execution requires `esbuild` installed in your project (`npm install -D esbuild`). Without it, tests fall back to the standard Playwright test runner automatically.
 
 ## Features
 
@@ -103,7 +101,7 @@ REPL, Test Explorer, Recorder, and Picker all share the same headed browser via 
 - **Bridge tests** — script sent directly to browser, no test runner overhead
 - **Node tests** — reuse browser via `connectOverCDP`, no separate browser launch
 
-## Workflow
+## Test Authoring Workflow
 
 **Record → Pick Locator → Assert → Run Test**
 
@@ -127,15 +125,17 @@ REPL, Test Explorer, Recorder, and Picker all share the same headed browser via 
 ## Getting Started
 
 1. Install the extension
-2. Open a project with a `playwright.config.ts`
-3. Click **Launch Browser** or run a test (browser auto-launches if Show Browser is enabled)
-4. Use the **REPL**, **Locator**, and **Assert** panels in the bottom bar
+2. Open a project with a `playwright.config.ts` — or clone the [demo repo](https://github.com/nickmccurdy/playwright-repl-demo) to try it immediately
+3. Click **Launch Browser** in the Testing sidebar — the browser launches with the Dramaturg extension pre-installed
+4. Open the **REPL** panel in the bottom bar and type `goto https://example.com` to get started
+5. Use **Pick Locator** to inspect elements, **Assert Builder** to verify values, and **Record** to capture interactions as test code
 
 ## Requirements
 
 - VS Code 1.93+
 - Node.js 18+
 - `@playwright/test` 1.58+ in your project
+- `esbuild` in your project for bridge execution (`npm install -D esbuild`) — without it, falls back to `esbuild-wasm` (bundled), which is slower but requires no installation
 
 ## Panels
 
