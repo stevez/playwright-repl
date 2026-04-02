@@ -20,11 +20,12 @@ export type { EngineOpts, EngineResult, ParsedArgs };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface PlaywrightDeps {
-  BrowserBackend: new (config: any, browserContext: any, tools: any) => any;
-  createBrowser: (config: any, clientInfo: any) => Promise<{ browserContext: any; close: () => Promise<void> }>;
+  BrowserBackend: new (config: any, browserContext: any, tools: any[]) => any;
+  createBrowser: (config: any, clientInfo: any) => Promise<any>;
+  browserTools: any[];
   playwright: any;
   registry: { findExecutable: (name: string) => { executablePath: () => string | undefined } | undefined };
-  configFromEnv: (config: any) => Promise<any> | any;
+  resolveConfig: (config: any) => Promise<any> | any;
   commands: Record<string, any>;
   parseCommand: (command: any, args: any) => { toolName: string; toolParams: Record<string, any> };
 }
@@ -43,9 +44,10 @@ function loadDeps(): PlaywrightDeps {
   _deps = {
     BrowserBackend:           pwCoreReq('lib/tools/backend/browserBackend.js').BrowserBackend,
     createBrowser:            pwCoreReq('lib/tools/mcp/browserFactory.js').createBrowser,
+    browserTools:             pwCoreReq('lib/tools/backend/tools.js').browserTools,
     playwright:               require('playwright-core'),
     registry:                 pwCoreReq('lib/server/registry/index.js').registry,
-    configFromEnv:            pwCoreReq('lib/tools/mcp/config.js').configFromEnv,
+    resolveConfig:            pwCoreReq('lib/tools/mcp/config.js').resolveConfig,
     commands:                 pwCoreReq('lib/tools/cli-daemon/commands.js').commands,
     parseCommand:             pwCoreReq('lib/tools/cli-daemon/command.js').parseCommand,
   };
@@ -82,11 +84,12 @@ export class Engine {
     const deps = this._deps || loadDeps();
     const config = await this._buildConfig(opts, deps);
 
-    const cwd = url.pathToFileURL(process.cwd()).href;
+    const cwd = process.cwd();
     const clientInfo = {
       name: 'playwright-repl',
       version: replVersion,
-      roots: [{ uri: cwd, name: 'cwd' }],
+      cwd,
+      roots: [{ uri: url.pathToFileURL(cwd).href, name: 'cwd' }],
       timestamp: Date.now(),
     };
 
@@ -160,11 +163,12 @@ export class Engine {
       console.log('Ready! Side panel can send commands.');
     } else {
       // Launch/connect mode: eagerly create context for immediate feedback.
-      const { browserContext, close } = await deps.createBrowser(config, clientInfo);
+      const browser = await deps.createBrowser(config, clientInfo);
+      const browserContext = browser.contexts()[0] || await browser.newContext();
       this._browserContext = browserContext;
-      this._close = close;
+      this._close = () => browser.close();
 
-      this._backend = new deps.BrowserBackend(config, browserContext, deps.commands);
+      this._backend = new deps.BrowserBackend(config, browserContext, deps.browserTools);
       await this._backend.initialize?.(clientInfo);
       this._connected = true;
 
@@ -293,7 +297,7 @@ export class Engine {
       this._commandServer = null;
     }
     if (this._backend) {
-      this._backend.serverClosed();
+      await this._backend.dispose();
       this._backend = null;
     }
     if (this._close) {
@@ -310,11 +314,12 @@ export class Engine {
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   private async _connectToCdp(deps: PlaywrightDeps, config: any, clientInfo: any): Promise<void> {
-    const { browserContext, close } = await deps.createBrowser(config, clientInfo);
+    const browser = await deps.createBrowser(config, clientInfo);
+    const browserContext = browser.contexts()[0] || await browser.newContext();
     this._browserContext = browserContext;
-    this._close = close;
+    this._close = () => browser.close();
 
-    this._backend = new deps.BrowserBackend(config, browserContext, deps.commands);
+    this._backend = new deps.BrowserBackend(config, browserContext, deps.browserTools);
     await this._backend.initialize?.(clientInfo);
     this._connected = true;
 
@@ -460,7 +465,7 @@ export class Engine {
       config.browser.isolated = false;
     }
 
-    return await deps.configFromEnv(config);
+    return await deps.resolveConfig(config);
   }
 }
 
