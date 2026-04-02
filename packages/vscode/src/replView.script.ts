@@ -5,7 +5,7 @@
 import { vscode } from './common';
 
 const output = document.getElementById('output')!;
-const input = document.getElementById('command-input') as HTMLInputElement;
+const input = document.getElementById('command-input') as HTMLTextAreaElement;
 
 let history: string[] = [];
 let historyIndex = -1;
@@ -14,7 +14,8 @@ let savedInput = '';
 // ─── Input handling ───────────────────────────────────────────────────────
 
 input.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
     const command = input.value.trim();
     if (!command) return;
     appendLine(command, 'command');
@@ -24,14 +25,15 @@ input.addEventListener('keydown', (e: KeyboardEvent) => {
     historyIndex = -1;
     savedInput = '';
     input.value = '';
-  } else if (e.key === 'ArrowUp') {
+    resetHeight();
+  } else if (e.key === 'ArrowUp' && input.selectionStart === 0 && !input.value.includes('\n')) {
     e.preventDefault();
     if (historyIndex < history.length - 1) {
       if (historyIndex === -1) savedInput = input.value;
       historyIndex++;
       input.value = history[historyIndex]!;
     }
-  } else if (e.key === 'ArrowDown') {
+  } else if (e.key === 'ArrowDown' && input.selectionEnd === input.value.length && !input.value.includes('\n')) {
     e.preventDefault();
     if (historyIndex > 0) {
       historyIndex--;
@@ -42,6 +44,11 @@ input.addEventListener('keydown', (e: KeyboardEvent) => {
     }
   }
 });
+
+function resetHeight() {
+  input.style.height = 'auto';
+}
+
 
 // ─── Messages from extension ──────────────────────────────────────────────
 

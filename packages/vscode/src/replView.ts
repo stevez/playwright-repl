@@ -314,7 +314,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         .line-info { color: var(--vscode-terminal-ansiCyan, var(--vscode-descriptionForeground)); }
         #input-row {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           padding: 4px 8px;
           border-top: 1px solid var(--vscode-panelInput-border, var(--vscode-panel-border));
         }
@@ -332,6 +332,11 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
           font-family: inherit;
           font-size: inherit;
           padding: 2px 0;
+          resize: none;
+          overflow: hidden;
+          line-height: 1.4;
+          field-sizing: content;
+          max-height: 40vh;
         }
         #command-input::placeholder {
           color: var(--vscode-input-placeholderForeground);
@@ -345,7 +350,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
       <div id="output"></div>
       <div id="input-row">
         <span id="prompt">&gt;</span>
-        <input id="command-input" type="text" placeholder="Type a command..." autofocus>
+        <textarea id="command-input" rows="1" placeholder="Type a command..." autofocus></textarea>
       </div>
     </body>
     <script nonce="${nonce}" src="${script}"></script>
