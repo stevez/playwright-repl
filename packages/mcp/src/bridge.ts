@@ -6,23 +6,6 @@ import { BridgeServer, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule, SnapshotCache } from './types.js';
 import { logEvent } from './logger.js';
-import { execSync } from 'node:child_process';
-
-async function killProcessOnPort(port: number): Promise<void> {
-    try {
-        if (process.platform === 'win32') {
-            const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8' });
-            const pid = out.trim().split(/\s+/).pop();
-            if (pid) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
-        } else {
-            execSync(`lsof -ti :${port} | xargs kill -9`, { stdio: 'ignore' });
-        }
-        // Wait for port to be released
-        await new Promise(resolve => setTimeout(resolve, 500));
-    } catch {
-        // Process may already be gone
-    }
-}
 
 export const descriptions = {
     runCommandInput: `A keyword command ('snapshot', 'goto https://example.com', 'click Submit', \
@@ -68,17 +51,7 @@ export async function createBridgeRunner(
         : (process.env.BRIDGE_PORT ? parseInt(process.env.BRIDGE_PORT) : 9876);
 
     const srv = new BridgeServer();
-    try {
-        await srv.start(port);
-    } catch (err: any) {
-        if (err?.code === 'EADDRINUSE') {
-            console.error(`Port ${port} in use — killing stale process...`);
-            await killProcessOnPort(port);
-            await srv.start(port);
-        } else {
-            throw err;
-        }
-    }
+    await srv.start(port);
     console.error(`playwright-repl bridge listening on ws://localhost:${port}`);
     logEvent(`Bridge listening on ws://localhost:${port}`);
     srv.onConnect(() => { console.error('Extension connected'); logEvent('Extension connected'); });

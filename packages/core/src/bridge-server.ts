@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { execSync } from 'node:child_process';
 import type { EngineResult } from './types.js';
 
 export class BridgeServer {
@@ -16,7 +17,7 @@ export class BridgeServer {
     get port()                   { return (this.wss.address() as { port: number }).port; }
 
     async start(port = 9876): Promise<void> {
-        this.wss = new WebSocketServer({
+        const createServer = () => new WebSocketServer({
             port,
             verifyClient: ({ origin }: { origin: string }) => {
                 // Allow: no origin (Node.js ws clients, curl, tests)
@@ -26,10 +27,22 @@ export class BridgeServer {
                 return origin.startsWith('chrome-extension://');
             },
         });
-        await new Promise<void>((resolve, reject) => {
-            this.wss.on('listening', resolve);
-            this.wss.on('error', reject);
-        });
+
+        this.wss = createServer();
+        try {
+            await new Promise<void>((resolve, reject) => {
+                this.wss.on('listening', resolve);
+                this.wss.on('error', reject);
+            });
+        } catch (err: any) {
+            if (err?.code !== 'EADDRINUSE') throw err;
+            await killProcessOnPort(port);
+            this.wss = createServer();
+            await new Promise<void>((resolve, reject) => {
+                this.wss.on('listening', resolve);
+                this.wss.on('error', reject);
+            });
+        }
         this.wss.on('connection', (ws) => {
             this.socket = ws;
             this._onConnect?.();
@@ -109,5 +122,20 @@ export class BridgeServer {
     async close(): Promise<void> {
         this.socket?.close();
         await new Promise<void>(r => this.wss.close(() => r()));
+    }
+}
+
+async function killProcessOnPort(port: number): Promise<void> {
+    try {
+        if (process.platform === 'win32') {
+            const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8' });
+            const pid = out.trim().split(/\s+/).pop();
+            if (pid) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+        } else {
+            execSync(`lsof -ti :${port} | xargs kill -9`, { stdio: 'ignore' });
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch {
+        // Process may already be gone
     }
 }
