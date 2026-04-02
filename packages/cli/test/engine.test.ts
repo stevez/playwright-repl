@@ -50,12 +50,16 @@ function createMockDeps() {
 
   return {
     deps: {
-      BrowserServerBackend: vi.fn(function () {
+      BrowserBackend: vi.fn(function () {
         this.callTool = mockCallTool;
         this.initialize = mockInitialize;
-        this.serverClosed = mockServerClosed;
+        this.dispose = mockServerClosed;
       }),
-      contextFactory: mockContextFactory,
+      createBrowser: vi.fn(async () => {
+        const ctx = await mockCreateContext();
+        return { contexts: () => [ctx.browserContext], close: ctx.close, newContext: async () => ctx.browserContext };
+      }),
+      browserTools: [],
       resolveConfig: mockResolveConfig,
       commands: mockCommands,
       parseCommand: mockParseCommand,
@@ -67,7 +71,7 @@ function createMockDeps() {
       browserContext: mockBrowserContext,
       closeContext: mockCloseContext,
       createContext: mockCreateContext,
-      contextFactory: mockContextFactory,
+      createBrowser: null as any,  // set after creation
       resolveConfig: mockResolveConfig,
       parseCommand: mockParseCommand,
       commands: mockCommands,
@@ -79,11 +83,13 @@ function createMockDeps() {
 
 describe('Engine', () => {
   let engine;
+  let deps;
   let mocks;
 
   beforeEach(() => {
-    const { deps, mocks: m } = createMockDeps();
-    mocks = m;
+    const created = createMockDeps();
+    deps = created.deps;
+    mocks = created.mocks;
     engine = new Engine(deps);
   });
 
@@ -104,57 +110,57 @@ describe('Engine', () => {
 
     it('defaults to headless mode', async () => {
       await engine.start({});
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.launchOptions.headless).toBe(true);
     });
 
     it('configures headed mode', async () => {
       await engine.start({ headed: true });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.launchOptions.headless).toBe(false);
     });
 
     it('configures CDP connect mode', async () => {
       await engine.start({ connect: 9222 });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.cdpEndpoint).toBe('http://localhost:9222');
     });
 
     it('configures browser selection — firefox', async () => {
       await engine.start({ browser: 'firefox' });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.browserName).toBe('firefox');
       expect(config.browser.launchOptions.channel).toBeUndefined();
     });
 
     it('configures browser selection — webkit', async () => {
       await engine.start({ browser: 'webkit' });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.browserName).toBe('webkit');
     });
 
     it('configures browser selection — msedge', async () => {
       await engine.start({ browser: 'msedge' });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.browserName).toBe('chromium');
       expect(config.browser.launchOptions.channel).toBe('msedge');
     });
 
     it('configures persistent profile', async () => {
       await engine.start({ persistent: true });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.isolated).toBe(false);
     });
 
     it('configures isolated mode by default', async () => {
       await engine.start({});
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.isolated).toBe(true);
     });
 
     it('configures custom profile directory', async () => {
       await engine.start({ profile: '/tmp/my-profile' });
-      const config = mocks.contextFactory.mock.calls[0][0];
+      const config = (deps.createBrowser as any).mock.calls[0][0];
       expect(config.browser.userDataDir).toBe('/tmp/my-profile');
       expect(config.browser.isolated).toBe(false);
     });
