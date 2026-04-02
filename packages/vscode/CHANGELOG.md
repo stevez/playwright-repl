@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.21.6
+
+**2026-04-02**
+
+### Features
+
+- Bridge-mode now works on all platforms — bundles `esbuild-wasm` as fallback when native esbuild is unavailable
+
+### Fixes
+
+- Fix duplicate `[Content_Types].xml` in VSIX packaging
+
 ## 0.21.5
 
 **2026-04-01**

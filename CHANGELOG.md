@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.21.6 — esbuild-wasm & Publish Script
+
+**2026-04-02**
+
+### Features
+
+- **esbuild-wasm fallback**: Bridge-mode now bundles `esbuild-wasm` — works on all platforms without requiring users to install esbuild. Native esbuild used when available for best performance. ([#538](https://github.com/stevez/playwright-repl/pull/538))
+
+### Fixes
+
+- **Publish script**: Replace Python zip with `adm-zip` for VSIX packaging. Fixes duplicate `[Content_Types].xml` that blocked marketplace publish. ([#535](https://github.com/stevez/playwright-repl/pull/535))
+
 ## v0.21.5 — nft Packaging & Bridge Fallback
 
 **2026-04-01**
