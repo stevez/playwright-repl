@@ -5,7 +5,7 @@
  * 1. Build monorepo + extension
  * 2. nft-build: trace deps, assemble .vsce-build/
  * 3. vsce package --no-dependencies (creates VSIX without node_modules)
- * 4. Append nft-traced node_modules to VSIX
+ * 4. Append nft-traced node_modules to VSIX via Python zipfile
  * 5. Optionally publish to marketplace
  *
  * Usage:
@@ -16,7 +16,6 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import AdmZip from 'adm-zip';
 
 const VSCODE_PKG = import.meta.dirname;
 const ROOT = path.resolve(VSCODE_PKG, '..', '..');
@@ -45,43 +44,39 @@ run('npx @vscode/vsce package --no-dependencies', { cwd: BUILD });
 console.log('\n=== Step 4: Append node_modules ===');
 const vsixName = fs.readdirSync(BUILD).find(f => f.endsWith('.vsix'));
 if (!vsixName) throw new Error('No .vsix file found');
-const vsixPath = path.join(BUILD, vsixName);
+const vsixPath = path.join(BUILD, vsixName).replace(/\\/g, '/');
+const nmDir = path.join(BUILD, 'node_modules').replace(/\\/g, '/');
 
-const zip = new AdmZip(vsixPath);
+run(`python3 -c "
+import zipfile, os
 
-// Add node_modules files
-const nmDir = path.join(BUILD, 'node_modules');
-let added = 0;
-(function walk(dir) {
-  for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fp = path.join(dir, f.name);
-    if (f.isDirectory()) walk(fp);
-    else {
-      const arcname = 'extension/' + path.relative(BUILD, fp).split(path.sep).join('/');
-      zip.addLocalFile(fp, path.dirname(arcname));
-      added++;
-    }
-  }
-})(nmDir);
+vsix = '${vsixPath}'
+tmp = vsix + '.tmp'
 
-// Fix Content_Types — add .mjs if missing
-const ctEntry = zip.getEntry('[Content_Types].xml');
-if (ctEntry) {
-  let ct = ctEntry.getData().toString('utf8');
-  if (!ct.includes('.mjs')) {
-    ct = ct.replace('</Types>', '<Default Extension=".mjs" ContentType="application/javascript"/></Types>');
-    zip.updateFile(ctEntry, Buffer.from(ct));
-  }
-}
+with zipfile.ZipFile(vsix, 'r') as zin, zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zout:
+    for item in zin.infolist():
+        if item.filename == '[Content_Types].xml':
+            ct = zin.read(item.filename).decode()
+            if '.mjs' not in ct:
+                ct = ct.replace('</Types>', '<Default Extension=\\x22.mjs\\x22 ContentType=\\x22application/javascript\\x22/></Types>')
+            zout.writestr(item, ct)
+        else:
+            zout.writestr(item, zin.read(item.filename))
+    nm_dir = '${nmDir}'
+    count = 0
+    for root, dirs, files in os.walk(nm_dir):
+        for f in files:
+            fp = os.path.join(root, f)
+            rel = os.path.relpath(fp, os.path.dirname(nm_dir)).replace(os.sep, '/')
+            zout.write(fp, 'extension/' + rel)
+            count += 1
 
-zip.writeZip(vsixPath);
-console.log(`Added ${added} files to VSIX`);
-
-const size = fs.statSync(vsixPath).size;
-console.log(`VSIX: ${(size / 1024 / 1024).toFixed(1)} MB`);
+os.replace(tmp, vsix)
+print(f'Added {count} files, VSIX: {os.path.getsize(vsix) / 1024 / 1024:.1f} MB')
+"`);
 
 // ─── 5. Copy VSIX / Publish ─────────────────────────────────────────────
-fs.cpSync(vsixPath, path.join(VSCODE_PKG, vsixName));
+fs.cpSync(path.join(BUILD, vsixName), path.join(VSCODE_PKG, vsixName));
 
 if (doPublish) {
   console.log('\n=== Step 5: Publish ===');
