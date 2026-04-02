@@ -90,6 +90,13 @@ jobs:
         working-directory: packages/runner
         timeout-minutes: 5
 
+      - name: 'Benchmark: todomvc via bridge direct (esbuild-wasm)'
+        run: node e2e/benchmark-bridge.js
+        working-directory: packages/runner
+        timeout-minutes: 5
+        env:
+          PW_USE_ESBUILD_WASM: '1'
+
       - name: 'Benchmark: pw repl (CDP) vs pw repl-extension (bridge)'
         run: node packages/runner/script-examples/bench.js --headless
         timeout-minutes: 5
