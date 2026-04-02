@@ -2,9 +2,7 @@
 
 Run commands live in the browser, pick locators, build assertions interactively, and run tests with near-instant feedback — all without leaving VS Code.
 
-<img src="https://raw.githubusercontent.com/stevez/playwright-repl/main/packages/vscode/images/hero.png" width="75%">
-
-<!-- TODO: Replace hero.png with a GIF showing: type `goto https://example.com` → page loads → `snapshot` → result appears -->
+<img src="https://raw.githubusercontent.com/stevez/playwright-repl/main/packages/vscode/images/hero.gif" width="75%">
 
 ## Built on Playwright Test for VS Code
 
@@ -125,7 +123,7 @@ REPL, Test Explorer, Recorder, and Picker all share the same headed browser via 
 ## Getting Started
 
 1. Install the extension
-2. Open a project with a `playwright.config.ts` — or clone the [demo repo](https://github.com/nickmccurdy/playwright-repl-demo) to try it immediately
+2. Open a project with a `playwright.config.ts` — or clone the [demo repo](https://github.com/stevez/playwright-examples) to try it immediately
 3. Click **Launch Browser** in the Testing sidebar — the browser launches with the Dramaturg extension pre-installed
 4. Open the **REPL** panel in the bottom bar and type `goto https://example.com` to get started
 5. Use **Pick Locator** to inspect elements, **Assert Builder** to verify values, and **Record** to capture interactions as test code
