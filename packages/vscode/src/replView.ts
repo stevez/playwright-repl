@@ -48,6 +48,14 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     this._browserManager = browserManager;
   }
 
+  notifyBrowserConnected() {
+    this._appendOutput('Connected to browser.', 'info');
+  }
+
+  notifyBrowserDisconnected() {
+    this._appendOutput('Browser disconnected.', 'error');
+  }
+
   resolveWebviewView(webviewView: vscodeTypes.WebviewView) {
     this._view = webviewView;
 
@@ -69,7 +77,9 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     }));
 
     // Send welcome message
-    this._appendOutput('Playwright REPL\nType commands. Use ↑↓ for history.\n', 'info');
+    const connected = this._browserManager?.isRunning() ?? false;
+    this._appendOutput('Playwright REPL\nType commands. Use ↑↓ for history.', 'info');
+    this._appendOutput(connected ? 'Connected to browser.' : 'Waiting for browser... Launch with Ctrl+Shift+P → "Launch Browser"', connected ? 'info' : 'error');
   }
 
   private async _execute(command: string) {

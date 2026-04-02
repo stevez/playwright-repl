@@ -218,8 +218,10 @@ export class Extension implements RunHooks {
       headless: false,
       workspaceFolder: resolvedFolder,
     });
-    if (this._replView)
+    if (this._replView) {
       this._replView.setBrowserManager(this._browserManager);
+      this._replView.notifyBrowserConnected();
+    }
     if (this._locatorsView)
       this._locatorsView.setBrowserManager(this._browserManager);
     if (this._assertView)
@@ -373,6 +375,7 @@ export class Extension implements RunHooks {
       }),
       vscode.commands.registerCommand('playwright-repl.stopBrowser', () => {
         this._browserManager?.stop();
+        this._replView?.notifyBrowserDisconnected();
       }),
       vscode.commands.registerCommand('playwright-repl.startRecording', async () => {
         if (!this._browserManager?.isRunning()) {
