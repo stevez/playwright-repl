@@ -52,7 +52,7 @@ jobs:
         working-directory: packages/extension
 
       - name: Run CLI E2E tests
-        run: node dist/playwright-repl.js --headless --replay examples/ --silent
+        run: node dist/playwright-repl.js --headless --replay examples/
         working-directory: packages/cli
 
       - name: Run bridge replay E2E tests
