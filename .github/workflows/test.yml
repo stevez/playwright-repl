@@ -55,52 +55,6 @@ jobs:
         run: node dist/playwright-repl.js --headless --replay examples/
         working-directory: packages/cli
 
-      - name: Run bridge replay E2E tests
-        run: node e2e/test-bridge-replay.js
-        working-directory: packages/cli
-
-      # ─── Benchmark: Playwright vs pw-cli (playwright-tests, 1 worker) ─────
-      - name: 'Benchmark: playwright-tests via Playwright (1 worker)'
-        run: npx playwright test playwright-tests/ --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 10
-        env:
-          FORCE_COLOR: '1'
-
-      - name: 'Benchmark: playwright-tests via pw-cli (1 worker)'
-        run: node ../dist/pw-cli.js test playwright-tests/ --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 10
-        env:
-          FORCE_COLOR: '1'
-
-      # ─── Benchmark: Playwright vs pw-cli vs bridge (todomvc, 1 worker) ───
-      - name: 'Benchmark: todomvc via Playwright (1 worker)'
-        run: npx playwright test todomvc/ --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 5
-        env:
-          FORCE_COLOR: '1'
-
-      - name: 'Benchmark: todomvc via pw-cli (1 worker)'
-        run: node ../dist/pw-cli.js test todomvc/ --workers 1 --reporter list
-        working-directory: packages/runner/examples
-        timeout-minutes: 5
-        env:
-          FORCE_COLOR: '1'
-
-      - name: 'Benchmark: todomvc via bridge direct'
-        run: node e2e/benchmark-bridge.js
-        working-directory: packages/runner
-        timeout-minutes: 5
-
-      - name: 'Benchmark: todomvc via bridge direct (esbuild-wasm)'
-        run: node e2e/benchmark-bridge.js
-        working-directory: packages/runner
-        timeout-minutes: 5
-        env:
-          PW_USE_ESBUILD_WASM: '1'
-
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test
