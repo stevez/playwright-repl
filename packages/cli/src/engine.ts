@@ -93,75 +93,8 @@ export class Engine {
       timestamp: Date.now(),
     };
 
-    // Choose context factory based on mode.
-    if (opts.extension) {
-      const serverPort = opts.port || 6781;
-      const cdpPort = opts.cdpPort || 9222;
-
-      // 1. Start CommandServer for panel HTTP commands.
-      const { CommandServer } = await import('@playwright-repl/core');
-      const cmdServer = new CommandServer(this);
-      await cmdServer.start(serverPort);
-      this._commandServer = cmdServer;
-      console.log(`CommandServer listening on http://localhost:${serverPort}`);
-
-      // 2. Spawn Chrome (only with --spawn).
-      if (opts.spawn) {
-        const extPath = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../../extension/dist');
-        const execInfo = deps.registry.findExecutable(opts.browser || 'chrome');
-        const execPath = execInfo?.executablePath();
-        if (!execPath)
-          throw new Error('Chrome executable not found. Make sure Chrome is installed.');
-
-        // Chrome 136+ requires --user-data-dir for CDP. Use a dedicated profile dir.
-        const os = await import('node:os');
-        const fs = await import('node:fs');
-        const userDataDir = opts.profile || path.join(os.default.homedir(), '.playwright-repl', 'chrome-profile');
-        fs.default.mkdirSync(userDataDir, { recursive: true });
-
-        const chromeArgs = [
-          `--remote-debugging-port=${cdpPort}`,
-          `--user-data-dir=${userDataDir}`,
-          `--load-extension=${extPath}`,
-          '--no-first-run',
-          '--no-default-browser-check',
-        ];
-
-        const { spawn } = await import('node:child_process');
-        const chromeProc = spawn(execPath, chromeArgs, {
-          detached: true, stdio: 'ignore',
-        });
-        chromeProc.unref();
-        this._chromeProc = chromeProc;
-        console.log(`Chrome profile: ${userDataDir}`);
-      } else {
-        console.log('Connecting to existing Chrome on port ' + cdpPort + ' (use --spawn to launch Chrome automatically)');
-      }
-
-      // 3. Wait for Chrome CDP to be ready (30s timeout).
-      console.log('Waiting for Chrome CDP...');
-      const cdpUrl = `http://localhost:${cdpPort}`;
-      const cdpTimeout = 30_000;
-      const cdpStart = Date.now();
-      while (true) {
-        if (Date.now() - cdpStart > cdpTimeout) {
-          throw new Error(`Timeout: Chrome CDP not available at ${cdpUrl} after ${cdpTimeout / 1000}s`);
-        }
-        try {
-          const res = await fetch(`${cdpUrl}/json/version`);
-          if (res.ok) break;
-        } catch { /* retry */ }
-        await new Promise(r => setTimeout(r, 500));
-      }
-      console.log('Chrome CDP ready. Connecting Playwright...');
-
-      // 4. Connect Playwright via CDP.
-      (config as any).browser.cdpEndpoint = cdpUrl;
-      this._reconnectInfo = { opts, config, clientInfo };
-      await this._connectToCdp(deps, config, clientInfo);
-
-      console.log('Ready! Side panel can send commands.');
-    } else {
+    // Launch/connect mode.
+    {
       // Launch/connect mode: eagerly create context for immediate feedback.
       const browser = await deps.createBrowser(config, clientInfo);
       const browserContext = browser.contexts()[0] || await browser.newContext();

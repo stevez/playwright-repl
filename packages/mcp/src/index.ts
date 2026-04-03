@@ -6,19 +6,31 @@ import { COMMANDS, CATEGORIES, refToLocator } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
 import { createBridgeRunner } from './bridge.js';
 import { createEvaluateRunner } from './evaluate.js';
+import { createStandaloneRunner } from './standalone.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, LOG_FILE } from './logger.js';
 import type { SnapshotCache } from './types.js';
 
 const argv = process.argv.slice(2);
 const standalone = argv.includes('--standalone');
+const headed = argv.includes('--headed');
 
 const snapshotCache: SnapshotCache = { value: null };
 
 // ─── Create runner ───────────────────────────────────────────────────────────
 
-const { runner, descriptions } = standalone
-    ? await createEvaluateRunner(argv, snapshotCache)
-    : await createBridgeRunner(argv, snapshotCache);
+let runnerModule;
+if (standalone) {
+    // Try evaluate mode (extension + JS support), fall back to Engine (keyword only)
+    try {
+        runnerModule = await createEvaluateRunner(argv, snapshotCache);
+    } catch {
+        runnerModule = createStandaloneRunner(headed, snapshotCache);
+    }
+} else {
+    runnerModule = await createBridgeRunner(argv, snapshotCache);
+}
+
+const { runner, descriptions } = runnerModule;
 
 logStartup(standalone ? 'standalone' : 'bridge', `log → ${LOG_FILE}`);
 

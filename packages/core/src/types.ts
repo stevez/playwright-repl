@@ -4,7 +4,6 @@ export interface EngineOpts {
   headed?: boolean;
   browser?: string;
   connect?: number | boolean;
-  extension?: boolean;
   spawn?: boolean;
   port?: number;
   cdpPort?: number;

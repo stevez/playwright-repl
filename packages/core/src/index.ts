@@ -3,7 +3,7 @@
  */
 
 export { minimist, replVersion, COMMANDS, CATEGORIES, JS_CATEGORIES, UPDATE_COMMANDS } from './resolve.js';
-export { parseInput, ALIASES, ALL_COMMANDS, booleanOptions } from './parser.js';
+export { parseInput, ALIASES, ALL_COMMANDS, booleanOptions, resolveArgs } from './parser.js';
 export { buildCompletionItems } from './completion-data.js';
 export { c, prettyJson } from './colors.js';
 export {
@@ -14,7 +14,6 @@ export {
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
 export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
-export { CommandServer, resolveArgs } from './extension-server.js';
 export { filterResponse } from './filter.js';
 export { BridgeServer } from './bridge-server.js';
 export { EvaluateConnection, findExtensionPath } from './evaluate-connection.js';
