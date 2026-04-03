@@ -101,9 +101,6 @@ jobs:
         env:
           PW_USE_ESBUILD_WASM: '1'
 
-      - name: 'Benchmark: pw repl (CDP) vs pw repl-extension (bridge)'
-        run: node packages/runner/script-examples/bench.js --headless
-        timeout-minutes: 5
 
       - name: Run extension E2E tests
         run: pnpm exec playwright test

@@ -38,29 +38,12 @@ const subcommand = args[0];
 
 // ─── Subcommands ─────────────────────────────────────────────────────────────
 
-if (subcommand === 'launch') {
-  const { handleLaunch } = await import('./pw-launch.js');
-  await handleLaunch(args.slice(1));
-  process.exit(0);
-}
-
-if (subcommand === 'close') {
-  const { handleClose } = await import('./pw-launch.js');
-  await handleClose(args.slice(1));
-  process.exit(0);
-}
-
 if (subcommand === 'repl') {
   const { handleRepl } = await import('./pw-repl.js');
   await handleRepl(args.slice(1));
   // handleRepl keeps process alive via node:repl — don't exit here
 }
 
-if (subcommand === 'repl-extension') {
-  const { handleReplExtension } = await import('./pw-repl-extension.js');
-  await handleReplExtension(args.slice(1));
-  // handleReplExtension keeps process alive via node:repl
-}
 
 // ─── Default: test ───────────────────────────────────────────────────────────
 
