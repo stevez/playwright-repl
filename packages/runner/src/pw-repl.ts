@@ -13,21 +13,12 @@
 import repl from 'node:repl';
 import { inspect } from 'node:util';
 import fs from 'node:fs';
-import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { EvaluateConnection, minimist } from '@playwright-repl/core';
+import { EvaluateConnection, findExtensionPath, minimist } from '@playwright-repl/core';
 
 const __filename = fileURLToPath(import.meta.url);
 const _require = createRequire(__filename);
-
-function findExtensionPath(): string {
-  const monorepoExt = path.resolve(path.dirname(__filename), '../../extension/dist');
-  const bundledExt = path.resolve(path.dirname(__filename), 'chrome-extension');
-  if (fs.existsSync(path.join(monorepoExt, 'manifest.json'))) return monorepoExt;
-  if (fs.existsSync(path.join(bundledExt, 'manifest.json'))) return bundledExt;
-  throw new Error('Chrome extension not found. Run "pnpm run build" first.');
-}
 
 export async function handleRepl(argv: string[]): Promise<void> {
   const args = minimist(argv, {
@@ -85,7 +76,9 @@ export async function handleRepl(argv: string[]): Promise<void> {
   // Default: evaluate mode — launch Chromium with extension
   const conn = new EvaluateConnection();
   const { chromium } = _require('@playwright/test');
-  await conn.start(findExtensionPath(), { headed, chromium });
+  const extPath = findExtensionPath(import.meta.url);
+  if (!extPath) throw new Error('Chrome extension not found. Run "pnpm run build" first.');
+  await conn.start(extPath, { headed, chromium });
   console.log(`Connected (${headed ? 'headed' : 'headless'})`);
 
   if (scriptFile) {

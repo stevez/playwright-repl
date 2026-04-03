@@ -14,27 +14,8 @@ import {
   filterResponse as filterResponseBase, resolveArgs,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
-import { createRequire } from 'node:module';
 import { Engine } from './engine.js';
 import { SessionManager } from './recorder.js';
-
-/** Find the Dramaturg Chrome extension dist path */
-function findExtensionPath(): string | null {
-  // Skip in test environment — let tests use the mocked Engine
-  if (process.env.VITEST) return null;
-  try {
-    // Try monorepo path first
-    const require = createRequire(import.meta.url);
-    const coreMain = require.resolve('@playwright-repl/core');
-    const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
-    const monorepoExt = path.resolve(coreDir, '../extension/dist');
-    if (fs.existsSync(path.join(monorepoExt, 'manifest.json'))) return monorepoExt;
-    // Try bundled path (npm install)
-    const bundledExt = path.resolve(coreDir, '../playwright-repl/chrome-extension');
-    if (fs.existsSync(path.join(bundledExt, 'manifest.json'))) return bundledExt;
-  } catch {}
-  return null;
-}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1029,8 +1010,8 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
 
   if (!opts.bridge && !opts.server && !opts.extension && !opts.connect) {
-    const { EvaluateConnection } = await import('@playwright-repl/core');
-    const extPath = findExtensionPath();
+    const { EvaluateConnection, findExtensionPath } = await import('@playwright-repl/core');
+    const extPath = process.env.VITEST ? null : findExtensionPath(import.meta.url);
     if (extPath) {
       const conn = new EvaluateConnection();
       log(`${c.dim}Launching Chromium with extension...${c.reset}`);

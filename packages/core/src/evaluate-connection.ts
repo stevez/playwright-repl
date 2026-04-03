@@ -6,7 +6,8 @@
  */
 
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
 
 // Types from playwright (avoid importing to keep dependencies light)
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -20,31 +21,67 @@ export interface EvaluateResult {
   image?: string;
 }
 
+/**
+ * Find the Dramaturg Chrome extension dist path.
+ * Checks monorepo first (dev), then bundled (npm install).
+ * @param from Path to resolve from (e.g. import.meta.url or __filename)
+ */
+export function findExtensionPath(from?: string): string | null {
+  try {
+    const req = from ? createRequire(from) : createRequire(import.meta.url);
+    const coreMain = req.resolve('@playwright-repl/core');
+    const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
+    // Monorepo: packages/extension/dist
+    const monorepoExt = path.resolve(coreDir, '../extension/dist');
+    if (fs.existsSync(path.join(monorepoExt, 'manifest.json'))) return monorepoExt;
+    // Bundled (npm): chrome-extension/ next to the caller
+    if (from) {
+      const callerDir = path.dirname(from.startsWith('file://') ? new URL(from).pathname : from);
+      const bundledExt = path.resolve(callerDir, 'chrome-extension');
+      if (fs.existsSync(path.join(bundledExt, 'manifest.json'))) return bundledExt;
+    }
+  } catch {}
+  return null;
+}
+
 export class EvaluateConnection {
   private _context: BrowserContext | null = null;
   private _sw: Worker | null = null;
   private _connected = false;
 
   get connected(): boolean { return this._connected; }
+  get context(): BrowserContext | null { return this._context; }
+  get serviceWorker(): Worker | null { return this._sw; }
   get port(): number { return 0; } // No port needed
 
   /**
    * Launch Chromium with the Dramaturg extension and connect.
    * @param extensionPath Path to the built Chrome extension (dist/)
-   * @param opts.chromium Playwright's chromium object (caller must provide — avoids dependency issues)
+   * @param opts.chromium Playwright's chromium object (caller must provide)
+   * @param opts.headed Show browser window (default: true)
+   * @param opts.userDataDir Custom user data dir (default: temp dir)
+   * @param opts.extraArgs Additional Chromium args
    */
-  async start(extensionPath: string, opts: { headed?: boolean; chromium?: any } = {}): Promise<void> {
+  async start(extensionPath: string, opts: {
+    headed?: boolean;
+    chromium?: any;
+    userDataDir?: string;
+    extraArgs?: string[];
+  } = {}): Promise<void> {
     const chromium = opts.chromium;
     if (!chromium) throw new Error('opts.chromium is required — pass the chromium object from playwright');
 
-    this._context = await chromium.launchPersistentContext('', {
+    const userDataDir = opts.userDataDir || '';
+
+    this._context = await chromium.launchPersistentContext(userDataDir, {
       channel: 'chromium',
-      headless: opts.headed === false,  // default headed for REPL; --headless → headed:false
+      headless: opts.headed === false,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
         '--no-first-run',
         '--no-default-browser-check',
+        ...(opts.extraArgs || []),
       ],
     });
 
@@ -52,6 +89,14 @@ export class EvaluateConnection {
     let sw = this._context.serviceWorkers()[0];
     if (!sw) sw = await this._context.waitForEvent('serviceworker');
     this._sw = sw;
+
+    // Wait for handleBridgeCommand to be available
+    await sw.evaluate(async () => {
+      for (let i = 0; i < 50; i++) {
+        if ((self as any).handleBridgeCommand) return;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    });
 
     // Navigate to blank page so the extension can attach to a tab
     const page = this._context.pages()[0] || await this._context.newPage();
@@ -93,6 +138,14 @@ export class EvaluateConnection {
       },
       { command: script, language }
     );
+  }
+
+  /**
+   * Evaluate arbitrary code in the service worker.
+   */
+  async evaluate(fn: any, arg?: any): Promise<any> {
+    if (!this._sw) throw new Error('Not connected');
+    return await this._sw.evaluate(fn, arg);
   }
 
   /**

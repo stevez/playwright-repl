@@ -17,7 +17,7 @@ export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
 export { CommandServer, resolveArgs } from './extension-server.js';
 export { filterResponse } from './filter.js';
 export { BridgeServer } from './bridge-server.js';
-export { EvaluateConnection } from './evaluate-connection.js';
+export { EvaluateConnection, findExtensionPath } from './evaluate-connection.js';
 export type { CompletionItem } from './completion-data.js';
 export type { CommandInfo } from './resolve.js';
 export { parseSnapshot, refToLocator, allRefLocators } from './snapshot-parser.js';

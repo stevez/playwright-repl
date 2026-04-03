@@ -3,35 +3,18 @@
  * No WebSocket bridge needed.
  */
 
-import { EvaluateConnection, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core';
+import { EvaluateConnection, findExtensionPath, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule, SnapshotCache } from './types.js';
 import { logEvent } from './logger.js';
 import { descriptions } from './bridge.js';
-import path from 'node:path';
-import fs from 'node:fs';
-import { createRequire } from 'node:module';
-
-/** Find the Dramaturg Chrome extension dist path */
-function findExtensionPath(): string | null {
-    try {
-        const require = createRequire(import.meta.url);
-        const coreMain = require.resolve('@playwright-repl/core');
-        const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
-        const monorepoExt = path.resolve(coreDir, '../extension/dist');
-        if (fs.existsSync(path.join(monorepoExt, 'manifest.json'))) return monorepoExt;
-        const bundledExt = path.resolve(coreDir, '../playwright-repl/chrome-extension');
-        if (fs.existsSync(path.join(bundledExt, 'manifest.json'))) return bundledExt;
-    } catch {}
-    return null;
-}
 
 export async function createEvaluateRunner(
     argv: string[],
     snapshotCache: SnapshotCache,
 ): Promise<RunnerModule> {
     const headed = argv.includes('--headed');
-    const extPath = findExtensionPath();
+    const extPath = findExtensionPath(import.meta.url);
     if (!extPath) throw new Error('Chrome extension not found. Run "pnpm run build" first.');
 
     const conn = new EvaluateConnection();
