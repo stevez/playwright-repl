@@ -16,7 +16,7 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge', 'server', 'include-snapshot', 'verbose'],
+  boolean: ['headed', 'headless', 'persistent', 'extension', 'help', 'step', 'silent', 'spawn', 'bridge', 'server', 'include-snapshot', 'verbose'],
   string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
@@ -95,7 +95,7 @@ if (args.replay) {
 
 startRepl({
   session: args.session as string,
-  headed: args.headed as boolean,
+  headed: !args.headless,
   browser: args.browser as string,
   persistent: args.persistent as boolean,
   profile: args.profile as string,

@@ -14,8 +14,27 @@ import {
   filterResponse as filterResponseBase, resolveArgs,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
+import { createRequire } from 'node:module';
 import { Engine } from './engine.js';
 import { SessionManager } from './recorder.js';
+
+/** Find the Dramaturg Chrome extension dist path */
+function findExtensionPath(): string | null {
+  // Skip in test environment — let tests use the mocked Engine
+  if (process.env.VITEST) return null;
+  try {
+    // Try monorepo path first
+    const require = createRequire(import.meta.url);
+    const coreMain = require.resolve('@playwright-repl/core');
+    const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
+    const monorepoExt = path.resolve(coreDir, '../extension/dist');
+    if (fs.existsSync(path.join(monorepoExt, 'manifest.json'))) return monorepoExt;
+    // Try bundled path (npm install)
+    const bundledExt = path.resolve(coreDir, '../playwright-repl/chrome-extension');
+    if (fs.existsSync(path.join(bundledExt, 'manifest.json'))) return bundledExt;
+  } catch {}
+  return null;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1005,6 +1024,32 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   if (opts.extension) {
     console.log(`${c.yellow}Warning: --extension is deprecated. Use --server for HTTP API or --bridge for extension.${c.reset}`);
+  }
+
+  // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
+
+  if (!opts.bridge && !opts.server && !opts.extension && !opts.connect) {
+    const { EvaluateConnection } = await import('@playwright-repl/core');
+    const extPath = findExtensionPath();
+    if (extPath) {
+      const conn = new EvaluateConnection();
+      log(`${c.dim}Launching Chromium with extension...${c.reset}`);
+      try {
+        const { chromium } = await import('playwright');
+        await conn.start(extPath, { headed: opts.headed, chromium });
+        log(`${c.green}✓${c.reset} Browser ready (with extension)`);
+        log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
+        if (opts.replay && opts.replay.length > 0) {
+          await runBridgeReplayMode(opts, conn as any);
+        } else {
+          await startBridgeLoop(opts, conn as any);
+        }
+        return;
+      } catch (err: unknown) {
+        log(`${c.yellow}⚠${c.reset} ${c.dim}Could not launch with extension: ${(err as Error).message}${c.reset}`);
+        log(`${c.dim}Falling back to standard engine...${c.reset}\n`);
+      }
+    }
   }
 
   // ─── Bridge mode ─────────────────────────────────────────────────

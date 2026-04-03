@@ -429,6 +429,8 @@ async function handleBridgeCommand(msg: {
 
 // Expose for VS Code CDP injection when chrome.offscreen is unavailable
 (self as any).handleBridgeCommand = handleBridgeCommand;
+// Expose for serviceWorker.evaluate() — direct command execution without bridge
+(self as any)._runCommand = executeSingleCommand;
 
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
