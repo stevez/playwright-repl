@@ -95,7 +95,7 @@ if (args.replay) {
 
 startRepl({
   session: args.session as string,
-  headed: !args.headless,
+  headed: args.headless ? false : args.headed ? true : undefined,
   browser: args.browser as string,
   persistent: args.persistent as boolean,
   profile: args.profile as string,

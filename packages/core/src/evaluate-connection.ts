@@ -39,7 +39,7 @@ export class EvaluateConnection {
 
     this._context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      headless: opts.headed === false,
+      headless: opts.headed === false,  // default headed for REPL; --headless → headed:false
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,

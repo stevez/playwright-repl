@@ -1036,7 +1036,8 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       log(`${c.dim}Launching Chromium with extension...${c.reset}`);
       try {
         const { chromium } = await import('playwright');
-        await conn.start(extPath, { headed: opts.headed, chromium });
+        // Default to headed for evaluate mode (interactive REPL with extension)
+        await conn.start(extPath, { headed: opts.headed ?? true, chromium });
         log(`${c.green}✓${c.reset} Browser ready (with extension)`);
         log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
         if (opts.replay && opts.replay.length > 0) {
