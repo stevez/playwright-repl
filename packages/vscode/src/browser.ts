@@ -1,21 +1,16 @@
 import type * as vscode from 'vscode';
-import { BridgeServer } from '@playwright-repl/core';
 import { createRequire } from 'node:module';
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
-import WebSocket from 'ws';
 import path from 'node:path';
 import fs from 'node:fs';
 
 // __filename is available at runtime in esbuild's CJS output
 declare const __filename: string;
 
-let CDP_PORT = 9222;
-
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface LaunchOptions {
   browser: string;
-  bridgePort?: number;
   headless?: boolean;
   workspaceFolder?: string;
 }
@@ -23,13 +18,10 @@ export interface LaunchOptions {
 // ─── BrowserManager ────────────────────────────────────────────────────────
 
 export class BrowserManager {
-  private _bridge: BridgeServer | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _browserServer: any = undefined;
+  private _context: any = undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _browser: any = undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _browserContext: any = undefined;
+  private _sw: any = undefined;
   private _running = false;
   private _log: vscode.OutputChannel;
   private _httpServer: Server | null = null;
@@ -41,20 +33,18 @@ export class BrowserManager {
   }
 
   isRunning() { return this._running; }
-  get bridge() { return this._bridge; }
-  get page() { return this._browserContext?.pages()[0]; }
+  get bridge() { return this._sw ? { connected: true, run: (cmd: string, opts?: any) => this.runCommand(cmd, opts), runScript: (s: string, l: string) => this.runScript(s, l as any) } : undefined; }
+  get page() { return this._context?.pages()[0]; }
   get httpPort() { return this._httpPort; }
-  get wsEndpoint() { return this._browserServer?.wsEndpoint(); }
   get cdpUrl() { return this._cdpUrl; }
 
   async launch(opts: LaunchOptions) {
     const _extRequire = createRequire(__filename);
-    // Resolve playwright from the user's project when possible, falling back to bundled
     const _require = opts.workspaceFolder
       ? createRequire(path.join(opts.workspaceFolder, 'package.json'))
       : _extRequire;
 
-    // 1. Find Chrome extension: bundled (VSIX) first, then monorepo fallback
+    // 1. Find Chrome extension
     const bundledExt = path.resolve(path.dirname(__filename), '..', 'chrome-extension');
     const coreMain = _extRequire.resolve('@playwright-repl/core');
     const coreDir = coreMain.replace(/[\\/]dist[\\/].*$/, '');
@@ -64,21 +54,11 @@ export class BrowserManager {
       throw new Error(`Chrome extension not found. Run "pnpm run build" first.`);
     this._log.appendLine(`Extension: ${extPath}`);
 
-    // 2. Start BridgeServer (WebSocket)
-    const bridge = new BridgeServer();
-    await bridge.start(opts.bridgePort || 0);
-    this._bridge = bridge;
-    this._log.appendLine(`BridgeServer on port ${bridge.port}`);
-
-    // 3. Launch Chrome with extension via launchServer + _userDataDir
-    //    This gives us both persistent context (extensions work) AND wsEndpoint (tests can connect)
-    const pwPath = _require.resolve('@playwright/test');
+    // 2. Launch Chrome with extension via launchPersistentContext
     const pw = _require('@playwright/test');
     const headless = opts.headless ?? false;
-    this._log.appendLine(`@playwright/test: ${pwPath}`);
     this._log.appendLine(`Launching Chromium (${headless ? 'headless' : 'headed'})...`);
 
-    // Create user data dir with DevTools prefs (dock to bottom)
     const os = await import('node:os');
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-repl-'));
     const defaultDir = path.join(userDataDir, 'Default');
@@ -87,9 +67,9 @@ export class BrowserManager {
       devtools: { preferences: { currentDockState: '"bottom"' } },
     }));
 
-    // Find a free port for CDP (9222 may be taken by the user's Chrome)
+    // Find a free port for CDP (so test runner can reuse this browser)
     const net = await import('node:net');
-    CDP_PORT = await new Promise<number>((resolve, reject) => {
+    const cdpPort: number = await new Promise((resolve, reject) => {
       const srv = net.createServer();
       srv.listen(0, '127.0.0.1', () => {
         const port = (srv.address() as import('node:net').AddressInfo).port;
@@ -97,13 +77,10 @@ export class BrowserManager {
       });
       srv.on('error', reject);
     });
-    this._log.appendLine(`CDP port: ${CDP_PORT}`);
 
-    this._browserServer = await pw.chromium.launchServer({
+    this._context = await pw.chromium.launchPersistentContext(userDataDir, {
       channel: 'chromium',
       headless,
-      _userDataDir: userDataDir,
-      _sharedBrowser: true,
       args: [
         `--disable-extensions-except=${extPath}`,
         `--load-extension=${extPath}`,
@@ -111,92 +88,16 @@ export class BrowserManager {
         '--no-default-browser-check',
         '--disable-background-timer-throttling',
         '--disable-infobars',
-        `--remote-debugging-port=${CDP_PORT}`,
+        `--remote-debugging-port=${cdpPort}`,
       ],
-    } as any);
-    this._log.appendLine(`Chromium launched. wsEndpoint: ${this._browserServer.wsEndpoint()}`);
-
-    this._browserServer.on('close', () => {
-      this._log.appendLine('Browser closed by user.');
-      this._running = false;
-      this._browserServer = undefined;
-      this._browserContext = undefined;
-      // Clean up bridge and HTTP proxy in background
-      this.stop().catch(() => {});
     });
+    this._log.appendLine(`Chromium launched. CDP port: ${cdpPort}`);
 
-    // 4. Connect to get browser context for REPL
-    // Store browser ref to prevent GC from dropping the connection
-    // (launchServer kills Chrome when no clients are connected)
-    this._browser = await pw.chromium.connect(this._browserServer.wsEndpoint());
-    this._browserContext = this._browser.contexts()[0];
-
-    // 5. Set bridge port via CDP on the extension's service worker
-    await new Promise<void>(resolve => setTimeout(resolve, 2000));
+    // Discover CDP WebSocket URL for test runner reuse
     try {
       const http = await import('node:http');
-      const targets = await new Promise<any[]>((resolve, reject) => {
-        http.get(`http://127.0.0.1:${CDP_PORT}/json`, res => {
-          let data = '';
-          res.on('data', (chunk: string) => data += chunk);
-          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
-        }).on('error', reject);
-      });
-      this._log.appendLine(`CDP targets: ${targets.map((t: any) => `${t.type}:${t.url}`).join(', ')}`);
-      const swTarget = targets.find((t: any) => t.type === 'service_worker' && t.url.includes('chrome-extension://'));
-      const hasOffscreen = targets.some((t: any) => t.url?.includes('offscreen'));
-      if (swTarget) {
-        this._log.appendLine(`Found service worker: ${swTarget.url}`);
-        // Helper to evaluate JS in the service worker via CDP
-        const swEval = (expr: string): Promise<void> => new Promise((res, rej) => {
-          const cdpWs = new WebSocket(swTarget.webSocketDebuggerUrl);
-          cdpWs.on('open', () => {
-            cdpWs.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: expr } }));
-            cdpWs.on('message', () => { cdpWs.close(); res(); });
-          });
-          cdpWs.on('error', rej);
-          setTimeout(() => { cdpWs.close(); rej(new Error('CDP timeout')); }, 10000);
-        });
-
-        // Set bridge port in storage (for offscreen doc if it exists)
-        await swEval(`chrome.storage.local.set({ bridgePort: ${bridge.port} })`);
-        this._log.appendLine(`Bridge port ${bridge.port} set via CDP.`);
-
-        // If no offscreen document, inject WebSocket bridge directly into SW
-        if (!hasOffscreen) {
-          this._log.appendLine('No offscreen document found — injecting WebSocket bridge into service worker.');
-          await swEval(`
-(function() {
-  if (self.__bridgeWs) { try { self.__bridgeWs.close(); } catch(e) {} }
-  const ws = new WebSocket('ws://127.0.0.1:${bridge.port}');
-  self.__bridgeWs = ws;
-  let commandQueue = Promise.resolve();
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    const execute = () => handleBridgeCommand({
-      command: msg.command,
-      scriptType: msg.type,
-      language: msg.language,
-      includeSnapshot: msg.includeSnapshot,
-    });
-    const queued = commandQueue.then(execute, execute);
-    commandQueue = queued.then(() => {}, () => {});
-    queued.then(result => {
-      if (ws.readyState === WebSocket.OPEN)
-        ws.send(JSON.stringify({ id: msg.id, ...result }));
-    }).catch(err => {
-      if (ws.readyState === WebSocket.OPEN)
-        ws.send(JSON.stringify({ id: msg.id, text: String(err), isError: true }));
-    });
-  };
-})()
-          `);
-          this._log.appendLine('WebSocket bridge injected into service worker.');
-        }
-      }
-      // Also fetch the CDP WebSocket URL for test runner
       const versionData = await new Promise<any>((resolve, reject) => {
-        http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, res => {
+        http.get(`http://127.0.0.1:${cdpPort}/json/version`, res => {
           let data = '';
           res.on('data', (chunk: string) => data += chunk);
           res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
@@ -207,19 +108,37 @@ export class BrowserManager {
         this._log.appendLine(`CDP URL: ${this._cdpUrl}`);
       }
     } catch (e: unknown) {
-      this._log.appendLine('CDP bridge port injection failed: ' + (e as Error).message);
+      this._log.appendLine(`CDP URL discovery failed: ${(e as Error).message}`);
     }
 
-    // 6. Wait for extension to connect
-    this._log.appendLine('Waiting for extension to connect...');
-    await bridge.waitForConnection(30000);
+    this._context.on('close', () => {
+      this._log.appendLine('Browser closed by user.');
+      this._running = false;
+      this._context = undefined;
+      this._sw = undefined;
+      this.stop().catch(() => {});
+    });
 
-    // 7. Start HTTP proxy so test workers can call bridge from separate processes
+    // 3. Get the extension's service worker
+    let sw = this._context.serviceWorkers()[0];
+    if (!sw) sw = await this._context.waitForEvent('serviceworker');
+    this._sw = sw;
+    this._log.appendLine(`Service worker: ${sw.url()}`);
+
+    // 4. Wait for handleBridgeCommand to be available
+    await sw.evaluate(async () => {
+      for (let i = 0; i < 50; i++) {
+        if ((self as any).handleBridgeCommand) return;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    });
+
+    // 5. Start HTTP proxy for test workers
     await this._startHttpProxy();
     this._log.appendLine(`HTTP proxy on port ${this._httpPort}`);
 
     this._running = true;
-    this._log.appendLine('Extension connected. Bridge ready.');
+    this._log.appendLine('Extension ready. serviceWorker.evaluate() mode.');
   }
 
   async stop() {
@@ -228,44 +147,47 @@ export class BrowserManager {
       this._httpServer = null;
       this._httpPort = null;
     }
-    if (this._bridge) {
-      await this._bridge.close().catch(() => {});
-      this._bridge = undefined;
-    }
-    if (this._browser) {
-      this._browser = undefined;
-    }
-    if (this._browserContext) {
-      this._browserContext = undefined;
-    }
-    if (this._browserServer) {
-      await this._browserServer.close().catch(() => {});
-      this._browserServer = undefined;
+    this._sw = undefined;
+    if (this._context) {
+      await this._context.close().catch(() => {});
+      this._context = undefined;
     }
     this._running = false;
   }
 
-  async runCommand(raw: string): Promise<{ text?: string; isError?: boolean }> {
-    if (!this._bridge) {
-      return { text: 'Bridge not started', isError: true };
-    }
-    return this._bridge.run(raw);
+  async runCommand(raw: string, opts?: { includeSnapshot?: boolean }): Promise<{ text?: string; isError?: boolean; image?: string }> {
+    if (!this._sw) return { text: 'Not connected', isError: true };
+    return this._sw.evaluate(
+      async (params: { command: string; includeSnapshot?: boolean }) => {
+        return await (self as any).handleBridgeCommand({
+          command: params.command,
+          scriptType: 'command',
+          includeSnapshot: params.includeSnapshot,
+        });
+      },
+      { command: raw, includeSnapshot: opts?.includeSnapshot }
+    );
   }
 
   async runScript(script: string, language: 'pw' | 'javascript' = 'javascript'): Promise<{ text?: string; isError?: boolean }> {
-    if (!this._bridge) {
-      return { text: 'Bridge not started', isError: true };
-    }
-    return this._bridge.runScript(script, language);
+    if (!this._sw) return { text: 'Not connected', isError: true };
+    return this._sw.evaluate(
+      async (params: { command: string; language: string }) => {
+        return await (self as any).handleBridgeCommand({
+          command: params.command,
+          scriptType: 'script',
+          language: params.language,
+        });
+      },
+      { command: script, language }
+    );
   }
 
   onEvent(fn: ((event: Record<string, unknown>) => void) | null) {
-    if (this._bridge) {
-      this._bridge.onEvent(fn || (() => {}));
-    }
+    // No-op — events were a bridge concept
   }
 
-  // ─── HTTP proxy for test workers (bridge mode) ────────────────────────────
+  // ─── HTTP proxy for test workers ──────────────────────────────────────────
 
   private async _startHttpProxy(): Promise<void> {
     this._httpServer = createServer((req, res) => this._handleProxy(req, res));
@@ -283,20 +205,20 @@ export class BrowserManager {
 
     if (req.method === 'GET' && req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', bridge: !!this._bridge?.connected }));
+      res.end(JSON.stringify({ status: 'ok', bridge: !!this._sw }));
       return;
     }
 
     if (req.method === 'POST' && req.url === '/run-script') {
-      if (!this._bridge) {
+      if (!this._sw) {
         res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ text: 'Bridge not started', isError: true }));
+        res.end(JSON.stringify({ text: 'Not connected', isError: true }));
         return;
       }
       try {
         const body = await readBody(req);
         const { script, language } = JSON.parse(body);
-        const result = await this._bridge.runScript(script, language || 'javascript');
+        const result = await this.runScript(script, language || 'javascript');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (e: unknown) {
@@ -307,15 +229,15 @@ export class BrowserManager {
     }
 
     if (req.method === 'POST' && req.url === '/run') {
-      if (!this._bridge) {
+      if (!this._sw) {
         res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ text: 'Bridge not started', isError: true }));
+        res.end(JSON.stringify({ text: 'Not connected', isError: true }));
         return;
       }
       try {
         const body = await readBody(req);
         const { command } = JSON.parse(body);
-        const result = await this._bridge.run(command);
+        const result = await this.runCommand(command);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (e: unknown) {
