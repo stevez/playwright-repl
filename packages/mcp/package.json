@@ -19,6 +19,7 @@
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.10.0",
         "@playwright-repl/core": "workspace:*",
+        "@playwright/test": "^1.59.1",
         "playwright-repl": "workspace:*",
         "zod": "^3.24.0"
     }

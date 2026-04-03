@@ -182,6 +182,9 @@ importers:
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
+      '@playwright/test':
+        specifier: ^1.59.1
+        version: 1.59.1
       playwright-repl:
         specifier: workspace:*
         version: link:../cli

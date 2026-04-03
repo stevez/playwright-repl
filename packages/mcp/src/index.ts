@@ -5,20 +5,19 @@ import { z } from 'zod';
 import { COMMANDS, CATEGORIES, refToLocator } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
 import { createBridgeRunner } from './bridge.js';
-import { createStandaloneRunner } from './standalone.js';
+import { createEvaluateRunner } from './evaluate.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, LOG_FILE } from './logger.js';
 import type { SnapshotCache } from './types.js';
 
 const argv = process.argv.slice(2);
 const standalone = argv.includes('--standalone');
-const headed = argv.includes('--headed');
 
 const snapshotCache: SnapshotCache = { value: null };
 
 // ─── Create runner ───────────────────────────────────────────────────────────
 
 const { runner, descriptions } = standalone
-    ? createStandaloneRunner(headed, snapshotCache)
+    ? await createEvaluateRunner(argv, snapshotCache)
     : await createBridgeRunner(argv, snapshotCache);
 
 logStartup(standalone ? 'standalone' : 'bridge', `log → ${LOG_FILE}`);
