@@ -7,49 +7,47 @@ import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
 
-// ─── Patch snapshot matchers ────────────────────────────────────────────────
-// toMatchAriaSnapshot, toMatchSnapshot, toHaveScreenshot require currentTestInfo()
-// which only exists inside the Playwright Test runner. We wrap expect() with a
-// Proxy that intercepts these matchers and calls locator._expect() directly,
-// bypassing the test info check while using Playwright's own matching engine.
+// ─── Patch toMatchAriaSnapshot ──────────────────────────────────────────────
+// toMatchAriaSnapshot requires currentTestInfo() which only exists inside the
+// Playwright Test runner. We wrap expect() with a Proxy that intercepts this
+// matcher and calls locator._expect() directly, bypassing the test-info check
+// while using Playwright's own matching engine.
+// Note: _expect() is a private Playwright API — may break on upgrades.
 
-function unshiftSnapshot(snapshot: string) {
-  const lines = snapshot.split('\n');
-  let prefix = 100;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const m = line.match(/^(\s*)/);
-    if (m && m[1].length < prefix) prefix = m[1].length;
-  }
-  return lines.filter(t => t.trim()).map(line => line.substring(prefix)).join('\n');
+function dedentSnapshot(snapshot: string) {
+  const lines = snapshot.split('\n').filter(l => l.trim());
+  const prefix = Math.min(...lines.map(l => l.match(/^(\s*)/)![1].length));
+  return lines.map(line => line.substring(prefix)).join('\n');
 }
 
 function makeAriaSnapshotMatcher(locator: any, isNot: boolean) {
   return async (expected: string, options?: { timeout?: number }) => {
     const timeout = options?.timeout ?? 5000;
-    const normalized = unshiftSnapshot(expected);
+    const normalized = dedentSnapshot(expected);
     const { matches: pass, received } = await locator._expect(
       'to.match.aria',
       { expectedValue: normalized, isNot, timeout },
     );
     if (isNot ? pass : !pass) {
       const actual = received?.raw ?? '';
+      const expectedOneLine = normalized.replace(/\n/g, ' ↵ ');
+      const actualOneLine = actual.replace(/\n/g, ' ↵ ');
       throw new Error(
         isNot
-          ? `Expected aria snapshot NOT to match:\n${normalized}\nReceived:\n${actual}`
-          : `toMatchAriaSnapshot\nExpected:\n${normalized}\nReceived:\n${actual}`
+          ? `toMatchAriaSnapshot (not)\nExpected: not to match\nReceived: ${actualOneLine}\n\nFull expected:\n${normalized}\n\nFull received:\n${actual}`
+          : `toMatchAriaSnapshot\nExpected: ${expectedOneLine}\nReceived: ${actualOneLine}\n\nFull expected:\n${normalized}\n\nFull received:\n${actual}`
       );
     }
   };
 }
 
-function wrapExpectResult(e: any, locator: any) {
+function wrapExpectResult(e: any, locator: any, isNot = false) {
   return new Proxy(e, {
     get(obj, prop) {
       if (prop === 'toMatchAriaSnapshot')
-        return makeAriaSnapshotMatcher(locator, false);
+        return makeAriaSnapshotMatcher(locator, isNot);
       if (prop === 'not')
-        return wrapExpectResult(Reflect.get(obj, prop), locator);
+        return wrapExpectResult(Reflect.get(obj, prop), locator, !isNot);
       return Reflect.get(obj, prop);
     },
   });

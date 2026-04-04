@@ -299,7 +299,7 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
           <span class="step-num">3</span>
           <label>Verify</label>
         </div>
-        <input id="assertion" placeholder="Assertion will appear here" aria-label="Assertion">
+        <textarea id="assertion" placeholder="Assertion will appear here" aria-label="Assertion" rows="2" style="resize:vertical;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;"></textarea>
         <div class="hbox" style="margin-top:4px;align-items:center;">
           <button id="verifyBtn" class="inline-btn">Verify</button>
           <span id="verifyResult" style="font-size:13px;margin-left:6px;display:none;"></span>

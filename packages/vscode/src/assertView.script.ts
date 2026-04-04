@@ -9,7 +9,7 @@ const locatorInput = document.getElementById('locator') as HTMLInputElement;
 const assertType = document.getElementById('assertType') as HTMLSelectElement;
 const negateCheckbox = document.getElementById('negateCheckbox') as HTMLInputElement;
 const argInput = document.getElementById('argInput') as HTMLInputElement;
-const assertionInput = document.getElementById('assertion') as HTMLInputElement;
+const assertionInput = document.getElementById('assertion') as HTMLTextAreaElement;
 const verifyBtn = document.getElementById('verifyBtn') as HTMLButtonElement;
 const verifyResult = document.getElementById('verifyResult')!;
 
@@ -84,6 +84,7 @@ window.addEventListener('message', event => {
     currentLocator = params.locator;
     locatorInput.value = params.locator;
     assertionInput.value = params.assertion;
+    autoSizeAssertion();
     if (params.ariaSnapshot) {
       storedAriaSnapshot = params.ariaSnapshot;
       if (ariaTextarea) ariaTextarea.value = '';
@@ -94,6 +95,7 @@ window.addEventListener('message', event => {
     verifyResult.style.display = 'none';
   } else if (method === 'assertionUpdated') {
     assertionInput.value = params.assertion;
+    autoSizeAssertion();
     verifyResult.style.display = 'none';
   } else if (method === 'verifyProcessing') {
     verifyBtn.disabled = params.processing;
@@ -131,6 +133,11 @@ window.addEventListener('message', event => {
   }
 });
 
+function autoSizeAssertion() {
+  const lines = assertionInput.value.split('\n').length;
+  assertionInput.rows = Math.max(2, Math.min(lines + 1, 12));
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function populateTypes(t: typeof types) {
@@ -148,14 +155,7 @@ function detectType(assertion: string) {
   for (const type of types) {
     if (assertion.includes(`.${type.value}(`)) {
       assertType.value = type.value;
-      const typeDef = types.find(t => t.value === type.value);
-      argInput.style.display = typeDef?.needsArg ? 'block' : 'none';
-      // Extract arg from assertion
-      const argMatch = assertion.match(new RegExp(`\\.${type.value}\\((.*)\\)`));
-      if (argMatch && argMatch[1]) {
-        const cleaned = argMatch[1].replace(/^['"]|['"]$/g, '');
-        argInput.value = cleaned;
-      }
+      rebuild();
       return;
     }
   }

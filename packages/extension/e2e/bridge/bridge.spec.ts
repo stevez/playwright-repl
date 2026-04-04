@@ -176,6 +176,28 @@ test.describe("Bridge command tests", () => {
       const r = await bridge.run('verify-element heading "todos"');
       expectOk(r);
     });
+
+    test('toMatchAriaSnapshot passes for matching snapshot', async ({ bridge }) => {
+      const r = await bridge.run(`await expect(page.locator('h1')).toMatchAriaSnapshot(\`- heading "todos" [level=1]\`)`);
+      expectOk(r);
+    });
+
+    test('toMatchAriaSnapshot fails for non-matching snapshot', async ({ bridge }) => {
+      const r = await bridge.run(`await expect(page.locator('h1')).toMatchAriaSnapshot(\`- heading "wrong"\`, { timeout: 1000 })`);
+      expect(r.isError).toBe(true);
+      expect(r.text).toContain('toMatchAriaSnapshot');
+    });
+
+    test('not.toMatchAriaSnapshot passes for non-matching snapshot', async ({ bridge }) => {
+      const r = await bridge.run(`await expect(page.locator('h1')).not.toMatchAriaSnapshot(\`- heading "wrong"\`)`);
+      expectOk(r);
+    });
+
+    test('not.toMatchAriaSnapshot fails for matching snapshot', async ({ bridge }) => {
+      const r = await bridge.run(`await expect(page.locator('h1')).not.toMatchAriaSnapshot(\`- heading "todos" [level=1]\`, { timeout: 1000 })`);
+      expect(r.isError).toBe(true);
+      expect(r.text).toContain('not to match');
+    });
   });
 
   // ─── Tab commands ────────────────────────────────────────────────────────────
