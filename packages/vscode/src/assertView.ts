@@ -32,8 +32,6 @@ const ALL_ASSERTION_TYPES: AssertionType[] = [
   // Attributes & count
   { value: 'toHaveAttribute', label: 'toHaveAttribute', needsArg: true, argType: 'pair' },
   { value: 'toHaveCount', label: 'toHaveCount', needsArg: true, argType: 'number' },
-  // ARIA snapshot
-  { value: 'toMatchAriaSnapshot', label: 'toMatchAriaSnapshot', needsArg: true, argType: 'aria' },
   // Page-level (uses expect(page) not expect(locator))
   { value: 'toHaveURL', label: 'toHaveURL (page)', needsArg: true, argType: 'string' },
   { value: 'toHaveTitle', label: 'toHaveTitle (page)', needsArg: true, argType: 'string' },
@@ -113,6 +111,8 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
         await this._verify(data.params.assertion);
       } else if (data.method === 'rebuild') {
         this._rebuildAssertion(data.params.type, data.params.arg, data.params.negate);
+      } else if (data.method === 'rebuildSnapshot') {
+        this._rebuildSnapshotAssertion(data.params.snapshot, data.params.negate);
       } else if (data.method === 'locatorChanged') {
         this._locator = data.params.locator;
       }
@@ -134,9 +134,7 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
     const isPageLevel = type === 'toHaveURL' || type === 'toHaveTitle';
     const target = isPageLevel ? 'page' : this._locator;
     let assertion: string;
-    if (typeDef.argType === 'aria' && arg) {
-      assertion = `await expect(${target}).${not}toMatchAriaSnapshot(\`\n${arg}\n\`);`;
-    } else if (typeDef.argType === 'pair' && arg) {
+    if (typeDef.argType === 'pair' && arg) {
       const parts = arg.split(',').map(s => s.trim());
       assertion = `await expect(${target}).${not}${type}('${parts[0] || ''}', '${parts[1] || ''}');`;
     } else if (typeDef.needsArg && arg) {
@@ -145,6 +143,20 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
     } else {
       assertion = `await expect(${target}).${not}${type}();`;
     }
+
+    this._assertion = assertion;
+    void this._view?.webview.postMessage({
+      method: 'assertionUpdated',
+      params: { assertion },
+    });
+  }
+
+  private _rebuildSnapshotAssertion(snapshot?: string, negate?: boolean) {
+    if (!this._locator) return;
+    const not = negate ? 'not.' : '';
+    const assertion = snapshot
+      ? `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\n${snapshot}\n\`);`
+      : `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\`);`;
 
     this._assertion = assertion;
     void this._view?.webview.postMessage({
@@ -255,6 +267,13 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         #argInput {
           margin-top: 4px;
         }
+        .radio-label {
+          font-size: 13px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 3px;
+        }
         .step-num {
           display: inline-flex;
           align-items: center;
@@ -276,23 +295,33 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         <div class="hbox">
           <span class="step-num">1</span>
           <button id="pickBtn" title="Pick element" class="icon-btn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M18 42h-7.5c-3 0-4.5-1.5-4.5-4.5v-27C6 7.5 7.5 6 10.5 6h27C42 6 42 10.404 42 10.5V18h-3V9H9v30h9v3Zm27-15-9 6 9 9-3 3-9-9-6 9-6-24 24 6Z"/></svg></button>
-          <label>Pick Locator</label>
+          <label>Pick Element</label>
         </div>
+        <label style="font-size:11px;color:var(--vscode-descriptionForeground);margin-top:4px;">Locator</label>
         <input id="locator" placeholder="Pick an element or type a locator" aria-label="Locator">
+        <label style="font-size:11px;color:var(--vscode-descriptionForeground);margin-top:6px;">ARIA Snapshot</label>
+        <textarea id="ariaPreview" placeholder="Pick an element to see its ARIA snapshot" aria-label="ARIA Snapshot" rows="4" readonly style="resize:vertical;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;opacity:0.8;"></textarea>
       </div>
       <div class="section">
         <div class="hbox">
           <span class="step-num">2</span>
-          <label>Select Matcher</label>
+          <label>Assert using</label>
         </div>
-        <div class="hbox" style="gap:6px;margin-top:2px;">
-          <select id="assertType" style="min-width:200px;"></select>
+        <div class="hbox" style="gap:8px;margin-top:2px;">
+          <label class="radio-label"><input type="radio" name="assertMode" value="locator" checked> Locator</label>
+          <label class="radio-label"><input type="radio" name="assertMode" value="snapshot"> Snapshot</label>
           <label style="flex:none;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px;margin-left:8px;">
-            not
             <input id="negateCheckbox" type="checkbox">
+            Not
           </label>
         </div>
-        <input id="argInput" placeholder="Expected value" aria-label="Expected value" style="display:none;">
+        <div id="locatorMode" style="margin-top:4px;">
+          <select id="assertType" style="min-width:200px;"></select>
+          <input id="argInput" placeholder="Expected value" aria-label="Expected value" style="display:none;">
+        </div>
+        <div id="snapshotMode" style="margin-top:4px;display:none;">
+          <textarea id="snapshotInput" placeholder="Edit ARIA snapshot YAML" aria-label="ARIA snapshot" rows="6" style="resize:vertical;width:100%;box-sizing:border-box;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;"></textarea>
+        </div>
       </div>
       <div class="section">
         <div class="hbox">

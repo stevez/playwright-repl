@@ -6,16 +6,36 @@ import { vscode } from './common';
 
 const pickBtn = document.getElementById('pickBtn') as HTMLButtonElement;
 const locatorInput = document.getElementById('locator') as HTMLInputElement;
+const ariaPreview = document.getElementById('ariaPreview') as HTMLTextAreaElement;
 const assertType = document.getElementById('assertType') as HTMLSelectElement;
 const negateCheckbox = document.getElementById('negateCheckbox') as HTMLInputElement;
 const argInput = document.getElementById('argInput') as HTMLInputElement;
+const snapshotInput = document.getElementById('snapshotInput') as HTMLTextAreaElement;
+const locatorMode = document.getElementById('locatorMode')!;
+const snapshotMode = document.getElementById('snapshotMode')!;
 const assertionInput = document.getElementById('assertion') as HTMLTextAreaElement;
 const verifyBtn = document.getElementById('verifyBtn') as HTMLButtonElement;
 const verifyResult = document.getElementById('verifyResult')!;
+const modeRadios = document.querySelectorAll<HTMLInputElement>('input[name="assertMode"]');
 
 let types: { value: string; label: string; needsArg: boolean; argType?: string }[] = [];
 let currentLocator = '';
-let storedAriaSnapshot = '';
+let currentMode: 'locator' | 'snapshot' = 'locator';
+
+// ─── Mode switching ──────────────────────────────────────────────────────
+
+function switchMode(mode: 'locator' | 'snapshot') {
+  currentMode = mode;
+  locatorMode.style.display = mode === 'locator' ? 'block' : 'none';
+  snapshotMode.style.display = mode === 'snapshot' ? 'block' : 'none';
+  rebuild();
+}
+
+for (const radio of modeRadios) {
+  radio.addEventListener('change', () => {
+    if (radio.checked) switchMode(radio.value as 'locator' | 'snapshot');
+  });
+}
 
 // ─── Event handlers ───────────────────────────────────────────────────────
 
@@ -24,43 +44,21 @@ pickBtn.addEventListener('click', () => {
 });
 
 function rebuild() {
-  const typeDef = types.find(t => t.value === assertType.value);
-  const isAria = typeDef?.argType === 'aria';
-  const needsArg = typeDef?.needsArg ?? false;
-
-  // Swap between input and textarea for aria argType
-  if (isAria) {
-    argInput.style.display = 'none';
-    ensureAriaTextarea();
-    ariaTextarea!.style.display = 'block';
-    if (storedAriaSnapshot && !ariaTextarea!.value)
-      ariaTextarea!.value = storedAriaSnapshot;
+  if (currentMode === 'snapshot') {
+    vscode.postMessage({ method: 'rebuildSnapshot', params: { snapshot: snapshotInput.value, negate: negateCheckbox.checked } });
   } else {
-    if (ariaTextarea) ariaTextarea.style.display = 'none';
+    const typeDef = types.find(t => t.value === assertType.value);
+    const needsArg = typeDef?.needsArg ?? false;
     argInput.style.display = needsArg ? 'block' : 'none';
     argInput.placeholder = typeDef?.argType === 'pair' ? 'attribute, value' :
       typeDef?.argType === 'number' ? 'Count' : 'Expected value';
+    vscode.postMessage({ method: 'rebuild', params: { type: assertType.value, arg: argInput.value, negate: negateCheckbox.checked } });
   }
-
-  const argValue = isAria ? (ariaTextarea?.value || '') : argInput.value;
-  vscode.postMessage({ method: 'rebuild', params: { type: assertType.value, arg: argValue, negate: negateCheckbox.checked } });
-}
-
-let ariaTextarea: HTMLTextAreaElement | null = null;
-function ensureAriaTextarea() {
-  if (ariaTextarea) return;
-  ariaTextarea = document.createElement('textarea');
-  ariaTextarea.id = 'ariaInput';
-  ariaTextarea.placeholder = 'ARIA snapshot YAML';
-  ariaTextarea.setAttribute('aria-label', 'ARIA snapshot');
-  ariaTextarea.rows = 6;
-  ariaTextarea.style.cssText = 'margin-top:4px;resize:vertical;width:100%;box-sizing:border-box;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;';
-  argInput.parentElement!.insertBefore(ariaTextarea, argInput.nextSibling);
-  ariaTextarea.addEventListener('input', rebuild);
 }
 
 assertType.addEventListener('change', rebuild);
 argInput.addEventListener('input', rebuild);
+snapshotInput.addEventListener('input', rebuild);
 negateCheckbox.addEventListener('change', rebuild);
 
 locatorInput.addEventListener('input', () => {
@@ -86,11 +84,10 @@ window.addEventListener('message', event => {
     assertionInput.value = params.assertion;
     autoSizeAssertion();
     if (params.ariaSnapshot) {
-      storedAriaSnapshot = params.ariaSnapshot;
-      if (ariaTextarea) ariaTextarea.value = '';
+      ariaPreview.value = params.ariaSnapshot;
+      snapshotInput.value = params.ariaSnapshot;
     }
     if (params.types) populateTypes(params.types);
-    // Detect current type from assertion
     detectType(params.assertion);
     verifyResult.style.display = 'none';
   } else if (method === 'assertionUpdated') {
@@ -152,10 +149,18 @@ function populateTypes(t: typeof types) {
 }
 
 function detectType(assertion: string) {
+  if (assertion.includes('.toMatchAriaSnapshot(')) {
+    // Switch to snapshot mode
+    (document.querySelector('input[name="assertMode"][value="snapshot"]') as HTMLInputElement).checked = true;
+    switchMode('snapshot');
+    return;
+  }
   for (const type of types) {
     if (assertion.includes(`.${type.value}(`)) {
       assertType.value = type.value;
-      rebuild();
+      // Stay in locator mode
+      (document.querySelector('input[name="assertMode"][value="locator"]') as HTMLInputElement).checked = true;
+      switchMode('locator');
       return;
     }
   }
