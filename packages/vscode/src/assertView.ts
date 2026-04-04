@@ -316,12 +316,10 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
           </label>
         </div>
         <div id="locatorMode" style="margin-top:4px;">
-          <select id="assertType" style="min-width:200px;"></select>
+          <select id="assertType"></select>
           <input id="argInput" placeholder="Expected value" aria-label="Expected value" style="display:none;">
         </div>
-        <div id="snapshotMode" style="margin-top:4px;display:none;">
-          <textarea id="snapshotInput" placeholder="Edit ARIA snapshot YAML" aria-label="ARIA snapshot" rows="6" style="resize:vertical;width:100%;box-sizing:border-box;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;"></textarea>
-        </div>
+        <div id="snapshotMode" style="display:none;"></div>
       </div>
       <div class="section">
         <div class="hbox">

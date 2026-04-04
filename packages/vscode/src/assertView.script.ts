@@ -10,7 +10,6 @@ const ariaPreview = document.getElementById('ariaPreview') as HTMLTextAreaElemen
 const assertType = document.getElementById('assertType') as HTMLSelectElement;
 const negateCheckbox = document.getElementById('negateCheckbox') as HTMLInputElement;
 const argInput = document.getElementById('argInput') as HTMLInputElement;
-const snapshotInput = document.getElementById('snapshotInput') as HTMLTextAreaElement;
 const locatorMode = document.getElementById('locatorMode')!;
 const snapshotMode = document.getElementById('snapshotMode')!;
 const assertionInput = document.getElementById('assertion') as HTMLTextAreaElement;
@@ -45,7 +44,7 @@ pickBtn.addEventListener('click', () => {
 
 function rebuild() {
   if (currentMode === 'snapshot') {
-    vscode.postMessage({ method: 'rebuildSnapshot', params: { snapshot: snapshotInput.value, negate: negateCheckbox.checked } });
+    vscode.postMessage({ method: 'rebuildSnapshot', params: { snapshot: ariaPreview.value, negate: negateCheckbox.checked } });
   } else {
     const typeDef = types.find(t => t.value === assertType.value);
     const needsArg = typeDef?.needsArg ?? false;
@@ -58,7 +57,6 @@ function rebuild() {
 
 assertType.addEventListener('change', rebuild);
 argInput.addEventListener('input', rebuild);
-snapshotInput.addEventListener('input', rebuild);
 negateCheckbox.addEventListener('change', rebuild);
 
 locatorInput.addEventListener('input', () => {
@@ -83,10 +81,8 @@ window.addEventListener('message', event => {
     locatorInput.value = params.locator;
     assertionInput.value = params.assertion;
     autoSizeAssertion();
-    if (params.ariaSnapshot) {
+    if (params.ariaSnapshot)
       ariaPreview.value = params.ariaSnapshot;
-      snapshotInput.value = params.ariaSnapshot;
-    }
     if (params.types) populateTypes(params.types);
     detectType(params.assertion);
     verifyResult.style.display = 'none';
