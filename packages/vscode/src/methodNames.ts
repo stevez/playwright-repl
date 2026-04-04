@@ -32,6 +32,7 @@ export const asyncMatchers = [
   'toHaveText',
   'toHaveValue',
   'toBeVisible',
+  'toMatchAriaSnapshot',
 ];
 
 export const pageMethods = [

@@ -99,7 +99,7 @@ export class Picker {
           if (this._locatorsView)
             this._locatorsView.showLocator(fullLocator, ariaSnapshot);
           if (this._assertView && this._sendToAssert)
-            this._assertView.showAssertion(fullLocator, assertion, info);
+            this._assertView.showAssertion(fullLocator, assertion, info, ariaSnapshot);
           this._sendToAssert = false;
         }
         this._stop();

@@ -15,6 +15,7 @@ const verifyResult = document.getElementById('verifyResult')!;
 
 let types: { value: string; label: string; needsArg: boolean; argType?: string }[] = [];
 let currentLocator = '';
+let storedAriaSnapshot = '';
 
 // ─── Event handlers ───────────────────────────────────────────────────────
 
@@ -24,10 +25,38 @@ pickBtn.addEventListener('click', () => {
 
 function rebuild() {
   const typeDef = types.find(t => t.value === assertType.value);
-  argInput.style.display = typeDef?.needsArg ? 'block' : 'none';
-  argInput.placeholder = typeDef?.argType === 'pair' ? 'attribute, value' :
-    typeDef?.argType === 'number' ? 'Count' : 'Expected value';
-  vscode.postMessage({ method: 'rebuild', params: { type: assertType.value, arg: argInput.value, negate: negateCheckbox.checked } });
+  const isAria = typeDef?.argType === 'aria';
+  const needsArg = typeDef?.needsArg ?? false;
+
+  // Swap between input and textarea for aria argType
+  if (isAria) {
+    argInput.style.display = 'none';
+    ensureAriaTextarea();
+    ariaTextarea!.style.display = 'block';
+    if (storedAriaSnapshot && !ariaTextarea!.value)
+      ariaTextarea!.value = storedAriaSnapshot;
+  } else {
+    if (ariaTextarea) ariaTextarea.style.display = 'none';
+    argInput.style.display = needsArg ? 'block' : 'none';
+    argInput.placeholder = typeDef?.argType === 'pair' ? 'attribute, value' :
+      typeDef?.argType === 'number' ? 'Count' : 'Expected value';
+  }
+
+  const argValue = isAria ? (ariaTextarea?.value || '') : argInput.value;
+  vscode.postMessage({ method: 'rebuild', params: { type: assertType.value, arg: argValue, negate: negateCheckbox.checked } });
+}
+
+let ariaTextarea: HTMLTextAreaElement | null = null;
+function ensureAriaTextarea() {
+  if (ariaTextarea) return;
+  ariaTextarea = document.createElement('textarea');
+  ariaTextarea.id = 'ariaInput';
+  ariaTextarea.placeholder = 'ARIA snapshot YAML';
+  ariaTextarea.setAttribute('aria-label', 'ARIA snapshot');
+  ariaTextarea.rows = 6;
+  ariaTextarea.style.cssText = 'margin-top:4px;resize:vertical;width:100%;box-sizing:border-box;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;';
+  argInput.parentElement!.insertBefore(ariaTextarea, argInput.nextSibling);
+  ariaTextarea.addEventListener('input', rebuild);
 }
 
 assertType.addEventListener('change', rebuild);
@@ -55,6 +84,10 @@ window.addEventListener('message', event => {
     currentLocator = params.locator;
     locatorInput.value = params.locator;
     assertionInput.value = params.assertion;
+    if (params.ariaSnapshot) {
+      storedAriaSnapshot = params.ariaSnapshot;
+      if (ariaTextarea) ariaTextarea.value = '';
+    }
     if (params.types) populateTypes(params.types);
     // Detect current type from assertion
     detectType(params.assertion);

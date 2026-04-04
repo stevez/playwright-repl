@@ -32,6 +32,8 @@ const ALL_ASSERTION_TYPES: AssertionType[] = [
   // Attributes & count
   { value: 'toHaveAttribute', label: 'toHaveAttribute', needsArg: true, argType: 'pair' },
   { value: 'toHaveCount', label: 'toHaveCount', needsArg: true, argType: 'number' },
+  // ARIA snapshot
+  { value: 'toMatchAriaSnapshot', label: 'toMatchAriaSnapshot', needsArg: true, argType: 'aria' },
   // Page-level (uses expect(page) not expect(locator))
   { value: 'toHaveURL', label: 'toHaveURL (page)', needsArg: true, argType: 'string' },
   { value: 'toHaveTitle', label: 'toHaveTitle (page)', needsArg: true, argType: 'string' },
@@ -58,6 +60,7 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
   private _picker: Picker | undefined;
   private _locator = '';
   private _assertion = '';
+  private _ariaSnapshot = '';
 
   constructor(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri) {
     super();
@@ -79,16 +82,17 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
   }
 
   /** Called from pick event — fills locator and default assertion */
-  public async showAssertion(locator: string, assertion: string, elementInfo?: { tag?: string; attributes?: Record<string, string> }) {
+  public async showAssertion(locator: string, assertion: string, elementInfo?: { tag?: string; attributes?: Record<string, string> }, ariaSnapshot?: string) {
     this._locator = locator;
     this._assertion = assertion;
+    this._ariaSnapshot = ariaSnapshot || '';
     const types = filterTypes(elementInfo?.tag, elementInfo?.attributes?.type);
     await this._vscode.commands.executeCommand('playwright-repl.assertView.focus');
     if (!this._view)
       await new Promise(r => setTimeout(r, 200));
     void this._view?.webview.postMessage({
       method: 'update',
-      params: { locator, assertion, types },
+      params: { locator, assertion, types, ariaSnapshot: this._ariaSnapshot },
     });
   }
 
@@ -130,7 +134,9 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
     const isPageLevel = type === 'toHaveURL' || type === 'toHaveTitle';
     const target = isPageLevel ? 'page' : this._locator;
     let assertion: string;
-    if (typeDef.argType === 'pair' && arg) {
+    if (typeDef.argType === 'aria' && arg) {
+      assertion = `await expect(${target}).${not}toMatchAriaSnapshot(\`\n${arg}\n\`);`;
+    } else if (typeDef.argType === 'pair' && arg) {
       const parts = arg.split(',').map(s => s.trim());
       assertion = `await expect(${target}).${not}${type}('${parts[0] || ''}', '${parts[1] || ''}');`;
     } else if (typeDef.needsArg && arg) {
