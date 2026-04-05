@@ -72,7 +72,7 @@ function createPage(overrides: Record<string, any> = {}) {
         waitForTimeout: vi.fn().mockResolvedValue(undefined),
         evaluate: vi.fn().mockResolvedValue(undefined),
         screenshot: vi.fn().mockResolvedValue(Buffer.from('fake-image')),
-        _snapshotForAI: vi.fn().mockResolvedValue({ full: '- heading "Test" [ref=e1]' }),
+        ariaSnapshot: vi.fn().mockResolvedValue('- heading "Test" [ref=e1]'),
         keyboard: {
             press: vi.fn().mockResolvedValue(undefined),
             type: vi.fn().mockResolvedValue(undefined),
@@ -771,23 +771,24 @@ describe('takeScreenshot', () => {
 // ─── Snapshot ──────────────────────────────────────────────────────────────
 
 describe('takeSnapshot', () => {
-    it('returns _snapshotForAI result', async () => {
+    it('returns ariaSnapshot result', async () => {
         const page = createPage();
         const result = await takeSnapshot(page);
         expect(result).toBe('- heading "Test" [ref=e1]');
     });
 
-    it('falls back to String(result) when result.full is undefined', async () => {
+    it('falls back to _snapshotForAI for older Playwright versions', async () => {
         const page = createPage({
-            _snapshotForAI: vi.fn().mockResolvedValue({ toString: () => 'stringified snapshot' }),
+            ariaSnapshot: undefined,
+            _snapshotForAI: vi.fn().mockResolvedValue({ full: '- heading "Legacy" [ref=e1]' }),
         });
         const result = await takeSnapshot(page);
-        expect(result).toBe('stringified snapshot');
+        expect(result).toBe('- heading "Legacy" [ref=e1]');
     });
 
-    it('falls back to title+URL when _snapshotForAI is unavailable', async () => {
+    it('falls back to title+URL when neither API is available', async () => {
         const page = createPage({
-            _snapshotForAI: undefined,
+            ariaSnapshot: undefined,
             title: vi.fn().mockResolvedValue('Fallback'),
             url: vi.fn().mockReturnValue('https://fb.com'),
         });

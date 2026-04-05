@@ -15,7 +15,7 @@
     {
       "label": "addInitScript",
       "type": "method",
-      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<void>",
+      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<Disposable>",
       "info": "Adds a script which would be evaluated in one of the following scenarios: - Whenever the page is navigated. - Whenever the child frame is attached or navigated. In this case, the script is evaluated in the context of the newly attached frame. The script is evaluated after the document was created bu"
     },
     {
@@ -91,16 +91,22 @@
       "info": "Adds a `<link rel=\"stylesheet\">` tag into the page with the desired url or a `<style type=\"text/css\">` tag with the content. Returns the added tag when the stylesheet's onload fires or when the CSS content was injected into frame."
     },
     {
-      "label": "agent",
+      "label": "ariaSnapshot",
       "type": "method",
-      "detail": "(options: { cache?: { cacheFile?: string; cacheOutFile?: string; }; expect?: { timeout?: number; }; limits?: { maxTokens…",
-      "info": "Initialize page agent with the llm provider and cache."
+      "detail": "(options: { depth?: number; mode?: \"ai\" | \"default\"; timeout?: number; }) => Promise<string>",
+      "info": "Captures the aria snapshot of the page. Read more about [aria snapshots](https://playwright.dev/docs/aria-snapshots)."
     },
     {
       "label": "bringToFront",
       "type": "method",
       "detail": "() => Promise<void>",
       "info": "Brings page to front (activates tab)."
+    },
+    {
+      "label": "cancelPickLocator",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Cancels an ongoing [page.pickLocator()](https://playwright.dev/docs/api/class-page#page-pick-locator) call by deactivating pick locator mode. If no pick locator mode is active, this method is a no-op."
     },
     {
       "label": "check",
@@ -112,13 +118,13 @@
       "label": "clearConsoleMessages",
       "type": "method",
       "detail": "() => Promise<void>",
-      "info": "Clears all stored console messages from this page. Subsequent calls to [page.consoleMessages()](https://playwright.dev/docs/api/class-page#page-console-messages) will only return messages logged after the clear."
+      "info": "Clears all stored console messages from this page. Subsequent calls to [page.consoleMessages([options])](https://playwright.dev/docs/api/class-page#page-console-messages) will only return messages logged after the clear."
     },
     {
       "label": "clearPageErrors",
       "type": "method",
       "detail": "() => Promise<void>",
-      "info": "Clears all stored page errors from this page. Subsequent calls to [page.pageErrors()](https://playwright.dev/docs/api/class-page#page-page-errors) will only return errors thrown after the clear."
+      "info": "Clears all stored page errors from this page. Subsequent calls to [page.pageErrors([options])](https://playwright.dev/docs/api/class-page#page-page-errors) will only return errors thrown after the clear."
     },
     {
       "label": "click",
@@ -135,7 +141,7 @@
     {
       "label": "consoleMessages",
       "type": "method",
-      "detail": "() => Promise<ConsoleMessage[]>",
+      "detail": "(options: { filter?: \"all\" | \"since-navigation\"; }) => Promise<ConsoleMessage[]>",
       "info": "Returns up to (currently) 200 last console messages from this page. See [page.on('console')](https://playwright.dev/docs/api/class-page#page-event-console) for more details."
     },
     {
@@ -177,7 +183,7 @@
     {
       "label": "exposeFunction",
       "type": "method",
-      "detail": "(name: string, callback: Function) => Promise<void>",
+      "detail": "(name: string, callback: Function) => Promise<Disposable>",
       "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-page#page-expose-function-option-name) on the `window` object of every frame in the page. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-page#page-expose-function-option-callback)"
     },
     {
@@ -303,7 +309,7 @@
     {
       "label": "pageErrors",
       "type": "method",
-      "detail": "() => Promise<Error[]>",
+      "detail": "(options: { filter?: \"all\" | \"since-navigation\"; }) => Promise<Error[]>",
       "info": "Returns up to (currently) 200 last page errors from this page. See [page.on('pageerror')](https://playwright.dev/docs/api/class-page#page-event-page-error) for more details."
     },
     {
@@ -317,6 +323,12 @@
       "type": "method",
       "detail": "(options: { displayHeaderFooter?: boolean; footerTemplate?: string; format?: string; headerTemplate?: string; height?: s…",
       "info": "Returns the PDF buffer. `page.pdf()` generates a pdf of the page with `print` css media. To generate a pdf with `screen` media, call [page.emulateMedia([options])](https://playwright.dev/docs/api/class-page#page-emulate-media) before calling `page.pdf()`: **NOTE** By default, `page.pdf()` generates"
+    },
+    {
+      "label": "pickLocator",
+      "type": "method",
+      "detail": "() => Promise<Locator>",
+      "info": "Enters pick locator mode where hovering over page elements highlights them and shows the corresponding locator. Once the user clicks an element, the mode is deactivated and the [Locator](https://playwright.dev/docs/api/class-locator) for the picked element is returned. **Usage** const locator = awai"
     },
     {
       "label": "press",
@@ -447,7 +459,7 @@
     {
       "label": "unrouteAll",
       "type": "method",
-      "detail": "(options: { behavior?: \"wait\" | \"ignoreErrors\" | \"default\"; }) => Promise<void>",
+      "detail": "(options: { behavior?: \"default\" | \"wait\" | \"ignoreErrors\"; }) => Promise<void>",
       "info": "Removes all routes created with [page.route(url, handler[, options])](https://playwright.dev/docs/api/class-page#page-route) and [page.routeFromHAR(har[, options])](https://playwright.dev/docs/api/class-page#page-route-from-har)."
     },
     {
@@ -459,7 +471,7 @@
       "label": "video",
       "type": "method",
       "detail": "() => Video",
-      "info": "Video object associated with this page. Can be used to control video recording with [video.start([options])](https://playwright.dev/docs/api/class-video#video-start) and [video.stop([options])](https://playwright.dev/docs/api/class-video#video-stop), or to access the video file when using the `recor"
+      "info": "Video object associated with this page. Can be used to access the video file when using the `recordVideo` context option."
     },
     {
       "label": "viewportSize",
@@ -529,6 +541,12 @@
       "type": "property",
       "detail": "APIRequestContext",
       "info": "API testing helper associated with this page. This method returns the same instance as [browserContext.request](https://playwright.dev/docs/api/class-browsercontext#browser-context-request) on the page's context. See [browserContext.request](https://playwright.dev/docs/api/class-browsercontext#brows"
+    },
+    {
+      "label": "screencast",
+      "type": "property",
+      "detail": "Screencast",
+      "info": "[Screencast](https://playwright.dev/docs/api/class-screencast) object associated with this page. **Usage** page.screencast.on('screencastFrame', data => { console.log('received frame, jpeg size:', data.length); }); await page.screencast.start(); // ... perform actions ... await page.screencast.stop("
     },
     {
       "label": "touchscreen",
@@ -798,7 +816,7 @@
     {
       "label": "addInitScript",
       "type": "method",
-      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<void>",
+      "detail": "(script: PageFunction<Arg, any> | { path?: string; content?: string; }, arg: Arg) => Promise<Disposable>",
       "info": "Adds a script which would be evaluated in one of the following scenarios: - Whenever a page is created in the browser context or is navigated. - Whenever a child frame is attached or navigated in any page in the browser context. In this case, the script is evaluated in the context of the newly attac"
     },
     {
@@ -882,7 +900,7 @@
     {
       "label": "exposeFunction",
       "type": "method",
-      "detail": "(name: string, callback: Function) => Promise<void>",
+      "detail": "(name: string, callback: Function) => Promise<Disposable>",
       "info": "The method adds a function called [`name`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-function-option-name) on the `window` object of every frame in every page in the context. When called, the function executes [`callback`](https://playwright.dev/docs/api/class-brows"
     },
     {
@@ -890,6 +908,12 @@
       "type": "method",
       "detail": "(permissions: readonly string[], options: { origin?: string; }) => Promise<void>",
       "info": "Grants specified permissions to the browser context. Only grants corresponding permissions to the given origin if specified. **NOTE** Supported permissions differ between browsers, and even between different versions of the same browser. Any permission may stop working after an update. Here are some"
+    },
+    {
+      "label": "isClosed",
+      "type": "method",
+      "detail": "() => boolean",
+      "info": "Indicates that the browser context is in the process of closing or has already been closed."
     },
     {
       "label": "newCDPSession",
@@ -983,7 +1007,7 @@
     {
       "label": "unrouteAll",
       "type": "method",
-      "detail": "(options: { behavior?: \"wait\" | \"ignoreErrors\" | \"default\"; }) => Promise<void>",
+      "detail": "(options: { behavior?: \"default\" | \"wait\" | \"ignoreErrors\"; }) => Promise<void>",
       "info": "Removes all routes created with [browserContext.route(url, handler[, options])](https://playwright.dev/docs/api/class-browsercontext#browser-context-route) and [browserContext.routeFromHAR(har[, options])](https://playwright.dev/docs/api/class-browsercontext#browser-context-route-from-har)."
     },
     {
@@ -997,6 +1021,12 @@
       "type": "property",
       "detail": "Clock",
       "info": "Playwright has ability to mock clock and passage of time."
+    },
+    {
+      "label": "debugger",
+      "type": "property",
+      "detail": "Debugger",
+      "info": "Debugger allows to pause and resume the execution."
     },
     {
       "label": "request",
@@ -1059,6 +1089,12 @@
       "info": "Emitted when Browser gets disconnected from the browser application. This might happen because of one of the following: - Browser application is closed or crashed. - The [browser.close([options])](https://playwright.dev/docs/api/class-browser#browser-close) method was called."
     },
     {
+      "label": "bind",
+      "type": "method",
+      "detail": "(title: string, options: { host?: string; metadata?: { [key: string]: any; }; port?: number; workspaceDir?: string; }) =…",
+      "info": "Binds the browser to a named pipe or web socket, making it available for other clients to connect to."
+    },
+    {
       "label": "browserType",
       "type": "method",
       "detail": "() => BrowserType<{}>",
@@ -1111,6 +1147,12 @@
       "type": "method",
       "detail": "() => Promise<Buffer<ArrayBufferLike>>",
       "info": "**NOTE** This API controls [Chromium Tracing](https://www.chromium.org/developers/how-tos/trace-event-profiling-tool) which is a low-level chromium-specific debugging tool. API to control [Playwright Tracing](https://playwright.dev/docs/trace-viewer) could be found [here](https://playwright.dev/docs"
+    },
+    {
+      "label": "unbind",
+      "type": "method",
+      "detail": "() => Promise<void>",
+      "info": "Unbinds the browser server previously bound with [browser.bind(title[, options])](https://playwright.dev/docs/api/class-browser#browser-bind)."
     },
     {
       "label": "version",
@@ -1370,7 +1412,7 @@
     {
       "label": "ariaSnapshot",
       "type": "method",
-      "detail": "(options: { timeout?: number; }) => Promise<string>",
+      "detail": "(options: { depth?: number; mode?: \"ai\" | \"default\"; timeout?: number; }) => Promise<string>",
       "info": "Captures the aria snapshot of the given element. Read more about [aria snapshots](https://playwright.dev/docs/aria-snapshots) and [expect(locator).toMatchAriaSnapshot(expected[, options])](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-match-aria-snapshot) for the corr"
     },
     {
@@ -1606,6 +1648,12 @@
       "type": "method",
       "detail": "(selectorOrLocator: string | Locator, options: { has?: Locator; hasNot?: Locator; hasNotText?: string | RegExp; hasText?…",
       "info": "The method finds an element matching the specified selector in the locator's subtree. It also accepts filter options, similar to [locator.filter([options])](https://playwright.dev/docs/api/class-locator#locator-filter) method. [Learn more about locators](https://playwright.dev/docs/locators)."
+    },
+    {
+      "label": "normalize",
+      "type": "method",
+      "detail": "() => Promise<Locator>",
+      "info": "Returns a new locator that uses best practices for referencing the matched element, prioritizing test ids, aria roles, and other user-facing attributes over CSS selectors. This is useful for converting implementation-detail selectors into more resilient, human-readable locators."
     },
     {
       "label": "nth",
@@ -2106,6 +2154,12 @@
       "type": "method",
       "detail": "(name: string) => Promise<string[]>",
       "info": "Returns all values of the headers matching the name, for example `set-cookie`. The name is case-insensitive."
+    },
+    {
+      "label": "httpVersion",
+      "type": "method",
+      "detail": "() => Promise<string>",
+      "info": "Returns the http version used by the response."
     },
     {
       "label": "json",

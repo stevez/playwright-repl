@@ -333,12 +333,14 @@ export async function takeScreenshot(page, fullPage) {
 // ─── Snapshot ────────────────────────────────────────────────────────────────
 
 export async function takeSnapshot(page) {
+  if (typeof page.ariaSnapshot === 'function') {
+    return await page.ariaSnapshot({ mode: 'ai' });
+  }
+  // Legacy fallback for older Playwright versions
   if (typeof page._snapshotForAI === 'function') {
     const result = await page._snapshotForAI();
-    // _snapshotForAI returns { full: string, incremental?: string }
     return result.full ?? String(result);
   }
-  // Fallback when _snapshotForAI is unavailable
   const title = await page.title();
   const url = page.url();
   return 'Title: ' + title + '\nURL: ' + url;

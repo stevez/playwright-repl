@@ -30,7 +30,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const TYPES_FILE = path.resolve(
   __dirname,
-  "node_modules/playwright-core/types/types.d.ts"
+  "packages/cli/node_modules/playwright-core/types/types.d.ts"
 );
 
 // Only extract these top-level interfaces — the ones you actually use in a REPL
