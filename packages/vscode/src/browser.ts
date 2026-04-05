@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
+import { handleLocalCommand } from '@playwright-repl/core';
 
 // __filename is available at runtime in esbuild's CJS output
 declare const __filename: string;
@@ -165,6 +166,11 @@ export class BrowserManager {
 
   async runCommand(raw: string, opts?: { includeSnapshot?: boolean }): Promise<{ text?: string; isError?: boolean; image?: string }> {
     if (!this._sw) return { text: 'Not connected', isError: true };
+
+    // Local commands (video, etc.) — run in Node.js
+    const localResult = await handleLocalCommand(raw, this._context);
+    if (localResult) return localResult;
+
     return this._sw.evaluate(
       async (params: { command: string; includeSnapshot?: boolean }) => {
         return await (self as any).handleBridgeCommand({

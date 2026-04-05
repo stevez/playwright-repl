@@ -3,7 +3,7 @@
  * No WebSocket bridge needed.
  */
 
-import { EvaluateConnection, findExtensionPath, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core';
+import { EvaluateConnection, findExtensionPath, UPDATE_COMMANDS, parseInput, handleLocalCommand } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule, SnapshotCache } from './types.js';
 import { logEvent } from './logger.js';
@@ -28,6 +28,10 @@ export async function createEvaluateRunner(
         descriptions,
         runner: {
             async runCommand(command: string): Promise<EngineResult> {
+                // Local commands (video, etc.) — run in Node.js
+                const localResult = await handleLocalCommand(command, conn.context);
+                if (localResult) return localResult;
+
                 const parsed = parseInput(command);
                 const cmdName = parsed?._[0];
                 const isUpdate = cmdName !== undefined && UPDATE_COMMANDS.has(cmdName);
