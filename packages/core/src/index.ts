@@ -21,3 +21,5 @@ export type { CompletionItem } from './completion-data.js';
 export type { CommandInfo } from './resolve.js';
 export { parseSnapshot, refToLocator, allRefLocators } from './snapshot-parser.js';
 export type { SnapshotNode, LocatorResult, RefLocatorEntry } from './snapshot-parser.js';
+export { isLocalCommand, handleLocalCommand, isVideoCommand, handleVideoCommand } from './local-commands.js';
+export type { LocalCommandResult } from './local-commands.js';

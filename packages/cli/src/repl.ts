@@ -12,6 +12,7 @@ import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES, refToLocator,
   filterResponse as filterResponseBase, resolveArgs,
+  isLocalCommand, handleLocalCommand,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
 import { Engine } from './engine.js';
@@ -750,56 +751,6 @@ function displayBridgeResult(result: EngineResult, silent: boolean): void {
   }
 }
 
-// ─── Video command handler (evaluate mode) ──────────────────────────────────
-
-function isVideoCommand(cmd: string): boolean {
-  return cmd.startsWith('video-start') || cmd === 'video-stop' || cmd.startsWith('video-chapter ') || cmd === 'video-chapter';
-}
-
-async function handleVideoCommand(
-  cmd: string,
-  srv: BridgeServer,
-  log: (...args: unknown[]) => void,
-): Promise<{ handled: boolean; isError?: boolean; errorMsg?: string }> {
-  const ctx = (srv as any).context;
-  if (!ctx) return { handled: false };
-
-  const pages = ctx.pages();
-  const page = pages[pages.length - 1];
-  if (!page) {
-    log(`${c.yellow}No page available.${c.reset}`);
-    return { handled: true, isError: true, errorMsg: 'No page available' };
-  }
-
-  try {
-    if (cmd.startsWith('video-start')) {
-      const args = parseInput(cmd);
-      const sizeStr = args?.size as string | undefined;
-      const size = sizeStr ? { width: parseInt(sizeStr.split('x')[0]), height: parseInt(sizeStr.split('x')[1]) } : undefined;
-      const outDir = path.join(os.homedir(), 'pw-videos');
-      fs.mkdirSync(outDir, { recursive: true });
-      const outPath = path.join(outDir, `pw-video-${Date.now()}.webm`);
-      await page.screencast.start({ path: outPath, size });
-      log(`${c.green}▶${c.reset} Recording started → ${outPath}`);
-    } else if (cmd === 'video-stop') {
-      await page.screencast.stop();
-      log(`${c.green}■${c.reset} Recording stopped.`);
-    } else if (cmd.startsWith('video-chapter')) {
-      const args = parseInput(cmd);
-      const title = args?._?.slice(1).join(' ') || '';
-      const description = args?.description as string | undefined;
-      const duration = args?.duration ? parseInt(String(args.duration)) : undefined;
-      await page.screencast.showChapter(title, { description, duration });
-      log(`Chapter "${title}" added.`);
-    }
-    return { handled: true };
-  } catch (err: unknown) {
-    const msg = (err as Error).message;
-    log(`${c.red}${msg}${c.reset}`);
-    return { handled: true, isError: true, errorMsg: msg };
-  }
-}
-
 // ─── Bridge replay mode ──────────────────────────────────────────────────────
 
 async function runSingleBridgeFile(
@@ -824,15 +775,16 @@ async function runSingleBridgeFile(
 
     const startTime = performance.now();
 
-    // Video commands — handle locally in evaluate mode
-    if (isVideoCommand(cmd)) {
-      const video = await handleVideoCommand(cmd, srv, log);
+    // Local commands — handle in Node.js (e.g. video needs real filesystem)
+    const localResult = await handleLocalCommand(cmd, (srv as any).context);
+    if (localResult) {
       const elapsed = (performance.now() - startTime).toFixed(0);
+      log(localResult.isError ? `${c.red}${localResult.text}${c.reset}` : localResult.text);
       log(`${c.dim}(${elapsed}ms)${c.reset}`);
-      if (video.handled && video.isError) {
+      if (localResult.isError) {
         return { passed: false, commandsRun, errorMsg: `failed at [${commandsRun}/${commands.length}]: ${cmd}` };
       }
-      if (video.handled) continue;
+      continue;
     }
 
     const result = await srv.run(cmd);
@@ -996,11 +948,10 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
       return;
     }
 
-    // ── Video commands (evaluate mode only — uses Node.js page.screencast) ──
-    if (isVideoCommand(command)) {
-      const { handled } = await handleVideoCommand(command, srv, log);
-      if (handled) return;
-      log(`${c.yellow}Video commands require evaluate mode (not bridge).${c.reset}`);
+    // ── Local commands (video, etc. — need Node.js filesystem) ─────
+    const localResult = await handleLocalCommand(command, (srv as any).context);
+    if (localResult) {
+      log(localResult.isError ? `${c.red}${localResult.text}${c.reset}` : localResult.text);
       return;
     }
 
