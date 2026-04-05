@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.1
+
+**2026-04-05**
+
+### Fixes
+
+- Fix locator generation for `<p>` and long-text elements — use `getByText()` with substring instead of generic CSS selector
+
 ## 0.23.0
 
 **2026-04-05**

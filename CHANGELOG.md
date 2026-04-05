@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.23.1
+
+**2026-04-05**
+
+### Fixes
+
+- **Element picker**: Fix locator generation for `<p>` and other long-text elements — use `getByText()` with a truncated substring instead of falling back to a generic CSS selector like `locator('p')`. ([#579](https://github.com/stevez/playwright-repl/issues/579))
+- **ARIA roles**: Add `paragraph` implicit role for `<p>` elements.
+
 ## v0.23.0 — Upgrade to Playwright 1.59.1
 
 **2026-04-05**
