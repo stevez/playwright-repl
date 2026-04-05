@@ -1,0 +1,29 @@
+# Record a video of adding todos
+# App: https://demo.playwright.dev/todomvc/
+# Video saved to ~/pw-videos/
+
+goto https://demo.playwright.dev/todomvc/
+localstorage-clear
+reload
+
+video-start
+video-chapter "Adding todos"
+fill textbox "What needs to be done?" "Buy groceries"
+press Enter
+fill textbox "What needs to be done?" "Write tests"
+press Enter
+fill textbox "What needs to be done?" "Deploy to production"
+press Enter
+
+video-chapter "Completing a todo"
+click "Buy groceries"
+verify-text "2 items left"
+
+video-chapter "Filtering"
+click "Completed"
+verify-text "Buy groceries"
+
+video-stop
+
+# Cleanup
+localstorage-clear

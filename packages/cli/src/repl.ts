@@ -934,6 +934,46 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
       return;
     }
 
+    // ── Video commands (evaluate mode only — uses Node.js page.screencast) ──
+    if (command.startsWith('video-start') || command === 'video-stop' || command.startsWith('video-chapter ')) {
+      const ctx = (srv as any).context;
+      if (!ctx) {
+        log(`${c.yellow}Video commands require evaluate mode (not bridge).${c.reset}`);
+        return;
+      }
+      const pages = ctx.pages();
+      const page = pages[pages.length - 1];
+      if (!page) {
+        log(`${c.yellow}No page available.${c.reset}`);
+        return;
+      }
+      try {
+        if (command.startsWith('video-start')) {
+          const args = parseInput(command);
+          const sizeStr = args?.size as string | undefined;
+          const size = sizeStr ? { width: parseInt(sizeStr.split('x')[0]), height: parseInt(sizeStr.split('x')[1]) } : undefined;
+          const outDir = path.join(os.homedir(), 'pw-videos');
+          fs.mkdirSync(outDir, { recursive: true });
+          const outPath = path.join(outDir, `pw-video-${Date.now()}.webm`);
+          await page.screencast.start({ path: outPath, size });
+          log(`${c.green}▶${c.reset} Recording started → ${outPath}`);
+        } else if (command === 'video-stop') {
+          await page.screencast.stop();
+          log(`${c.green}■${c.reset} Recording stopped.`);
+        } else if (command.startsWith('video-chapter ')) {
+          const args = parseInput(command);
+          const title = args?._?.slice(1).join(' ') || '';
+          const description = args?.description as string | undefined;
+          const duration = args?.duration ? parseInt(String(args.duration)) : undefined;
+          await page.screencast.showChapter(title, { description, duration });
+          log(`Chapter "${title}" added.`);
+        }
+      } catch (err: unknown) {
+        log(`${c.red}${(err as Error).message}${c.reset}`);
+      }
+      return;
+    }
+
     if (!srv.connected) {
       log(`${c.yellow}[not connected] Waiting for extension...${c.reset}`);
       return;
