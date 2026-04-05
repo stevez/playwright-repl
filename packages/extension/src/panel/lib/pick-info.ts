@@ -254,12 +254,13 @@ export function pickResultToSerialized(data: PickResultData): SerializedValue {
 }
 
 /**
- * Resolve Playwright's locator for a picked element via CDP _generateLocatorString().
+ * Resolve Playwright's locator for a picked element via locator.normalize().
  * The element must be marked with data-pw-pick-id by the content script.
  */
 export async function resolvePlaywrightLocator(pickId: string): Promise<string | null> {
     try {
-        const expr = `page.$('[data-pw-pick-id="${pickId}"]').then(async el => { if (!el) return null; await el.evaluate(e => e.removeAttribute('data-pw-pick-id')); const loc = await el._generateLocatorString(); el.dispose(); return loc ?? null; })`;
+        const selector = `[data-pw-pick-id="${pickId}"]`;
+        const expr = `page.locator('${selector}').normalize().then(async loc => { await page.locator('${selector}').evaluate(e => e.removeAttribute('data-pw-pick-id')); return loc.toString(); })`;
         const result = await swDebugEval(expr) as { result?: { type?: string; value?: string } };
         if (result?.result?.type === 'string' && result.result.value)
             return result.result.value;
