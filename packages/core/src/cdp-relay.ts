@@ -10,6 +10,11 @@
  * Two WebSocket paths on the same port:
  * - /extension — Dramaturg extension connects here
  * - /devtools/browser/<guid> — Playwright connectOverCDP connects here
+ *
+ * IMPORTANT: Responses and events are both sent to Playwright synchronously
+ * from onExtensionMessage. This guarantees correct ordering — if events and
+ * responses were on different paths (async vs sync), Playwright could receive
+ * lifecycle events before the frame tree response, causing page.title() to hang.
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
@@ -27,6 +32,15 @@ interface CdpMessage {
   error?: { code?: number; message: string };
 }
 
+interface ExtCallback {
+  resolve: (r: unknown) => void;
+  reject: (e: Error) => void;
+  // Playwright message context — used to send the response directly
+  // from onExtensionMessage (synchronous path, same as events)
+  pwId?: number;
+  pwSessionId?: string;
+}
+
 // ─── CdpRelay ───────────────────────────────────────────────────────────────
 
 export class CdpRelay {
@@ -40,7 +54,7 @@ export class CdpRelay {
   private _onExtensionConnect?: () => void;
 
   // Extension request/response tracking
-  private _extCallbacks = new Map<number, { resolve: (r: unknown) => void; reject: (e: Error) => void }>();
+  private _extCallbacks = new Map<number, ExtCallback>();
   private _extNextId = 1;
 
   // Connected tab info
@@ -130,14 +144,13 @@ export class CdpRelay {
       this._connected = false;
       this._tabSessionId = null;
       this._tabTargetInfo = null;
-      // Reject pending extension calls
       for (const [, cb] of this._extCallbacks) cb.reject(new Error('Extension disconnected'));
       this._extCallbacks.clear();
     });
   }
 
   /** Send a request to the extension and wait for response. */
-  private sendToExtension(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  private sendToExtension(method: string, params: Record<string, unknown> = {}, pwContext?: { id: number; sessionId?: string }): Promise<unknown> {
     if (!this.extensionSocket || this.extensionSocket.readyState !== WebSocket.OPEN)
       return Promise.reject(new Error('Extension not connected'));
     const id = this._extNextId++;
@@ -145,7 +158,7 @@ export class CdpRelay {
     console.error(`[cdp-relay] → ext: ${method} (id=${id})`, JSON.stringify(params).slice(0, 150));
     this.extensionSocket.send(JSON.stringify(msg));
     return new Promise((resolve, reject) => {
-      this._extCallbacks.set(id, { resolve, reject });
+      this._extCallbacks.set(id, { resolve, reject, pwId: pwContext?.id, pwSessionId: pwContext?.sessionId });
     });
   }
 
@@ -157,7 +170,28 @@ export class CdpRelay {
       this._extCallbacks.delete(msg.id);
       const resultStr = JSON.stringify(msg.result);
       console.error(`[cdp-relay] ← ext: resp id=${msg.id}`, msg.error ? `ERROR: ${msg.error}` : `OK ${resultStr?.slice(0, 500)}`);
-      if (msg.error) cb.reject(new Error(msg.error as string));
+
+      // Send response to Playwright IMMEDIATELY (synchronous) — same code path
+      // as events. This ensures correct ordering: if chrome.debugger sends a
+      // response followed by events, they arrive at Playwright in the same order.
+      if (cb.pwId !== undefined) {
+        if (msg.error) {
+          this.sendToPlaywright({
+            id: cb.pwId,
+            sessionId: cb.pwSessionId,
+            error: { message: typeof msg.error === 'string' ? msg.error : JSON.stringify(msg.error) },
+          });
+        } else {
+          this.sendToPlaywright({
+            id: cb.pwId,
+            sessionId: cb.pwSessionId,
+            result: (msg.result ?? {}) as Record<string, unknown>,
+          });
+        }
+      }
+
+      // Resolve/reject the promise (for callers that await, e.g. attachToTab)
+      if (msg.error) cb.reject(new Error(typeof msg.error === 'string' ? msg.error : JSON.stringify(msg.error)));
       else cb.resolve(msg.result);
       return;
     }
@@ -185,9 +219,9 @@ export class CdpRelay {
     console.error('[cdp-relay] Playwright connected');
     this.playwrightSocket = ws;
 
-    ws.on('message', async (data) => {
+    ws.on('message', (data) => {
       const msg: CdpMessage = JSON.parse(String(data));
-      await this.handlePlaywrightMessage(msg);
+      this.handlePlaywrightMessage(msg);
     });
 
     ws.on('close', () => {
@@ -196,26 +230,37 @@ export class CdpRelay {
     });
   }
 
-  /** Handle CDP messages from Playwright. */
-  private async handlePlaywrightMessage(msg: CdpMessage): Promise<void> {
+  /** Handle CDP messages from Playwright — route locally or forward to extension. */
+  private handlePlaywrightMessage(msg: CdpMessage): void {
     const { id, sessionId, method, params } = msg;
     console.error(`[cdp-relay] ← PW: ${sessionId ? `[${sessionId}] ` : ''}${method} (id=${id})`);
 
-    try {
-      const result = await this.handleCDPCommand(method!, params, sessionId);
-      this.sendToPlaywright({ id, sessionId, result });
-    } catch (e: unknown) {
-      this.sendToPlaywright({
-        id,
-        sessionId,
-        error: { message: (e as Error).message },
-      });
+    // Try to handle locally (browser-level commands)
+    const localResult = this.tryLocalCommand(method!, params, sessionId);
+    if (localResult !== undefined) {
+      this.sendToPlaywright({ id, sessionId, result: localResult });
+      return;
     }
+
+    // Target.setAutoAttach (browser-level) — async, needs extension call
+    if (method === 'Target.setAutoAttach' && !sessionId) {
+      this.handleBrowserAutoAttach(id!);
+      return;
+    }
+
+    // Forward to extension — response is sent from onExtensionMessage (synchronous)
+    const forwardSessionId = (this._tabSessionId === sessionId) ? undefined : sessionId;
+    this.sendToExtension('forwardCDPCommand', {
+      method,
+      params,
+      sessionId: forwardSessionId,
+    }, { id: id!, sessionId }).catch((e: Error) => {
+      this.sendToPlaywright({ id, sessionId, error: { message: e.message } });
+    });
   }
 
-  /** Route CDP commands — synthesize browser-level, forward session-level. */
-  private async handleCDPCommand(method: string, params: Record<string, unknown> | undefined, sessionId: string | undefined): Promise<unknown> {
-    // Browser-level commands (no sessionId)
+  /** Handle commands that can be answered locally (no extension call needed). */
+  private tryLocalCommand(method: string, params: Record<string, unknown> | undefined, _sessionId: string | undefined): unknown | undefined {
     switch (method) {
       case 'Browser.getVersion':
         return {
@@ -225,28 +270,9 @@ export class CdpRelay {
         };
       case 'Browser.setDownloadBehavior':
         return {};
-      case 'Target.setAutoAttach': {
-        // Session-level Target.setAutoAttach → forward to extension
-        if (sessionId) break;
-        // Browser-level → attach to the active tab
-        const { targetInfo } = await this.sendToExtension('attachToTab', {}) as { targetInfo: Record<string, unknown> };
-        this._tabTargetInfo = targetInfo;
-        this._tabSessionId = `pw-tab-${this._nextSessionId++}`;
-        // Send Target.attachedToTarget event to Playwright
-        this.sendToPlaywright({
-          method: 'Target.attachedToTarget',
-          params: {
-            sessionId: this._tabSessionId,
-            targetInfo: { ...targetInfo, attached: true },
-            waitingForDebugger: false,
-          },
-        });
-        return {};
-      }
       case 'Target.getTargetInfo':
-        if (!params?.targetId) {
+        if (!params?.targetId)
           return { targetInfo: { targetId: 'browser', type: 'browser', title: '', url: '' } };
-        }
         return { targetInfo: this._tabTargetInfo || {} };
       case 'Target.setDiscoverTargets':
         return {};
@@ -255,14 +281,28 @@ export class CdpRelay {
       case 'Target.getTargets':
         return { targetInfos: this._tabTargetInfo ? [this._tabTargetInfo] : [] };
     }
+    // Session-level Target.setAutoAttach falls through to forwarding
+    return undefined;
+  }
 
-    // Forward to extension — strip top-level sessionId
-    const forwardSessionId = (this._tabSessionId === sessionId) ? undefined : sessionId;
-    return await this.sendToExtension('forwardCDPCommand', {
-      method,
-      params,
-      sessionId: forwardSessionId,
-    });
+  /** Handle browser-level Target.setAutoAttach — attaches to the active tab. */
+  private async handleBrowserAutoAttach(pwId: number): Promise<void> {
+    try {
+      const { targetInfo } = await this.sendToExtension('attachToTab', {}) as { targetInfo: Record<string, unknown> };
+      this._tabTargetInfo = targetInfo;
+      this._tabSessionId = `pw-tab-${this._nextSessionId++}`;
+      this.sendToPlaywright({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: this._tabSessionId,
+          targetInfo: { ...targetInfo, attached: true },
+          waitingForDebugger: false,
+        },
+      });
+      this.sendToPlaywright({ id: pwId, result: {} });
+    } catch (e: unknown) {
+      this.sendToPlaywright({ id: pwId, error: { message: (e as Error).message } });
+    }
   }
 
   private sendToPlaywright(msg: CdpMessage): void {

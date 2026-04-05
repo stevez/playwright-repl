@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 /**
- * Interactive CDP Relay REPL.
- *
- * Starts a CDP relay server and waits for the Dramaturg extension to connect.
- * Then connects Playwright via connectOverCDP and drops into an interactive REPL.
- *
- * Steps:
- * 1. Run this script
- * 2. Load the extension in Chrome (chrome://extensions → Load unpacked → packages/extension/dist)
- * 3. The extension auto-connects to port 9877
- * 4. Playwright connects via CDP relay
- * 5. Type commands in the REPL
+ * Interactive CDP Relay REPL — connects to existing browser with Dramaturg.
  *
  * Usage:
  *   node packages/cli/e2e/test-cdp-relay-repl.mjs
+ *
+ * Then in Chrome SW DevTools:
+ *   chrome.storage.local.set({ cdpRelayPort: 9877 })
  */
 
 import { chromium } from 'playwright';
@@ -27,18 +20,18 @@ async function main() {
   await relay.start(CDP_PORT);
   console.log(`CDP relay started on port ${CDP_PORT}`);
   console.log(`WebSocket: ${relay.wsUrl}\n`);
-  console.log('Waiting for Dramaturg extension to connect...');
-  console.log('(Load the extension in Chrome if not already loaded)\n');
+  console.log('Waiting for extension to connect...');
+  console.log('Run in Chrome SW DevTools:  chrome.storage.local.set({ cdpRelayPort: 9877 })\n');
 
   await relay.waitForExtension(120000);
   console.log('Extension connected!\n');
 
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 500));
 
   console.log('Connecting Playwright via connectOverCDP...');
   let browser, page;
   try {
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { timeout: 30000 });
     console.log('✓ Connected!');
 
     const contexts = browser.contexts();
@@ -47,21 +40,63 @@ async function main() {
       const pages = ctx.pages();
       console.log(`  Pages: ${pages.length}`);
       for (const p of pages) {
-        console.log(`    - ${p.url()}`);
+        console.log(`    - url="${p.url()}" mainFrame=${!!p.mainFrame()}`);
       }
       if (pages.length > 0) page = pages[0];
     }
+
+    if (page) {
+      console.log('\n--- Testing page operations ---');
+
+      // Test 1: page.url()
+      console.log(`1. page.url() = "${page.url()}"`);
+
+      // Test 2: page.title() with timeout
+      console.log('2. Testing page.title() (10s timeout)...');
+      try {
+        const title = await Promise.race([
+          page.title(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT: page.title() took >10s')), 10000))
+        ]);
+        console.log(`   ✓ page.title() = "${title}"`);
+      } catch (e) {
+        console.error(`   ✗ page.title() failed: ${e.message}`);
+
+        // Test 3: Try direct evaluate as fallback
+        console.log('3. Testing page.evaluate() directly (5s timeout)...');
+        try {
+          const title2 = await Promise.race([
+            page.evaluate(() => document.title),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 5000))
+          ]);
+          console.log(`   ✓ page.evaluate() = "${title2}"`);
+        } catch (e2) {
+          console.error(`   ✗ page.evaluate() failed: ${e2.message}`);
+        }
+
+        // Test 4: Check CDP session directly
+        console.log('4. Testing CDP session directly...');
+        try {
+          const cdp = await page.context().newCDPSession(page);
+          const dom = await Promise.race([
+            cdp.send('DOM.getDocument'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 5000))
+          ]);
+          console.log(`   ✓ DOM.getDocument root nodeId=${dom.root.nodeId}`);
+        } catch (e3) {
+          console.error(`   ✗ CDP session failed: ${e3.message}`);
+        }
+      }
+    }
   } catch (err) {
     console.error('connectOverCDP failed:', err.message);
+    if (err.stack) console.error(err.stack.split('\n').slice(1, 4).join('\n'));
   }
 
-  // Expose variables for eval
+  // REPL
   let context = browser?.contexts()[0];
-
   console.log('\n--- CDP Relay REPL ---');
   console.log('Globals: browser, context, page, relay');
-  console.log('Try: browser.contexts().length, context?.pages().length');
-  console.log('Type .pages to refresh page list');
   console.log('Type .quit to exit\n');
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'cdp> ' });
@@ -80,7 +115,6 @@ async function main() {
       rl.prompt();
       return;
     }
-
     try {
       const result = await eval(`(async () => { return ${cmd}; })()`);
       if (result !== undefined) console.log(result);

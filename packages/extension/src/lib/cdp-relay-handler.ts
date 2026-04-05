@@ -47,7 +47,11 @@ export async function handleCdpCommand(msg: { method: string; params?: Record<st
       const cdpParams = (params as any)?.params;
       const sessionId = (params as any)?.sessionId;
       const result = await doForwardCommand(cdpMethod, cdpParams, sessionId);
-      return { result };
+      // chrome.debugger.sendCommand returns undefined for commands with empty results
+      // (e.g. Page.enable, Runtime.enable). Ensure result is at least {} so it
+      // survives JSON serialization — without this, the { result } field is dropped
+      // and Playwright's callback never resolves.
+      return { result: result ?? {} };
     }
 
     return { error: `Unknown method: ${method}` };
@@ -69,19 +73,22 @@ async function doAttachToTab(): Promise<{ targetInfo: Record<string, unknown> }>
 
   const tabId = tab.id;
 
-  if (attachedTabId !== null && attachedTabId !== tabId) {
-    chrome.debugger.detach({ tabId: attachedTabId }).catch(() => {});
-  }
+  // Always detach first — ensures a fresh debugger session so Runtime.enable etc.
+  // re-send events (executionContextCreated). Without this, reconnecting to the
+  // same tab reuses a stale session where domains are already enabled.
+  // Detach both tracked tab AND target tab (may differ if state was corrupted).
+  if (attachedTabId !== null && attachedTabId !== tabId)
+    await chrome.debugger.detach({ tabId: attachedTabId }).catch(() => {});
+  await chrome.debugger.detach({ tabId }).catch(() => {});
+  attachedTabId = null;
 
-  if (attachedTabId !== tabId) {
-    await new Promise<void>((resolve, reject) => {
-      chrome.debugger.attach({ tabId }, '1.3', () => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve();
-      });
+  await new Promise<void>((resolve, reject) => {
+    chrome.debugger.attach({ tabId }, '1.3', () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
     });
-    attachedTabId = tabId;
-  }
+  });
+  attachedTabId = tabId;
 
   return {
     targetInfo: {
@@ -113,7 +120,6 @@ async function doForwardCommand(method: string, params?: Record<string, unknown>
 
 function setupEventForwarding(): void {
   chrome.debugger.onEvent.addListener((source: any, method: string, params: any) => {
-    console.log('[cdp-relay] debugger event:', method, 'sendToNode:', !!sendToNode);
     if (!sendToNode) return;
     sendToNode({
       method: 'forwardCDPEvent',

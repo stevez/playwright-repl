@@ -95,7 +95,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => { /* panel may not be open */ });
   }
   if (area === 'local' && changes.cdpRelayPort) {
-    chrome.runtime.sendMessage({ type: 'cdp-relay-port-changed', port: changes.cdpRelayPort.newValue }).catch(() => {});
+    // Reconnect directly — no need to broadcast to offscreen
+    const port = changes.cdpRelayPort.newValue as number;
+    if (port) connectCdpRelay(port);
   }
 });
 
@@ -527,25 +529,73 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.get(['cdpRelayPort']).then((s: Record<string, unknown>) => sendResponse((s.cdpRelayPort as number) || 0));
     return true;
   }
-  if (msg.type === 'cdp-command') {
-    console.log('[background] cdp-command:', msg.method, JSON.stringify(msg.params || {}).slice(0, 100));
-    handleCdpCommand(msg).then(r => {
-      console.log('[background] cdp-response:', msg.method, JSON.stringify(r).slice(0, 100));
-      sendResponse(r);
-    }).catch(e => {
-      console.log('[background] cdp-error:', msg.method, e.message);
-      sendResponse({ error: String(e) });
-    });
-    return true;
-  }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
 });
 
-// ─── CDP Relay (bridge v2) ──────────────────────────────────────────────────
-// Send CDP responses/events to offscreen doc, which forwards them to the Node WS
+// ─── CDP Relay (direct WS to Node) ─────────────────────────────────────────
+// Background SW connects directly to the Node CDP relay server via WebSocket.
+// No offscreen intermediary — eliminates chrome.runtime.sendMessage broadcast
+// which caused Runtime.exceptionThrown flooding in content scripts.
+
+let cdpRelayWs: WebSocket | null = null;
+let cdpRelayReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function connectCdpRelay(port: number) {
+  // Clean up existing connection
+  if (cdpRelayReconnectTimer) { clearTimeout(cdpRelayReconnectTimer); cdpRelayReconnectTimer = null; }
+  if (cdpRelayWs) { cdpRelayWs.onclose = null; cdpRelayWs.close(); cdpRelayWs = null; }
+
+  try {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/extension`);
+
+    ws.onopen = () => {
+      console.log('[cdp-relay] Connected to relay on port', port);
+      cdpRelayWs = ws;
+    };
+
+    ws.onmessage = async (e) => {
+      const msg = JSON.parse(e.data as string);
+      if (msg.id && msg.method) {
+        try {
+          const response = await handleCdpCommand(msg);
+          if (ws.readyState === WebSocket.OPEN)
+            ws.send(JSON.stringify({ id: msg.id, ...response }));
+        } catch (err) {
+          if (ws.readyState === WebSocket.OPEN)
+            ws.send(JSON.stringify({ id: msg.id, error: String(err) }));
+        }
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('[cdp-relay] Disconnected from relay');
+      if (cdpRelayWs === ws) cdpRelayWs = null;
+      cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 3000);
+    };
+
+    ws.onerror = () => {};
+  } catch {
+    cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 3000);
+  }
+}
+
+async function tryConnectCdpRelay() {
+  try {
+    const { cdpRelayPort } = await chrome.storage.local.get(['cdpRelayPort']) as { cdpRelayPort?: number };
+    if (cdpRelayPort) connectCdpRelay(cdpRelayPort);
+  } catch {
+    cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 5000);
+  }
+}
+
+// Forward chrome.debugger events directly to the relay WS
 initCdpRelay((msg) => {
-  chrome.runtime.sendMessage(msg).catch(() => { /* offscreen may not be open */ });
+  if (cdpRelayWs?.readyState === WebSocket.OPEN)
+    cdpRelayWs.send(JSON.stringify(msg));
 });
+
+// Connect on startup and when port changes
+tryConnectCdpRelay();
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;
