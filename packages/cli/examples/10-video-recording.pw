@@ -16,11 +16,11 @@ fill textbox "What needs to be done?" "Deploy to production"
 press Enter
 
 video-chapter "Completing a todo"
-click "Buy groceries"
+check "Buy groceries"
 verify-text "2 items left"
 
 video-chapter "Filtering"
-click "Completed"
+click link "Completed"
 verify-text "Buy groceries"
 
 video-stop
