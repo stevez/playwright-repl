@@ -17,6 +17,8 @@ const NODE_ONLY_METHODS = new Set([
   'route', 'unroute', 'routeFromHAR', 'unrouteAll',
   'waitForEvent', 'waitForResponse', 'waitForRequest',
   'frames', 'mainFrame',
+  // Filesystem-dependent APIs (SW uses memfs — files not persisted to disk)
+  'screencast', 'tracing', 'saveAs',
 ]);
 
 /**
