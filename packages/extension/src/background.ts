@@ -6,6 +6,7 @@ import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
+import { initCdpRelay, handleCdpCommand } from './lib/cdp-relay-handler';
 
 // ─── Patch toMatchAriaSnapshot ──────────────────────────────────────────────
 // toMatchAriaSnapshot requires currentTestInfo() which only exists inside the
@@ -93,6 +94,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.bridgePort) {
     chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => { /* panel may not be open */ });
   }
+  if (area === 'local' && changes.cdpRelayPort) {
+    chrome.runtime.sendMessage({ type: 'cdp-relay-port-changed', port: changes.cdpRelayPort.newValue }).catch(() => {});
+  }
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
@@ -123,6 +127,9 @@ function resetCrxState() {
 
 async function ensureCrxApp(): Promise<CrxApplication> {
   if (crxApp) return crxApp;
+  // Skip playwright-crx when CDP relay is active (avoids chrome.debugger conflict)
+  const { cdpRelayPort } = await chrome.storage.local.get(['cdpRelayPort']) as { cdpRelayPort?: number };
+  if (cdpRelayPort) throw new Error('playwright-crx disabled — CDP relay mode active');
   crxApp = await crx.start();
   (crxApp as any).on('close', () => resetCrxState());
   return crxApp;
@@ -516,7 +523,28 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;
   }
+  if (msg.type === 'get-cdp-relay-port') {
+    chrome.storage.local.get(['cdpRelayPort']).then((s: Record<string, unknown>) => sendResponse((s.cdpRelayPort as number) || 0));
+    return true;
+  }
+  if (msg.type === 'cdp-command') {
+    console.log('[background] cdp-command:', msg.method, JSON.stringify(msg.params || {}).slice(0, 100));
+    handleCdpCommand(msg).then(r => {
+      console.log('[background] cdp-response:', msg.method, JSON.stringify(r).slice(0, 100));
+      sendResponse(r);
+    }).catch(e => {
+      console.log('[background] cdp-error:', msg.method, e.message);
+      sendResponse({ error: String(e) });
+    });
+    return true;
+  }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
+});
+
+// ─── CDP Relay (bridge v2) ──────────────────────────────────────────────────
+// Send CDP responses/events to offscreen doc, which forwards them to the Node WS
+initCdpRelay((msg) => {
+  chrome.runtime.sendMessage(msg).catch(() => { /* offscreen may not be open */ });
 });
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
