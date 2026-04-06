@@ -76,7 +76,6 @@ async function doAttachToTab(): Promise<{ targetInfo: Record<string, unknown> }>
   // Always detach first — ensures a fresh debugger session so Runtime.enable etc.
   // re-send events (executionContextCreated). Without this, reconnecting to the
   // same tab reuses a stale session where domains are already enabled.
-  // Detach both tracked tab AND target tab (may differ if state was corrupted).
   if (attachedTabId !== null && attachedTabId !== tabId)
     await chrome.debugger.detach({ tabId: attachedTabId }).catch(() => {});
   await chrome.debugger.detach({ tabId }).catch(() => {});
@@ -90,25 +89,23 @@ async function doAttachToTab(): Promise<{ targetInfo: Record<string, unknown> }>
   });
   attachedTabId = tabId;
 
-  return {
-    targetInfo: {
-      targetId: String(tabId),
-      type: 'page',
-      title: tab.title || '',
-      url: tab.url || '',
-      attached: true,
-      browserContextId: 'default',
-      canAccessOpener: false,
-    },
-  };
+  // Get targetInfo from CDP (matches Playwright MCP extension approach)
+  const result: any = await new Promise((resolve, reject) => {
+    chrome.debugger.sendCommand({ tabId }, 'Target.getTargetInfo', {}, (r: unknown) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(r);
+    });
+  });
+  return { targetInfo: result?.targetInfo };
 }
 
 async function doForwardCommand(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<unknown> {
   if (attachedTabId === null) throw new Error('No tab attached');
 
-  const debuggee = sessionId
-    ? { targetId: sessionId }
-    : { tabId: attachedTabId };
+  // Must include tabId alongside sessionId — chrome.debugger needs both.
+  // Using { targetId: sessionId } was wrong and caused commands to fail.
+  const debuggee: Record<string, unknown> = { tabId: attachedTabId };
+  if (sessionId) debuggee.sessionId = sessionId;
 
   return new Promise((resolve, reject) => {
     chrome.debugger.sendCommand(debuggee, method, params || {}, (result: unknown) => {
@@ -126,7 +123,7 @@ function setupEventForwarding(): void {
       params: {
         method,
         params,
-        sessionId: source.targetId !== undefined ? String(source.targetId) : undefined,
+        sessionId: source.sessionId,
       },
     });
   });

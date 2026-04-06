@@ -128,7 +128,6 @@ export class CdpRelay {
       ws.close(1000, 'Another extension already connected');
       return;
     }
-    console.error('[cdp-relay] Extension connected');
     this.extensionSocket = ws;
     this._connected = true;
     this._onExtensionConnect?.();
@@ -139,7 +138,6 @@ export class CdpRelay {
     });
 
     ws.on('close', () => {
-      console.error('[cdp-relay] Extension disconnected');
       this.extensionSocket = null;
       this._connected = false;
       this._tabSessionId = null;
@@ -155,7 +153,6 @@ export class CdpRelay {
       return Promise.reject(new Error('Extension not connected'));
     const id = this._extNextId++;
     const msg = { id, method, params };
-    console.error(`[cdp-relay] → ext: ${method} (id=${id})`, JSON.stringify(params).slice(0, 150));
     this.extensionSocket.send(JSON.stringify(msg));
     return new Promise((resolve, reject) => {
       this._extCallbacks.set(id, { resolve, reject, pwId: pwContext?.id, pwSessionId: pwContext?.sessionId });
@@ -168,9 +165,6 @@ export class CdpRelay {
     if (typeof msg.id === 'number' && this._extCallbacks.has(msg.id)) {
       const cb = this._extCallbacks.get(msg.id)!;
       this._extCallbacks.delete(msg.id);
-      const resultStr = JSON.stringify(msg.result);
-      console.error(`[cdp-relay] ← ext: resp id=${msg.id}`, msg.error ? `ERROR: ${msg.error}` : `OK ${resultStr?.slice(0, 500)}`);
-
       // Send response to Playwright IMMEDIATELY (synchronous) — same code path
       // as events. This ensures correct ordering: if chrome.debugger sends a
       // response followed by events, they arrive at Playwright in the same order.
@@ -197,7 +191,6 @@ export class CdpRelay {
     }
 
     // Event from extension (forwardCDPEvent)
-    console.error(`[cdp-relay] ← ext event:`, JSON.stringify(msg).slice(0, 200));
     if (msg.method === 'forwardCDPEvent') {
       const params = msg.params as { method: string; params?: unknown; sessionId?: string };
       const sessionId = params.sessionId || this._tabSessionId;
@@ -216,7 +209,6 @@ export class CdpRelay {
       ws.close(1000, 'Another Playwright client already connected');
       return;
     }
-    console.error('[cdp-relay] Playwright connected');
     this.playwrightSocket = ws;
 
     ws.on('message', (data) => {
@@ -225,7 +217,6 @@ export class CdpRelay {
     });
 
     ws.on('close', () => {
-      console.error('[cdp-relay] Playwright disconnected');
       this.playwrightSocket = null;
     });
   }
@@ -233,8 +224,6 @@ export class CdpRelay {
   /** Handle CDP messages from Playwright — route locally or forward to extension. */
   private handlePlaywrightMessage(msg: CdpMessage): void {
     const { id, sessionId, method, params } = msg;
-    console.error(`[cdp-relay] ← PW: ${sessionId ? `[${sessionId}] ` : ''}${method} (id=${id})`);
-
     // Try to handle locally (browser-level commands)
     const localResult = this.tryLocalCommand(method!, params, sessionId);
     if (localResult !== undefined) {
@@ -306,11 +295,8 @@ export class CdpRelay {
   }
 
   private sendToPlaywright(msg: CdpMessage): void {
-    if (this.playwrightSocket?.readyState === WebSocket.OPEN) {
-      const data = JSON.stringify(msg);
-      console.error(`[cdp-relay] → PW: ${data.slice(0, 250)}`);
-      this.playwrightSocket.send(data);
-    }
+    if (this.playwrightSocket?.readyState === WebSocket.OPEN)
+      this.playwrightSocket.send(JSON.stringify(msg));
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────

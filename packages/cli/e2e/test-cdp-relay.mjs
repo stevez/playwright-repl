@@ -64,7 +64,7 @@ async function main() {
   // 3. Connect Playwright via CDP relay
   console.log(`\nConnecting Playwright via connectOverCDP(http://127.0.0.1:${CDP_PORT})...`);
   try {
-    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { isLocal: true });
     console.log('✓ Connected via CDP relay');
 
     const contexts = browser.contexts();

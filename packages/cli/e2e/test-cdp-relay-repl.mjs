@@ -31,7 +31,7 @@ async function main() {
   console.log('Connecting Playwright via connectOverCDP...');
   let browser, page;
   try {
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { timeout: 30000 });
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { timeout: 30000, isLocal: true });
     console.log('✓ Connected!');
 
     const contexts = browser.contexts();

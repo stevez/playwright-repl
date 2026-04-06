@@ -539,6 +539,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 let cdpRelayWs: WebSocket | null = null;
 let cdpRelayReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let cdpRelayHadConnection = false;
 
 function connectCdpRelay(port: number) {
   // Clean up existing connection
@@ -549,8 +550,8 @@ function connectCdpRelay(port: number) {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/extension`);
 
     ws.onopen = () => {
-      console.log('[cdp-relay] Connected to relay on port', port);
       cdpRelayWs = ws;
+      cdpRelayHadConnection = true;
     };
 
     ws.onmessage = async (e) => {
@@ -568,23 +569,17 @@ function connectCdpRelay(port: number) {
     };
 
     ws.onclose = () => {
-      console.log('[cdp-relay] Disconnected from relay');
       if (cdpRelayWs === ws) cdpRelayWs = null;
-      cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 3000);
+      // Only auto-reconnect if we previously had a successful connection
+      // (relay server restarted). Don't retry on initial connection failure.
+      if (cdpRelayHadConnection)
+        cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
     };
 
     ws.onerror = () => {};
   } catch {
-    cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 3000);
-  }
-}
-
-async function tryConnectCdpRelay() {
-  try {
-    const { cdpRelayPort } = await chrome.storage.local.get(['cdpRelayPort']) as { cdpRelayPort?: number };
-    if (cdpRelayPort) connectCdpRelay(cdpRelayPort);
-  } catch {
-    cdpRelayReconnectTimer = setTimeout(() => tryConnectCdpRelay(), 5000);
+    if (cdpRelayHadConnection)
+      cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
   }
 }
 
@@ -593,9 +588,6 @@ initCdpRelay((msg) => {
   if (cdpRelayWs?.readyState === WebSocket.OPEN)
     cdpRelayWs.send(JSON.stringify(msg));
 });
-
-// Connect on startup and when port changes
-tryConnectCdpRelay();
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;
