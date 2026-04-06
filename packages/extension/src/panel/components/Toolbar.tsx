@@ -430,16 +430,6 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
                 </button>
-                <button
-                    id="video-btn"
-                    data-testid="video-btn"
-                    className={isVideoRecording ? 'video-recording' : ''}
-                    title={isVideoRecording ? `Stop video (${formatElapsed(videoElapsed)})` : 'Record video'}
-                    onClick={handleVideoRecord}
-                >
-                    <ScreencastIcon />
-                    {isVideoRecording && <span className="ml-1 text-[10px] font-mono">{formatElapsed(videoElapsed)}</span>}
-                </button>
                 {(isRunning || stepLine !== -1) && !isStepDebugging
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title="Stop" onClick={handleStop}><StopIcon /></button>
                     : <button id="run-btn" data-testid="run-btn" title="Run script (Ctrl+Enter)" disabled={!editorContent.trim() || isStepDebugging} onClick={handleRun}>&#9654;</button>
@@ -471,6 +461,16 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                         className="px-1.5 py-0.5 text-[11px] border-0 rounded-none"
                     >JS</button>
                 </div>
+                <button
+                    id="video-btn"
+                    data-testid="video-btn"
+                    className={isVideoRecording ? 'video-recording' : ''}
+                    title={isVideoRecording ? `Stop video (${formatElapsed(videoElapsed)})` : 'Record video'}
+                    onClick={handleVideoRecord}
+                >
+                    <ScreencastIcon />
+                    {isVideoRecording && <span className="ml-1 text-[10px] font-mono">{formatElapsed(videoElapsed)}</span>}
+                </button>
                 <button id="open-btn" title="Open .pw file" onClick={handleFileOpen}><FolderOpenIcon /></button>
                 <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}><SaveIcon /></button>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>

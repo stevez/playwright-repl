@@ -165,7 +165,7 @@ export function DebugStopIcon({ size = 16 }: { size?: number }) {
 }
 
 export function ScreencastIcon({ size = 16 }: { size?: number }) {
-  return <span style={{ fontSize: size, lineHeight: 1 }}>🎬</span>;
+  return <span style={{ fontSize: size, lineHeight: 1, filter: 'grayscale(1)' }}>🎬</span>;
 }
 
 export function CrosshairIcon({ size = 16 }: { size?: number }) {
