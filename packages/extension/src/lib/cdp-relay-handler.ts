@@ -23,6 +23,11 @@ export function initCdpRelay(send: SendFn): void {
 
 export function disposeCdpRelay(): void {
   sendToNode = null;
+  detachCdpRelay();
+}
+
+/** Detach debugger without clearing event forwarding (safe for reconnect). */
+export function detachCdpRelay(): void {
   if (attachedTabId !== null) {
     chrome.debugger.detach({ tabId: attachedTabId }).catch(() => {});
     attachedTabId = null;

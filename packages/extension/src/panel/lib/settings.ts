@@ -5,7 +5,7 @@ export type PwReplSettings = {
     languageMode: 'pw' | 'js',
 };
 
-const DEFAULT: PwReplSettings = { openAs: 'sidepanel', bridgePort: 9876, cdpRelayPort: 9877, languageMode: 'pw' };
+const DEFAULT: PwReplSettings = { openAs: 'sidepanel', bridgePort: 9876, cdpRelayPort: 0, languageMode: 'pw' };
 
 export async function loadSettings(): Promise<PwReplSettings> {
     const stored = await chrome.storage.local.get(['openAs', 'bridgePort', 'cdpRelayPort', 'languageMode']) as Partial<PwReplSettings>;

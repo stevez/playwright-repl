@@ -6,7 +6,7 @@ import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
-import { initCdpRelay, handleCdpCommand } from './lib/cdp-relay-handler';
+import { initCdpRelay, detachCdpRelay, handleCdpCommand } from './lib/cdp-relay-handler';
 
 // ─── Patch toMatchAriaSnapshot ──────────────────────────────────────────────
 // toMatchAriaSnapshot requires currentTestInfo() which only exists inside the
@@ -340,6 +340,14 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
       if (inner !== null) return formatBridgeResult(`${r.description} {${inner}}`);
     }
 
+    // Playwright Response: extract status + url via method calls
+    if (r.objectId && /^Response\d*$/.test(r.description ?? '')) {
+      const res = await cdpCallFunctionOn(r.objectId,
+        'function(){try{return this.status()+" "+this.url()}catch{return null}}');
+      const summary = res?.result?.value;
+      if (summary) return formatBridgeResult(`Response: ${summary}`);
+    }
+
     // Plain objects/arrays: use JSON.stringify for full nested representation
     if (r.objectId && (r.description === 'Object' || /^Array\(\d+\)$/.test(r.description ?? ''))) {
       const res = await cdpCallFunctionOn(r.objectId,
@@ -583,6 +591,8 @@ async function connectCdpRelay(port: number) {
 
     ws.onclose = () => {
       if (cdpRelayWs === ws) cdpRelayWs = null;
+      // Detach debugger when relay disconnects — prevents stale banner
+      detachCdpRelay();
       cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
     };
 

@@ -1058,6 +1058,16 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     await relay.waitForExtension(120000);
     log(`${c.green}✓${c.reset} Extension connected`);
 
+    // Prevent crashes from CDP session errors during cross-origin navigation.
+    // Playwright's CRSession throws assertions inside setImmediate — uncaughtException
+    // is the only way to catch them without crashing.
+    process.on('uncaughtException', (err) => {
+      const msg = err?.message ?? '';
+      if (msg.includes('session') || msg.includes('Session') || msg.includes('No frame'))
+        console.error(`${c.yellow}⚠${c.reset} ${c.dim}CDP session error (non-fatal)${c.reset}`);
+      else { console.error(err); process.exit(1); }
+    });
+
     const { chromium } = await import('playwright');
     const browser = await chromium.connectOverCDP(relay.wsUrl, { isLocal: true });
     const context = browser.contexts()[0];
