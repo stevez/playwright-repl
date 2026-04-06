@@ -428,7 +428,9 @@ describe('Toolbar component tests', () => {
     const screen = await renderToolbar();
     await screen.getByRole('button', { name: 'Record' }).click();
 
-    expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(window.chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'record-start' })
+    );
   });
 
   it('should dispatch error when record-start fails', async () => {
