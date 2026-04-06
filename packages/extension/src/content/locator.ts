@@ -25,6 +25,7 @@ export const IMPLICIT_ROLES: Record<string, string | ((el: Element) => string | 
     MAIN: 'main',
     HEADER: 'banner',
     FOOTER: 'contentinfo',
+    P: 'paragraph',
     UL: 'list', OL: 'list',
     LI: 'listitem',
     TABLE: 'table',
@@ -320,9 +321,12 @@ export function generateLocator(el: Element): string {
     const title = el.getAttribute('title');
     if (title) return `getByTitle(${escapeString(title)})`;
 
-    // 7. Text content
+    // 7. Text content (use substring for long text — getByText does partial matching)
     const text = (el.textContent || '').trim();
-    if (text && text.length <= 80) return `getByText(${escapeString(text)})`;
+    if (text) {
+        const snippet = text.length <= 80 ? text : text.slice(0, 50).replace(/\s+\S*$/, '');
+        if (snippet) return `getByText(${escapeString(snippet)})`;
+    }
 
     // 8. Role without name
     if (role) return `getByRole(${escapeString(role)})`;

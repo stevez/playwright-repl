@@ -3,7 +3,27 @@
  * Injected into the active tab via chrome.scripting.executeScript.
  * Highlights elements on hover, captures click, generates locator + element info.
  */
-import { generateLocator } from './locator';
+import { generateLocator, getImplicitRole } from './locator';
+
+// ─── Element retargeting ────────────────────────────────────────────────
+
+/** Interactive roles that should be retargeted to (like Playwright codegen). */
+const INTERACTIVE_ROLES = new Set(['link', 'button', 'checkbox', 'radio', 'textbox', 'combobox', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'switch', 'treeitem']);
+
+/**
+ * Walk up from the clicked element to the nearest interactive ancestor.
+ * Playwright codegen does this to ensure locators target the semantic element
+ * (e.g. the <a> link) rather than a child <span> inside it.
+ */
+function retarget(el: Element): Element {
+    let current: Element | null = el;
+    while (current && current !== document.body && current !== document.documentElement) {
+        const role = getImplicitRole(current);
+        if (role && INTERACTIVE_ROLES.has(role)) return current;
+        current = current.parentElement;
+    }
+    return el;
+}
 
 // ─── Element info gathering ──────────────────────────────────────────────
 
@@ -45,8 +65,9 @@ export let currentElement: Element | null = null;
 // ─── Event handlers ──────────────────────────────────────────────────────
 
 export function onMouseMove(e: MouseEvent) {
-    const target = document.elementFromPoint(e.clientX, e.clientY);
-    if (!target || target === highlight) return;
+    const raw = document.elementFromPoint(e.clientX, e.clientY);
+    if (!raw || raw === highlight) return;
+    const target = retarget(raw);
     if (target === currentElement) return;
     currentElement = target;
 
