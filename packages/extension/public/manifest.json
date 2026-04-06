@@ -11,7 +11,9 @@
     "storage",
     "windows",
     "offscreen",
-    "scripting"
+    "scripting",
+    "tabCapture",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

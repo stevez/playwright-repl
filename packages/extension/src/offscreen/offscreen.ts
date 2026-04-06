@@ -1,10 +1,71 @@
-// ─── CLI Bridge (offscreen document) ���─────────────────��───────────────────────
-// Maintains WebSocket connections to:
-// 1. Bridge server (command relay) — port from chrome.storage
-// 2. CDP relay server (CDP protocol relay) — port from chrome.storage
+// ─── CLI Bridge (offscreen document) ──────────────────────────────────────────
+// Maintains WebSocket connection to the bridge server + handles video capture.
 // This runs independently of the side panel — MCP works without the panel open.
 
-// ─── Bridge WebSocket (command relay) ──────────��────────────────────────────
+// ─── Video Capture (tabCapture + MediaRecorder) ─────────────────────────────
+
+let recorder: MediaRecorder | undefined;
+let recordedChunks: Blob[] = [];
+
+async function startVideoCapture(streamId: string) {
+    if (recorder?.state === 'recording') {
+        throw new Error('Already recording');
+    }
+
+    const media = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            mandatory: {
+                chromeMediaSource: 'tab',
+                chromeMediaSourceId: streamId,
+            },
+        } as any,
+        video: {
+            mandatory: {
+                chromeMediaSource: 'tab',
+                chromeMediaSourceId: streamId,
+            },
+        } as any,
+    });
+
+    // Continue playing captured audio to the user
+    const output = new AudioContext();
+    const source = output.createMediaStreamSource(media);
+    source.connect(output.destination);
+
+    recorder = new MediaRecorder(media, { mimeType: 'video/webm' });
+    recorder.ondataavailable = (event) => recordedChunks.push(event.data);
+    recorder.start();
+
+    // Track recording state in URL hash (survives SW restarts)
+    window.location.hash = 'recording';
+}
+
+async function stopVideoCapture(): Promise<{ blobUrl: string; size: number }> {
+    if (!recorder || recorder.state !== 'recording') {
+        throw new Error('Not recording');
+    }
+
+    return new Promise<{ blobUrl: string; size: number }>((resolve) => {
+        recorder!.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const blobUrl = URL.createObjectURL(blob);
+            const size = blob.size;
+
+            // Clean up
+            recorder = undefined;
+            recordedChunks = [];
+            window.location.hash = '';
+
+            resolve({ blobUrl, size });
+        };
+
+        // Stop recording and release tab capture
+        recorder!.stop();
+        recorder!.stream.getTracks().forEach((t) => t.stop());
+    });
+}
+
+// ─── Bridge WebSocket (command relay) ────────────────────────────────────────
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -67,11 +128,26 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
 
 // ─── Message routing from background SW ─────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
     if (msg.type === 'bridge-port-changed') {
         if (reconnectTimer) clearTimeout(reconnectTimer);
         if (ws) { ws.onclose = null; ws.close(); }
         connect(msg.port as number);
+    }
+
+    // Video capture messages
+    if (msg.type === 'video-capture-start') {
+        startVideoCapture(msg.streamId as string)
+            .then(() => sendResponse({ ok: true }))
+            .catch((e: Error) => sendResponse({ ok: false, error: e.message }));
+        return true;
+    }
+    if (msg.type === 'video-capture-stop') {
+        stopVideoCapture()
+            .then(({ blobUrl, size }) => sendResponse({ ok: true, blobUrl, size }))
+            .catch((e: Error) => sendResponse({ ok: false, error: e.message }));
+        return true;
     }
 
     // Forward recording/picker events to the bridge client (VS Code)

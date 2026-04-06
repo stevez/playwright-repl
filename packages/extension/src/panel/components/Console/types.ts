@@ -23,6 +23,9 @@ export interface ConsoleEntry {
   value?: SerializedValue;
   text?: string;
   image?: string;
+  video?: string;
+  videoDuration?: number;
+  videoSize?: number;
   codeBlock?: string;
   errorText?: string;
   getProperties?: (objectId: string) => Promise<unknown>;

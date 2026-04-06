@@ -7,6 +7,18 @@ import Lightbox from '../Lightbox';
 import { saveToFile } from '@/lib/file-utils';
 import type { ConsoleEntry as Entry } from './types';
 
+function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ConsoleEntry({ entry }: { entry: Entry }) {
     const [lightbox, setLightbox] = useState(false);
 
@@ -48,6 +60,18 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                             <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (
                             <SnapshotCodeBlock codeBlock={entry.codeBlock} />
+                        ) : entry.video !== undefined ? (
+                            <div data-type="video" className="flex items-center gap-2 py-1">
+                                <span className="text-(--color-success)">Video recorded{entry.videoDuration !== undefined ? ` (${formatDuration(entry.videoDuration)}, ${formatSize(entry.videoSize ?? 0)})` : ''}</span>
+                                <button
+                                    className="bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[11px] cursor-pointer hover:bg-(--bg-button-hover)"
+                                    onClick={() => chrome.runtime.sendMessage({ type: 'video-preview', blobUrl: entry.video })}
+                                >Preview</button>
+                                <button
+                                    className="bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[11px] cursor-pointer hover:bg-(--bg-button-hover)"
+                                    onClick={() => chrome.runtime.sendMessage({ type: 'video-save', blobUrl: entry.video })}
+                                >Save Video</button>
+                            </div>
                         ) : entry.image !== undefined ? (
                             entry.image.startsWith('data:application/pdf') ? (
                                 <div data-type="pdf" className="flex items-center gap-2 py-1">

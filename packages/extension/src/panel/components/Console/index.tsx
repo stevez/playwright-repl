@@ -19,7 +19,12 @@ function outputLinesToEntries(lines: OutputLine[]): ConsoleEntry[] {
             if (next && next.type !== 'command' && next.type !== 'comment') {
                 const entry: ConsoleEntry = { id, input: line.text, status: next.type === 'error' ? 'error' : 'done', time: next.time };
                 if (next.type === 'success') {
-                    if (next.value !== undefined) {
+                    if (next.video) {
+                        entry.video = next.video;
+                        entry.videoDuration = next.videoDuration;
+                        entry.videoSize = next.videoSize;
+                        entry.text = next.text;
+                    } else if (next.value !== undefined) {
                         entry.value = next.value as SerializedValue;
                         if (next.getProperties) entry.getProperties = next.getProperties;
                     } else {

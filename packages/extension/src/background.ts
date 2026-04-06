@@ -73,8 +73,8 @@ async function ensureOffscreen() {
   if (await chrome.offscreen.hasDocument()) return;
   await chrome.offscreen.createDocument({
     url: 'offscreen/offscreen.html',
-    reasons: [chrome.offscreen.Reason.BLOBS],
-    justification: 'Maintains WebSocket connection to CLI/MCP bridge server',
+    reasons: [chrome.offscreen.Reason.BLOBS, chrome.offscreen.Reason.USER_MEDIA],
+    justification: 'Maintains WebSocket connection to CLI/MCP bridge server and handles video capture',
   });
 }
 ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
@@ -246,6 +246,47 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
+// ─── Video Capture ──────────────────────────────────────────────────────────
+
+let videoRecording = false;
+let videoStartTime = 0;
+
+async function startVideoCapture(): Promise<{ ok: boolean; error?: string }> {
+  if (videoRecording) return { ok: false, error: 'Already recording' };
+
+  const tabId = await getActiveTabId();
+  if (!tabId) return { ok: false, error: 'No active tab' };
+
+  await ensureOffscreen();
+
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+
+  const result = await chrome.runtime.sendMessage({
+    type: 'video-capture-start',
+    streamId,
+  });
+
+  if (result?.ok) {
+    videoRecording = true;
+    videoStartTime = Date.now();
+  }
+  return result ?? { ok: false, error: 'No response from offscreen document' };
+}
+
+async function stopVideoCapture(): Promise<{ ok: boolean; error?: string; blobUrl?: string; duration?: number; size?: number }> {
+  if (!videoRecording) return { ok: false, error: 'Not recording' };
+
+  const duration = Math.round((Date.now() - videoStartTime) / 1000);
+  const result = await chrome.runtime.sendMessage({ type: 'video-capture-stop' });
+  videoRecording = false;
+
+  if (result?.ok && result.blobUrl) {
+    return { ok: true, blobUrl: result.blobUrl, duration, size: result.size };
+  }
+
+  return result ?? { ok: false, error: 'No response from offscreen document' };
+}
+
 // ─── Pick Element ────────────────────────────────────────────────────────────
 
 async function startPicking(): Promise<{ ok: boolean; error?: string }> {
@@ -408,7 +449,7 @@ async function executeSingleCommand(command: string): Promise<{ text: string; is
   return executeBridgeExpr(parsed.jsExpr);
 }
 
-type BridgeResult = { text: string; isError: boolean; image?: string };
+type BridgeResult = { text: string; isError: boolean; image?: string; blobUrl?: string; duration?: number; size?: number };
 
 function executeCommandPayload(msg: {
   command: string;
@@ -460,6 +501,14 @@ async function handleBridgeCommand(msg: {
   if (cmd === 'pick-stop') {
     const r = await stopPicking();
     return { text: r.ok ? 'Pick mode stopped' : 'Failed', isError: !r.ok };
+  }
+  if (cmd === 'video-start') {
+    const r = await startVideoCapture();
+    return { text: r.ok ? 'Video recording started' : (r.error || 'Failed'), isError: !r.ok };
+  }
+  if (cmd === 'video-stop') {
+    const r = await stopVideoCapture();
+    return { text: r.ok ? 'Video recorded' : (r.error || 'Failed'), isError: !r.ok, blobUrl: r.blobUrl, duration: r.duration, size: r.size };
   }
 
   if (!currentPage) {
@@ -528,6 +577,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'pick-start')    { startPicking().then(sendResponse); return true; }
   if (msg.type === 'pick-stop')     { stopPicking().then(sendResponse); return true; }
+  if (msg.type === 'video-start')   { startVideoCapture().then(sendResponse); return true; }
+  if (msg.type === 'video-stop')    { stopVideoCapture().then(sendResponse); return true; }
+  if (msg.type === 'video-save') {
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    chrome.downloads.download({ url: msg.blobUrl, filename: `tab-recording-${timestamp}.webm`, saveAs: true });
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (msg.type === 'video-preview') {
+    chrome.windows.create({ url: msg.blobUrl, type: 'popup', width: 1280, height: 720 });
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg.type === 'get-bridge-port') {
     chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;

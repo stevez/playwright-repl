@@ -215,8 +215,28 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
     addCommand(command);
     dispatch({ type: 'COMMAND_SUBMITTED', line: { text: command, type: 'command' } });
 
-    // run-code is handled via swDebugEval (background service worker runtime)
     const cmdName = command.trim().split(/\s+/)[0].toLowerCase();
+
+    // Video capture — send directly to SW (not through parseReplCommand/swDebugEval)
+    if (cmdName === 'video-start' || cmdName === 'video-stop') {
+        try {
+            const start = performance.now();
+            const r = await chrome.runtime.sendMessage({ type: cmdName });
+            const time = Math.round(performance.now() - start);
+            const text = r?.ok
+                ? (cmdName === 'video-start' ? 'Video recording started' : 'Video recording stopped')
+                : (r?.error || 'Failed');
+            const isError = !r?.ok;
+            dispatch({ type: isError ? 'COMMAND_ERROR' : 'COMMAND_SUCCESS', line: { text, type: isError ? 'error' : 'success', time } });
+            return { text, isError };
+        } catch (e: any) {
+            const text = e?.message ?? String(e);
+            dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
+            return { text, isError: true };
+        }
+    }
+
+    // run-code is handled via swDebugEval (background service worker runtime)
     if (cmdName === 'run-code') {
         const code = command.trim().slice('run-code'.length).trim();
         try {

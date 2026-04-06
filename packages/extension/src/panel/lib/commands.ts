@@ -81,6 +81,8 @@ export const COMMANDS: Record<string, CommandInfo> = {
     'verify-url':           { desc: 'Verify page URL', usage: 'verify-url <text>' },
     'verify-value':         { desc: 'Verify input / checkbox / radio value', usage: 'verify-value <ref|text> <value>' },
     'verify-visible':       { desc: 'Verify element is visible by role', usage: 'verify-visible <role> <name>' },
+    'video-start':          { desc: 'Start recording the active tab', usage: 'video-start' },
+    'video-stop':           { desc: 'Stop recording and save video', usage: 'video-stop' },
     'wait-for-text':        { desc: 'Wait until text appears', usage: 'wait-for-text <text>',
                               examples: ['wait-for-text "Loading complete"'] },
 };
@@ -91,7 +93,7 @@ export const CATEGORIES: Record<string, string[]> = {
     'Navigation':     ['goto', 'open', 'go-back', 'go-forward', 'reload'],
     'Interaction':    ['click', 'dblclick', 'fill', 'type', 'press', 'hover', 'select', 'check', 'uncheck', 'drag'],
     'Verification':   ['verify', 'verify-text', 'verify-no-text', 'verify-title', 'verify-url', 'verify-element', 'verify-no-element', 'verify-value', 'verify-visible', 'wait-for-text'],
-    'Inspection':     ['snapshot', 'locator', 'screenshot', 'pdf', 'eval', 'run-code', 'console', 'network'],
+    'Inspection':     ['snapshot', 'locator', 'screenshot', 'pdf', 'video-start', 'video-stop', 'eval', 'run-code', 'console', 'network'],
     'Tabs':           ['tab-list', 'tab-new', 'tab-close', 'tab-select'],
     'Cookies':        ['cookie-list', 'cookie-get', 'cookie-set', 'cookie-delete', 'cookie-clear'],
     'LocalStorage':   ['localstorage-list', 'localstorage-get', 'localstorage-set', 'localstorage-delete', 'localstorage-clear'],

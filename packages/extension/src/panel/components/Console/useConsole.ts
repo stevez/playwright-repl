@@ -28,6 +28,7 @@ const executors = {
             return { value: fromCdpRemoteObject(result.cdpResult), getProperties: swGetProperties };
         }
         if (result.image) return { image: result.image as string };
+        if ('video' in result && result.video) return { video: result.video, duration: result.duration, size: result.size };
         const cmd = command.trim().split(/\s+/)[0].toLowerCase();
         if (SNAPSHOT_CMDS.has(cmd)) return { codeBlock: result.text as string };
         return { text: (result.text || 'Done') as string };
@@ -134,10 +135,12 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
 
         try {
             const start = performance.now();
-            const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.js(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
+            const result = await (mode === 'pw' ? executors.pw(trimmed) : executors.js(trimmed)) as { value?: ConsoleEntry['value']; text?: string; image?: string; video?: string; duration?: number; size?: number; codeBlock?: string; getProperties?: ConsoleEntry['getProperties'] };
             const time = Math.round(performance.now() - start);
             if (result.value !== undefined) {
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', time, value: result.value, getProperties: result.getProperties } });
+            } else if (result.video !== undefined) {
+                dispatch({ type: 'COMMAND_SUCCESS', line: { text: 'Video recorded', type: 'success', time, video: result.video, videoDuration: result.duration, videoSize: result.size } });
             } else if (result.image !== undefined) {
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'screenshot', time, image: result.image } });
             } else if (result.codeBlock !== undefined) {

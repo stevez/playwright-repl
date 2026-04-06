@@ -3,6 +3,9 @@ export type OutputLine = {
     type: 'command' | 'success' | 'error' | 'info' | 'comment' | 'snapshot' | 'code-block' | 'screenshot'
     time?: number
     image?: string
+    video?: string
+    videoDuration?: number
+    videoSize?: number
     value?: unknown
     getProperties?: (objectId: string) => Promise<unknown>
     pickResult?: PickResultData
