@@ -15,7 +15,7 @@ import PreferencesForm from '../../src/preferences/PreferencesForm';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, cdpRelayPort: 9877, languageMode: 'pw' });
+    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
     mockStoreSettings.mockResolvedValue(undefined);
 });
 

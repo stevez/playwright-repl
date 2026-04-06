@@ -7,7 +7,7 @@
  * Three connection modes:
  *   - launch:    new browser via Playwright (default)
  *   - connect:   existing Chrome via CDP port (--connect [port])
- *   - extension: DevTools extension CDP relay (--extension)
+ *   - extension: DevTools extension via serviceWorker.evaluate (--extension)
  */
 
 import { createRequire } from 'node:module';

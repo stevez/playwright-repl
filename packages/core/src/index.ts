@@ -16,7 +16,6 @@ export {
 export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
 export { filterResponse } from './filter.js';
 export { BridgeServer } from './bridge-server.js';
-export { CdpRelay } from './cdp-relay.js';
 export { EvaluateConnection, findExtensionPath } from './evaluate-connection.js';
 export type { CompletionItem } from './completion-data.js';
 export type { CommandInfo } from './resolve.js';

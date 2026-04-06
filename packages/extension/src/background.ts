@@ -6,7 +6,6 @@ import { loadSettings } from './panel/lib/settings';
 import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
-import { initCdpRelay, detachCdpRelay, handleCdpCommand } from './lib/cdp-relay-handler';
 
 // ─── Patch toMatchAriaSnapshot ──────────────────────────────────────────────
 // toMatchAriaSnapshot requires currentTestInfo() which only exists inside the
@@ -94,11 +93,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.bridgePort) {
     chrome.runtime.sendMessage({ type: 'bridge-port-changed', port: changes.bridgePort.newValue }).catch(() => { /* panel may not be open */ });
   }
-  if (area === 'local' && changes.cdpRelayPort) {
-    // Reconnect directly — no need to broadcast to offscreen
-    const port = changes.cdpRelayPort.newValue as number;
-    if (port) connectCdpRelay(port);
-  }
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
@@ -129,8 +123,6 @@ function resetCrxState() {
 
 async function ensureCrxApp(): Promise<CrxApplication> {
   if (crxApp) return crxApp;
-  // Skip playwright-crx when CDP relay is active (avoids chrome.debugger conflict)
-  if (cdpRelayWs) throw new Error('playwright-crx disabled — CDP relay mode active');
   crxApp = await crx.start();
   (crxApp as any).on('close', () => resetCrxState());
   return crxApp;
@@ -641,93 +633,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;
   }
-  if (msg.type === 'get-cdp-relay-port') {
-    chrome.storage.local.get(['cdpRelayPort']).then((s: Record<string, unknown>) => sendResponse((s.cdpRelayPort as number) || 0));
-    return true;
-  }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
   return false;
 });
-
-// ─── CDP Relay (direct WS to Node) ─────────────────────────────────────────
-// Background SW connects directly to the Node CDP relay server via WebSocket.
-// No offscreen intermediary — eliminates chrome.runtime.sendMessage broadcast
-// which caused Runtime.exceptionThrown flooding in content scripts.
-
-let cdpRelayWs: WebSocket | null = null;
-let cdpRelayReconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Probe the relay's HTTP endpoint before opening a WebSocket (avoids ERR_CONNECTION_REFUSED in console). */
-async function probeRelay(port: number): Promise<boolean> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function connectCdpRelay(port: number) {
-  // Clean up existing connection
-  if (cdpRelayReconnectTimer) { clearTimeout(cdpRelayReconnectTimer); cdpRelayReconnectTimer = null; }
-  if (cdpRelayWs) { cdpRelayWs.onclose = null; cdpRelayWs.close(); cdpRelayWs = null; }
-
-  // Probe first — don't open WebSocket if relay isn't running
-  if (!await probeRelay(port)) {
-    cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
-    return;
-  }
-
-  try {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/extension`);
-
-    ws.onopen = () => {
-      cdpRelayWs = ws;
-    };
-
-    ws.onmessage = async (e) => {
-      const msg = JSON.parse(e.data as string);
-      if (msg.id && msg.method) {
-        try {
-          const response = await handleCdpCommand(msg);
-          if (ws.readyState === WebSocket.OPEN)
-            ws.send(JSON.stringify({ id: msg.id, ...response }));
-        } catch (err) {
-          if (ws.readyState === WebSocket.OPEN)
-            ws.send(JSON.stringify({ id: msg.id, error: String(err) }));
-        }
-      }
-    };
-
-    ws.onclose = () => {
-      if (cdpRelayWs === ws) cdpRelayWs = null;
-      // Detach debugger when relay disconnects — prevents stale banner
-      detachCdpRelay();
-      cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
-    };
-
-    ws.onerror = () => {};
-  } catch {
-    cdpRelayReconnectTimer = setTimeout(() => connectCdpRelay(port), 3000);
-  }
-}
-
-// Forward chrome.debugger events directly to the relay WS
-// Guard: chrome.debugger may not exist in test environment
-try {
-  initCdpRelay((msg) => {
-    if (cdpRelayWs?.readyState === WebSocket.OPEN)
-      cdpRelayWs.send(JSON.stringify(msg));
-  });
-
-  // Auto-connect on startup if port is configured
-  const p = chrome.storage?.local?.get?.(['cdpRelayPort']);
-  if (p && typeof p.then === 'function')
-    p.then((s: Record<string, unknown>) => {
-      const port = s.cdpRelayPort as number;
-      if (port) connectCdpRelay(port);
-    }).catch(() => {});
-} catch { /* test environment — chrome.debugger not available */ }
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
 (globalThis as any).attachToTab = attachToTab;

@@ -31,7 +31,7 @@ It consists of two parts working together: **Dramaturg** (a Chrome extension tha
 | Full Playwright API | ✅ | ✅ | ✅ |
 | JS/DOM eval | ✅ | ❌ | ✅ |
 
-> Playwright MCP and Playwriter control Chrome from outside via CDP relay. `@playwright-repl/mcp` runs Playwright natively inside Chrome via `playwright-crx` — enabling `expect()`, recording, and a full DevTools panel alongside AI.
+> Playwright MCP and Playwriter control Chrome from outside via CDP. `@playwright-repl/mcp` runs Playwright natively inside Chrome via `playwright-crx` — enabling `expect()`, recording, and a full DevTools panel alongside AI.
 
 ## Architecture
 
