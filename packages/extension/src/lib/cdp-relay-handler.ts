@@ -103,7 +103,6 @@ async function doForwardCommand(method: string, params?: Record<string, unknown>
   if (attachedTabId === null) throw new Error('No tab attached');
 
   // Must include tabId alongside sessionId — chrome.debugger needs both.
-  // Using { targetId: sessionId } was wrong and caused commands to fail.
   const debuggee: Record<string, unknown> = { tabId: attachedTabId };
   if (sessionId) debuggee.sessionId = sessionId;
 
@@ -118,6 +117,7 @@ async function doForwardCommand(method: string, params?: Record<string, unknown>
 function setupEventForwarding(): void {
   chrome.debugger.onEvent.addListener((source: any, method: string, params: any) => {
     if (!sendToNode) return;
+    if (source.tabId !== attachedTabId) return;
     sendToNode({
       method: 'forwardCDPEvent',
       params: {

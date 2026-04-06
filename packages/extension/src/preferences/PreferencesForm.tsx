@@ -3,7 +3,7 @@ import { loadSettings, storeSettings } from '../panel/lib/settings';
 import type { PwReplSettings } from '../panel/lib/settings';
 
 export default function PreferencesForm() {
-  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876, cdpRelayPort: 9877, languageMode: 'pw' });
 
   useEffect(() => {
     loadSettings().then(setSettings);
@@ -60,6 +60,22 @@ export default function PreferencesForm() {
         />
         <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#888' }}>
           Port the MCP server listens on (default: 9876). Reopen the panel after changing.
+        </p>
+      </fieldset>
+      <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>
+        <legend style={{ fontWeight: 600, marginBottom: '12px' }}>CDP Relay Port:</legend>
+        <input
+          type="number"
+          value={settings.cdpRelayPort}
+          onChange={(e) => {
+            const next = { ...settings, cdpRelayPort: Number(e.target.value) };
+            setSettings(next);
+            storeSettings(next);
+          }}
+          style={{ width: '100px', padding: '4px 8px', fontSize: '14px' }}
+        />
+        <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#888' }}>
+          Port for CDP relay server (default: 9877). Enables full Playwright API on your browser.
         </p>
       </fieldset>
       <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>

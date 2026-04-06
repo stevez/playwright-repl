@@ -29,7 +29,7 @@ test.describe('Preferences page', () => {
   });
 
   test('defaults bridge port to 9876', async ({ prefsPage }) => {
-    await expect(prefsPage.getByRole('spinbutton')).toHaveValue('9876');
+    await expect(prefsPage.getByRole('group', { name: 'Bridge Port:' }).getByRole('spinbutton')).toHaveValue('9876');
   });
 
   // ─── Open As ────────────────────────────────────────────────────────────
@@ -63,10 +63,10 @@ test.describe('Preferences page', () => {
   // ─── Bridge Port ────────────────────────────────────────────────────────
 
   test('changing bridge port persists after reload', async ({ prefsPage }) => {
-    const input = prefsPage.getByRole('spinbutton');
+    const input = prefsPage.getByRole('group', { name: 'Bridge Port:' }).getByRole('spinbutton');
     await input.fill('1234');
 
     await prefsPage.reload();
-    await expect(prefsPage.getByRole('spinbutton')).toHaveValue('1234');
+    await expect(prefsPage.getByRole('group', { name: 'Bridge Port:' }).getByRole('spinbutton')).toHaveValue('1234');
   });
 });

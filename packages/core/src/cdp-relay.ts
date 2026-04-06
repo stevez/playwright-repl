@@ -5,7 +5,7 @@
  * Follows the same pattern as Playwright's official MCP CDPRelayServer:
  * - Extension is a dumb CDP proxy (attachToTab, forwardCDPCommand, forwardCDPEvent)
  * - All CDP protocol translation happens here on the Node side
- * - Single tab at a time
+ * - Single tab at a time (tab management via bridge's tab-list/tab-select)
  *
  * Two WebSocket paths on the same port:
  * - /extension — Dramaturg extension connects here

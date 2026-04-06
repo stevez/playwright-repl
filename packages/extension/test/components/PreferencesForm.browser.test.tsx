@@ -15,7 +15,7 @@ import PreferencesForm from '../../src/preferences/PreferencesForm';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, cdpRelayPort: 9877, languageMode: 'pw' });
     mockStoreSettings.mockResolvedValue(undefined);
 });
 
@@ -52,13 +52,13 @@ describe('PreferencesForm', () => {
     it('renders Bridge Port fieldset with default value', async () => {
         const screen = await render(<PreferencesForm />);
         await expect.element(screen.getByText('Bridge Port:')).toBeInTheDocument();
-        const input = screen.getByRole('spinbutton');
+        const input = screen.getByRole('group', { name: 'Bridge Port:' }).getByRole('spinbutton');
         await expect.element(input).toHaveValue(9876);
     });
 
     it('calls storeSettings when bridge port changed', async () => {
         const screen = await render(<PreferencesForm />);
-        const input = screen.getByRole('spinbutton');
+        const input = screen.getByRole('group', { name: 'Bridge Port:' }).getByRole('spinbutton');
         await userEvent.clear(input);
         await userEvent.type(input, '1234');
         await vi.waitFor(() => {
