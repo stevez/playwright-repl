@@ -60,6 +60,14 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
                             <div data-type="success"><ObjectTree data={entry.value} getProperties={entry.getProperties} /></div>
                         ) : entry.codeBlock !== undefined ? (
                             <SnapshotCodeBlock codeBlock={entry.codeBlock} />
+                        ) : entry.trace ? (
+                            <div data-type="trace" className="flex items-center gap-2 py-1">
+                                <span className="text-(--color-success)">Trace saved{entry.traceSize ? ` (${formatSize(entry.traceSize)})` : ''}</span>
+                                <button
+                                    className="bg-(--bg-button) text-(--text-default) border border-solid border-(--border-button) rounded-[3px] py-[2px] px-2 font-[inherit] text-[11px] cursor-pointer hover:bg-(--bg-button-hover)"
+                                    onClick={() => chrome.runtime.sendMessage({ type: 'tracing-view' })}
+                                >View Trace</button>
+                            </div>
                         ) : entry.video !== undefined ? (
                             <div data-type="video" className="flex items-center gap-2 py-1">
                                 <span className="text-(--color-success)">Video recorded{entry.videoDuration !== undefined ? ` (${formatDuration(entry.videoDuration)}, ${formatSize(entry.videoSize ?? 0)})` : ''}</span>

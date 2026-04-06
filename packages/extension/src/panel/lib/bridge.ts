@@ -2,7 +2,7 @@ export type CommandResult = { text: string; isError: boolean; image?: string };
 export type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import { parseReplCommand } from './commands';
-export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: string; image?: string; video?: string; duration?: number; size?: number };
+export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: string; image?: string; video?: string; duration?: number; size?: number; trace?: boolean; traceSize?: number };
 
 type CdpResult = { type?: string; value?: unknown; description?: string; objectId?: string };
 
@@ -104,7 +104,8 @@ export async function executeCommandForConsole(command: string): Promise<Console
   if (cmdName === 'tracing-start' || cmdName === 'tracing-stop') {
     const r = await chrome.runtime.sendMessage({ type: cmdName });
     if (!r?.ok) throw new Error(r?.error || 'Failed');
-    return { text: r.text || (cmdName === 'tracing-start' ? 'Tracing started' : 'Tracing stopped') };
+    if (cmdName === 'tracing-stop') return { text: r.text || 'Tracing stopped', trace: true, traceSize: r.size };
+    return { text: 'Tracing started' };
   }
 
   const parsed = parseReplCommand(command);

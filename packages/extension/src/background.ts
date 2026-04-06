@@ -322,6 +322,10 @@ async function stopVideoCapture(): Promise<{ ok: boolean; error?: string; blobUr
   return result ?? { ok: false, error: 'No response from offscreen document' };
 }
 
+// ─── Tracing ─────────────────────────────────────────────────────────────────
+
+let lastTraceData: Uint8Array | null = null;
+
 // ─── Pick Element ────────────────────────────────────────────────────────────
 
 async function startPicking(): Promise<{ ok: boolean; error?: string }> {
@@ -575,6 +579,8 @@ async function handleBridgeCommand(msg: {
       // Read trace from memfs and download via chrome.downloads
       const data = crx.fs.readFileSync(tracePath);
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      // Keep a copy for "View Trace" in browser
+      lastTraceData = bytes;
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       const dataUrl = `data:application/zip;base64,${btoa(binary)}`;
@@ -673,6 +679,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       await app.context().tracing.stop({ path: tracePath });
       const data = crx.fs.readFileSync(tracePath);
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      lastTraceData = bytes;
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       const dataUrl = `data:application/zip;base64,${btoa(binary)}`;
@@ -683,7 +690,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       crx.fs.unlinkSync(tracePath);
       const size = bytes.length;
       const sizeStr = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
-      return { ok: true, text: `Trace saved to Downloads/${filename} (${sizeStr})` };
+      return { ok: true, text: `Trace saved to Downloads/${filename} (${sizeStr})`, size };
     })().then(sendResponse).catch((e: Error) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
@@ -699,6 +706,29 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg.type === 'video-preview') {
     chrome.windows.create({ url: msg.blobUrl, type: 'popup', width: 1280, height: 720 });
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (msg.type === 'tracing-view') {
+    if (!lastTraceData) { sendResponse({ ok: false, error: 'No trace data available' }); return false; }
+    const traceBytes = lastTraceData;
+    (async () => {
+      const win = await chrome.windows.create({ url: 'https://trace.playwright.dev/', type: 'popup', width: 1400, height: 900 });
+      const tabId = win.tabs?.[0]?.id;
+      if (!tabId) return;
+      // Wait for page to load, then inject content script and send trace data
+      const onUpdated = (tid: number, info: chrome.tabs.TabChangeInfo) => {
+        if (tid !== tabId || info.status !== 'complete') return;
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['content/trace-loader.js'],
+        }).then(() => {
+          chrome.tabs.sendMessage(tabId, { type: 'load-trace', data: Array.from(traceBytes) });
+        });
+      };
+      chrome.tabs.onUpdated.addListener(onUpdated);
+    })();
     sendResponse({ ok: true });
     return false;
   }

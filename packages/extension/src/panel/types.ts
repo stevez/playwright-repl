@@ -6,6 +6,8 @@ export type OutputLine = {
     video?: string
     videoDuration?: number
     videoSize?: number
+    trace?: boolean
+    traceSize?: number
     value?: unknown
     getProperties?: (objectId: string) => Promise<unknown>
     pickResult?: PickResultData
