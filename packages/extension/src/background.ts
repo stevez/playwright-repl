@@ -582,6 +582,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'video-save') {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
     chrome.downloads.download({ url: msg.blobUrl, filename: `tab-recording-${timestamp}.webm`, saveAs: true });
+    // Revoke blob URL after download starts
+    chrome.runtime.sendMessage({ type: 'video-revoke' }).catch(() => {});
     sendResponse({ ok: true });
     return false;
   }

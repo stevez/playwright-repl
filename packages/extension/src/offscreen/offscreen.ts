@@ -6,11 +6,20 @@
 
 let recorder: MediaRecorder | undefined;
 let recordedChunks: Blob[] = [];
+let lastBlobUrl: string | null = null;
+
+function revokeLastBlob() {
+    if (lastBlobUrl) {
+        URL.revokeObjectURL(lastBlobUrl);
+        lastBlobUrl = null;
+    }
+}
 
 async function startVideoCapture(streamId: string) {
     if (recorder?.state === 'recording') {
         throw new Error('Already recording');
     }
+    revokeLastBlob();
 
     const media = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -49,6 +58,7 @@ async function stopVideoCapture(): Promise<{ blobUrl: string; size: number }> {
         recorder!.onstop = () => {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const blobUrl = URL.createObjectURL(blob);
+            lastBlobUrl = blobUrl;
             const size = blob.size;
 
             // Clean up
@@ -148,6 +158,9 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any)
             .then(({ blobUrl, size }) => sendResponse({ ok: true, blobUrl, size }))
             .catch((e: Error) => sendResponse({ ok: false, error: e.message }));
         return true;
+    }
+    if (msg.type === 'video-revoke') {
+        revokeLastBlob();
     }
 
     // Forward recording/picker events to the bridge client (VS Code)
