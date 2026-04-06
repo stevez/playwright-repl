@@ -16,8 +16,8 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'include-snapshot', 'verbose'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
+  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'relay', 'include-snapshot', 'verbose'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'relay-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -42,6 +42,8 @@ Options:
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
   --bridge               Connect to extension via WebSocket bridge (no CDP required)
   --bridge-port <port>   WebSocket bridge port (default: 9876)
+  --relay                Connect to extension via CDP relay (full Playwright API)
+  --relay-port <port>    CDP relay port (default: 9877)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
@@ -104,6 +106,8 @@ startRepl({
   silent: args.silent as boolean,
   bridge: args.bridge as boolean,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
+  relay: args.relay as boolean,
+  relayPort: args['relay-port'] ? parseInt(args['relay-port'] as string, 10) : undefined,
   includeSnapshot: args['include-snapshot'] as boolean,
   verbose: args.verbose as boolean,
 }).catch((err: Error) => {

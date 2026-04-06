@@ -28,6 +28,8 @@ export interface ReplOpts extends EngineOpts {
   silent?: boolean;
   bridge?: boolean;
   bridgePort?: number;
+  relay?: boolean;
+  relayPort?: number;
   includeSnapshot?: boolean;
   verbose?: boolean;
 }
@@ -1018,7 +1020,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
 
-  if (!opts.bridge && !opts.connect) {
+  if (!opts.bridge && !opts.relay && !opts.connect) {
     const { EvaluateConnection, findExtensionPath } = await import('@playwright-repl/core');
     const extPath = process.env.VITEST ? null : findExtensionPath(import.meta.url);
     if (extPath) {
@@ -1041,6 +1043,78 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
         log(`${c.dim}Falling back to standard engine...${c.reset}\n`);
       }
     }
+  }
+
+  // ─── Relay mode (CDP relay → full Playwright API) ────────────────
+
+  if (opts.relay) {
+    const { CdpRelay } = await import('@playwright-repl/core');
+    const relayPort = opts.relayPort ?? 9877;
+    const relay = new CdpRelay();
+    await relay.start(relayPort);
+    log(`CDP relay listening on port ${relayPort}`);
+    log('Waiting for extension to connect...');
+    log(`${c.dim}Set cdpRelayPort to ${relayPort} in extension preferences${c.reset}`);
+    await relay.waitForExtension(120000);
+    log(`${c.green}✓${c.reset} Extension connected`);
+
+    const { chromium } = await import('playwright');
+    const browser = await chromium.connectOverCDP(relay.wsUrl, { isLocal: true });
+    const context = browser.contexts()[0];
+    const pages = context?.pages() ?? [];
+    log(`${c.green}✓${c.reset} Connected — ${pages.length} page(s)`);
+    for (const p of pages) log(`  ${c.dim}${p.url()}${c.reset}`);
+
+    const page = pages[0];
+    if (!page) { console.error('No page found'); process.exit(1); }
+
+    log(`\n${c.dim}Globals: browser, context, page${c.reset}`);
+    log(`${c.dim}Type .quit to exit${c.reset}\n`);
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: `${c.cyan}relay>${c.reset} ` });
+    rl.prompt();
+
+    rl.on('line', async (line) => {
+      const cmd = line.trim();
+      if (cmd === '.quit' || cmd === '.exit') { rl.close(); return; }
+      if (!cmd) { rl.prompt(); return; }
+
+      // Local commands (video, etc.)
+      if (isLocalCommand(cmd)) {
+        const result = await handleLocalCommand(cmd, context);
+        if (result) console.log(result.isError ? `${c.red}✗${c.reset} ${result.text}` : result.text);
+        rl.prompt();
+        return;
+      }
+
+      // Evaluate as JavaScript with page/context/browser in scope
+      try {
+        const result = await eval(`(async () => { return ${cmd}; })()`);
+        if (result !== undefined) {
+          if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean')
+            console.log(result);
+          else if (result === null)
+            console.log('null');
+          else if (typeof result?.status === 'function' && typeof result?.url === 'function')
+            console.log(`Response: ${result.status()} ${result.url()}`);
+          else if (typeof result?.toString === 'function' && result.toString() !== '[object Object]')
+            console.log(result.toString());
+          else
+            console.log(JSON.stringify(result, null, 2));
+        }
+      } catch (err: unknown) {
+        console.error(`${c.red}Error:${c.reset} ${(err as Error).message}`);
+      }
+      rl.prompt();
+    });
+
+    rl.on('close', async () => {
+      log('\nCleaning up...');
+      await browser.close().catch(() => {});
+      await relay.close();
+      process.exit(0);
+    });
+    return;
   }
 
   // ─── Bridge mode ─────────────────────────────────────────────────

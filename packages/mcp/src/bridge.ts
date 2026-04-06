@@ -2,7 +2,7 @@
  * Bridge runner — connects to Chrome via the Dramaturg extension over WebSocket.
  */
 
-import { BridgeServer, UPDATE_COMMANDS, parseInput } from '@playwright-repl/core';
+import { BridgeServer, CdpRelay, UPDATE_COMMANDS, parseInput, handleLocalCommand, isLocalCommand } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule, SnapshotCache } from './types.js';
 import { logEvent } from './logger.js';
@@ -57,12 +57,41 @@ export async function createBridgeRunner(
     srv.onConnect(() => { console.error('Extension connected'); logEvent('Extension connected'); });
     srv.onDisconnect(() => { console.error('Extension disconnected'); logEvent('Extension disconnected'); });
 
+    // CDP relay for local commands (screencast, tracing) — optional
+    const relayPortIdx = argv.indexOf('--relay-port');
+    const relayPort = relayPortIdx !== -1
+        ? parseInt(argv[relayPortIdx + 1])
+        : (process.env.CDP_RELAY_PORT ? parseInt(process.env.CDP_RELAY_PORT) : 9877);
+
+    const relay = new CdpRelay();
+    let relayContext: any = null;
+    relay.start(relayPort).then(() => {
+        console.error(`CDP relay listening on port ${relayPort}`);
+        logEvent(`CDP relay on port ${relayPort}`);
+        relay.waitForExtension(0).then(async () => {
+            const pw = 'playwright';
+            const { chromium } = await import(pw);
+            const browser = await chromium.connectOverCDP(relay.wsUrl, { isLocal: true });
+            relayContext = browser.contexts()[0] ?? null;
+            console.error('CDP relay connected — local commands available');
+            logEvent('CDP relay connected');
+        }).catch(() => {});
+    }).catch(() => {});
+
     return {
         descriptions,
         runner: {
             async runCommand(command: string): Promise<EngineResult> {
                 if (!srv.connected) {
                     return { text: 'Browser not connected. Open Chrome with the playwright-repl extension — it connects automatically.', isError: true };
+                }
+
+                // Local commands (video, etc.) — route through CDP relay's context
+                if (isLocalCommand(command)) {
+                    if (!relayContext)
+                        return { text: 'Local commands require CDP relay. Ensure the extension is connected on the relay port.', isError: true };
+                    const localResult = await handleLocalCommand(command, relayContext);
+                    if (localResult) return localResult;
                 }
 
                 // Determine command name for snapshot logic

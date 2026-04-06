@@ -89,14 +89,27 @@ async function doAttachToTab(): Promise<{ targetInfo: Record<string, unknown> }>
   });
   attachedTabId = tabId;
 
-  // Get targetInfo from CDP (matches Playwright MCP extension approach)
-  const result: any = await new Promise((resolve, reject) => {
-    chrome.debugger.sendCommand({ tabId }, 'Target.getTargetInfo', {}, (r: unknown) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(r);
+  // Get targetInfo from CDP, fall back to chrome.tabs data
+  let targetInfo: Record<string, unknown> | undefined;
+  try {
+    const result: any = await new Promise((resolve, reject) => {
+      chrome.debugger.sendCommand({ tabId }, 'Target.getTargetInfo', {}, (r: unknown) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(r);
+      });
     });
-  });
-  return { targetInfo: result?.targetInfo };
+    targetInfo = result?.targetInfo;
+  } catch { /* fall through to fallback */ }
+  if (!targetInfo || !targetInfo.targetId) {
+    targetInfo = {
+      targetId: String(tabId),
+      type: 'page',
+      title: tab.title || '',
+      url: tab.url || '',
+      browserContextId: 'default',
+    };
+  }
+  return { targetInfo };
 }
 
 async function doForwardCommand(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<unknown> {
