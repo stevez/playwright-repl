@@ -185,6 +185,12 @@ html, body {
   border-color: var(--color-recording-border) !important;
 }
 
+#video-btn.video-recording {
+  background: var(--color-recording-bg) !important;
+  color: var(--color-recording-text) !important;
+  border-color: var(--color-recording-border) !important;
+}
+
 [data-testid="pick-btn"].picking {
   background: #e3f2fd !important;
   color: #1565c0 !important;

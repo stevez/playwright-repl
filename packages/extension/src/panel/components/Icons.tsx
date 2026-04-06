@@ -164,6 +164,10 @@ export function DebugStopIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function ScreencastIcon({ size = 16 }: { size?: number }) {
+  return <span style={{ fontSize: size, lineHeight: 1 }}>🎬</span>;
+}
+
 export function CrosshairIcon({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 16 16" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">

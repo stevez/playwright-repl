@@ -3,7 +3,7 @@ import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { swTerminateExecution, swDebugResume, swDebugEval } from '@/lib/sw-debugger';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon, ScreencastIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
@@ -22,6 +22,9 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
     const [availableTabs, setAvailableTabs] = useState<chrome.tabs.Tab[]>([]);
     const [canAttach, setCanAttach] = useState(true);
     const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
+    const [isVideoRecording, setIsVideoRecording] = useState(false);
+    const [videoElapsed, setVideoElapsed] = useState(0);
+    const videoStartTimeRef = useRef(0);
 
     const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
@@ -343,6 +346,54 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         chrome.runtime.sendMessage({ type: 'detach' }).catch(e => console.debug('[pw-repl] detach:', e));
     }
 
+    // ─── Video capture (toolbar button) ───
+
+    function formatElapsed(seconds: number): string {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Sync video state on panel load (in case panel reopens mid-recording)
+    useEffect(() => {
+        chrome.runtime.sendMessage({ type: 'video-state' }).then((r: { recording?: boolean; startTime?: number }) => {
+            if (r?.recording && r.startTime) {
+                setIsVideoRecording(true);
+                videoStartTimeRef.current = r.startTime;
+                setVideoElapsed(Math.round((Date.now() - r.startTime) / 1000));
+            }
+        }).catch(() => {});
+    }, []);
+
+    // Timer tick while video recording
+    useEffect(() => {
+        if (!isVideoRecording) { setVideoElapsed(0); return; }
+        const id = setInterval(() => {
+            setVideoElapsed(Math.round((Date.now() - videoStartTimeRef.current) / 1000));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [isVideoRecording]);
+
+    async function handleVideoRecord() {
+        if (isVideoRecording) {
+            const r = await chrome.runtime.sendMessage({ type: 'video-stop' });
+            setIsVideoRecording(false);
+            if (r?.ok && r.blobUrl) {
+                dispatch({ type: 'ADD_LINE', line: { text: 'Video recorded', type: 'info', video: r.blobUrl, videoDuration: r.duration, videoSize: r.size } });
+            } else {
+                dispatch({ type: 'ADD_LINE', line: { text: `Video stop failed: ${r?.error ?? 'unknown'}`, type: 'error' } });
+            }
+            return;
+        }
+        const r = await chrome.runtime.sendMessage({ type: 'video-start' });
+        if (r?.ok) {
+            setIsVideoRecording(true);
+            videoStartTimeRef.current = Date.now();
+        } else {
+            dispatch({ type: 'ADD_LINE', line: { text: `Video failed: ${r?.error ?? 'unknown'}`, type: 'error' } });
+        }
+    }
+
     // ─── Theme toggle ───
 
     useEffect(() => {
@@ -378,6 +429,16 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                     onClick={handleRecord}
                 >
                     {isRecording ? <StopIcon /> : <RecordIcon />}
+                </button>
+                <button
+                    id="video-btn"
+                    data-testid="video-btn"
+                    className={isVideoRecording ? 'video-recording' : ''}
+                    title={isVideoRecording ? `Stop video (${formatElapsed(videoElapsed)})` : 'Record video'}
+                    onClick={handleVideoRecord}
+                >
+                    <ScreencastIcon />
+                    {isVideoRecording && <span className="ml-1 text-[10px] font-mono">{formatElapsed(videoElapsed)}</span>}
                 </button>
                 {(isRunning || stepLine !== -1) && !isStepDebugging
                     ? <button id="stop-run-btn" data-testid="stop-run-btn" title="Stop" onClick={handleStop}><StopIcon /></button>
