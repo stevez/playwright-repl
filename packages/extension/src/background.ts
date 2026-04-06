@@ -246,10 +246,45 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
+// ─── Recording Overlay ──────────────────────────────────────────────────────
+
+function injectRecordingOverlay(tabId: number) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      if (document.getElementById('__pw_rec_overlay')) return;
+      const el = document.createElement('div');
+      el.id = '__pw_rec_overlay';
+      el.textContent = '● REC';
+      const style = document.createElement('style');
+      style.id = '__pw_rec_style';
+      style.textContent = `@keyframes __pw_rec_dot { 0%,100%{opacity:1} 50%{opacity:0.2} }`;
+      document.documentElement.appendChild(style);
+      el.innerHTML = '<span style="color:#ff4444;animation:__pw_rec_dot 1.5s ease-in-out infinite;display:inline-block;font-size:16px;vertical-align:middle;line-height:1">●</span> REC';
+      Object.assign(el.style, {
+        position: 'fixed', top: '8px', right: '8px', zIndex: '2147483647',
+        background: 'rgba(0,0,0,0.75)', color: '#ffffff',
+        padding: '4px 10px', borderRadius: '4px',
+        fontSize: '12px', fontFamily: 'monospace', fontWeight: 'bold',
+        pointerEvents: 'none', userSelect: 'none',
+      });
+      document.documentElement.appendChild(el);
+    },
+  }).catch(e => console.debug('[pw-repl] overlay inject:', e));
+}
+
+function removeRecordingOverlay(tabId: number) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => { document.getElementById('__pw_rec_overlay')?.remove(); document.getElementById('__pw_rec_style')?.remove(); },
+  }).catch(e => console.debug('[pw-repl] overlay remove:', e));
+}
+
 // ─── Video Capture ──────────────────────────────────────────────────────────
 
 let videoRecording = false;
 let videoStartTime = 0;
+let videoTabId: number | null = null;
 
 async function startVideoCapture(): Promise<{ ok: boolean; error?: string }> {
   if (videoRecording) return { ok: false, error: 'Already recording' };
@@ -257,20 +292,26 @@ async function startVideoCapture(): Promise<{ ok: boolean; error?: string }> {
   const tabId = await getActiveTabId();
   if (!tabId) return { ok: false, error: 'No active tab' };
 
-  await ensureOffscreen();
+  try {
+    await ensureOffscreen();
 
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
 
-  const result = await chrome.runtime.sendMessage({
-    type: 'video-capture-start',
-    streamId,
-  });
+    const result = await chrome.runtime.sendMessage({
+      type: 'video-capture-start',
+      streamId,
+    });
 
-  if (result?.ok) {
-    videoRecording = true;
-    videoStartTime = Date.now();
+    if (result?.ok) {
+      videoRecording = true;
+      videoStartTime = Date.now();
+      videoTabId = tabId;
+      injectRecordingOverlay(tabId);
+    }
+    return result ?? { ok: false, error: 'No response from offscreen document' };
+  } catch (e) {
+    return { ok: false, error: String(e) };
   }
-  return result ?? { ok: false, error: 'No response from offscreen document' };
 }
 
 async function stopVideoCapture(): Promise<{ ok: boolean; error?: string; blobUrl?: string; duration?: number; size?: number }> {
@@ -279,6 +320,8 @@ async function stopVideoCapture(): Promise<{ ok: boolean; error?: string; blobUr
   const duration = Math.round((Date.now() - videoStartTime) / 1000);
   const result = await chrome.runtime.sendMessage({ type: 'video-capture-stop' });
   videoRecording = false;
+  if (videoTabId) removeRecordingOverlay(videoTabId);
+  videoTabId = null;
 
   if (result?.ok && result.blobUrl) {
     return { ok: true, blobUrl: result.blobUrl, duration, size: result.size };
@@ -603,6 +646,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
+  return false;
 });
 
 // ─── CDP Relay (direct WS to Node) ─────────────────────────────────────────

@@ -380,13 +380,17 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             setIsVideoRecording(false);
             if (r?.ok && r.blobUrl) {
                 dispatch({ type: 'ADD_LINE', line: { text: 'Video recorded', type: 'info', video: r.blobUrl, videoDuration: r.duration, videoSize: r.size } });
-            } else {
+            } else if (r?.error !== 'Not recording') {
                 dispatch({ type: 'ADD_LINE', line: { text: `Video stop failed: ${r?.error ?? 'unknown'}`, type: 'error' } });
             }
             return;
         }
         const r = await chrome.runtime.sendMessage({ type: 'video-start' });
         if (r?.ok) {
+            setIsVideoRecording(true);
+            videoStartTimeRef.current = Date.now();
+        } else if (r?.error === 'Already recording') {
+            // Out of sync — background is recording but toolbar didn't know
             setIsVideoRecording(true);
             videoStartTimeRef.current = Date.now();
         } else {
