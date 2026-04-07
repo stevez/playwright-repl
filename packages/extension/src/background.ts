@@ -563,10 +563,10 @@ async function handleBridgeCommand(msg: {
     const r = await stopRecording();
     return { text: r.ok ? 'Recording stopped' : 'Failed', isError: !r.ok };
   }
+  // pick-start/pick-stop handled via direct chrome.runtime.sendMessage (not bridge command queue)
+  // because pickLocator() blocks until user clicks — would freeze the command queue
   if (cmd === 'pick-start') {
-    const r = await pickElement();
-    if (!r.ok) return { text: r.error || 'Failed', isError: r.error !== 'cancelled' };
-    return { text: r.info?.locator ? `Picked: page.${r.info.locator}` : 'Pick cancelled', isError: false };
+    return { text: 'Use pick message instead of bridge command', isError: true };
   }
   if (cmd === 'pick-stop') {
     await cancelPick();
