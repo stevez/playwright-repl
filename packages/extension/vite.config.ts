@@ -12,6 +12,7 @@ import { writeFileSync, mkdirSync } from 'fs';
  */
 function contentScriptPlugin(): Plugin {
   const contentScripts = [
+    { entry: resolve(__dirname, "src/content/picker.ts"), out: "content/picker.js" },
     { entry: resolve(__dirname, "src/content/recorder.ts"), out: "content/recorder.js" },
     { entry: resolve(__dirname, "src/content/trace-loader.ts"), out: "content/trace-loader.js" },
   ];

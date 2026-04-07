@@ -2,11 +2,10 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
-import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
+import { swTerminateExecution, swDebugResume, swDebugEval } from '@/lib/sw-debugger';
 import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon, ScreencastIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
-import { buildPickResult } from '@/lib/pick-info';
-import type { ElementPickInfo } from '@/types';
+import { buildPickResult, resolvePlaywrightLocator } from '@/lib/pick-info';
 import { loadSettings, storeSettings } from '@/lib/settings'
 
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging' | 'breakPoints'> {
@@ -291,33 +290,54 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     // ─── Pick element ───
 
+    useEffect(() => {
+        if (!chrome.runtime?.onMessage) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listener = (msg: any) => {
+            if (msg.type === 'element-picked-raw') {
+                setIsPicking(false);
+                resolvePlaywrightLocator(msg.pickId).then(async cdpLocator => {
+                    const pickResult = buildPickResult(msg.info, cdpLocator);
+                    // Fetch aria snapshot for the picked element
+                    try {
+                        const jsLocator = cdpLocator ?? msg.info.locator;
+                        const expr = `await page.${jsLocator}.ariaSnapshot()`;
+                        const result = await swDebugEval(expr) as { result?: { type?: string; value?: string } };
+                        if (result?.result?.type === 'string' && result.result.value)
+                            pickResult.ariaSnapshot = result.result.value;
+                    } catch { /* aria snapshot is optional */ }
+                    dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
+                });
+            }
+            if (msg.type === 'pick-cancelled') {
+                setIsPicking(false);
+            }
+        };
+        chrome.runtime.onMessage.addListener(listener);
+        return () => chrome.runtime.onMessage.removeListener(listener);
+    }, [dispatch]);
+
     async function handlePick() {
         if (!chrome.tabs?.query) return;
 
         if (isPicking) {
             setIsPicking(false);
-            await chrome.runtime.sendMessage({ type: 'pick-cancel' }).catch(e => console.debug('[pw-repl] pick-cancel:', e));
+            await chrome.runtime.sendMessage({ type: 'pick-stop' }).catch(e => console.debug('[pw-repl] pick-stop:', e));
             return;
         }
 
-        setIsPicking(true);
+        let result: { ok: boolean; error?: string } | undefined;
         try {
-            const result = await chrome.runtime.sendMessage({ type: 'pick' }) as { ok: boolean; info?: ElementPickInfo & { ariaSnapshot?: string }; error?: string };
-            if (!result?.ok || !result.info) {
-                if (result?.error !== 'cancelled')
-                    dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${result?.error ?? 'unknown error'}`, type: 'error' } });
-                return;
-            }
-            const info = result.info;
-            const pickResult = buildPickResult(info, info.locator);
-            if (info.ariaSnapshot)
-                pickResult.ariaSnapshot = info.ariaSnapshot;
-            dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
+            result = await chrome.runtime.sendMessage({ type: 'pick-start' });
         } catch (e) {
             dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${String(e)}`, type: 'error' } });
-        } finally {
-            setIsPicking(false);
+            return;
         }
+        if (!result?.ok) {
+            dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${result?.error ?? 'unknown error'}`, type: 'error' } });
+            return;
+        }
+        setIsPicking(true);
     }
 
     function handleDetach() {

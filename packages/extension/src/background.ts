@@ -324,54 +324,20 @@ let lastTraceData: Uint8Array | null = null;
 
 // ─── Pick Element ────────────────────────────────────────────────────────────
 
-async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string }> {
-  if (!currentPage) {
-    const tabId = await getActiveTabId();
-    if (tabId) await attachToTab(tabId);
-    if (!currentPage) return { ok: false, error: 'No active page' };
-  }
-
+async function startPicking(): Promise<{ ok: boolean; error?: string }> {
   try {
-    const locator = await currentPage.pickLocator();
-    const locatorStr = locator.toString();
-    const ariaSnapshot = await locator.ariaSnapshot().catch(() => '');
-    const elementInfo = await locator.evaluate((el: Element) => {
-      const attrs: Record<string, string> = {};
-      for (const attr of el.attributes) attrs[attr.name] = attr.value;
-      const tag = el.tagName;
-      const inputType = (attrs.type || '').toLowerCase();
-      return {
-        tag,
-        text: (el as HTMLElement).innerText?.slice(0, 200) ?? '',
-        html: el.outerHTML?.slice(0, 500) ?? '',
-        attributes: attrs,
-        visible: true,
-        enabled: !(el as HTMLInputElement).disabled,
-        box: el.getBoundingClientRect().toJSON(),
-        value: ('value' in el) ? (el as HTMLInputElement).value : undefined,
-        checked: (tag === 'INPUT' && (inputType === 'checkbox' || inputType === 'radio'))
-          ? (el as HTMLInputElement).checked : undefined,
-      };
-    }).catch(() => null);
-
-    return {
-      ok: true,
-      info: {
-        locator: locatorStr,
-        ariaSnapshot,
-        ...(elementInfo || {}),
-      },
-    };
-  } catch (e: any) {
-    if (e?.message?.includes('cancelled')) return { ok: false, error: 'cancelled' };
-    return { ok: false, error: e?.message ?? String(e) };
+    const tabId = await getActiveTabId();
+    if (!tabId) return { ok: false, error: 'No active tab' };
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/picker.js'] });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
   }
 }
 
-async function cancelPick(): Promise<{ ok: boolean }> {
-  if (currentPage) {
-    try { await currentPage.cancelPickLocator(); } catch { /* ignore */ }
-  }
+async function stopPicking(): Promise<{ ok: boolean }> {
+  const tabId = await getActiveTabId();
+  if (tabId) await chrome.tabs.sendMessage(tabId, { type: 'pick-stop' }).catch(e => console.debug('[pw-repl] pick-stop:', e));
   return { ok: true };
 }
 
@@ -563,14 +529,13 @@ async function handleBridgeCommand(msg: {
     const r = await stopRecording();
     return { text: r.ok ? 'Recording stopped' : 'Failed', isError: !r.ok };
   }
-  // pick-start/pick-stop handled via direct chrome.runtime.sendMessage (not bridge command queue)
-  // because pickLocator() blocks until user clicks — would freeze the command queue
   if (cmd === 'pick-start') {
-    return { text: 'Use pick message instead of bridge command', isError: true };
+    const r = await startPicking();
+    return { text: r.ok ? 'Pick mode started' : (r.error || 'Failed'), isError: !r.ok };
   }
   if (cmd === 'pick-stop') {
-    await cancelPick();
-    return { text: 'Pick mode stopped', isError: false };
+    const r = await stopPicking();
+    return { text: r.ok ? 'Pick mode stopped' : 'Failed', isError: !r.ok };
   }
   if (cmd === 'video-start') {
     const r = await startVideoCapture();
@@ -693,8 +658,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'health')        { sendResponse({ ok: !!crxApp }); return false; }
   if (msg.type === 'record-start')  { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
-  if (msg.type === 'pick')           { pickElement().then(sendResponse); return true; }
-  if (msg.type === 'pick-cancel')   { cancelPick().then(sendResponse); return true; }
+  if (msg.type === 'pick-start')    { startPicking().then(sendResponse); return true; }
+  if (msg.type === 'pick-stop')     { stopPicking().then(sendResponse); return true; }
   if (msg.type === 'video-start')   { startVideoCapture().then(sendResponse); return true; }
   if (msg.type === 'video-stop')    { stopVideoCapture().then(sendResponse); return true; }
   if (msg.type === 'tracing-start') {

@@ -1,3 +1,4 @@
+import { swDebugEval } from '@/lib/sw-debugger';
 import type { ElementPickInfo, PickResultData } from '@/types';
 import type { SerializedValue } from '@/components/Console/types';
 
@@ -252,4 +253,20 @@ export function pickResultToSerialized(data: PickResultData): SerializedValue {
     return { __type: 'object', cls: 'PickResult', props };
 }
 
+/**
+ * Resolve Playwright's locator for a picked element via locator.normalize().
+ * The element must be marked with data-pw-pick-id by the content script.
+ */
+export async function resolvePlaywrightLocator(pickId: string): Promise<string | null> {
+    try {
+        const selector = `[data-pw-pick-id="${pickId}"]`;
+        const expr = `page.locator('${selector}').normalize().then(async loc => { await page.locator('${selector}').evaluate(e => e.removeAttribute('data-pw-pick-id')); return loc.toString(); })`;
+        const result = await swDebugEval(expr) as { result?: { type?: string; value?: string } };
+        if (result?.result?.type === 'string' && result.result.value)
+            return result.result.value;
+        return null;
+    } catch {
+        return null;
+    }
+}
 
