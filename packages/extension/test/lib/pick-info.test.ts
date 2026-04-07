@@ -67,32 +67,32 @@ describe('buildPickResult', () => {
         expect(result.assertPw).toBe('verify-element link "Home"');
     });
 
-    it('derives pw command with role for getByPlaceholder on input', () => {
+    it('derives pw command with role for getByPlaceholder on input (via ariaSnapshot)', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByPlaceholder('What needs to be done?')",
             tag: 'input',
             text: '',
             attributes: {},
-        }));
+        }), null, '- textbox "What needs to be done?"');
         expect(result.pwCommand).toBe('highlight textbox "What needs to be done?"');
     });
 
-    it('derives pw command with role for getByLabel on textarea', () => {
+    it('derives pw command with role for getByLabel on textarea (via ariaSnapshot)', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByLabel('Notes')",
             tag: 'textarea',
             text: '',
             attributes: {},
-        }));
+        }), null, '- textbox "Notes"');
         expect(result.pwCommand).toBe('highlight textbox "Notes"');
     });
 
-    it('derives pw command with role for getByText on button', () => {
+    it('derives pw command with role for getByText on button (via ariaSnapshot)', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByText('Submit')",
             tag: 'button',
             text: 'Submit',
-        }));
+        }), null, '- button "Submit"');
         expect(result.pwCommand).toBe('highlight button "Submit"');
     });
 
@@ -379,5 +379,58 @@ describe('buildPickResult', () => {
             text: "it's a button",
         }));
         expect(result.assertJs).toContain("toContainText('it\\'s a button')");
+    });
+
+    // ─── Aria snapshot integration ──────────────────────────────────────
+
+    it('derives pw command from single-line aria snapshot', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'Get started' })",
+            tag: 'a',
+            text: 'Get started',
+            attributes: { href: '/start' },
+        }), null, '- link "Get started"');
+        expect(result.pwCommand).toBe('highlight link "Get started"');
+    });
+
+    it('derives --in flag from nested aria snapshot', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('checkbox', { name: 'reading' })",
+            tag: 'input',
+            text: '',
+            attributes: { type: 'checkbox' },
+            checked: true,
+        }), null, '- listitem:\n  - checkbox "reading"');
+        expect(result.pwCommand).toBe('highlight checkbox "reading" --in listitem');
+    });
+
+    it('includes parent name in --in flag when available', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('button', { name: 'Delete' })",
+            tag: 'button',
+            text: 'Delete',
+        }), null, '- listitem "reading":\n  - button "Delete"');
+        expect(result.pwCommand).toBe('highlight button "Delete" --in listitem "reading"');
+    });
+
+    it('handles aria snapshot with role only (no name)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('listitem')",
+            tag: 'li',
+            text: 'Some content',
+            attributes: {},
+        }), null, '- listitem');
+        expect(result.pwCommand).toBe('highlight listitem');
+    });
+
+    it('aria snapshot overrides JS locator parsing for pw command', () => {
+        // Complex .filter() locator that JS fallback can't parse —
+        // aria snapshot provides the role + name
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('listitem').filter({ hasText: 'reading' }).getByRole('button', { name: 'Delete' })",
+            tag: 'button',
+            text: 'Delete',
+        }), null, '- listitem:\n  - button "Delete"');
+        expect(result.pwCommand).toBe('highlight button "Delete" --in listitem');
     });
 });

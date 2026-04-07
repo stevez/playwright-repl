@@ -309,7 +309,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 return;
             }
             const info = result.info;
-            const pickResult = buildPickResult(info, info.locator);
+            const pickResult = buildPickResult(info, info.locator, info.ariaSnapshot);
             if (info.ariaSnapshot)
                 pickResult.ariaSnapshot = info.ariaSnapshot;
             dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
