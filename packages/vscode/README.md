@@ -132,7 +132,7 @@ REPL, Test Explorer, Recorder, and Picker all share the same headed browser via 
 
 - VS Code 1.93+
 - Node.js 18+
-- `@playwright/test` 1.58+ in your project
+- `@playwright/test` 1.59+ in your project
 - `esbuild` in your project for bridge execution (`npm install -D esbuild`) — without it, falls back to `esbuild-wasm` (bundled), which is slower but requires no installation
 
 ## Panels
