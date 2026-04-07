@@ -1,16 +1,18 @@
 /**
  * Recorder
  *
- * Manages the recording flow in VS Code:
- * 1. Detects cursor context (inside/outside test function)
- * 2. Generates test template if needed
- * 3. Starts recording via bridge
- * 4. Receives streamed actions via bridge events
- * 5. Inserts each action at cursor in the active editor
+ * Manages the recording flow in VS Code using Playwright Page API directly.
+ * No extension dependency — injects capture script via page.exposeFunction()
+ * and resolves locators on the Node side via locator.normalize().toString().
  */
 
 import * as vscode from 'vscode';
 import type { BrowserManager } from './browser.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// __filename is available at runtime in esbuild's CJS output
+declare const __filename: string;
 
 // ─── Cursor Context Detection ──────────────────────────────────────────────
 
@@ -109,6 +111,27 @@ function replaceLastInsert(editor: vscode.TextEditor, text: string, indent: numb
   });
 }
 
+// ─── Command building ──────────────────────────────────────────────────────
+
+function escapeString(s: string): string {
+  return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
+function buildJsCommand(locatorStr: string, action: string, opts: Record<string, unknown>): string {
+  const loc = `page.${locatorStr}`;
+  switch (action) {
+    case 'click': return `await ${loc}.click();`;
+    case 'fill': return `await ${loc}.fill(${escapeString(String(opts.value ?? ''))});`;
+    case 'check': return `await ${loc}.check();`;
+    case 'uncheck': return `await ${loc}.uncheck();`;
+    case 'select': return `await ${loc}.selectOption(${escapeString(String(opts.option ?? ''))});`;
+    case 'press':
+      if (locatorStr) return `await ${loc}.press(${escapeString(String(opts.key ?? ''))});`;
+      return `await page.keyboard.press(${escapeString(String(opts.key ?? ''))});`;
+    default: return `// unknown action: ${action}`;
+  }
+}
+
 // ─── Recorder Class ────────────────────────────────────────────────────────
 
 export class Recorder {
@@ -118,6 +141,8 @@ export class Recorder {
   private _statusBarItem: vscode.StatusBarItem;
   private _indentation = 4;
   private _editor: vscode.TextEditor | undefined;
+  private _functionsExposed = false;
+  private _locatorCache = new Map<string, string>();
 
   constructor(browserManager: BrowserManager, outputChannel: vscode.OutputChannel) {
     this._browserManager = browserManager;
@@ -137,9 +162,60 @@ export class Recorder {
     this._statusBarItem.dispose();
   }
 
+  private async _resolveLocator(page: any, recId: string, keepMarker = false): Promise<string> {
+    if (!recId) return '';  // global key press, no element
+    // Return cached locator if available (avoids repeated normalize() calls during fill)
+    const cached = this._locatorCache.get(recId);
+    if (cached) {
+      if (!keepMarker) {
+        this._locatorCache.delete(recId);
+        await page.locator(`[data-pw-rec-id="${recId}"]`).evaluate((el: any) => el.removeAttribute('data-pw-rec-id')).catch(() => {});
+      }
+      return cached;
+    }
+    try {
+      const loc = page.locator(`[data-pw-rec-id="${recId}"]`);
+      const normalized = await loc.normalize();
+      const locatorStr = normalized.toString();
+      if (keepMarker) {
+        this._locatorCache.set(recId, locatorStr);
+      } else {
+        await loc.evaluate((el: any) => el.removeAttribute('data-pw-rec-id')).catch(() => {});
+      }
+      return locatorStr;
+    } catch (e) {
+      this._outputChannel.appendLine(`[recorder] locator resolve failed for ${recId}: ${(e as Error).message}`);
+      return '';
+    }
+  }
+
+  private async _exposeRecorderFunctions(page: any) {
+    if (this._functionsExposed) return;
+
+    await page.exposeFunction('__pwRecordAction', async (action: string, recId: string, opts: Record<string, unknown>) => {
+      if (!this._recording || !this._editor) return;
+      const keepMarker = action === 'fill';  // fill needs marker for subsequent updates
+      const locatorStr = await this._resolveLocator(page, recId, keepMarker);
+      if (!locatorStr && action !== 'press') return;  // skip if locator resolution failed (except global press)
+      const js = buildJsCommand(locatorStr, action, opts);
+      insertAtCursor(this._editor!, js, this._indentation);
+    });
+
+    await page.exposeFunction('__pwRecordFillUpdate', async (_action: string, recId: string, opts: Record<string, unknown>) => {
+      if (!this._recording || !this._editor) return;
+      const locatorStr = await this._resolveLocator(page, recId, true);  // keep marker for more updates
+      if (!locatorStr) return;  // skip if locator resolution failed
+      const js = buildJsCommand(locatorStr, 'fill', opts);
+      replaceLastInsert(this._editor!, js, this._indentation);
+    });
+
+    this._functionsExposed = true;
+  }
+
   async start() {
     if (this._recording) return;
-    if (!this._browserManager.isRunning()) {
+    const page = this._browserManager.page;
+    if (!page) {
       vscode.window.showWarningMessage('Launch browser first.');
       return;
     }
@@ -160,61 +236,57 @@ export class Recorder {
       lastInsertLength = 0;
     }
 
-    // Register event listener BEFORE starting recording to avoid race condition
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright REPL: Stop Recording';
     this._statusBarItem.command = 'playwright-repl.stopRecording';
     this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 
-    this._browserManager.onEvent((event) => {
-      if (!this._recording || !this._editor) return;
+    try {
+      // Expose callback functions on the page
+      await this._exposeRecorderFunctions(page);
 
-      if (event.type === 'recorded-action') {
-        const action = event.action as { js: string; pw: string };
-        insertAtCursor(this._editor!, action.js, this._indentation);
+      // Inject the capture script
+      const injectPath = path.resolve(path.dirname(__filename), 'recorder-inject.js');
+      const injectCode = fs.readFileSync(injectPath, 'utf-8');
+      await page.evaluate(injectCode);
+
+      // Insert goto for current page URL
+      if (!ctx || !ctx.inside) {
+        const url = page.url();
+        if (url && url !== 'about:blank' && this._editor) {
+          insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
+        }
       }
 
-      if (event.type === 'recorded-fill-update') {
-        const action = event.action as { js: string; pw: string };
-        replaceLastInsert(this._editor!, action.js, this._indentation);
-      }
-    });
-
-    // Start recording via bridge — returns URL of current page
-    const result = await this._browserManager.runCommand('record-start');
-    if (result.isError) {
+      this._outputChannel.appendLine('Recording started.');
+    } catch (e: unknown) {
       this._recording = false;
       this._statusBarItem.text = '$(circle-filled) Record';
       this._statusBarItem.command = 'playwright-repl.startRecording';
       this._statusBarItem.backgroundColor = undefined;
-      this._browserManager.onEvent(null);
-      vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
-      return;
+      vscode.window.showErrorMessage(`Recording failed: ${(e as Error).message}`);
     }
-
-    // Insert goto only when starting a new test (template was inserted or cursor is at first line)
-    if (!ctx || !ctx.inside) {
-      const urlMatch = result.text?.match(/Recording started:\s*(.+)/);
-      const url = urlMatch?.[1]?.trim() || '';
-      if (url && this._editor) {
-        insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
-      }
-    }
-
-    this._outputChannel.appendLine('Recording started.');
   }
 
   async stop() {
     if (!this._recording) return;
+    const page = this._browserManager.page;
 
-    await this._browserManager.runCommand('record-stop');
+    // Clean up event listeners in the page
+    if (page) {
+      try {
+        await page.evaluate(() => {
+          if (window.__pwRecorderCleanup) window.__pwRecorderCleanup();
+        });
+      } catch { /* page may have navigated */ }
+    }
+
     this._recording = false;
     this._statusBarItem.text = '$(circle-filled) Record';
     this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
     this._statusBarItem.command = 'playwright-repl.startRecording';
     this._statusBarItem.backgroundColor = undefined;
-    this._browserManager.onEvent(null);
     this._outputChannel.appendLine('Recording stopped.');
   }
 

@@ -39,12 +39,26 @@ const options = {
   minify: !watch,
 };
 
+// Recorder inject script — runs in browser, not Node
+const injectOptions = {
+  entryPoints: ['src/recorder-inject.ts'],
+  bundle: true,
+  outdir: 'dist',
+  format: 'iife',
+  platform: 'browser',
+  target: 'ES2019',
+  sourcemap: false,
+  minify: !watch,
+};
+
 if (watch) {
   const ctx = await esbuild.context(options);
   await ctx.watch();
+  await esbuild.build(injectOptions);
   console.log('Watching for changes...');
 } else {
   await esbuild.build(options);
+  await esbuild.build(injectOptions);
 
   // Copy Chrome extension dist into VSIX bundle
   const src = path.resolve('..', 'extension', 'dist');
