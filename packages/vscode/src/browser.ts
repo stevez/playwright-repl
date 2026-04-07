@@ -135,7 +135,7 @@ export class BrowserManager {
       // Set up event queue for pick/record events
       (self as any).__eventQueue = [] as any[];
       chrome.runtime.onMessage.addListener((msg: any) => {
-        const eventTypes = ['element-picked-raw', 'pick-cancelled', 'recorded-action', 'recorded-fill-update'];
+        const eventTypes = ['recorded-action', 'recorded-fill-update'];
         if (eventTypes.includes(msg.type)) {
           (self as any).__eventQueue.push(msg);
         }

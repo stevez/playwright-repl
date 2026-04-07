@@ -163,9 +163,8 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any)
         revokeLastBlob();
     }
 
-    // Forward recording/picker events to the bridge client (VS Code)
-    if (msg.type === 'recorded-action' || msg.type === 'recorded-fill-update' ||
-        msg.type === 'element-picked-raw' || msg.type === 'pick-cancelled') {
+    // Forward recording events to the bridge client (VS Code)
+    if (msg.type === 'recorded-action' || msg.type === 'recorded-fill-update') {
         if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ _event: true, ...msg }));
         }
