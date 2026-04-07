@@ -4,8 +4,8 @@
  * Manages the recording flow in VS Code:
  * 1. Detects cursor context (inside/outside test function)
  * 2. Generates test template if needed
- * 3. Starts recording via bridge
- * 4. Receives streamed actions via bridge events
+ * 3. Starts recording via Playwright's built-in Recorder (_enableRecorder)
+ * 4. Receives actions via in-process channel callbacks (no polling)
  * 5. Inserts each action at cursor in the active editor
  */
 
@@ -160,46 +160,39 @@ export class Recorder {
       lastInsertLength = 0;
     }
 
-    // Register event listener BEFORE starting recording to avoid race condition
+    // Insert goto for new templates
+    if ((!ctx || !ctx.inside) && this._editor) {
+      const page = this._browserManager.page;
+      const url = page?.url?.() || '';
+      if (url && url !== 'about:blank')
+        insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
+    }
+
+    // Start recording via Playwright's built-in Recorder
     this._recording = true;
     this._statusBarItem.text = '$(debug-stop) Stop Recording';
     this._statusBarItem.tooltip = 'Playwright REPL: Stop Recording';
     this._statusBarItem.command = 'playwright-repl.stopRecording';
     this._statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 
-    this._browserManager.onEvent((event) => {
-      if (!this._recording || !this._editor) return;
-
-      if (event.type === 'recorded-action') {
-        const action = event.action as { js: string; pw: string };
-        insertAtCursor(this._editor!, action.js, this._indentation);
-      }
-
-      if (event.type === 'recorded-fill-update') {
-        const action = event.action as { js: string; pw: string };
-        replaceLastInsert(this._editor!, action.js, this._indentation);
-      }
-    });
-
-    // Start recording via bridge — returns URL of current page
-    const result = await this._browserManager.runCommand('record-start');
-    if (result.isError) {
+    try {
+      await this._browserManager.startRecording({
+        onActionAdded: (code: string) => {
+          if (!this._recording || !this._editor) return;
+          insertAtCursor(this._editor, code, this._indentation);
+        },
+        onActionUpdated: (code: string) => {
+          if (!this._recording || !this._editor) return;
+          replaceLastInsert(this._editor, code, this._indentation);
+        },
+      });
+    } catch (e) {
       this._recording = false;
       this._statusBarItem.text = '$(circle-filled) Record';
       this._statusBarItem.command = 'playwright-repl.startRecording';
       this._statusBarItem.backgroundColor = undefined;
-      this._browserManager.onEvent(null);
-      vscode.window.showErrorMessage(`Recording failed: ${result.text}`);
+      vscode.window.showErrorMessage(`Recording failed: ${String(e)}`);
       return;
-    }
-
-    // Insert goto only when starting a new test (template was inserted or cursor is at first line)
-    if (!ctx || !ctx.inside) {
-      const urlMatch = result.text?.match(/Recording started:\s*(.+)/);
-      const url = urlMatch?.[1]?.trim() || '';
-      if (url && this._editor) {
-        insertAtCursor(this._editor, `await page.goto('${url}');`, this._indentation);
-      }
     }
 
     this._outputChannel.appendLine('Recording started.');
@@ -208,13 +201,12 @@ export class Recorder {
   async stop() {
     if (!this._recording) return;
 
-    await this._browserManager.runCommand('record-stop');
+    await this._browserManager.stopRecording();
     this._recording = false;
     this._statusBarItem.text = '$(circle-filled) Record';
     this._statusBarItem.tooltip = 'Playwright REPL: Start Recording';
     this._statusBarItem.command = 'playwright-repl.startRecording';
     this._statusBarItem.backgroundColor = undefined;
-    this._browserManager.onEvent(null);
     this._outputChannel.appendLine('Recording stopped.');
   }
 
