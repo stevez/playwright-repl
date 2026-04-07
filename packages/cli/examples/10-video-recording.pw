@@ -7,7 +7,6 @@ localstorage-clear
 reload
 
 video-start
-video-chapter "Adding todos"
 fill textbox "What needs to be done?" "Buy groceries"
 press Enter
 fill textbox "What needs to be done?" "Write tests"
@@ -15,11 +14,9 @@ press Enter
 fill textbox "What needs to be done?" "Deploy to production"
 press Enter
 
-video-chapter "Completing a todo"
 check "Buy groceries"
 verify-text "2 items left"
 
-video-chapter "Filtering"
 click link "Completed"
 verify-text "Buy groceries"
 
