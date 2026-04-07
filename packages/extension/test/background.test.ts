@@ -175,12 +175,12 @@ describe("background.ts message handlers", () => {
     expect(result.error).toContain('CDP failed');
   });
 
-  it("attach recovers via detachAll on transient error", async () => {
+  it("attach recovers via detach on transient error", async () => {
     mockCrxApp.attach
       .mockRejectedValueOnce(new Error('Frame has been detached'))
       .mockResolvedValueOnce(mockPage);
     const result = await sendMessage({ type: 'attach', tabId: 42 });
-    expect(mockCrxApp.detachAll).toHaveBeenCalled();
+    expect(mockCrxApp.detach).toHaveBeenCalledWith(42);
     expect(result).toEqual({ ok: true, url: 'https://example.com' });
   });
 
@@ -193,10 +193,12 @@ describe("background.ts message handlers", () => {
     expect(mockCrxApp.detach).not.toHaveBeenCalled();
   });
 
-  it("attach detaches when re-attaching to the same tab", async () => {
+  it("attach reuses existing page when re-attaching to the same tab", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    await sendMessage({ type: 'attach', tabId: 42 });
-    expect(mockCrxApp.detach).toHaveBeenCalledWith(42);
+    const result = await sendMessage({ type: 'attach', tabId: 42 });
+    // Should reuse existing page, not detach/reattach
+    expect(mockCrxApp.detach).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, url: 'https://example.com' });
   });
 
   // ─── record-start / record-stop ───────────────────────────────────────────
@@ -246,7 +248,7 @@ describe("background.ts message handlers", () => {
 
   // ─── attach: Frame detached retry ─────────────────────────────────────────
 
-  it("attach retries on 'Frame has been detached' error via detachAll", async () => {
+  it("attach retries on 'Frame has been detached' error via detach", async () => {
     const retryPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
     let callCount = 0;
     mockCrxApp.attach.mockImplementation(() => {
@@ -257,7 +259,7 @@ describe("background.ts message handlers", () => {
 
     const result = await sendMessage({ type: 'attach', tabId: 42 });
     expect(result.ok).toBe(true);
-    expect(mockCrxApp.detachAll).toHaveBeenCalled();
+    expect(mockCrxApp.detach).toHaveBeenCalledWith(42);
     expect(mockCrxApp.attach).toHaveBeenCalledTimes(2);
   });
 
