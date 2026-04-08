@@ -16,8 +16,8 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'include-snapshot', 'verbose'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
+  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'http', 'include-snapshot', 'verbose'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'http-url'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -42,6 +42,8 @@ Options:
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
   --bridge               Connect to extension via WebSocket bridge (no CDP required)
   --bridge-port <port>   WebSocket bridge port (default: 9876)
+  --http                 Connect to shared HTTP MCP server (default: http://127.0.0.1:9877/mcp)
+  --http-url <url>       HTTP MCP server URL (default: http://127.0.0.1:9877/mcp)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
@@ -71,6 +73,8 @@ Examples:
   playwright-repl --connect 9333         # connect to Chrome on custom port
   playwright-repl --bridge               # connect to extension via WebSocket bridge
   playwright-repl --bridge --bridge-port 9877  # custom bridge port
+  playwright-repl --http                 # connect to shared HTTP MCP server
+  playwright-repl --http --http-url http://localhost:9877/mcp  # custom URL
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
   playwright-repl --replay tests/         # replay all .pw files in folder
@@ -104,6 +108,8 @@ startRepl({
   silent: args.silent as boolean,
   bridge: args.bridge as boolean,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
+  http: args.http as boolean,
+  httpUrl: args['http-url'] as string | undefined,
   includeSnapshot: args['include-snapshot'] as boolean,
   verbose: args.verbose as boolean,
 }).catch((err: Error) => {

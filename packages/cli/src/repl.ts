@@ -28,6 +28,8 @@ export interface ReplOpts extends EngineOpts {
   silent?: boolean;
   bridge?: boolean;
   bridgePort?: number;
+  http?: boolean;
+  httpUrl?: string;
   includeSnapshot?: boolean;
   verbose?: boolean;
 }
@@ -961,7 +963,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
 
-  if (!opts.bridge && !opts.connect) {
+  if (!opts.bridge && !opts.connect && !opts.http) {
     const { EvaluateConnection, findExtensionPath } = await import('@playwright-repl/core');
     const extPath = process.env.VITEST ? null : findExtensionPath(import.meta.url);
     if (extPath) {
@@ -984,6 +986,28 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
         log(`${c.dim}Falling back to standard engine...${c.reset}\n`);
       }
     }
+  }
+
+  // ─── HTTP mode (connect to shared MCP server) ───────────────────
+
+  if (opts.http) {
+    const { HttpMcpClient } = await import('./http-client.js');
+    const client = new HttpMcpClient(opts.httpUrl);
+    try {
+      await client.start();
+      log(`${c.green}✓${c.reset} Connected to MCP server at ${opts.httpUrl || 'http://127.0.0.1:9877/mcp'}`);
+    } catch (err: unknown) {
+      console.error(`${c.red}Failed to connect: ${(err as Error).message}${c.reset}`);
+      console.error(`${c.dim}Make sure the HTTP MCP server is running: playwright-repl-mcp --http${c.reset}`);
+      process.exit(1);
+    }
+    if (opts.replay && opts.replay.length > 0) {
+      await runBridgeReplayMode(opts, client as any);
+    } else {
+      log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
+      await startBridgeLoop(opts, client as any);
+    }
+    return;
   }
 
   // ─── Bridge mode ─────────────────────────────────────────────────
