@@ -13,7 +13,8 @@ import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createMcpServer } from './index.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { createMcpServer } from './server-factory.js';
 import { logEvent } from './logger.js';
 import type { Runner, RunnerDescriptions } from './types.js';
 
@@ -40,16 +41,35 @@ export async function startHttpTransport(
         }
 
         if (req.method === 'POST') {
+            // Parse request body
+            const body = await new Promise<string>((resolve) => {
+                let data = '';
+                req.on('data', (chunk: Buffer) => { data += chunk; });
+                req.on('end', () => resolve(data));
+            });
+            const jsonBody = JSON.parse(body);
+
             let transport = sessionId ? sessions.get(sessionId) : undefined;
             if (!transport) {
-                // New session — create a fresh McpServer + transport
+                // Only create a new session for initialize requests
+                if (!isInitializeRequest(jsonBody)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        jsonrpc: '2.0',
+                        error: { code: -32000, message: 'Bad Request: No valid session ID provided' },
+                        id: null,
+                    }));
+                    return;
+                }
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
+                    onsessioninitialized: (sid) => {
+                        sessions.set(sid, transport!);
+                        logEvent(`HTTP session created: ${sid}`);
+                    },
                 });
                 const server = createMcpServer(runner, descriptions);
                 await server.connect(transport);
-                sessions.set(transport.sessionId!, transport);
-                logEvent(`HTTP session created: ${transport.sessionId}`);
 
                 transport.onclose = () => {
                     const sid = transport!.sessionId;
@@ -57,7 +77,7 @@ export async function startHttpTransport(
                     logEvent(`HTTP session closed: ${sid}`);
                 };
             }
-            await transport.handleRequest(req, res);
+            await transport.handleRequest(req, res, jsonBody);
             return;
         }
 
