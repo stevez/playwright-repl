@@ -78,16 +78,17 @@ export class BridgeServer {
             });
         });
 
-        // Heartbeat: detect silent disconnects every 15s
+        // Heartbeat: detect silent disconnects every 30s
         this.heartbeatTimer = setInterval(() => {
             if (!this.socket) return;
             if ((this.socket as any)._alive === false) {
+                console.error('[bridge] heartbeat: no pong received, terminating socket');
                 this.socket.terminate();
                 return;
             }
             (this.socket as any)._alive = false;
             this.socket.ping();
-        }, 15000);
+        }, 30000);
     }
 
     async run(command: string, opts?: { includeSnapshot?: boolean }): Promise<EngineResult> {
