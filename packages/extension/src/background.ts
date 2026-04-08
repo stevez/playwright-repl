@@ -150,16 +150,14 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
       return { ok: true, url: currentPage.url() };
     }
 
-    let app = await ensureCrxApp();
+    const app = await ensureCrxApp();
 
     try {
       currentPage = await app.attach(tabId);
     } catch {
       // "Frame has been detached" — stale frame tree from previous attach.
-      // app.detach() doesn't fully clean up transport state (_tabToTarget maps),
-      // so close the app entirely and get a fresh instance.
-      await app.close().catch(() => {});
-      app = await ensureCrxApp();
+      // Detach and retry once to get a fresh frame tree.
+      await app.detach(tabId).catch(() => {});
       currentPage = await app.attach(tabId);
     }
     activeTabId = tabId;
