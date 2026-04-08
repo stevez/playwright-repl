@@ -165,7 +165,7 @@ describe("background.ts message handlers", () => {
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome://settings' });
     const result = await sendMessage({ type: 'attach', tabId: 1 });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('Cannot attach to internal pages');
+    expect(result.error).toContain('Cannot attach to this page');
   });
 
   it("attach returns error when all recovery attempts fail", async () => {
@@ -406,7 +406,7 @@ describe("background.ts message handlers", () => {
     (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome-extension://abc/panel.html' });
     const result = await sendMessage({ type: 'attach', tabId: 1 });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('Cannot attach to internal pages');
+    expect(result.error).toContain('Cannot attach to this page');
   });
 
   // ─── chrome.storage.onChanged listener ─────────────────────────────────────
