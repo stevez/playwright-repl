@@ -79,10 +79,13 @@ test.describe("Panel page test", () => {
 
   test('navigates history with ArrowUp/ArrowDown', async ({ sidePanel }) => {
     await sidePanel.submitInput('goto https://a.com');
+    await expect(sidePanel.commandInput.locator('.cm-placeholder')).toBeVisible();
     await sidePanel.submitInput('goto https://b.com');
+    await expect(sidePanel.commandInput.locator('.cm-placeholder')).toBeVisible();
 
-    // Re-focus the input before navigating history
+    // Re-focus the input and wait for CodeMirror to be ready
     await sidePanel.commandInput.locator('.cm-content').click();
+    await expect(sidePanel.commandInput.locator('.cm-editor.cm-focused')).toBeVisible();
 
     await sidePanel.raw.keyboard.press('ArrowUp');
     await expect(sidePanel.commandInput).toContainText('goto https://b.com');
