@@ -144,9 +144,11 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
   try {
     const tab = await chrome.tabs.get(tabId);
     const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
-    if (tab.url?.startsWith('chrome://') ||
-        (tab.url?.startsWith('chrome-extension://') && !tab.url?.startsWith(ownOrigin))) {
-      return { ok: false, error: 'Cannot attach to internal pages. Navigate to a regular webpage first.' };
+    const url = tab.url ?? '';
+    if (url.startsWith('chrome://') ||
+        (url.startsWith('chrome-extension://') && !url.startsWith(ownOrigin)) ||
+        url.startsWith('https://chromewebstore.google.com')) {
+      return { ok: false, error: 'Cannot attach to this page — Chrome restricts extension access. Navigate to a regular webpage first.' };
     }
 
     const app = await ensureCrxApp();
@@ -645,9 +647,10 @@ async function handleBridgeCommand(msg: {
 
   let result = await executeCommandPayload(msg);
 
-  // Stale page recovery: if the command failed because the page/tab was closed,
+  // Stale page recovery: if the command failed because the page/tab was closed
+  // or Chrome forcibly detached the extension (e.g. navigated to chromewebstore.google.com),
   // clear state and retry once with a fresh attach.
-  if (result.isError && result.text.includes('TargetClosedError')) {
+  if (result.isError && (result.text.includes('TargetClosedError') || result.text.includes('Target closed') || result.text.includes('detached'))) {
     currentPage = null;
     activeTabId = null;
     const tabId = await getActiveTabId();
