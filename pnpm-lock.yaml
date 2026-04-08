@@ -89,8 +89,8 @@ importers:
         specifier: ^1.2.3
         version: 1.2.3
       '@playwright-repl/playwright-crx':
-        specifier: ^1.21.1
-        version: 1.21.1
+        specifier: ^1.21.2
+        version: 1.21.2
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
@@ -1105,8 +1105,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@playwright-repl/playwright-crx@1.21.1':
-    resolution: {integrity: sha512-06BzlQEX4iqLQKEEPpn1fV0yL+bRiXruU1KlzqfYUa9X88R37reEEI921yWNR3U4lai0KRD5A1tl+R8caeMh0w==}
+  '@playwright-repl/playwright-crx@1.21.2':
+    resolution: {integrity: sha512-6imzLbw2e2XuyaIiuUJaXH4cVJEO6i2taLimU5Fif0RvoVcyJ03H28rF/tqANZDOWqH4oSr7noGyVGsqYitzww==}
     engines: {node: '>=18'}
 
   '@playwright/test@1.59.1':
@@ -4524,7 +4524,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@playwright-repl/playwright-crx@1.21.1':
+  '@playwright-repl/playwright-crx@1.21.2':
     dependencies:
       zod: 4.3.6
       zod-to-json-schema: 3.25.2(zod@4.3.6)
