@@ -128,14 +128,28 @@ async function ensureCrxApp(): Promise<CrxApplication> {
   return crxApp;
 }
 
+function isAttachableUrl(url: string | undefined): boolean {
+  if (!url) return true; // no URL info — let attachToTab decide
+  if (url.startsWith('chrome://')) return false;
+  if (url.startsWith('https://chromewebstore.google.com')) return false;
+  if (url.startsWith('chrome-extension://') && !url.startsWith(`chrome-extension://${chrome.runtime.id}/`)) return false;
+  return true;
+}
+
 async function getActiveTabId(): Promise<number | null> {
   if (activeTabId) return activeTabId;
   // Try focused window first
   const [focused] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (focused?.id) return focused.id;
+  if (focused?.id && isAttachableUrl(focused.url)) return focused.id;
   // Fall back to any active tab (handles Chrome not being the focused app)
   const [active] = await chrome.tabs.query({ active: true });
-  return active?.id ?? null;
+  if (active?.id && isAttachableUrl(active.url)) return active.id;
+  // All active tabs are restricted — find any regular tab
+  const tabs = await chrome.tabs.query({});
+  for (const t of tabs) {
+    if (t.id && isAttachableUrl(t.url)) return t.id;
+  }
+  return null;
 }
 
 // ─── Tab Attachment ───────────────────────────────────────────────────────────
