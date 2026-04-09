@@ -1,3 +1,8 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "playwright-repl": {
+      "command": "node",
+      "args": ["packages/mcp/dist/index.js"]
+    }
+  }
 }
