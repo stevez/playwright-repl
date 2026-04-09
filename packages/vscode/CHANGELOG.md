@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.24.0
+
+**2026-04-09**
+
+### Features
+
+- Element picker uses Playwright's native `page.pickLocator()` API
+- Derive `.pw` locators from `ariaSnapshot()` in pick locator
+- Tracing commands (`tracing-start` / `tracing-stop`) — open trace files directly in browser
+
+### Fixes
+
+- Bridge server reconnects after extension WebSocket drops
+- Relaxed heartbeat interval to 30s with dead connection detection
+- Handle Chrome Web Store forced extension detachment
+- Reset `crxApp` on attach failure
+- Auto-attach tab on bridge connect with robust tab discovery
+
 ## 0.23.1
 
 **2026-04-05**

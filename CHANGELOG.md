@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.24.0
+
+**2026-04-09**
+
+### Features
+
+- **Video capture**: Record tab video in the Chrome extension via `tabCapture` + `MediaRecorder`. Toolbar button with timer and recording indicator overlay on the page. ([#588](https://github.com/stevez/playwright-repl/issues/588), [#594](https://github.com/stevez/playwright-repl/issues/594), [#595](https://github.com/stevez/playwright-repl/issues/595))
+- **Video via CLI/MCP**: `video-start` / `video-stop` commands available through the bridge. ([#601](https://github.com/stevez/playwright-repl/issues/601))
+- **Tracing**: `tracing-start` / `tracing-stop` commands in extension, CLI, and MCP. Open trace files directly in the browser from the extension. ([#604](https://github.com/stevez/playwright-repl/issues/604), [#606](https://github.com/stevez/playwright-repl/issues/606), [#612](https://github.com/stevez/playwright-repl/issues/612))
+- **Element picker**: Use Playwright's native `page.pickLocator()` API in both VS Code and Chrome extension. Derive `.pw` locators from `ariaSnapshot()`. ([#615](https://github.com/stevez/playwright-repl/issues/615), [#617](https://github.com/stevez/playwright-repl/issues/617), [#625](https://github.com/stevez/playwright-repl/issues/625), [#631](https://github.com/stevez/playwright-repl/issues/631))
+- **Response formatting**: Playwright `Response` objects now display as `Response: 200 https://...` instead of raw object representation.
+- **Tracing/Video keyword commands**: `tracing-start`, `tracing-stop`, `video-start`, `video-stop`, `video-chapter` registered in the command map with help text and completions.
+- **CLI `--engine` flag**: Force standalone engine mode (no extension, keyword commands only).
+- **Browser extension package**: Publish extension dist as `@playwright-repl/browser-extension`. ([#652](https://github.com/stevez/playwright-repl/issues/652))
+
+### Fixes
+
+- **Bridge reconnection**: Bridge server reconnects after extension WebSocket drops, with relaxed heartbeat (30s) and dead connection detection. ([#642](https://github.com/stevez/playwright-repl/issues/642), [#643](https://github.com/stevez/playwright-repl/issues/643), [#650](https://github.com/stevez/playwright-repl/issues/650))
+- **Tab attach**: Auto-attach tab on bridge connect with robust tab discovery. ([#636](https://github.com/stevez/playwright-repl/issues/636))
+- **Chrome Web Store detachment**: Handle forced extension detachment gracefully. ([#645](https://github.com/stevez/playwright-repl/issues/645))
+- **Attach failure**: Reset `crxApp` on attach failure instead of detach-only retry. ([#628](https://github.com/stevez/playwright-repl/issues/628))
+- **pickLocator**: Prevent `pickLocator()` from blocking the bridge command queue.
+- **playwright-crx**: Bump to 1.21.2 with simplified attach logic. ([#609](https://github.com/stevez/playwright-repl/issues/609))
+- **CDP relay removed**: Remove CDP relay to avoid `chrome.debugger` conflict with bridge mode. ([#600](https://github.com/stevez/playwright-repl/issues/600))
+- **CI**: Stabilize flaky history ArrowUp/ArrowDown test on macOS. ([#637](https://github.com/stevez/playwright-repl/issues/637))
+
+### Refactors
+
+- **Locator command**: Use `locator.normalize()` instead of YAML snapshot cache. ([#624](https://github.com/stevez/playwright-repl/issues/624))
+
 ## v0.23.1
 
 **2026-04-05**
