@@ -32,6 +32,7 @@ export async function startHttpTransport(
     port: number,
 ): Promise<void> {
     const httpServer = createServer(async (req, res) => {
+      try {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
         if (req.url !== '/mcp') {
@@ -47,7 +48,14 @@ export async function startHttpTransport(
                 req.on('data', (chunk: Buffer) => { data += chunk; });
                 req.on('end', () => resolve(data));
             });
-            const jsonBody = JSON.parse(body);
+            let jsonBody: unknown;
+            try {
+                jsonBody = JSON.parse(body);
+            } catch {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }));
+                return;
+            }
 
             let transport = sessionId ? sessions.get(sessionId) : undefined;
             if (!transport) {
@@ -107,6 +115,14 @@ export async function startHttpTransport(
 
         res.writeHead(405);
         res.end('Method not allowed');
+      } catch (err: any) {
+        logEvent(`HTTP handler error: ${err?.message ?? err}`);
+        console.error('[http] request handler error:', err);
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null }));
+        }
+      }
     });
 
     await new Promise<void>((resolve) => {
@@ -128,8 +144,10 @@ export async function startHttpTransport(
         sessions.clear();
         httpServer.close();
     };
-    process.on('SIGINT', () => { cleanup(); process.exit(0); });
-    process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+    process.on('SIGINT', () => { logEvent('Received SIGINT, shutting down'); cleanup(); process.exit(0); });
+    process.on('SIGTERM', () => { logEvent('Received SIGTERM, shutting down'); cleanup(); process.exit(0); });
+    process.on('uncaughtException', (err) => { logEvent(`Uncaught exception: ${err.message}`); console.error(err); });
+    process.on('unhandledRejection', (reason) => { logEvent(`Unhandled rejection: ${reason}`); console.error(reason); });
 }
 
 // ─── PID File ────────────────────────────────────────────────────────────────
