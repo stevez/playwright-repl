@@ -35,7 +35,7 @@ It consists of two parts working together: **Dramaturg** (a Chrome extension tha
 
 ## Architecture
 
-### Bridge mode (default — stdio)
+### Bridge mode (default)
 
 ```
 Claude Desktop / Claude Code (or any MCP client)
@@ -46,16 +46,6 @@ Chrome extension (offscreen document → service worker)
   ↕ CDP / chrome.debugger
 Playwright running in your real Chrome session
 ```
-
-### Bridge mode (HTTP — multi-client)
-
-```
-Claude Desktop  ──┐
-Claude Code     ──┼── HTTP (:9877) ──→  MCP server  ──── WS (:9876) ──→  Dramaturg extension
-Copilot         ──┘                    (long-lived)                       (Chrome)
-```
-
-With `--http`, the MCP server runs as a standalone HTTP process. Multiple AI clients connect to the same server simultaneously — no port conflicts, no process restarts.
 
 ### Standalone mode (`--standalone`)
 
@@ -96,14 +86,12 @@ Add `--standalone` to the MCP server command. The server launches Chromium with 
 
 ### 3. Configure your MCP client
 
-#### Option A: Stdio (default — one client at a time)
-
-Each AI client spawns its own MCP server process.
-
 **Claude Desktop** — add to `claude_desktop_config.json`:
 
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+Bridge mode:
 
 ```json
 {
@@ -115,105 +103,7 @@ Each AI client spawns its own MCP server process.
 }
 ```
 
-**Claude Code:**
-
-```bash
-claude mcp add playwright-repl playwright-repl-mcp
-```
-
-#### Option B: HTTP (recommended — multiple clients, persistent server)
-
-Run the MCP server once, connect from any number of AI clients.
-
-**1. Start the server:**
-
-```bash
-playwright-repl-mcp --http
-```
-
-The server listens on `http://127.0.0.1:9877/mcp` (HTTP) and `ws://127.0.0.1:9876` (WebSocket to extension).
-
-**2. Configure clients:**
-
-**Claude Desktop** — add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "playwright-repl": {
-      "command": "npx",
-      "args": ["mcp-remote", "http://localhost:9877/mcp"]
-    }
-  }
-}
-```
-
-**Claude Code:**
-
-```bash
-claude mcp add playwright-repl --transport http http://localhost:9877/mcp
-```
-
-**3. Run as a background service (optional):**
-
-Create a wrapper script (`start-mcp.bat` on Windows, `start-mcp.sh` on macOS/Linux):
-
-Windows (`start-mcp.bat`):
-```bat
-@echo off
-title playwright-repl-mcp
-node /path/to/packages/mcp/dist/index.js --http
-```
-
-macOS/Linux (`start-mcp.sh`):
-```bash
-#!/bin/bash
-node /path/to/packages/mcp/dist/index.js --http
-```
-
-Auto-start on login:
-
-**Windows** (run from admin terminal):
-```cmd
-schtasks /Create /TN "playwright-repl-mcp" /TR "C:\path\to\start-mcp.bat" /SC ONLOGON /F
-```
-
-**macOS** — create `~/Library/LaunchAgents/com.playwright-repl.mcp.plist`:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.playwright-repl.mcp</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/node</string>
-        <string>/path/to/packages/mcp/dist/index.js</string>
-        <string>--http</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardErrorPath</key>
-    <string>/tmp/playwright-repl-mcp.err</string>
-</dict>
-</plist>
-```
-
-Then load it:
-```bash
-launchctl load ~/Library/LaunchAgents/com.playwright-repl.mcp.plist
-```
-
-Manage the server:
-- **Check status**: `netstat -ano | grep 9877` (Windows) / `lsof -i :9877` (macOS)
-- **Stop**: `kill $(cat ~/.playwright-repl/mcp.pid)`
-- **Remove** (Windows): `schtasks /Delete /TN playwright-repl-mcp /F`
-- **Remove** (macOS): `launchctl unload ~/Library/LaunchAgents/com.playwright-repl.mcp.plist`
-
-#### Standalone mode
+Standalone mode:
 
 ```json
 {
@@ -226,9 +116,15 @@ Manage the server:
 }
 ```
 
-**Claude Code:**
+Restart Claude Desktop after saving.
+
+**Claude Code** — run once in a terminal:
 
 ```bash
+# Bridge mode
+claude mcp add playwright-repl playwright-repl-mcp
+
+# Standalone mode
 claude mcp add playwright-repl playwright-repl-mcp -- --standalone --headed
 ```
 
@@ -382,26 +278,36 @@ Each agent has access to `run_command` and `run_script` via the MCP server and r
 - **Prefer keyword commands** for common actions — they're shorter and more reliable than raw Playwright API
 - **Fall back to Playwright API** when keyword commands are ambiguous (e.g. two elements match the same text) — use `exact: true` or scope with a locator chain
 
-## Custom ports
+## Custom port
 
-### Bridge WebSocket port (extension connection)
+By default the MCP server listens on port `9876`. To use a different port:
 
-Default: `9876`. Change via `--port` or `BRIDGE_PORT` env var:
+**Claude Desktop** — via args or env in `claude_desktop_config.json`:
 
-```bash
-playwright-repl-mcp --port 9878
-# or
-BRIDGE_PORT=9878 playwright-repl-mcp
+```json
+{
+  "mcpServers": {
+    "playwright-repl": {
+      "command": "playwright-repl-mcp",
+      "args": ["--port", "9877"]
+    }
+  }
+}
 ```
+
+```json
+{
+  "mcpServers": {
+    "playwright-repl": {
+      "command": "playwright-repl-mcp",
+      "env": { "BRIDGE_PORT": "9877" }
+    }
+  }
+}
+```
+
+`--port` takes precedence over `BRIDGE_PORT`. Default is `9876`.
 
 Update Dramaturg's Bridge Port setting to match (Dramaturg icon → Options → Bridge Port).
 
-### HTTP port (AI client connection)
-
-Default: `9877`. Change via `--http-port`:
-
-```bash
-playwright-repl-mcp --http --http-port 9878
-```
-
-> **Note:** In stdio mode, Claude Desktop and Claude Code cannot run simultaneously — each spawns its own process that competes for the bridge port. Use `--http` mode to share one server across multiple clients.
+> **Note:** Claude Desktop and Claude Code cannot run simultaneously on the same port — close one before opening the other.
