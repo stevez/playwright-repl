@@ -31,6 +31,17 @@ export async function expectTestTree(testController: TestController, expected: s
   expect(actual).toBe(expected);
 }
 
+export async function expectRenderLog(testRun: any, expected: string, timeout = 10000) {
+  const start = Date.now();
+  let actual: string = '';
+  while (Date.now() - start < timeout) {
+    actual = testRun.renderLog();
+    if (actual === expected) return;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  expect(actual).toBe(expected);
+}
+
 export async function expectConnectionLog(vscode: VSCode, expected: any[], timeout = 10000) {
   const filterCommands = new Set(['ping', 'initialize']);
   const filteredLog = () => vscode.connectionLog.filter((e: any) => !filterCommands.has(e.method));

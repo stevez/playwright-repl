@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { activate } from './mock-activate';
-import { expectConnectionLog } from './expect-helpers';
+import { expectConnectionLog, expectRenderLog } from './expect-helpers';
 
 describe('run annotations', () => {
   it('should mark test as skipped', async () => {
@@ -39,7 +39,7 @@ describe('run annotations', () => {
     });
 
     const testRun = await testController.run();
-    expect(testRun.renderLog()).toBe(`
+    await expectRenderLog(testRun, `
     tests > test.spec.ts > pass [2:0]
       enqueued
       started

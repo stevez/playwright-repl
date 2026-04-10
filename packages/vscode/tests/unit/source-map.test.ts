@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { activate } from './mock-activate';
-import { expectTestTree, expectConnectionLog } from './expect-helpers';
+import { expectTestTree, expectConnectionLog, expectRenderLog } from './expect-helpers';
 
 const escapedPathSep = path.sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -278,7 +278,7 @@ describe('source map', () => {
     });
 
     const testRun = await testController.run();
-    expect(testRun.renderLog()).toBe(`
+    await expectRenderLog(testRun, `
     tests > test.spec.ts > one [2:0]
       enqueued
       started
@@ -314,7 +314,7 @@ describe('source map', () => {
     const testItems = testController.findTestItems(/one/);
     const testRun = await testController.run(testItems);
 
-    expect(testRun.renderLog()).toBe(`
+    await expectRenderLog(testRun, `
     tests > test.spec.ts > one [2:0]
       enqueued
       enqueued
