@@ -2,8 +2,7 @@
  * Assert Builder — dedicated panel for building and testing Playwright assertions.
  */
 
-import { DisposableBase } from './disposableBase';
-import { getNonce, html } from './utils';
+import { WebviewBase } from './webviewBase';
 import type { IBrowserManager } from './browser';
 import type { Picker } from './picker';
 import * as vscodeTypes from './vscodeTypes';
@@ -50,25 +49,19 @@ export function filterTypes(tag?: string, inputType?: string): AssertionType[] {
   return filtered;
 }
 
-export class AssertView extends DisposableBase implements vscodeTypes.WebviewViewProvider {
-  private _vscode: vscodeTypes.VSCode;
-  private _view: vscodeTypes.WebviewView | undefined;
-  private _extensionUri: vscodeTypes.Uri;
+export class AssertView extends WebviewBase {
   private _browserManager: IBrowserManager | undefined;
   private _picker: Picker | undefined;
   private _locator = '';
   private _assertion = '';
   private _ariaSnapshot = '';
 
+  get viewId() { return 'playwright-repl.assertView'; }
+  get scriptName() { return 'assertView.script.js'; }
+  get bodyClass() { return 'assert-view'; }
+
   constructor(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri) {
-    super();
-    this._vscode = vscode;
-    this._extensionUri = extensionUri;
-    this._disposables = [
-      vscode.window.registerWebviewViewProvider('playwright-repl.assertView', this, {
-        webviewOptions: { retainContextWhenHidden: true },
-      }),
-    ];
+    super(vscode, extensionUri);
   }
 
   setBrowserManager(browserManager: IBrowserManager) {
@@ -88,118 +81,11 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
     await this._vscode.commands.executeCommand('playwright-repl.assertView.focus');
     if (!this._view)
       await new Promise(r => setTimeout(r, 200));
-    void this._view?.webview.postMessage({
-      method: 'update',
-      params: { locator, assertion, types, ariaSnapshot: this._ariaSnapshot },
-    });
+    this.postMessage('update', { locator, assertion, types, ariaSnapshot: this._ariaSnapshot });
   }
 
-  resolveWebviewView(webviewView: vscodeTypes.WebviewView) {
-    this._view = webviewView;
-
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this._extensionUri],
-    };
-
-    webviewView.webview.html = htmlForWebview(this._vscode, this._extensionUri, webviewView.webview);
-
-    this._disposables.push(webviewView.webview.onDidReceiveMessage(async data => {
-      if (data.method === 'pick') {
-        await this._vscode.commands.executeCommand('playwright-repl.assertBuilder');
-      } else if (data.method === 'verify') {
-        await this._verify(data.params.assertion);
-      } else if (data.method === 'rebuild') {
-        this._rebuildAssertion(data.params.type, data.params.arg, data.params.negate);
-      } else if (data.method === 'rebuildSnapshot') {
-        this._rebuildSnapshotAssertion(data.params.snapshot, data.params.negate);
-      } else if (data.method === 'locatorChanged') {
-        this._locator = data.params.locator;
-      }
-    }));
-
-    // Send types on init
-    void webviewView.webview.postMessage({
-      method: 'init',
-      params: { types: ALL_ASSERTION_TYPES },
-    });
-  }
-
-  private _rebuildAssertion(type: string, arg?: string, negate?: boolean) {
-    if (!this._locator && !type.startsWith('toHave')) return;
-    const typeDef = ALL_ASSERTION_TYPES.find(t => t.value === type);
-    if (!typeDef) return;
-
-    const not = negate ? 'not.' : '';
-    const isPageLevel = type === 'toHaveURL' || type === 'toHaveTitle';
-    const target = isPageLevel ? 'page' : this._locator;
-    let assertion: string;
-    if (typeDef.argType === 'pair' && arg) {
-      const parts = arg.split(',').map(s => s.trim());
-      assertion = `await expect(${target}).${not}${type}('${parts[0] || ''}', '${parts[1] || ''}');`;
-    } else if (typeDef.needsArg && arg) {
-      const argStr = typeDef.argType === 'number' ? arg : `'${arg.replace(/'/g, "\\'")}'`;
-      assertion = `await expect(${target}).${not}${type}(${argStr});`;
-    } else {
-      assertion = `await expect(${target}).${not}${type}();`;
-    }
-
-    this._assertion = assertion;
-    void this._view?.webview.postMessage({
-      method: 'assertionUpdated',
-      params: { assertion },
-    });
-  }
-
-  private _rebuildSnapshotAssertion(snapshot?: string, negate?: boolean) {
-    if (!this._locator) return;
-    const not = negate ? 'not.' : '';
-    const assertion = snapshot
-      ? `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\n${snapshot}\n\`);`
-      : `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\`);`;
-
-    this._assertion = assertion;
-    void this._view?.webview.postMessage({
-      method: 'assertionUpdated',
-      params: { assertion },
-    });
-  }
-
-  private async _verify(assertion: string) {
-    if (!this._browserManager?.isRunning() || !assertion) return;
-    this._assertion = assertion;
-    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: true } });
-    try {
-      const result = await this._browserManager.runCommand(assertion);
-      const passed = !result.isError;
-      void this._view?.webview.postMessage({
-        method: 'verifyResult',
-        params: { passed, error: passed ? null : result.text },
-      });
-    } catch (e: unknown) {
-      void this._view?.webview.postMessage({
-        method: 'verifyResult',
-        params: { passed: false, error: (e as Error).message },
-      });
-    }
-    void this._view?.webview.postMessage({ method: 'verifyProcessing', params: { processing: false } });
-  }
-}
-
-function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri, webview: vscodeTypes.Webview) {
-  const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'common.css'));
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'assertView.script.js'));
-  const nonce = getNonce();
-
-  return html`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link href="${style}" rel="stylesheet">
-      <title>Assert</title>
+  bodyHtml(_webview: vscodeTypes.Webview): string {
+    return `
       <style>
         body.assert-view {
           user-select: text;
@@ -289,8 +175,6 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
           margin-right: 6px;
         }
       </style>
-    </head>
-    <body class="assert-view">
       <div class="section">
         <div class="hbox">
           <span class="step-num">1</span>
@@ -332,8 +216,72 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
           <span id="verifyResult" style="font-size:13px;margin-left:6px;display:none;"></span>
         </div>
       </div>
-    </body>
-    <script nonce="${nonce}" src="${script}"></script>
-    </html>
-  `;
+    `;
+  }
+
+  async onMessage(data: any) {
+    if (data.method === 'pick') {
+      await this._vscode.commands.executeCommand('playwright-repl.assertBuilder');
+    } else if (data.method === 'verify') {
+      await this._verify(data.params.assertion);
+    } else if (data.method === 'rebuild') {
+      this._rebuildAssertion(data.params.type, data.params.arg, data.params.negate);
+    } else if (data.method === 'rebuildSnapshot') {
+      this._rebuildSnapshotAssertion(data.params.snapshot, data.params.negate);
+    } else if (data.method === 'locatorChanged') {
+      this._locator = data.params.locator;
+    }
+  }
+
+  protected onViewReady() {
+    this.postMessage('init', { types: ALL_ASSERTION_TYPES });
+  }
+
+  private _rebuildAssertion(type: string, arg?: string, negate?: boolean) {
+    if (!this._locator && !type.startsWith('toHave')) return;
+    const typeDef = ALL_ASSERTION_TYPES.find(t => t.value === type);
+    if (!typeDef) return;
+
+    const not = negate ? 'not.' : '';
+    const isPageLevel = type === 'toHaveURL' || type === 'toHaveTitle';
+    const target = isPageLevel ? 'page' : this._locator;
+    let assertion: string;
+    if (typeDef.argType === 'pair' && arg) {
+      const parts = arg.split(',').map(s => s.trim());
+      assertion = `await expect(${target}).${not}${type}('${parts[0] || ''}', '${parts[1] || ''}');`;
+    } else if (typeDef.needsArg && arg) {
+      const argStr = typeDef.argType === 'number' ? arg : `'${arg.replace(/'/g, "\\'")}'`;
+      assertion = `await expect(${target}).${not}${type}(${argStr});`;
+    } else {
+      assertion = `await expect(${target}).${not}${type}();`;
+    }
+
+    this._assertion = assertion;
+    this.postMessage('assertionUpdated', { assertion });
+  }
+
+  private _rebuildSnapshotAssertion(snapshot?: string, negate?: boolean) {
+    if (!this._locator) return;
+    const not = negate ? 'not.' : '';
+    const assertion = snapshot
+      ? `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\n${snapshot}\n\`);`
+      : `await expect(${this._locator}).${not}toMatchAriaSnapshot(\`\`);`;
+
+    this._assertion = assertion;
+    this.postMessage('assertionUpdated', { assertion });
+  }
+
+  private async _verify(assertion: string) {
+    if (!this._browserManager?.isRunning() || !assertion) return;
+    this._assertion = assertion;
+    this.postMessage('verifyProcessing', { processing: true });
+    try {
+      const result = await this._browserManager.runCommand(assertion);
+      const passed = !result.isError;
+      this.postMessage('verifyResult', { passed, error: passed ? null : result.text });
+    } catch (e: unknown) {
+      this.postMessage('verifyResult', { passed: false, error: (e as Error).message });
+    }
+    this.postMessage('verifyProcessing', { processing: false });
+  }
 }

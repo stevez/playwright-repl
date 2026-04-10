@@ -2,8 +2,7 @@
  * REPL Webview — interactive command panel for Playwright REPL.
  */
 
-import { DisposableBase } from './disposableBase';
-import { getNonce, html } from './utils';
+import { WebviewBase } from './webviewBase';
 import type { IBrowserManager } from './browser';
 import * as vscodeTypes from './vscodeTypes';
 import { COMMANDS, CATEGORIES, ALIASES } from '@playwright-repl/core';
@@ -12,26 +11,20 @@ function core() {
   return { COMMANDS, CATEGORIES, ALIASES };
 }
 
-export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewProvider {
-  private _vscode: vscodeTypes.VSCode;
-  private _view: vscodeTypes.WebviewView | undefined;
-  private _extensionUri: vscodeTypes.Uri;
+export class ReplView extends WebviewBase {
   private _browserManager: IBrowserManager | undefined;
   private _history: string[] = [];
   private _commandCount = 0;
 
+  get viewId() { return 'playwright-repl.replView'; }
+  get scriptName() { return 'replView.script.js'; }
+  get bodyClass() { return 'repl-view'; }
+
   constructor(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri) {
-    super();
-    this._vscode = vscode;
-    this._extensionUri = extensionUri;
-    this._disposables = [
-      vscode.window.registerWebviewViewProvider('playwright-repl.replView', this, {
-        webviewOptions: { retainContextWhenHidden: true },
-      }),
-    ];
+    super(vscode, extensionUri);
   }
 
-  setIBrowserManager(browserManager: IBrowserManager) {
+  setBrowserManager(browserManager: IBrowserManager) {
     this._browserManager = browserManager;
   }
 
@@ -43,27 +36,83 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     this._appendOutput('Browser disconnected.', 'error');
   }
 
-  resolveWebviewView(webviewView: vscodeTypes.WebviewView) {
-    this._view = webviewView;
+  bodyHtml(_webview: vscodeTypes.Webview): string {
+    return `
+      <style>
+        body.repl-view {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          overflow: hidden;
+          font-family: var(--vscode-editor-font-family, 'Consolas, monospace');
+          font-size: var(--vscode-editor-font-size, 13px);
+          user-select: text;
+        }
+        #output {
+          flex: 1;
+          overflow-y: auto;
+          padding: 4px 8px;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .line { line-height: 1.4; }
+        .line-command { color: var(--vscode-terminal-ansiBrightWhite, var(--vscode-editor-foreground)); }
+        .line-command::before { content: 'pw> '; color: var(--vscode-terminal-ansiGreen); }
+        .line-output { color: var(--vscode-editor-foreground); }
+        .line-error { color: var(--vscode-terminal-ansiRed); }
+        .line-info { color: var(--vscode-terminal-ansiCyan, var(--vscode-descriptionForeground)); }
+        #input-row {
+          display: flex;
+          align-items: flex-start;
+          padding: 4px 8px;
+          border-top: 1px solid var(--vscode-panelInput-border, var(--vscode-panel-border));
+        }
+        #prompt {
+          color: var(--vscode-terminal-ansiGreen);
+          margin-right: 4px;
+          flex: none;
+        }
+        #command-input {
+          flex: 1;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: var(--vscode-editor-foreground);
+          font-family: inherit;
+          font-size: inherit;
+          padding: 2px 0;
+          resize: none;
+          overflow: hidden;
+          line-height: 1.4;
+          field-sizing: content;
+          max-height: 40vh;
+        }
+        #command-input::placeholder {
+          color: var(--vscode-input-placeholderForeground);
+        }
+        #command-input:disabled {
+          opacity: 0.5;
+        }
+      </style>
+      <div id="output"></div>
+      <div id="input-row">
+        <span id="prompt">pw&gt;</span>
+        <textarea id="command-input" rows="1" placeholder="Type a command..." autofocus></textarea>
+      </div>
+    `;
+  }
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this._extensionUri],
-    };
+  async onMessage(data: any) {
+    if (data.method === 'execute') {
+      await this._execute(data.params.command);
+    } else if (data.method === 'getHistory') {
+      this.postMessage('history', { history: this._history });
+    } else if (data.method === 'savePdf') {
+      await this._savePdf(data.params.dataUri);
+    }
+  }
 
-    webviewView.webview.html = htmlForWebview(this._vscode, this._extensionUri, webviewView.webview);
-
-    this._disposables.push(webviewView.webview.onDidReceiveMessage(async data => {
-      if (data.method === 'execute') {
-        await this._execute(data.params.command);
-      } else if (data.method === 'getHistory') {
-        void this._view?.webview.postMessage({ method: 'history', params: { history: this._history } });
-      } else if (data.method === 'savePdf') {
-        await this._savePdf(data.params.dataUri);
-      }
-    }));
-
-    // Send welcome message
+  protected onViewReady() {
     const connected = this._browserManager?.isRunning() ?? false;
     this._appendOutput('Playwright REPL\nType commands. Use ↑↓ for history.', 'info');
     this._appendOutput(connected ? 'Connected to browser.' : 'Waiting for browser... Launch with Ctrl+Shift+P → "Launch Browser"', connected ? 'info' : 'error');
@@ -146,7 +195,7 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
 
     // .clear — clear output
     if (trimmed === '.clear') {
-      void this._view?.webview.postMessage({ method: 'clear' });
+      this.postMessage('clear');
       return true;
     }
 
@@ -218,20 +267,19 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
       return true;
     }
 
-
     return false;
   }
 
   private _appendOutput(text: string, type: 'output' | 'error' | 'info') {
-    void this._view?.webview.postMessage({ method: 'output', params: { text, type } });
+    this.postMessage('output', { text, type });
   }
 
   private _appendImage(dataUri: string) {
-    void this._view?.webview.postMessage({ method: 'image', params: { dataUri } });
+    this.postMessage('image', { dataUri });
   }
 
   private _appendPdf(dataUri: string) {
-    void this._view?.webview.postMessage({ method: 'pdf', params: { dataUri } });
+    this.postMessage('pdf', { dataUri });
   }
 
   private async _savePdf(dataUri: string) {
@@ -248,89 +296,6 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
   }
 
   private _setProcessing(processing: boolean) {
-    void this._view?.webview.postMessage({ method: 'processing', params: { processing } });
+    this.postMessage('processing', { processing });
   }
-}
-
-function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Uri, webview: vscodeTypes.Webview) {
-  const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'common.css'));
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'replView.script.js'));
-  const nonce = getNonce();
-
-  return html`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data:;">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link href="${style}" rel="stylesheet">
-      <title>REPL</title>
-      <style>
-        body.repl-view {
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          overflow: hidden;
-          font-family: var(--vscode-editor-font-family, 'Consolas, monospace');
-          font-size: var(--vscode-editor-font-size, 13px);
-          user-select: text;
-        }
-        #output {
-          flex: 1;
-          overflow-y: auto;
-          padding: 4px 8px;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-        .line { line-height: 1.4; }
-        .line-command { color: var(--vscode-terminal-ansiBrightWhite, var(--vscode-editor-foreground)); }
-        .line-command::before { content: 'pw> '; color: var(--vscode-terminal-ansiGreen); }
-        .line-output { color: var(--vscode-editor-foreground); }
-        .line-error { color: var(--vscode-terminal-ansiRed); }
-        .line-info { color: var(--vscode-terminal-ansiCyan, var(--vscode-descriptionForeground)); }
-        #input-row {
-          display: flex;
-          align-items: flex-start;
-          padding: 4px 8px;
-          border-top: 1px solid var(--vscode-panelInput-border, var(--vscode-panel-border));
-        }
-        #prompt {
-          color: var(--vscode-terminal-ansiGreen);
-          margin-right: 4px;
-          flex: none;
-        }
-        #command-input {
-          flex: 1;
-          border: none;
-          outline: none;
-          background: transparent;
-          color: var(--vscode-editor-foreground);
-          font-family: inherit;
-          font-size: inherit;
-          padding: 2px 0;
-          resize: none;
-          overflow: hidden;
-          line-height: 1.4;
-          field-sizing: content;
-          max-height: 40vh;
-        }
-        #command-input::placeholder {
-          color: var(--vscode-input-placeholderForeground);
-        }
-        #command-input:disabled {
-          opacity: 0.5;
-        }
-      </style>
-    </head>
-    <body class="repl-view">
-      <div id="output"></div>
-      <div id="input-row">
-        <span id="prompt">pw&gt;</span>
-        <textarea id="command-input" rows="1" placeholder="Type a command..." autofocus></textarea>
-      </div>
-    </body>
-    <script nonce="${nonce}" src="${script}"></script>
-    </html>
-  `;
 }
