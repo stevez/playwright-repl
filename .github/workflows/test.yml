@@ -42,10 +42,9 @@ jobs:
         run: pnpm run lint
         working-directory: packages/extension
 
-      # Install Playwright browsers (all packages now use 1.59 stable)
+      # Install Playwright browsers (shared across extension + vscode packages)
       - name: Install Playwright browsers
         run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
-        working-directory: packages/extension
 
       - name: Run extension component tests
         run: pnpm run test:component

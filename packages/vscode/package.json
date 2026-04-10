@@ -246,7 +246,7 @@
   "scripts": {
     "build": "node build.mjs",
     "build:test": "node build-test.mjs",
-    "test": "node build-test.mjs && playwright test --config tests/playwright.config.ts --project default",
+    "test:mock": "node build-test.mjs && playwright test --config tests/playwright.config.ts --project default",
     "watch": "node build.mjs --watch",
     "package": "node publish.mjs",
     "publish:vsce": "node publish.mjs publish"

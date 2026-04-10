@@ -25,7 +25,7 @@ interface CursorContext {
  * If inside, returns the indentation and insert position.
  * If outside, returns inside=false so we generate a template.
  */
-function detectCursorContext(editor: vscode.TextEditor): CursorContext {
+export function detectCursorContext(editor: vscode.TextEditor): CursorContext {
   const doc = editor.document;
   const cursorLine = editor.selection.active.line;
 

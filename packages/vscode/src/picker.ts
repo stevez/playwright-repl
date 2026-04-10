@@ -122,7 +122,7 @@ export class Picker {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface ElementInfo {
+export interface ElementInfo {
   tag?: string;
   text?: string;
   value?: string;
@@ -132,7 +132,7 @@ interface ElementInfo {
 
 // ─── Assertion derivation ─────────────────────────────────────────────────
 
-function deriveAssertion(info: ElementInfo, locator: string): string {
+export function deriveAssertion(info: ElementInfo, locator: string): string {
   const tag = info.tag?.toLowerCase() ?? '';
   const inputType = (info.attributes?.type || '').toLowerCase();
 
