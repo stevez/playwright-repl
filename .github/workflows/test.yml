@@ -60,6 +60,10 @@ jobs:
         run: pnpm exec playwright test
         working-directory: packages/extension
 
+      - name: Merge extension coverage
+        run: pnpm run coverage:merge
+        working-directory: packages/extension
+
       - name: Build VS Code extension for tests
         run: node build-test.mjs
         working-directory: packages/vscode
@@ -74,7 +78,3 @@ jobs:
       #   run: ${{ runner.os == 'Linux' && 'xvfb-run' || '' }} pnpm exec playwright test --config e2e/playwright.config.ts
       #   working-directory: packages/vscode
       #   timeout-minutes: 5
-
-      - name: Merge extension coverage
-        run: pnpm run coverage:merge
-        working-directory: packages/extension
