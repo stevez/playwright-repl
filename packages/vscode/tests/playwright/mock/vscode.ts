@@ -988,7 +988,7 @@ export class VSCode {
   readonly context: { subscriptions: any[]; extensionUri: Uri; workspaceState: any };
   readonly extensions: any[] = [];
   private _webviewProviders = new Map<string, any>();
-  private _browser: Browser | null;
+  private _browser: Browser;
   private _webViewsByPanelType = new Map<string, Set<Page>>();
   readonly webViews = new Map<string, Page>();
   readonly commandLog: string[] = [];
@@ -1002,7 +1002,7 @@ export class VSCode {
   readonly diagnosticsCollections: DiagnosticsCollection[] = [];
   private _clipboardText = '';
 
-  constructor(readonly versionNumber: number, baseDir: string, browser: Browser | null = null) {
+  constructor(readonly versionNumber: number, baseDir: string, browser: Browser) {
     this.version = String(versionNumber);
     const workspaceStateStorage = new Map();
     const workspaceState = {

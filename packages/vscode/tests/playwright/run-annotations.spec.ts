@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 
-import { describe, it, expect } from 'vitest';
-import { activate } from './mock-activate';
-import { expectConnectionLog, expectRenderLog } from './expect-helpers';
+import { expect, test } from './utils';
 
-describe('run annotations', () => {
-  it('should mark test as skipped', async () => {
-    const { vscode, testController } = await activate({
-      'playwright.config.js': `module.exports = { testDir: 'tests' }`,
-      'tests/test.spec.ts': `
+test('should mark test as skipped', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test.spec.ts': `
       import { test } from '@playwright/test';
       test('pass', async () => {});
       test('skipped', async () => {
@@ -36,10 +33,10 @@ describe('run annotations', () => {
         expect(1).toBe(2);
       });
     `,
-    });
+  });
 
-    const testRun = await testController.run();
-    await expectRenderLog(testRun, `
+  const testRun = await testController.run();
+  expect(testRun.renderLog()).toBe(`
     tests > test.spec.ts > pass [2:0]
       enqueued
       started
@@ -58,16 +55,15 @@ describe('run annotations', () => {
       passed
   `);
 
-    await expectConnectionLog(vscode, [
-      { method: 'listFiles', params: {} },
-      { method: 'runGlobalSetup', params: {} },
-      {
-        method: 'runTests',
-        params: expect.objectContaining({
-          locations: [],
-          testIds: undefined
-        })
-      },
-    ]);
-  });
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} },
+    { method: 'runGlobalSetup', params: {} },
+    {
+      method: 'runTests',
+      params: expect.objectContaining({
+        locations: [],
+        testIds: undefined
+      })
+    },
+  ]);
 });

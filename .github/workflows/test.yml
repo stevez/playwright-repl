@@ -68,10 +68,6 @@ jobs:
         run: node build-test.mjs
         working-directory: packages/vscode
 
-      - name: Run VS Code extension unit tests
-        run: pnpm exec vitest run
-        working-directory: packages/vscode
-
       - name: Run VS Code extension mock tests
         run: pnpm exec playwright test --config tests/playwright/playwright.config.ts --project default
         working-directory: packages/vscode

@@ -14,11 +14,250 @@
  * limitations under the License.
  */
 
-// Tests that don't need webviews have been moved to tests/unit/list-files.test.ts.
-// Only tests that use enableConfigs/enableProjects (webview interaction) remain here.
-
 import { enableConfigs, enableProjects, expect, test } from './utils';
 import path from 'path';
+
+test('should list files', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test.spec.ts': `
+      import { test } from '@playwright/test';
+      test('one', async () => {});
+    `,
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test.spec.ts
+  `);
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should list files top level if no testDir', async ({ activate }, testInfo) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `{}`,
+    'test.spec.ts': `
+      import { test } from '@playwright/test';
+      test('one', async () => {});
+    `,
+  }, { rootDir: testInfo.outputPath('myWorkspace') });
+
+  await expect(testController).toHaveTestTree(`
+    -   test.spec.ts
+  `);
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should list only test files', async ({ activate }) => {
+  const { testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'model.ts': `
+      export const a = 1;
+    `,
+    'tests/test.spec.ts': `
+      import { test } from '@playwright/test';
+      test('one', async () => {});
+    `,
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test.spec.ts
+  `);
+});
+
+test('should list folders', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/foo/test-a.spec.ts': ``,
+    'tests/foo/test-b.spec.ts': ``,
+    'tests/bar/test-a.spec.ts': ``,
+    'tests/a/b/c/d/test-c.spec.ts': ``,
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   a
+        -   b
+          -   c
+            -   d
+              -   test-c.spec.ts
+      -   bar
+        -   test-a.spec.ts
+      -   foo
+        -   test-a.spec.ts
+        -   test-b.spec.ts
+  `);
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should pick new files', async ({ activate }) => {
+  const { vscode, testController, workspaceFolder } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test-1.spec.ts': ``
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+  `);
+
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+
+  await Promise.all([
+    new Promise(f => testController.onDidChangeTestItem(f)),
+    workspaceFolder.addFile('tests/test-2.spec.ts', '')
+  ]);
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+      -   test-2.spec.ts
+  `);
+
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} },
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should not pick non-test files', async ({ activate }) => {
+  const { workspaceFolder, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test-1.spec.ts': ``
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+  `);
+
+  await Promise.all([
+    new Promise(f => testController.onDidChangeTestItem(f)),
+    workspaceFolder.addFile('tests/model.ts', ''),
+    workspaceFolder.addFile('tests/test-2.spec.ts', ''),
+  ]);
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+      -   test-2.spec.ts
+  `);
+});
+
+test('should tolerate missing testDir', async ({ activate }) => {
+  const { workspaceFolder, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+  });
+
+  await expect(testController).toHaveTestTree(`
+  `);
+
+  await Promise.all([
+    new Promise(f => testController.onDidChangeTestItem(f)),
+    workspaceFolder.addFile('tests/test.spec.ts', '')
+  ]);
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test.spec.ts
+  `);
+});
+
+test('should remove deleted files', async ({ activate }) => {
+  const { vscode, testController, workspaceFolder } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test-1.spec.ts': ``,
+    'tests/test-2.spec.ts': ``,
+    'tests/test-3.spec.ts': ``,
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+      -   test-2.spec.ts
+      -   test-3.spec.ts
+  `);
+
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+
+  await Promise.all([
+    new Promise(f => testController.onDidChangeTestItem(f)),
+    workspaceFolder.removeFile('tests/test-2.spec.ts')
+  ]);
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+      -   test-3.spec.ts
+  `);
+
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} },
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should do nothing for not loaded changed file', async ({ activate }) => {
+  const { workspaceFolder, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test-1.spec.ts': ``,
+    'tests/test-2.spec.ts': ``,
+    'tests/test-3.spec.ts': ``,
+  });
+
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test-1.spec.ts
+      -   test-2.spec.ts
+      -   test-3.spec.ts
+  `);
+
+  let changed = false;
+  testController.onDidChangeTestItem(() => changed = true);
+  await workspaceFolder.changeFile('tests/test-2.spec.ts', '// new content');
+  await new Promise(f => setTimeout(f, 2000));
+  expect(changed).toBeFalsy();
+});
+
+test('should support multiple projects', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = {
+      testDir: './tests',
+      projects: [
+        { name: 'project 1' },
+        { name: 'project 2' },
+      ]
+    }`,
+    'tests/test1.spec.ts': `
+      import { test } from '@playwright/test';
+      test('one', async () => {});
+    `,
+    'tests/test2.spec.ts': `
+      import { test } from '@playwright/test';
+      test('two', async () => {});
+    `,
+  });
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test1.spec.ts
+      -   test2.spec.ts
+  `);
+
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+});
 
 test('should switch between multiple projects with filter', async ({ activate }) => {
   const { vscode, testController } = await activate({
@@ -73,6 +312,23 @@ test('should switch between multiple projects with filter', async ({ activate })
     [x] project 2
   `);
 
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} }
+  ]);
+});
+
+test('should list files in relative folder', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'foo/bar/playwright.config.js': `module.exports = { testDir: '../../tests' }`,
+    'tests/test.spec.ts': `
+      import { test } from '@playwright/test';
+      test('one', async () => {});
+    `,
+  });
+  await expect(testController).toHaveTestTree(`
+    -   tests
+      -   test.spec.ts
+  `);
   await expect(vscode).toHaveConnectionLog([
     { method: 'listFiles', params: {} }
   ]);
