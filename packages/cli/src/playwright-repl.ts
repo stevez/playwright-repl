@@ -17,7 +17,7 @@ import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
   boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'engine', 'include-snapshot', 'verbose'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'command'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -88,6 +88,8 @@ if (args.replay) {
   for (const a of args._ as string[]) replayFiles.push(String(a));
 }
 
+const commandArg = args.command as string | undefined;
+
 startRepl({
   session: args.session as string,
   headed: args.headless ? false : args.headed ? true : undefined,
@@ -100,9 +102,10 @@ startRepl({
   cdpPort: args['cdp-port'] ? parseInt(args['cdp-port'] as string, 10) : undefined,
   config: args.config as string,
   replay: replayFiles.length > 0 ? replayFiles : undefined,
+  command: commandArg,
+  silent: (args.silent as boolean) || !!commandArg,
   record: args.record as string,
   step: args.step as boolean,
-  silent: args.silent as boolean,
   bridge: args.bridge as boolean,
   engine: args.engine as boolean,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
