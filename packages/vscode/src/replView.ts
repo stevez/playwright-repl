@@ -5,22 +5,11 @@
 import { DisposableBase } from './disposableBase';
 import { getNonce, html } from './utils';
 import type { IBrowserManager } from './browser';
-import { createRequire } from 'node:module';
 import * as vscodeTypes from './vscodeTypes';
-
-// Lazy-loaded core module (ESM, loaded at runtime via createRequire)
-let _core: {
-  COMMANDS: Record<string, { desc: string; usage?: string; examples?: string[] }>;
-  CATEGORIES: Record<string, string[]>;
-  ALIASES: Record<string, string>;
-} | undefined;
+import { COMMANDS, CATEGORIES, ALIASES } from '@playwright-repl/core';
 
 function core() {
-  if (!_core) {
-    const _require = createRequire(__filename);
-    _core = _require('@playwright-repl/core');
-  }
-  return _core!;
+  return { COMMANDS, CATEGORIES, ALIASES };
 }
 
 export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewProvider {

@@ -37,7 +37,7 @@ const ALL_ASSERTION_TYPES: AssertionType[] = [
   { value: 'toHaveTitle', label: 'toHaveTitle (page)', needsArg: true, argType: 'string' },
 ];
 
-function filterTypes(tag?: string, inputType?: string): AssertionType[] {
+export function filterTypes(tag?: string, inputType?: string): AssertionType[] {
   const t = tag?.toLowerCase();
   const filtered = ALL_ASSERTION_TYPES.filter(a => {
     if (!a.tags) return true;
