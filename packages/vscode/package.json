@@ -274,6 +274,8 @@
     "@vscode/vsce": "^3.7.1",
     "adm-zip": "^0.5.17",
     "esbuild": "^0.25.0",
+    "glob": "^8.1.0",
+    "minimatch": "^10.2.4",
     "stack-utils": "^2.0.6",
     "which": "^4.0.0",
     "ws": "^8.17.1",

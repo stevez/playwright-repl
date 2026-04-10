@@ -342,7 +342,7 @@ export class Extension implements RunHooks {
         }
       }),
       vscode.workspace.onDidChangeConfiguration(event => {
-        if (event.affectsConfiguration('playwright.env'))
+        if (event.affectsConfiguration('playwright-repl.env'))
           this._scheduleRebuildModels();
       }),
       this._testTree,

@@ -137,7 +137,7 @@ class PersistentSetting<T> extends SettingBase<T> {
   constructor(vscode: vscodeTypes.VSCode, settingName: string) {
     super(vscode, settingName);
 
-    const settingFQN = `playwright.${settingName}`;
+    const settingFQN = `playwright-repl.${settingName}`;
     this._disposables = [
       this._onChange,
       vscode.workspace.onDidChangeConfiguration(event => {
