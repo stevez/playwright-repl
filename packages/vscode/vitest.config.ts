@@ -4,6 +4,7 @@ import path from 'path';
 export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    testTimeout: 30000,
   },
   resolve: {
     alias: {
