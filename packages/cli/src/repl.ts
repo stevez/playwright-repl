@@ -26,6 +26,7 @@ export interface ReplOpts extends EngineOpts {
   record?: string;
   step?: boolean;
   silent?: boolean;
+  command?: string;
   bridge?: boolean;
   bridgePort?: number;
   engine?: boolean;
@@ -959,6 +960,23 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
+
+  // ─── Single-command mode (--command flag) ──────────────────────
+
+  if (opts.command) {
+    if (opts.bridge) {
+      const port = opts.bridgePort ?? 9876;
+      const srv = new BridgeServer();
+      await srv.start(port);
+      await srv.waitForConnection(30000);
+      const parsed = parseInput(opts.command);
+      if (!parsed) { process.stderr.write('Invalid command\n'); process.exit(1); }
+      const result = await srv.run(parsed);
+      process.stdout.write((result.text ?? '') + '\n');
+      process.exit(result.isError ? 1 : 0);
+    }
+    // For non-bridge modes, fall through to normal startup
+  }
 
   // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
 
