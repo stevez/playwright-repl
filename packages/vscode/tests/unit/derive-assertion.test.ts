@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { deriveAssertion, type ElementInfo } from '../src/picker';
+import { deriveAssertion, type ElementInfo } from '../../src/picker';
 
 describe('deriveAssertion', () => {
   const locator = "page.getByRole('button')";

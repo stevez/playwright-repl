@@ -17,12 +17,12 @@
 import fs from 'fs';
 import glob from 'glob';
 import path from 'path';
-import { Disposable, EventEmitter, Event } from '../../src/upstream/events';
+import { Disposable, EventEmitter, Event } from '../../../src/upstream/events';
 import { minimatch } from 'minimatch';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import which from 'which';
 import { Browser, Page } from '@playwright/test';
-import { CancellationToken } from '../../src/vscodeTypes';
+import { CancellationToken } from '../../../src/vscodeTypes';
 
 /* eslint-disable no-restricted-properties */
 
@@ -1199,7 +1199,7 @@ export class VSCode {
     const settings: Record<string, any> = {
       'workbench.colorTheme': 'Dark Modern',
     };
-    const { properties } = require('../../package.json').contributes.configuration;
+    const { properties } = require('../../../package.json').contributes.configuration;
     for (const [key, value] of Object.entries(properties))
       settings[key] = (value as any).default;
 

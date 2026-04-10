@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { filterTypes } from '../src/assertView';
+import { filterTypes } from '../../src/assertView';
 
 describe('filterTypes', () => {
   it('returns all types when no tag specified', () => {

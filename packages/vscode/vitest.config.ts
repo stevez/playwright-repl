@@ -3,12 +3,12 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    include: ['test/**/*.test.ts'],
+    include: ['tests/unit/**/*.test.ts'],
   },
   resolve: {
     alias: {
       // Stub 'vscode' module — not available outside VS Code
-      'vscode': path.resolve(__dirname, 'test/vscode-stub.ts'),
+      'vscode': path.resolve(__dirname, 'tests/unit/vscode-stub.ts'),
     },
   },
 });

@@ -69,7 +69,7 @@ jobs:
         working-directory: packages/vscode
 
       - name: Run VS Code extension mock tests
-        run: pnpm exec playwright test --config tests/playwright.config.ts --project default
+        run: pnpm exec playwright test --config tests/playwright/playwright.config.ts --project default
         working-directory: packages/vscode
         timeout-minutes: 10
 

@@ -16,7 +16,7 @@ const options = {
   alias: {
     // Stub the 'vscode' module — our recorder.ts/picker.ts import it
     // at runtime, unlike upstream which only uses type imports.
-    'vscode': './tests/vscode-shim.ts',
+    'vscode': './tests/playwright/vscode-shim.ts',
   },
   external: [
     // These are loaded dynamically by the extension at runtime
