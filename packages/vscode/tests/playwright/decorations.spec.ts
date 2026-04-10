@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-import { describe, it, expect } from 'vitest';
-import path from 'path';
-import { activate } from './mock-activate';
-import { expectConnectionLog } from './expect-helpers';
+import { escapedPathSep, expect, test } from './utils';
 
-const escapedPathSep = path.sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-describe('decorations', () => {
-  it('should highlight steps while running', async () => {
-    const { vscode, testController } = await activate({
-      'playwright.config.js': `module.exports = { testDir: 'tests' }`,
-      'tests/test.spec.ts': `
+test('should highlight steps while running', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test.spec.ts': `
       import { test, expect } from '@playwright/test';
       test('pass', async () => {
         expect(1).toBe(1);
@@ -33,13 +27,13 @@ describe('decorations', () => {
         expect(3).toBe(3);
       });
     `,
-    });
+  });
 
-    await vscode.openEditors('**/test.spec.ts');
-    await new Promise(f => testController.onDidChangeTestItem(f));
+  await vscode.openEditors('**/test.spec.ts');
+  await new Promise(f => testController.onDidChangeTestItem(f));
 
-    await testController.run();
-    expect(vscode.window.activeTextEditor.renderDecorations('  ')).toBe(`
+  await testController.run();
+  expect(vscode.window.activeTextEditor.renderDecorations('  ')).toBe(`
     --------------------------------------------------------------
 
     --------------------------------------------------------------
@@ -69,45 +63,44 @@ describe('decorations', () => {
     [5:18 - 5:18]: decorator completedStep {"after":{"contentText":" — Xms"}}
   `);
 
-    await expectConnectionLog(vscode, [
-      { method: 'listFiles', params: {} },
-      {
-        method: 'listTests',
-        params: expect.objectContaining({
-          locations: [expect.stringContaining(`tests${escapedPathSep}test\\.spec\\.ts`)]
-        })
-      },
-      { method: 'runGlobalSetup', params: {} },
-      {
-        method: 'runTests',
-        params: expect.objectContaining({
-          locations: [],
-          testIds: undefined
-        })
-      },
-    ]);
-  });
+  await expect(vscode).toHaveConnectionLog([
+    { method: 'listFiles', params: {} },
+    {
+      method: 'listTests',
+      params: expect.objectContaining({
+        locations: [expect.stringContaining(`tests${escapedPathSep}test\\.spec\\.ts`)]
+      })
+    },
+    { method: 'runGlobalSetup', params: {} },
+    {
+      method: 'runTests',
+      params: expect.objectContaining({
+        locations: [],
+        testIds: undefined
+      })
+    },
+  ]);
+});
 
-  it('should limit highlights', async () => {
-    const { vscode, testController } = await activate({
-      'playwright.config.js': `module.exports = { testDir: 'tests' }`,
-      'tests/test.spec.ts': `
+test('should limit highlights', async ({ activate }) => {
+  const { vscode, testController } = await activate({
+    'playwright.config.js': `module.exports = { testDir: 'tests' }`,
+    'tests/test.spec.ts': `
       import { test, expect } from '@playwright/test';
-      test('pass', async () => {
+      test('pass', async () => {  
         for (let i = 0; i < 2000; i++) {
           expect(i).toBe(i);
         }
       });
     `,
-    });
-
-    await vscode.openEditors('**/test.spec.ts');
-    await new Promise(f => testController.onDidChangeTestItem(f));
-
-    await testController.run();
-
-    const decorationsLog = vscode.window.activeTextEditor.renderDecorations('  ');
-    const lastState = decorationsLog.substring(decorationsLog.lastIndexOf('------'));
-    expect(lastState).toContain(`[4:20 - 4:20]: decorator completedStep {"after":{"contentText":" — Xms (ran 2000×)"}}`);
   });
+
+  await vscode.openEditors('**/test.spec.ts');
+  await new Promise(f => testController.onDidChangeTestItem(f));
+
+  await testController.run();
+
+  const decorationsLog = vscode.window.activeTextEditor.renderDecorations('  ');
+  const lastState = decorationsLog.substring(decorationsLog.lastIndexOf('------'));
+  expect(lastState).toContain(`[4:20 - 4:20]: decorator completedStep {"after":{"contentText":" — Xms (ran 2000×)"}}`);
 });
