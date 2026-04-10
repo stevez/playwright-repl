@@ -246,6 +246,7 @@
   "scripts": {
     "build": "node build.mjs",
     "build:test": "node build-test.mjs",
+    "test": "vitest run",
     "test:playwright": "node build-test.mjs && playwright test --config tests/playwright/playwright.config.ts --project default",
     "watch": "node build.mjs --watch",
     "package": "node publish.mjs",
