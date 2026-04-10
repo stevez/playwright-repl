@@ -6,19 +6,19 @@
  */
 
 import * as vscode from 'vscode';
-import type { BrowserManager } from './browser.js';
+import type { IBrowserManager } from './browser.js';
 import type { LocatorsView } from './locatorsView';
 import type { AssertView } from './assertView';
 
 export class Picker {
-  private _browserManager: BrowserManager;
+  private _browserManager: IBrowserManager;
   private _outputChannel: vscode.OutputChannel;
   private _locatorsView: LocatorsView | undefined;
   private _assertView: AssertView | undefined;
   private _picking = false;
   private _sendToAssert = false;
 
-  constructor(browserManager: BrowserManager, outputChannel: vscode.OutputChannel) {
+  constructor(browserManager: IBrowserManager, outputChannel: vscode.OutputChannel) {
     this._browserManager = browserManager;
     this._outputChannel = outputChannel;
   }

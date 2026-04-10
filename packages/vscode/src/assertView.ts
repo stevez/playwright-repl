@@ -4,7 +4,7 @@
 
 import { DisposableBase } from './disposableBase';
 import { getNonce, html } from './utils';
-import type { BrowserManager } from './browser';
+import type { IBrowserManager } from './browser';
 import type { Picker } from './picker';
 import * as vscodeTypes from './vscodeTypes';
 
@@ -54,7 +54,7 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
   private _vscode: vscodeTypes.VSCode;
   private _view: vscodeTypes.WebviewView | undefined;
   private _extensionUri: vscodeTypes.Uri;
-  private _browserManager: BrowserManager | undefined;
+  private _browserManager: IBrowserManager | undefined;
   private _picker: Picker | undefined;
   private _locator = '';
   private _assertion = '';
@@ -71,7 +71,7 @@ export class AssertView extends DisposableBase implements vscodeTypes.WebviewVie
     ];
   }
 
-  setBrowserManager(browserManager: BrowserManager) {
+  setBrowserManager(browserManager: IBrowserManager) {
     this._browserManager = browserManager;
   }
 

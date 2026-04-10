@@ -4,7 +4,7 @@
 
 import { DisposableBase } from './disposableBase';
 import { getNonce, html } from './utils';
-import type { BrowserManager } from './browser';
+import type { IBrowserManager } from './browser';
 import { createRequire } from 'node:module';
 import * as vscodeTypes from './vscodeTypes';
 
@@ -27,7 +27,7 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
   private _vscode: vscodeTypes.VSCode;
   private _view: vscodeTypes.WebviewView | undefined;
   private _extensionUri: vscodeTypes.Uri;
-  private _browserManager: BrowserManager | undefined;
+  private _browserManager: IBrowserManager | undefined;
   private _history: string[] = [];
   private _commandCount = 0;
 
@@ -42,7 +42,7 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     ];
   }
 
-  setBrowserManager(browserManager: BrowserManager) {
+  setIBrowserManager(browserManager: IBrowserManager) {
     this._browserManager = browserManager;
   }
 
@@ -125,7 +125,7 @@ export class ReplView extends DisposableBase implements vscodeTypes.WebviewViewP
     this._commandCount++;
     const start = Date.now();
     try {
-      const result = await this._browserManager.runCommand(command) as { text?: string; isError?: boolean; image?: string };
+      const result = await this._browserManager.runCommand(command);
       const elapsed = Date.now() - start;
 
       // PDF — offer save

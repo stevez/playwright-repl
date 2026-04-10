@@ -24,10 +24,10 @@ export default defineConfig<WorkerOptions>({
   retries: process.env.CI ? 2 : 2,
   workers: process.env.CI ? 2 : 4,
   reporter: process.env.CI ? [
-    ['line'],
+    ['list'],
     ['blob'],
   ] : [
-    ['line']
+    ['list']
   ],
   tag: process.env.PW_TAG,  // Set when running vscode extension tests in playwright repo CI.
   projects: [

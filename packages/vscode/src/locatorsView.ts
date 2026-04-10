@@ -29,7 +29,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
   private _settingsModel: SettingsModel;
   private _reusedBrowser: ReusedBrowser;
-  private _browserManager: import('./browser').BrowserManager | undefined;
+  private _browserManager: import('./browser').IBrowserManager | undefined;
   private _backendVersion = 0;
 
   constructor(vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, reusedBrowser: ReusedBrowser, extensionUri: vscodeTypes.Uri) {
@@ -53,7 +53,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     ];
   }
 
-  setBrowserManager(browserManager: import('./browser').BrowserManager) {
+  setBrowserManager(browserManager: import('./browser').IBrowserManager) {
     this._browserManager = browserManager;
   }
 

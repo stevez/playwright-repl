@@ -10,15 +10,30 @@ declare const __filename: string;
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+export type CommandResult = { text?: string; isError?: boolean; image?: string };
+
 export interface LaunchOptions {
   browser: string;
   headless?: boolean;
   workspaceFolder?: string;
 }
 
+export interface IBrowserManager {
+  isRunning(): boolean;
+  get page(): any;
+  get bridge(): { connected: boolean; run(cmd: string, opts?: any): Promise<CommandResult>; runScript(s: string, l: string): Promise<CommandResult> } | undefined;
+  get httpPort(): number | null;
+  get cdpUrl(): string | undefined;
+  launch(opts: LaunchOptions): Promise<void>;
+  stop(): Promise<void>;
+  runCommand(raw: string, opts?: { includeSnapshot?: boolean }): Promise<CommandResult>;
+  runScript(script: string, language?: 'pw' | 'javascript'): Promise<CommandResult>;
+  onEvent(fn: ((event: Record<string, unknown>) => void) | null): void;
+}
+
 // ─── BrowserManager ────────────────────────────────────────────────────────
 
-export class BrowserManager {
+export class BrowserManager implements IBrowserManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _context: any = undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,7 +176,7 @@ export class BrowserManager {
     this._running = false;
   }
 
-  async runCommand(raw: string, opts?: { includeSnapshot?: boolean }): Promise<{ text?: string; isError?: boolean; image?: string }> {
+  async runCommand(raw: string, opts?: { includeSnapshot?: boolean }): Promise<CommandResult> {
     if (!this._sw) return { text: 'Not connected', isError: true };
 
     // Local commands (video, etc.) — run in Node.js
@@ -180,7 +195,7 @@ export class BrowserManager {
     );
   }
 
-  async runScript(script: string, language: 'pw' | 'javascript' = 'javascript'): Promise<{ text?: string; isError?: boolean }> {
+  async runScript(script: string, language: 'pw' | 'javascript' = 'javascript'): Promise<CommandResult> {
     if (!this._sw) return { text: 'Not connected', isError: true };
     return this._sw.evaluate(
       async (params: { command: string; language: string }) => {
