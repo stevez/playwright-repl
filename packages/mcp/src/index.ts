@@ -8,6 +8,31 @@ import { createBridgeRunner } from './bridge.js';
 import { createEvaluateRunner } from './evaluate.js';
 import { createStandaloneRunner } from './standalone.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, LOG_FILE } from './logger.js';
+// ─── Process exit handlers — log why the process dies ───────────────────────
+
+process.on('uncaughtException', (err) => {
+    logError('uncaughtException', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+    logError('unhandledRejection', reason);
+});
+
+process.on('SIGTERM', () => {
+    logEvent('Received SIGTERM — exiting');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    logEvent('Received SIGINT — exiting');
+    process.exit(0);
+});
+
+process.on('exit', (code) => {
+    logEvent(`Process exiting (code: ${code})`);
+});
+
 const argv = process.argv.slice(2);
 const standalone = argv.includes('--standalone');
 const headed = argv.includes('--headed');

@@ -8,7 +8,7 @@ class MockWebSocket {
   static instances: MockWebSocket[] = [];
 
   onmessage: ((e: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((e?: { code?: number; reason?: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   readyState = MockWebSocket.OPEN;
   sent: string[] = [];
@@ -20,7 +20,7 @@ class MockWebSocket {
   }
 
   send(data: string) { this.sent.push(data); }
-  close() { this.readyState = MockWebSocket.CLOSED; this.onclose?.(); }
+  close() { this.readyState = MockWebSocket.CLOSED; this.onclose?.({ code: 1000, reason: '' }); }
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ describe('offscreen bridge', () => {
 
   it('reconnects after WebSocket closes', async () => {
     const ws = MockWebSocket.instances[0];
-    ws.onclose!();
+    ws.onclose!({ code: 1000, reason: '' });
 
     expect(MockWebSocket.instances).toHaveLength(1); // no new WS yet
 
@@ -207,7 +207,7 @@ describe('offscreen bridge', () => {
     const ws = MockWebSocket.instances[0];
 
     // Trigger onclose to start a reconnect timer (to port 9876)
-    ws.onclose!();
+    ws.onclose!({ code: 1000, reason: '' });
 
     // Before the 3s timer fires, change port
     const countBefore = MockWebSocket.instances.length;

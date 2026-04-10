@@ -62,13 +62,13 @@ export function logToolCall(tool: string, input: Record<string, unknown>): void 
             return `${k}=${truncate(s, 120)}`;
         })
         .join(' ');
-    write('info', `→ ${tool}(${args})`);
+    write('info', `-> ${tool}(${args})`);
 }
 
 export function logToolResult(tool: string, isError: boolean, text: string | undefined, durationMs: number): void {
     const status = isError ? 'ERROR' : 'OK';
     const summary = text ? truncate(text.replace(/\n/g, '\\n')) : '(empty)';
-    write('info', `← ${tool} [${status}] ${durationMs}ms ${summary}`);
+    write('info', `<- ${tool} [${status}] ${durationMs}ms ${summary}`);
 }
 
 export function logError(context: string, err: unknown): void {

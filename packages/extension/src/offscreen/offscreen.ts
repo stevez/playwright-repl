@@ -2,6 +2,17 @@
 // Maintains WebSocket connection to the bridge server + handles video capture.
 // This runs independently of the side panel — MCP works without the panel open.
 
+// ─── Lifecycle logging ──────────────────────────────────────────────────────
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        console.debug(`[pw-repl] offscreen visibility: ${document.visibilityState}`);
+    });
+    window.addEventListener('beforeunload', () => {
+        console.debug('[pw-repl] offscreen beforeunload — document being killed');
+    });
+}
+
 // ─── Video Capture (tabCapture + MediaRecorder) ─────────────────────────────
 
 let recorder: MediaRecorder | undefined;
@@ -123,6 +134,7 @@ function connect(port: number) {
         ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
         ws.onopen = () => {
+            console.debug(`[pw-repl] bridge connected to port ${port}`);
             retryCount = 0;
             // Trigger auto-attach so the CLI knows which tab is connected
             chrome.runtime.sendMessage({ type: 'bridge-attach' }).then((result: any) => {
@@ -160,7 +172,8 @@ function connect(port: number) {
             }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (e) => {
+            console.debug(`[pw-repl] bridge disconnected (code: ${e.code}, reason: ${e.reason || 'none'})`);
             ws = null;
             scheduleReconnect();
         };

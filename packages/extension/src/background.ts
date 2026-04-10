@@ -7,6 +7,20 @@ import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
 
+// ─── Service worker lifecycle logging ────────────────────────────────────────
+
+chrome.runtime.onSuspend.addListener(() => {
+  console.debug('[pw-repl] onSuspend — service worker suspending');
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  console.debug('[pw-repl] onStartup — browser cold start');
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  console.debug(`[pw-repl] onInstalled — reason: ${details.reason}`);
+});
+
 // ─── Patch toMatchAriaSnapshot ──────────────────────────────────────────────
 // toMatchAriaSnapshot requires currentTestInfo() which only exists inside the
 // Playwright Test runner. We wrap expect() with a Proxy that intercepts this
