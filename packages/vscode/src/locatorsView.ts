@@ -1,24 +1,15 @@
 /**
- * Copyright (c) Microsoft Corporation.
+ * Locators View — locator inspector and highlighter.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Originally forked from Microsoft's playwright-vscode, simplified to use
+ * BrowserManager only (removed ReusedBrowser dependency).
  */
 
 import { DisposableBase } from './disposableBase';
-import { ReusedBrowser } from './reusedBrowser';
 import { pickElementAction } from './settingsView';
 import { getNonce, html } from './utils';
 import type { SettingsModel } from './settingsModel';
+import type { IBrowserManager } from './browser';
 import * as vscodeTypes from './vscodeTypes';
 
 export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewViewProvider {
@@ -28,33 +19,22 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _locator: { locator: string, error?: string } = { locator: '' };
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
   private _settingsModel: SettingsModel;
-  private _reusedBrowser: ReusedBrowser;
-  private _browserManager: import('./browser').IBrowserManager | undefined;
-  private _backendVersion = 0;
+  private _browserManager: IBrowserManager | undefined;
 
-  constructor(vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, reusedBrowser: ReusedBrowser, extensionUri: vscodeTypes.Uri) {
+  constructor(vscode: vscodeTypes.VSCode, settingsModel: SettingsModel, extensionUri: vscodeTypes.Uri) {
     super();
     this._vscode = vscode;
     this._extensionUri = extensionUri;
     this._settingsModel = settingsModel;
-    this._reusedBrowser = reusedBrowser;
     this._disposables = [
       vscode.window.registerWebviewViewProvider('playwright-repl.locatorsView', this),
-      this._reusedBrowser.onInspectRequested(async ({ locator, ariaSnapshot, backendVersion }) => {
-        await vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
-        this._backendVersion = backendVersion;
-        this._locator = { locator: locator || '' };
-        this._ariaSnapshot = { yaml: ariaSnapshot || '' };
-        this._updateValues();
-      }),
-      reusedBrowser.onRunningTestsChanged(() => this._updateActions()),
-      reusedBrowser.onPageCountChanged(() => this._updateActions()),
       settingsModel.onChange(() => this._updateSettings()),
     ];
   }
 
-  setBrowserManager(browserManager: import('./browser').IBrowserManager) {
+  setBrowserManager(browserManager: IBrowserManager) {
     this._browserManager = browserManager;
+    this._updateActions();
   }
 
   /** Allow external callers (e.g. our bridge picker) to show a locator. */
@@ -79,27 +59,22 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     };
 
     webviewView.webview.html = htmlForWebview(this._vscode, this._extensionUri, webviewView.webview);
-    this._disposables.push(webviewView.webview.onDidReceiveMessage(data => {
+    this._disposables.push(webviewView.webview.onDidReceiveMessage(async data => {
       if (data.method === 'execute') {
         void this._vscode.commands.executeCommand(data.params.command);
       } else if (data.method === 'locatorChanged') {
         this._locator.locator = data.params.locator;
-        this._reusedBrowser.highlight(this._locator.locator).then(() => {
+        if (!this._browserManager?.isRunning()) return;
+        try {
+          await this._browserManager.runCommand(`await ${this._locator.locator}.highlight()`);
           this._locator.error = undefined;
-          this._updateValues();
-        }).catch(e => {
+        } catch (e: any) {
           this._locator.error = e.message;
-          this._updateValues();
-        });
+        }
+        this._updateValues();
       } else if (data.method === 'ariaSnapshotChanged') {
         this._ariaSnapshot.yaml = data.params.ariaSnapshot;
-        this._reusedBrowser.highlightAria(this._ariaSnapshot.yaml).then(() => {
-          this._ariaSnapshot.error = undefined;
-          this._updateValues();
-        }).catch(e => {
-          this._ariaSnapshot.error = e.message;
-          this._updateValues();
-        });
+        // Aria snapshot highlighting not supported via BrowserManager yet
       } else if (data.method === 'toggle') {
         void this._vscode.commands.executeCommand(`playwright-repl.toggle.${data.params.setting}`);
       } else if (data.method === 'highlight') {
@@ -149,7 +124,6 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
       params: {
         locator: this._locator,
         ariaSnapshot: this._ariaSnapshot,
-        hideAria: this._backendVersion && this._backendVersion < 1.50
       }
     });
   }

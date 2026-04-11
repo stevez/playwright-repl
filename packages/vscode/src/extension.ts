@@ -200,7 +200,7 @@ export class Extension implements RunHooks {
   async activate() {
     const vscode = this._vscode;
     this._settingsView = new SettingsView(vscode, this._settingsModel, this._models, this._reusedBrowser, this._context.extensionUri);
-    this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
+    this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._context.extensionUri);
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
     this._browserController = new BrowserController(vscode, this._logger);
