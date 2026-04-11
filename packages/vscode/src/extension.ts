@@ -34,12 +34,10 @@ import { LocatorsView } from './locatorsView';
 import { pathToFileURL } from 'url';
 import { TestConfig } from './playwrightTestServer';
 import { findTestEndPosition } from './babelHighlightUtil';
-import { BrowserManager } from './browser';
-import { Recorder } from './recorder';
-import { Picker } from './picker';
 import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
+import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
   cwd: '/ensure_absolute_paths'
@@ -95,11 +93,9 @@ export class Extension implements RunHooks {
   private _watchItemsBatch?: vscodeTypes.TestItem[];
 
   // Playwright REPL: bridge-based features
-  private _browserManager?: BrowserManager;
+  private _browserController!: BrowserController;
   private _replView!: ReplView;
   private _assertView!: AssertView;
-  private _recorder?: Recorder;
-  private _picker?: Picker;
 
   private _modelRebuild?: { result: Promise<void>; token: vscodeTypes.CancellationTokenSource; needsAnother: boolean; };
 
@@ -171,69 +167,25 @@ export class Extension implements RunHooks {
     this._treeItemObserver = new TreeItemObserver(this._vscode, this._logger);
   }
 
-  private _lastCdpUrl: string | undefined;
-
   async onWillRunTests(config: TestConfig, debug: boolean) {
     const showBrowser = this._settingsModel.showBrowser.get();
-    // Headed mode: use BrowserManager (reuse browser across REPL and tests)
+    // Headed mode: use BrowserController
     if (showBrowser && !debug) {
-      await this._ensureBrowserManager(config.workspaceFolder);
-      if (this._browserManager?.isRunning() && this._browserManager.cdpUrl) {
-        const cdpUrl = this._browserManager.cdpUrl;
-        const httpPort = this._browserManager.httpPort;
-        const needsReset = this._lastCdpUrl !== cdpUrl;
-        this._lastCdpUrl = cdpUrl;
-        if (httpPort)
-          process.env.PW_BRIDGE_PORT = String(httpPort);
-        return { connectWsEndpoint: cdpUrl, resetTestServer: needsReset, reusingBrowser: true };
-      }
+      const result = await this._browserController.onWillRunTests(config.workspaceFolder);
+      if (result) return result;
     }
 
     // Headless / debug / fallback: original Playwright extension behavior
-    const needsReset = !!this._lastCdpUrl;
-    delete process.env.PW_BRIDGE_PORT;
-    this._lastCdpUrl = undefined;
+    const needsReset = !!this._browserController.lastCdpUrl;
+    this._browserController.clearCdpUrl();
     await this._reusedBrowser.onWillRunTests(config, debug);
     return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(), resetTestServer: needsReset };
   }
 
   async onDidRunTests() {
-    // If BrowserManager owns the browser, keep it alive
-    if (this._browserManager?.isRunning())
+    if (this._browserController.isRunning())
       return;
     await this._reusedBrowser.onDidRunTests();
-  }
-
-  private async _ensureBrowserManager(workspaceFolder?: string) {
-    if (!this._browserManager) {
-      this._browserManager = new BrowserManager(this._logger);
-    }
-    if (this._browserManager.isRunning())
-      return;
-    // Resolve workspace folder: explicit arg > VS Code workspace
-    const resolvedFolder = workspaceFolder
-      || this._vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    await this._browserManager.launch({
-      browser: 'chromium',
-      headless: false,
-      workspaceFolder: resolvedFolder,
-    });
-    if (this._replView) {
-      this._replView.setBrowserManager(this._browserManager);
-      this._replView.notifyBrowserConnected();
-    }
-    if (this._locatorsView)
-      this._locatorsView.setBrowserManager(this._browserManager);
-    if (this._assertView)
-      this._assertView.setBrowserManager(this._browserManager);
-  }
-
-  private _ensurePicker() {
-    if (this._picker || !this._browserManager) return;
-    this._picker = new Picker(this._browserManager, this._logger);
-    this._picker.setLocatorsView(this._locatorsView);
-    this._picker.setAssertView(this._assertView);
-    this._assertView.setPicker(this._picker);
   }
 
   reusedBrowserForTest(): ReusedBrowser {
@@ -251,6 +203,8 @@ export class Extension implements RunHooks {
     this._locatorsView = new LocatorsView(vscode, this._settingsModel, this._reusedBrowser, this._context.extensionUri);
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
+    this._browserController = new BrowserController(vscode, this._logger);
+    this._browserController.setViews(this._replView, this._locatorsView, this._assertView, this._settingsView);
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
     this._disposables = [
       this._debugHighlight,
@@ -367,59 +321,31 @@ export class Extension implements RunHooks {
       // ─── Playwright REPL: bridge-based commands ────────────────────────────
       vscode.commands.registerCommand('playwright-repl.launchBrowser', async () => {
         try {
-          const workspaceFolder = this._vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-          await this._ensureBrowserManager(workspaceFolder);
+          await this._browserController.ensureLaunched();
         } catch (e: unknown) {
           vscode.window.showErrorMessage(`Launch failed: ${(e as Error).message}`);
         }
       }),
       vscode.commands.registerCommand('playwright-repl.stopBrowser', () => {
-        this._browserManager?.stop();
-        this._replView?.notifyBrowserDisconnected();
+        this._browserController.stop();
       }),
       vscode.commands.registerCommand('playwright-repl.startRecording', async () => {
-        if (!this._browserManager?.isRunning()) {
-          vscode.window.showWarningMessage('Launch browser first.');
-          return;
-        }
-        if (!this._recorder)
-          this._recorder = new Recorder(this._browserManager, this._logger);
-        await this._recorder.start();
-        this._settingsView.setRecording(true);
+        await this._browserController.startRecording();
       }),
       vscode.commands.registerCommand('playwright-repl.stopRecording', () => {
-        this._recorder?.stop();
-        this._settingsView.setRecording(false);
+        this._browserController.stopRecording();
       }),
       vscode.commands.registerCommand('playwright-repl.pickLocator', async () => {
         try {
-          if (!this._browserManager?.isRunning()) {
-            vscode.window.showWarningMessage('Launch browser first.');
-            return;
-          }
-          this._ensurePicker();
-          if (this._picker!.isPicking)
-            await this._picker!.stop();
-          else
-            await this._picker!.start();
+          await this._browserController.pickLocator();
         } catch (e: unknown) {
           this._logger.error('Pick locator error:', (e as Error).message);
           vscode.window.showErrorMessage(`Pick locator failed: ${(e as Error).message}`);
         }
       }),
-
       vscode.commands.registerCommand('playwright-repl.assertBuilder', async () => {
         try {
-          await this._ensureBrowserManager();
-          if (!this._browserManager?.isRunning()) {
-            vscode.window.showWarningMessage('Could not launch browser.');
-            return;
-          }
-          this._ensurePicker();
-          // Focus Assert panel and start pick (sends result to Assert view)
-          await this._vscode.commands.executeCommand('playwright-repl.assertView.focus');
-          if (!this._picker!.isPicking)
-            await this._picker!.startForAssert();
+          await this._browserController.assertBuilder();
         } catch (e: unknown) {
           this._logger.error('Assert builder error:', (e as Error).message);
         }
@@ -866,7 +792,7 @@ export class Extension implements RunHooks {
       // Only attempt bridge when Show Browser is on (bridge needs headed browser + extension)
       let bridgeHandled = false;
       if (this._settingsModel.showBrowser.get()) {
-        await this._ensureBrowserManager();
+        await this._browserController.ensureLaunched();
         try {
           bridgeHandled = await this._tryDirectBridge(request, testRun);
         } catch (e: unknown) {
@@ -892,7 +818,8 @@ export class Extension implements RunHooks {
     testRun: vscodeTypes.TestRun,
   ): Promise<boolean> {
     // Only when BrowserManager is running (headed mode)
-    if (!this._browserManager?.isRunning() || !this._browserManager.bridge)
+    const browserManager = this._browserController.browserManager;
+    if (!browserManager?.isRunning() || !browserManager.bridge)
       return false;
 
     const bridgeUtils = require('@playwright-repl/runner/dist/bridge-utils.cjs') as {
@@ -945,7 +872,7 @@ export class Extension implements RunHooks {
     }
 
     // Run bridge-eligible tests directly
-    const bridge = this._browserManager.bridge;
+    const bridge = browserManager.bridge!;
 
     for (const [filePath, testItems] of fileToItems) {
       // Compile test file

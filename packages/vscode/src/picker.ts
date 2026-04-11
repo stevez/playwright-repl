@@ -7,14 +7,20 @@
 
 import * as vscode from 'vscode';
 import type { IBrowserManager } from './browser.js';
-import type { LocatorsView } from './locatorsView';
-import type { AssertView } from './assertView';
+
+export interface ILocatorsView {
+  showLocator(locator: string, ariaSnapshot?: string): void;
+}
+
+export interface IAssertView {
+  showAssertion(locator: string, assertion: string, elementInfo?: any, ariaSnapshot?: string): Promise<void> | void;
+}
 
 export class Picker {
   private _browserManager: IBrowserManager;
   private _outputChannel: vscode.OutputChannel;
-  private _locatorsView: LocatorsView | undefined;
-  private _assertView: AssertView | undefined;
+  private _locatorsView: ILocatorsView | undefined;
+  private _assertView: IAssertView | undefined;
   private _picking = false;
   private _sendToAssert = false;
 
@@ -25,11 +31,11 @@ export class Picker {
 
   get isPicking() { return this._picking; }
 
-  setLocatorsView(view: LocatorsView) {
+  setLocatorsView(view: ILocatorsView) {
     this._locatorsView = view;
   }
 
-  setAssertView(view: AssertView) {
+  setAssertView(view: IAssertView) {
     this._assertView = view;
   }
 
