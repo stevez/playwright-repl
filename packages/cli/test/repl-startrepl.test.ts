@@ -179,7 +179,7 @@ describe('startRepl', () => {
 
   it('--command --bridge uses custom bridge port', async () => {
     await startRepl({ silent: true, command: 'snapshot', bridge: true, bridgePort: 9877 });
-    expect(mockBridgeStart).toHaveBeenCalledWith(9877);
+    expect(mockBridgeStart).toHaveBeenCalledWith(9877, { silent: true });
   });
 
   it('--command --bridge does not start interactive loop', async () => {
