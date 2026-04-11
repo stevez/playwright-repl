@@ -247,7 +247,10 @@
     "build": "node build.mjs",
     "build:test": "node build-test.mjs",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:playwright": "node build-test.mjs && playwright test --config tests/playwright/playwright.config.ts --project default",
+    "coverage:merge": "nextcov merge coverage/unit coverage/e2e -o coverage/merged",
+    "coverage:all": "npm run test:coverage && npm run test:playwright && npm run coverage:merge",
     "watch": "node build.mjs --watch",
     "package": "node publish.mjs",
     "publish:vsce": "node publish.mjs publish"
@@ -277,6 +280,7 @@
     "@vscode/vsce": "^3.7.1",
     "adm-zip": "^0.5.17",
     "esbuild": "^0.25.0",
+    "nextcov": "^1.2.1",
     "glob": "^8.1.0",
     "minimatch": "^10.2.4",
     "stack-utils": "^2.0.6",

@@ -9,7 +9,7 @@
 import * as esbuild from 'esbuild';
 
 /** @type {esbuild.BuildOptions} */
-const options = {
+const extensionOptions = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outdir: 'dist',
@@ -40,5 +40,27 @@ const options = {
   },
 };
 
-await esbuild.build(options);
+// Webview scripts — bundled for browser with sourcemaps for coverage
+/** @type {esbuild.BuildOptions} */
+const webviewOptions = {
+  entryPoints: [
+    'src/settingsView.script.ts',
+    'src/locatorsView.script.ts',
+    'src/replView.script.ts',
+    'src/assertView.script.ts',
+  ],
+  bundle: true,
+  outdir: 'dist',
+  external: ['vscode'],
+  format: 'cjs',
+  platform: 'browser',
+  target: 'ES2019',
+  sourcemap: true,
+  minify: false,
+};
+
+await Promise.all([
+  esbuild.build(extensionOptions),
+  esbuild.build(webviewOptions),
+]);
 console.log('Test build complete.');

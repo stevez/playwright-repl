@@ -63,6 +63,7 @@ export class WebviewPagePool {
       // Reuse — swap handlers and re-navigate to pick up new html.
       existing.setMessageHandler(data => messageHandler.current(data));
       existing.setVisibilityHandler(state => visibilityHandler.current(state));
+      await existing.page.coverage.startJSCoverage({ resetOnNavigation: false });
       await existing.page.goto('http://localhost');
       return existing.page;
     }
@@ -103,6 +104,7 @@ export class WebviewPagePool {
     await page.addInitScript(() => {
       (globalThis as any).acquireVsCodeApi = () => globalThis;
     });
+    await page.coverage.startJSCoverage({ resetOnNavigation: false });
     await page.goto('http://localhost');
     await page.exposeFunction('postMessage', (data: any) => msgHandler(data));
 
@@ -113,6 +115,11 @@ export class WebviewPagePool {
     });
 
     return page;
+  }
+
+  /** Return all live pages (for coverage collection). */
+  getPages(): Page[] {
+    return [...this._slots.values()].map(s => s.page);
   }
 
   async close() {

@@ -15,6 +15,7 @@
  */
 
 import { expect as baseExpect, test as baseTest, Browser, BrowserContextOptions, chromium, Page } from '@playwright/test';
+import { filterAppCoverage, saveClientCoverage } from 'nextcov/playwright';
 // @ts-ignore
 import { Extension } from '../../dist/extension';
 import { TestController, VSCode, WebviewPagePool, WorkspaceFolder, TestRun, TestItem } from './mock/vscode';
@@ -22,6 +23,16 @@ import { TestController, VSCode, WebviewPagePool, WorkspaceFolder, TestRun, Test
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
+
+const EXTENSION_DIR = path.resolve(__dirname, '../..');
+
+/** Map http://localhost/dist/foo.js → file:///…/packages/vscode/dist/foo.js */
+function transformUrl(url: string): string {
+  if (!url.startsWith('http://localhost/')) return url;
+  const suffix = url.substring('http://localhost/'.length);
+  return pathToFileURL(path.join(EXTENSION_DIR, suffix)).href;
+}
 
 process.env.PW_DEBUG_CONTROLLER_HEADLESS = '1';
 // the x-pw-highlight element has otherwise a closed shadow root.
@@ -40,6 +51,7 @@ type Latch = {
 };
 
 type TestFixtures = {
+  _collectCoverage: void;
   vscode: VSCode,
   activate: (files: { [key: string]: string }, options?: { rootDir?: string, workspaceFolders?: [string, any][], env?: Record<string, any>, runGlobalSetupOnEachRun?: boolean }) => Promise<ActivateResult>;
   createLatch: () => Latch;
@@ -131,6 +143,27 @@ export const test = baseTest.extend<TestFixtures, WorkerOptions & WorkerFixtures
     await use(pool);
     await pool.close();
   }, { scope: 'worker' }],
+
+  // Auto-fixture: collect client-side JS coverage from webview pages after each test.
+  _collectCoverage: [async ({ webviewPool }, use, testInfo) => {
+    await use();
+
+    // Stop coverage on all pool pages and save via nextcov
+    const pages = webviewPool.getPages();
+    for (const page of pages) {
+      try {
+        const jsCoverage = await page.coverage.stopJSCoverage();
+        const entries = jsCoverage.map(e => ({ ...e, url: transformUrl(e.url) }));
+        const appCoverage = filterAppCoverage(entries);
+        if (appCoverage.length > 0) {
+          const testId = `${testInfo.workerIndex}-${testInfo.testId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+          await saveClientCoverage(testId, appCoverage);
+        }
+      } catch {
+        // Page may not have coverage started (e.g. test didn't create webviews)
+      }
+    }
+  }, { auto: true }],
 
   vscode: async ({ browser, webviewPool, vsCodeVersion }, use) => {
     const vscode = new VSCode(vsCodeVersion, path.resolve(__dirname, '../..'), browser, webviewPool);

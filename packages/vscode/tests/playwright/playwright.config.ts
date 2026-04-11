@@ -14,9 +14,22 @@
  * limitations under the License.
  */
 import { defineConfig } from '@playwright/test';
+import type { NextcovConfig } from 'nextcov';
 import { WorkerOptions } from './utils';
 
+// Nextcov configuration — client-side coverage from webview pages
+export const nextcov: NextcovConfig = {
+  outputDir: 'coverage/e2e',
+  sourceRoot: './src',
+  collectServer: false,
+  include: ['src/**/*.ts'],
+  exclude: ['src/upstream/**'],
+  reporters: ['html', 'lcov', 'json', 'text-summary'],
+};
+
 export default defineConfig<WorkerOptions>({
+  globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   testDir: '.',
   outputDir: './test-results/inner',
   fullyParallel: true,
