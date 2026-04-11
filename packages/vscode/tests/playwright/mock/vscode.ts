@@ -231,6 +231,8 @@ class Range {
 }
 
 class Selection extends Range {
+  get active() { return this.end; }
+  get anchor() { return this.start; }
 }
 
 class CancellationTokenSource implements Disposable {
@@ -802,29 +804,36 @@ class TextEditor {
     return `${prefix}<selection>${selection}</selection>${suffix}`;
   }
 
+  revealRange(_range: Range) {}
+
   edit(editCallback: any) {
+    const doReplace = (range: Range, text: string) => {
+      const from = this.renderWithSelection();
+      const lines = this.document.text.split('\n');
+      const editLines = text.split('\n');
+      const newLines = lines.slice(0, range.start.line);
+      if (editLines.length === 1) {
+        newLines.push(lines[range.start.line].substring(0, range.start.character) + text + lines[range.end.line].substring(range.end.character));
+      } else {
+        newLines.push(lines[range.start.line].substring(0, range.start.character) + editLines[0]);
+        newLines.push(...editLines.slice(1, -1));
+        newLines.push(editLines[editLines.length - 1] + lines[range.end.line].substring(range.end.character));
+      }
+      newLines.push(...lines.slice(range.end.line + 1));
+      this.document.lines = newLines;
+
+      const lastLine = editLines[editLines.length - 1];
+      const endOfLastLine = new Position(range.start.line + (editLines.length - 1), editLines.length > 1 ? lastLine.length : range.start.character + lastLine.length);
+      this.selection = new Selection(range.start.line, range.start.character, endOfLastLine.line, endOfLastLine.character);
+
+      this.edits.push({ range: range.toString(), from, to: this.renderWithSelection() });
+    };
     editCallback({
+      insert: (position: Position, text: string) => {
+        doReplace(new Range(position, position), text);
+      },
       replace: (range: Range, text: string) => {
-        const from = this.renderWithSelection();
-        const lines = this.document.text.split('\n');
-        const editLines = text.split('\n');
-        const newLines = lines.slice(0, range.start.line);
-        if (editLines.length === 1) {
-          newLines.push(lines[range.start.line].substring(0, range.start.character) + text + lines[range.end.line].substring(range.end.character));
-        } else {
-          newLines.push(lines[range.start.line].substring(0, range.start.character) + editLines[0]);
-          newLines.push(...editLines.slice(1, -1));
-          newLines.push(editLines[editLines.length - 1] + lines[range.end.line].substring(range.end.character));
-        }
-        newLines.push(...lines.slice(range.end.line + 1));
-        this.document.lines = newLines;
-
-        this.selection = range.clone();
-        const lastLine = editLines[editLines.length - 1];
-        const endOfLastLine = new Position(range.start.line + (editLines.length - 1), editLines.length > 1 ? lastLine.length : range.start.character + lastLine.length);
-        this.selection.end = endOfLastLine;
-
-        this.edits.push({ range: range.toString(), from, to: this.renderWithSelection() });
+        doReplace(range, text);
       }
     });
   }
@@ -1026,6 +1035,7 @@ type HoverProvider = {
 };
 
 class LogOutputChannel {
+  appendLine(_message: string) {}
   debug() {}
   info() {}
   warn() {}
@@ -1049,6 +1059,8 @@ export class VSCode {
   TestMessageStackFrame = TestMessageStackFrame;
   TestRunProfileKind = TestRunProfileKind;
   TestRunRequest = TestRunRequest;
+  ThemeColor = class ThemeColor { constructor(public id: string) {} };
+  StatusBarAlignment = { Left: 1, Right: 2 };
   Uri = Uri;
   UIKind = UIKind;
   commands: any = {};
@@ -1264,6 +1276,10 @@ export class VSCode {
         const kind = /Dark/i.test(theme) ? 2 : 1;
         return { kind };
       },
+    });
+    this.window.createStatusBarItem = () => ({
+      text: '', tooltip: '', command: '', backgroundColor: undefined,
+      show: () => {}, hide: () => {}, dispose: () => {},
     });
     this.window.createOutputChannel = () => new LogOutputChannel();
 

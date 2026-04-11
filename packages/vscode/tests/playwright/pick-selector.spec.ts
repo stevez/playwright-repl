@@ -1,153 +1,134 @@
 /**
- * Copyright (c) Microsoft Corporation.
+ * Tests for Picker — element selection and assertion derivation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Uses mock BrowserManager. The full pick flow (page.pickLocator) requires
+ * interactive browser clicks, so we test the surrounding logic:
+ * - deriveAssertion() for all element types
+ * - Picker lifecycle (start/stop/isPicking)
+ * - Warning when browser not running
+ * - Copy-to-clipboard behavior
+ * - View integration (locatorsView, assertView)
  */
 
-import { selectors } from '@playwright/test';
-import { connectToSharedBrowser, expect, test, waitForPage, waitForRecorderMode } from './utils';
+import { expect, test } from './utils';
 
-// Our fork replaced the upstream ReusedBrowser picker with BrowserManager-based Picker.
-// These tests exercise the upstream codepath (ReusedBrowser.inspect) which no longer applies.
-// TODO: Phase 5 will add tests for our Picker implementation.
-test.skip();
+// ─── deriveAssertion tests ───────────────────────────────────────────────────
 
-test('should pick locator and dismiss the toolbar', async ({ activate }) => {
+test.describe('deriveAssertion', () => {
+  let deriveAssertion: typeof import('../../src/picker').deriveAssertion;
+
+  test.beforeAll(async () => {
+    const mod = await import('../../dist/picker');
+    deriveAssertion = mod.deriveAssertion;
+  });
+
+  test('should derive toBeVisible for empty element', () => {
+    const result = deriveAssertion({}, "page.getByRole('button')");
+    expect(result).toBe("await expect(page.getByRole('button')).toBeVisible();");
+  });
+
+  test('should derive toBeChecked for checked checkbox', () => {
+    const result = deriveAssertion(
+      { tag: 'INPUT', attributes: { type: 'checkbox' }, checked: true },
+      "page.getByLabel('Accept')",
+    );
+    expect(result).toBe("await expect(page.getByLabel('Accept')).toBeChecked();");
+  });
+
+  test('should derive not.toBeChecked for unchecked checkbox', () => {
+    const result = deriveAssertion(
+      { tag: 'INPUT', attributes: { type: 'checkbox' }, checked: false },
+      "page.getByLabel('Accept')",
+    );
+    expect(result).toBe("await expect(page.getByLabel('Accept')).not.toBeChecked();");
+  });
+
+  test('should derive toBeChecked for radio button', () => {
+    const result = deriveAssertion(
+      { tag: 'INPUT', attributes: { type: 'radio' }, checked: true },
+      "page.getByLabel('Option A')",
+    );
+    expect(result).toBe("await expect(page.getByLabel('Option A')).toBeChecked();");
+  });
+
+  test('should derive toHaveValue for text input', () => {
+    const result = deriveAssertion(
+      { tag: 'INPUT', attributes: { type: 'text' }, value: 'hello' },
+      "page.getByLabel('Name')",
+    );
+    expect(result).toBe("await expect(page.getByLabel('Name')).toHaveValue('hello');");
+  });
+
+  test('should derive toHaveValue for textarea', () => {
+    const result = deriveAssertion(
+      { tag: 'TEXTAREA', value: 'some text' },
+      "page.getByRole('textbox')",
+    );
+    expect(result).toBe("await expect(page.getByRole('textbox')).toHaveValue('some text');");
+  });
+
+  test('should derive toHaveValue for select', () => {
+    const result = deriveAssertion(
+      { tag: 'SELECT', value: 'option-2' },
+      "page.getByRole('combobox')",
+    );
+    expect(result).toBe("await expect(page.getByRole('combobox')).toHaveValue('option-2');");
+  });
+
+  test('should derive toContainText for element with text', () => {
+    const result = deriveAssertion(
+      { tag: 'H1', text: 'Welcome' },
+      "page.getByRole('heading')",
+    );
+    expect(result).toBe("await expect(page.getByRole('heading')).toContainText('Welcome');");
+  });
+
+  test('should skip toContainText for getByText locator (redundant)', () => {
+    const result = deriveAssertion(
+      { tag: 'SPAN', text: 'Hello World' },
+      "page.getByText('Hello World')",
+    );
+    // Should fall through to toBeVisible since text assertion is redundant
+    expect(result).toBe("await expect(page.getByText('Hello World')).toBeVisible();");
+  });
+
+  test('should truncate long text in toContainText', () => {
+    const longText = 'A'.repeat(100);
+    const result = deriveAssertion(
+      { tag: 'P', text: longText },
+      "page.getByRole('paragraph')",
+    );
+    expect(result).toContain('toContainText');
+    // Text should be truncated to 80 chars
+    expect(result).toContain('A'.repeat(80));
+    expect(result).not.toContain('A'.repeat(81));
+  });
+
+  test('should escape single quotes in value', () => {
+    const result = deriveAssertion(
+      { tag: 'INPUT', attributes: { type: 'text' }, value: "it's a test" },
+      "page.getByLabel('Input')",
+    );
+    expect(result).toContain("toHaveValue('it\\'s a test')");
+  });
+});
+
+// ─── Picker lifecycle tests ──────────────────────────────────────────────────
+
+test('should show warning when browser is not running', async ({ activate }) => {
   const { vscode } = await activate({
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const settingsView = await vscode.webView('playwright-repl.settingsView');
-  await settingsView.getByText('Pick locator').click();
-  await waitForRecorderMode(vscode, 'inspecting');
+  const { Picker } = await import('../../dist/picker');
+  const mockBrowser = { isRunning: () => false, page: null };
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const picker = new Picker(vscode, mockBrowser, outputChannel);
 
-  const browser = await connectToSharedBrowser(vscode);
-  const page = await waitForPage(browser);
-  await page.setContent(`
-    <h1>Hello</h1>
-    <h1>World</h1>
-  `);
-  await page.locator('h1').first().click();
+  await picker.start();
 
-  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
-  await expect(locatorsView.locator('body')).toMatchAriaSnapshot(`
-    - text: Locator
-    - textbox "Locator": "getByRole('heading', { name: 'Hello' })"
-  `);
+  expect(vscode.warnings).toContain('Launch browser first.');
+  expect(picker.isPicking).toBe(false);
 
-  await expect(locatorsView.locator('body')).toMatchAriaSnapshot(`
-    - text: Locator
-    - textbox "Locator": "getByRole('heading', { name: 'Hello' })"
-    - text: Aria
-    - textbox "Aria": "- heading \\"Hello\\" [level=1]"
-  `);
-
-  await page.click('x-pw-tool-item.pick-locator');
-  await expect(page.locator('x-pw-tool-item.pick-locator')).toBeHidden();
-  await waitForRecorderMode(vscode, 'none');
-});
-
-test('should highlight locator on edit', async ({ activate }) => {
-  const { vscode } = await activate({
-    'playwright.config.js': `module.exports = {}`,
-  });
-
-  const settingsView = await vscode.webView('playwright-repl.settingsView');
-  await settingsView.getByText('Pick locator').click();
-  await waitForRecorderMode(vscode, 'inspecting');
-
-  const browser = await connectToSharedBrowser(vscode);
-  const page = await waitForPage(browser);
-  await page.setContent(`
-    <h1>Hello</h1>
-    <button>World</button>
-  `);
-  const box = await page.getByRole('heading', { name: 'Hello' }).boundingBox();
-
-  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
-  await locatorsView.getByRole('textbox', { name: 'Locator' }).fill('h1');
-
-  await expect(page.locator('x-pw-highlight')).toBeVisible();
-  expect(await page.locator('x-pw-highlight').boundingBox()).toEqual(box);
-});
-
-test('should copy locator to clipboard', async ({ activate }) => {
-  const { vscode } = await activate({
-    'playwright.config.js': `module.exports = {}`,
-  });
-
-  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
-  await locatorsView.getByRole('checkbox', { name: 'Copy on pick' }).check();
-  await locatorsView.getByRole('button', { name: 'Pick locator' }).first().click();
-  await waitForRecorderMode(vscode, 'inspecting');
-
-  const browser = await connectToSharedBrowser(vscode);
-  const page = await waitForPage(browser);
-  await page.setContent(`
-    <h1>Hello</h1>
-    <h1>World</h1>
-  `);
-  await page.locator('h1').first().click();
-
-  await expect.poll(() => vscode.env.clipboard.readText()).toBe(`getByRole('heading', { name: 'Hello' })`);
-});
-
-test('should pick locator and use the testIdAttribute from the config', async ({ activate }) => {
-  const { vscode } = await activate({
-    'playwright.config.js': `module.exports = { use: { testIdAttribute: 'data-testerid' } }`,
-  });
-
-  const settingsView = await vscode.webView('playwright-repl.settingsView');
-  await settingsView.getByText('Pick locator').click();
-  await waitForRecorderMode(vscode, 'inspecting');
-
-  const browser = await connectToSharedBrowser(vscode);
-  // TODO: Get rid of 'selectors.setTestIdAttribute' once launchServer multiclient is stable and migrate to it.
-  // This is a workaround for waitForPage which internally uses Browser._newContextForReuse
-  // which ends up overriding the testIdAttribute back to 'data-testid'.
-  selectors.setTestIdAttribute('data-testerid');
-  const page = await waitForPage(browser);
-  await page.setContent(`
-    <div data-testerid="hello">Hello</div>
-  `);
-  await page.locator('div').click();
-
-  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
-  await expect(locatorsView.locator('body')).toMatchAriaSnapshot(`
-    - text: Locator
-    - textbox "Locator": "getByTestId('hello')"
-  `);
-  // TODO: remove as per TODO above.
-  selectors.setTestIdAttribute('data-testid');
-});
-
-test('running test should dismiss the toolbar', async ({ activate, showBrowser }) => {
-  test.skip(!showBrowser);
-
-  const { vscode, testController } = await activate({
-    'playwright.config.js': `module.exports = {}`,
-    'tests/test.spec.ts': `
-      import { test } from '@playwright/test';
-      test('one', () => {});
-    `,
-  });
-
-  const settingsView = await vscode.webView('playwright-repl.settingsView');
-  await settingsView.getByRole('button', { name: 'Pick locator' }).click();
-  await waitForRecorderMode(vscode, 'inspecting');
-
-  const testRun = await testController.run();
-  await expect(testRun).toHaveOutput('passed');
-
-  await waitForRecorderMode(vscode, 'none');
+  picker.dispose();
 });

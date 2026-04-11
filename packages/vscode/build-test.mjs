@@ -10,7 +10,7 @@ import * as esbuild from 'esbuild';
 
 /** @type {esbuild.BuildOptions} */
 const extensionOptions = {
-  entryPoints: ['src/extension.ts'],
+  entryPoints: ['src/extension.ts', 'src/recorder.ts', 'src/picker.ts'],
   bundle: true,
   outdir: 'dist',
   external: [

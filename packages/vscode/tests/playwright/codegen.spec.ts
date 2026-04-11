@@ -1,159 +1,285 @@
 /**
- * Copyright (c) Microsoft Corporation.
+ * Tests for Recorder — code generation via recording.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Uses mock BrowserManager to simulate recorded events without a real browser.
+ * Tests editor insertion logic, template generation, and start/stop lifecycle.
  */
 
-import { connectToSharedBrowser, enableProjects, expect, test, waitForPage } from './utils';
-import fs from 'node:fs';
+import { expect, test } from './utils';
+import type { IBrowserManager, CommandResult } from '../../src/browser';
 
-// Our fork replaced upstream recording (Record new / Record at cursor) with
-// BrowserManager-based Recorder. These tests exercise the upstream codepath.
-// TODO: Phase 5 will add tests for our Recorder implementation.
-test.skip();
+// ─── Mock BrowserManager ─────────────────────────────────────────────────────
 
-test('should generate code', async ({ activate }) => {
-  test.slow();
+class MockBrowserManager implements IBrowserManager {
+  private _running = true;
+  private _eventCallback: ((event: Record<string, unknown>) => void) | null = null;
+  private _pageUrl = 'https://example.com';
+  recordStartCalled = false;
+  recordStopCalled = false;
 
-  const globalSetupFile = test.info().outputPath('globalSetup.txt');
+  isRunning() { return this._running; }
+  setRunning(v: boolean) { this._running = v; }
+
+  get page() { return { url: () => this._pageUrl }; }
+  get bridge() { return undefined; }
+  get httpPort() { return null; }
+  get cdpUrl() { return undefined; }
+  async launch() {}
+  async stop() {}
+  async runScript() { return { text: '' }; }
+
+  async runCommand(raw: string): Promise<CommandResult> {
+    if (raw === 'record-start') {
+      this.recordStartCalled = true;
+      return { text: `Recording started: ${this._pageUrl}` };
+    }
+    if (raw === 'record-stop') {
+      this.recordStopCalled = true;
+      return { text: 'Recording stopped' };
+    }
+    return { text: '' };
+  }
+
+  onEvent(fn: ((event: Record<string, unknown>) => void) | null) {
+    this._eventCallback = fn;
+  }
+
+  /** Simulate a recorded action event */
+  emitAction(js: string, pw?: string) {
+    this._eventCallback?.({ type: 'recorded-action', action: { js, pw: pw ?? js } });
+  }
+
+  /** Simulate a fill update event */
+  emitFillUpdate(js: string, pw?: string) {
+    this._eventCallback?.({ type: 'recorded-fill-update', action: { js, pw: pw ?? js } });
+  }
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+test('should show warning when browser is not running', async ({ activate }) => {
   const { vscode } = await activate({
-    'playwright.config.js': `module.exports = {
-      projects: [
-        {
-          name: 'default',
-        },
-        {
-          name: 'germany',
-          use: {
-            locale: 'de-DE',
-          },
-        },
-      ],
-      globalSetup: './globalSetup.js',
-    }`,
-    'globalSetup.js': `
-      import fs from 'fs';
-      module.exports = async () => {
-        fs.writeFileSync(${JSON.stringify(globalSetupFile)}, 'global setup was called');
-      }
-    `,
-  });
-
-  const webView = await vscode.webView('playwright-repl.settingsView');
-  await webView.getByRole('checkbox', { name: 'default' }).setChecked(false);
-  await webView.getByRole('checkbox', { name: 'germany' }).setChecked(true);
-  await webView.getByText('Record new').click();
-  await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual({ message: 'recording\u2026' });
-
-  expect(fs.readFileSync(globalSetupFile, 'utf-8')).toBe('global setup was called');
-
-  const browser = await connectToSharedBrowser(vscode);
-  const page = await waitForPage(browser, { locale: 'de-DE' });
-  await page.locator('body').click();
-  expect(await page.evaluate(() => navigator.language)).toBe('de-DE');
-  await expect.poll(() => {
-    return vscode.window.visibleTextEditors[0]?.edits;
-  }).toEqual([{
-    from: `import { test, expect } from '@playwright/test';
-
-test('test', async ({ page }) => {
-  <selection>// Recording...</selection>
-});`,
-    range: '[3:2 - 3:17]',
-    to: `import { test, expect } from '@playwright/test';
-
-test('test', async ({ page }) => {
-  <selection>await page.locator('body').click();</selection>
-});`
-  }]);
-});
-
-test('running test should stop the recording', async ({ activate, showBrowser }) => {
-  test.skip(!showBrowser);
-
-  const { vscode, testController } = await activate({
     'playwright.config.js': `module.exports = {}`,
-    'tests/test.spec.ts': `
-      import { test } from '@playwright/test';
-      test('one', () => {});
-    `,
   });
 
-  const webView = await vscode.webView('playwright-repl.settingsView');
-  await webView.getByText('Record new').click();
-  await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual({ message: 'recording\u2026' });
+  const mockBrowser = new MockBrowserManager();
+  mockBrowser.setRunning(false);
 
-  const testRun = await testController.run();
-  await expect(testRun).toHaveOutput('passed');
+  // @ts-ignore — access internal for test
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
 
-  await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual('finished');
+  await recorder.start();
+
+  expect(vscode.warnings).toContain('Launch browser first.');
+  expect(recorder.isRecording).toBe(false);
+
+  recorder.dispose();
 });
 
-test('Record at Cursor should respect custom testId', async ({ activate, showBrowser }) => {
-  test.skip(!showBrowser);
-
-  const { vscode, testController } = await activate({
-    'playwright.config.js': `module.exports = {
-      projects: [
-        { name: 'main', use: { testIdAttribute: 'data-testerid', testDir: 'tests' } },
-        { name: 'unused', use: { testIdAttribute: 'unused', testDir: 'nonExistant' } },
-      ]
-    };`,
-    'tests/test.spec.ts': `
-      import { test } from '@playwright/test';
-      test('should pass', async ({ page }) => {
-        await page.setContent('<button data-testerid="foo">click me</button>');
-
-      });
-    `,
+test('should insert test template when cursor is outside test function', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+    'tests/test.spec.ts': [
+      "import { test } from '@playwright/test';",
+      '',
+    ].join('\n'),
   });
-
-  await enableProjects(vscode, ['main']);
-
-  await testController.expandTestItems(/test.spec/);
-  await expect(await testController.run()).toHaveOutput('1 passed');
 
   await vscode.openEditors('**/test.spec.ts');
   const editor = vscode.window.activeTextEditor;
-  expect(editor.document.uri.path).toContain('test.spec.ts');
-  editor.selection = new vscode.Selection(4, 0, 4, 0);
+  // Place cursor at line 1 (outside any test)
+  editor.selection = new vscode.Selection(1, 0, 1, 0);
 
-  const webView = await vscode.webView('playwright-repl.settingsView');
-  await webView.getByText('Record at cursor').click();
-  await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual({ message: 'recording\u2026' });
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
 
-  const browser = await connectToSharedBrowser(vscode);
-  const page = await waitForPage(browser);
-  await page.getByRole('button', { name: 'click me' }).click();
-  await expect.poll(() => editor.edits).toEqual([
-    {
-      range: '[4:0 - 4:0]',
-      from: `
-      import { test } from '@playwright/test';
-      test('should pass', async ({ page }) => {
-        await page.setContent('<button data-testerid="foo">click me</button>');
-<selection></selection>
-      });
-    `,
-      to: `
-      import { test } from '@playwright/test';
-      test('should pass', async ({ page }) => {
-        await page.setContent('<button data-testerid="foo">click me</button>');
-<selection>await page.getByTestId('foo').click();</selection>
-      });
-    `,
-    }
-  ]);
+  await recorder.start();
 
-  vscode.lastWithProgressToken!.cancel();
+  expect(recorder.isRecording).toBe(true);
+  expect(mockBrowser.recordStartCalled).toBe(true);
+
+  // Template should have been inserted
+  const text = editor.document.text;
+  expect(text).toContain("test('new test', async ({ page }) => {");
+  expect(text).toContain('});');
+
+  // Goto should have been inserted from the URL returned by record-start
+  expect(text).toContain("await page.goto('https://example.com');");
+
+  await recorder.stop();
+  recorder.dispose();
+});
+
+test('should insert actions at cursor inside test function', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+    'tests/test.spec.ts': [
+      "import { test } from '@playwright/test';",
+      '',
+      "test('my test', async ({ page }) => {",
+      '  ',
+      '});',
+    ].join('\n'),
+  });
+
+  await vscode.openEditors('**/test.spec.ts');
+  const editor = vscode.window.activeTextEditor;
+  // Place cursor inside the test body (line 3)
+  editor.selection = new vscode.Selection(3, 0, 3, 0);
+
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
+
+  await recorder.start();
+  expect(recorder.isRecording).toBe(true);
+
+  // Simulate clicking a button
+  mockBrowser.emitAction("await page.getByRole('button', { name: 'Submit' }).click();");
+
+  // Wait for edit queue to process
+  await new Promise(r => setTimeout(r, 50));
+
+  const text = editor.document.text;
+  expect(text).toContain("await page.getByRole('button', { name: 'Submit' }).click();");
+
+  await recorder.stop();
+  recorder.dispose();
+});
+
+test('should replace last line on fill update', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+    'tests/test.spec.ts': [
+      "import { test } from '@playwright/test';",
+      '',
+      "test('my test', async ({ page }) => {",
+      '  ',
+      '});',
+    ].join('\n'),
+  });
+
+  await vscode.openEditors('**/test.spec.ts');
+  const editor = vscode.window.activeTextEditor;
+  editor.selection = new vscode.Selection(3, 0, 3, 0);
+
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
+
+  await recorder.start();
+
+  // Simulate typing — first keystroke is an action, subsequent are fill updates
+  mockBrowser.emitAction("await page.getByLabel('Email').fill('h');");
+  await new Promise(r => setTimeout(r, 50));
+  mockBrowser.emitFillUpdate("await page.getByLabel('Email').fill('he');");
+  await new Promise(r => setTimeout(r, 50));
+  mockBrowser.emitFillUpdate("await page.getByLabel('Email').fill('hello');");
+  await new Promise(r => setTimeout(r, 50));
+
+  const text = editor.document.text;
+  // Should have the final fill value, not intermediate ones
+  expect(text).toContain("await page.getByLabel('Email').fill('hello');");
+  expect(text).not.toContain("fill('h')");
+  expect(text).not.toContain("fill('he')");
+
+  await recorder.stop();
+  recorder.dispose();
+});
+
+test('should stop recording and reset state', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+    'tests/test.spec.ts': [
+      "import { test } from '@playwright/test';",
+      '',
+      "test('my test', async ({ page }) => {",
+      '  ',
+      '});',
+    ].join('\n'),
+  });
+
+  await vscode.openEditors('**/test.spec.ts');
+  const editor = vscode.window.activeTextEditor;
+  editor.selection = new vscode.Selection(3, 0, 3, 0);
+
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
+
+  await recorder.start();
+  expect(recorder.isRecording).toBe(true);
+
+  await recorder.stop();
+  expect(recorder.isRecording).toBe(false);
+  expect(mockBrowser.recordStopCalled).toBe(true);
+
+  // Events after stop should not insert anything
+  mockBrowser.emitAction("await page.getByText('Should not appear').click();");
+  await new Promise(r => setTimeout(r, 50));
+
+  const text = editor.document.text;
+  expect(text).not.toContain('Should not appear');
+
+  recorder.dispose();
+});
+
+test('should not start recording twice', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+    'tests/test.spec.ts': [
+      "import { test } from '@playwright/test';",
+      '',
+      "test('my test', async ({ page }) => {",
+      '  ',
+      '});',
+    ].join('\n'),
+  });
+
+  await vscode.openEditors('**/test.spec.ts');
+  const editor = vscode.window.activeTextEditor;
+  editor.selection = new vscode.Selection(3, 0, 3, 0);
+
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
+
+  await recorder.start();
+  expect(recorder.isRecording).toBe(true);
+
+  // Second start should be a no-op
+  await recorder.start();
+  expect(recorder.isRecording).toBe(true);
+
+  await recorder.stop();
+  recorder.dispose();
+});
+
+test('should show warning when no editor is open', async ({ activate }) => {
+  const { vscode } = await activate({
+    'playwright.config.js': `module.exports = {}`,
+  });
+
+  // No editor open
+  vscode.window.activeTextEditor = undefined;
+
+  const mockBrowser = new MockBrowserManager();
+  const { Recorder } = await import('../../dist/recorder');
+  const outputChannel = vscode.window.createOutputChannel('test');
+  const recorder = new Recorder(vscode, mockBrowser, outputChannel);
+
+  await recorder.start();
+
+  expect(vscode.warnings).toContain('Open a test file first.');
+  expect(recorder.isRecording).toBe(false);
+
+  recorder.dispose();
 });
