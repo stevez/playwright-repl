@@ -17,8 +17,8 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'engine', 'include-snapshot', 'verbose'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'command'],
+  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'engine', 'include-snapshot', 'verbose', 'http'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'command', 'http-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -47,6 +47,8 @@ Options:
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
+  --http                 Start HTTP server for external command access (port 9223)
+  --http-port <port>     HTTP server port (default: 9223)
   --command <cmd>        Run a single command, print output, and exit
   --config <file>        Path to config file
   --replay <files...>   Replay .pw file(s) or folder(s)
@@ -111,6 +113,8 @@ startRepl({
   step: args.step as boolean,
   bridge: args.bridge as boolean,
   engine: args.engine as boolean,
+  http: args.http as boolean,
+  httpPort: args['http-port'] ? parseInt(args['http-port'] as string, 10) : undefined,
   bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
   includeSnapshot: args['include-snapshot'] as boolean,
   verbose: args.verbose as boolean,

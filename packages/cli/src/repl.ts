@@ -8,6 +8,7 @@ import readline from 'node:readline';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
@@ -30,6 +31,8 @@ export interface ReplOpts extends EngineOpts {
   bridge?: boolean;
   bridgePort?: number;
   engine?: boolean;
+  http?: boolean;
+  httpPort?: number;
   includeSnapshot?: boolean;
   verbose?: boolean;
 }
@@ -953,11 +956,114 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
   });
 }
 
+// ─── HTTP server for --http mode ─────────────────────────────────────────────
+
+const DEFAULT_HTTP_PORT = 9223;
+
+interface CommandRunner {
+  run(command: string, opts?: { includeSnapshot?: boolean }): Promise<{ text?: string; isError?: boolean }>;
+  runScript?(script: string, language: string): Promise<{ text?: string; isError?: boolean }>;
+}
+
+function startHttpServer(port: number, runner: CommandRunner, log: (...args: unknown[]) => void): Promise<http.Server> {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(async (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/run') {
+        try {
+          const body = await readBody(req);
+          const { command } = JSON.parse(body);
+          const result = await runner.run(command);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } catch (e: unknown) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/run-script') {
+        try {
+          const body = await readBody(req);
+          const { script, language } = JSON.parse(body);
+          const result = runner.runScript
+            ? await runner.runScript(script, language || 'javascript')
+            : await runner.run(script);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } catch (e: unknown) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
+        }
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('Not found');
+    });
+
+    server.listen(port, () => {
+      log(`${c.green}✓${c.reset} HTTP server on port ${port}`);
+      resolve(server);
+    });
+    server.on('error', reject);
+  });
+}
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk: Buffer) => data += chunk);
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
+/** Try to send --command via HTTP to an already-running --http server. */
+async function tryHttpCommand(command: string, port: number): Promise<boolean> {
+  try {
+    const result = await new Promise<{ text?: string; isError?: boolean }>((resolve, reject) => {
+      const body = JSON.stringify({ command });
+      const req = http.request({ hostname: '127.0.0.1', port, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 3000 }, res => {
+        let data = '';
+        res.on('data', (chunk: string) => data += chunk);
+        res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid response')); } });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      req.write(body);
+      req.end();
+    });
+    process.stdout.write((result.text ?? '') + '\n');
+    process.exit(result.isError ? 1 : 0);
+  } catch {
+    return false; // Server not running, fall back
+  }
+  return false; // unreachable
+}
+
 // ─── REPL ────────────────────────────────────────────────────────────────────
 
 export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   const silent = opts.silent || false;
   const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
+
+  // ─── --command --http: send via HTTP to running server ──────────
+  if (opts.command && opts.http) {
+    const httpPort = opts.httpPort ?? DEFAULT_HTTP_PORT;
+    const sent = await tryHttpCommand(opts.command, httpPort);
+    if (sent) return;
+    console.error(`Could not connect to HTTP server on port ${httpPort}. Is playwright-repl --http running?`);
+    process.exit(1);
+  }
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
 
@@ -979,6 +1085,14 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
           process.stdout.write((result.text ?? '') + '\n');
           await conn.close();
           process.exit(result.isError ? 1 : 0);
+        }
+        // Start HTTP server if --http
+        if (opts.http) {
+          try {
+            await startHttpServer(opts.httpPort ?? DEFAULT_HTTP_PORT, conn as CommandRunner, log);
+          } catch (e: unknown) {
+            log(`${c.yellow}⚠${c.reset} HTTP server failed: ${(e as Error).message}`);
+          }
         }
         log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
         if (opts.replay && opts.replay.length > 0) {
@@ -1007,6 +1121,14 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       process.stdout.write((result.text ?? '') + '\n');
       srv.close();
       process.exit(result.isError ? 1 : 0);
+    }
+    // Start HTTP server if --http
+    if (opts.http) {
+      try {
+        await startHttpServer(opts.httpPort ?? DEFAULT_HTTP_PORT, srv as CommandRunner, log);
+      } catch (e: unknown) {
+        log(`${c.yellow}⚠${c.reset} HTTP server failed: ${(e as Error).message}`);
+      }
     }
     if (opts.replay && opts.replay.length > 0) {
       await runBridgeReplayMode(opts, srv);
