@@ -999,7 +999,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   if (opts.bridge) {
     const port = opts.bridgePort ?? 9876;
     const srv = new BridgeServer();
-    await srv.start(port);
+    await srv.start(port, { silent: !!opts.command });
     log(`Bridge server listening on ws://localhost:${port}`);
     if (opts.command) {
       await srv.waitForConnection(30000);

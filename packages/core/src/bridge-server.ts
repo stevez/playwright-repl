@@ -17,6 +17,7 @@ export class BridgeServer {
     private _onEvent?: (event: Record<string, unknown>) => void;
     private heartbeatTimer?: ReturnType<typeof setInterval>;
     private waiters: Array<{ resolve: () => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }> = [];
+    private _silent = false;
 
     onConnect(fn: () => void)    { this._onConnect = fn; }
     onDisconnect(fn: () => void) { this._onDisconnect = fn; }
@@ -24,7 +25,8 @@ export class BridgeServer {
     get connected()              { return this.socket?.readyState === WebSocket.OPEN; }
     get port()                   { return (this.wss.address() as { port: number }).port; }
 
-    async start(port = 9876): Promise<void> {
+    async start(port = 9876, opts?: { silent?: boolean }): Promise<void> {
+        this._silent = opts?.silent ?? false;
         const createServer = () => new WebSocketServer({
             port,
             host: '127.0.0.1',
@@ -58,7 +60,7 @@ export class BridgeServer {
             console.error(`[bridge ${ts()}] server error: ${err.message}`);
         });
         this.wss.on('connection', (ws) => {
-            console.error(`[bridge ${ts()}] new connection accepted`);
+            if (!this._silent) console.error(`[bridge ${ts()}] new connection accepted`);
             this.socket = ws;
             (ws as any)._alive = true;
 
