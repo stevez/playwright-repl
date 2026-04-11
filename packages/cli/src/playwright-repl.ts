@@ -5,6 +5,7 @@
  *
  * Usage:
  *   playwright-repl [options]
+ *   playwright-repl --bridge --command "snapshot"
  *   playwright-repl --replay session.pw
  *   playwright-repl --replay session.pw --step
  *   playwright-repl --replay file1.pw file2.pw
@@ -46,6 +47,7 @@ Options:
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
+  --command <cmd>        Run a single command, print output, and exit
   --config <file>        Path to config file
   --replay <files...>   Replay .pw file(s) or folder(s)
   --record <file>        Start REPL with recording to file
@@ -76,6 +78,7 @@ Examples:
   playwright-repl --replay login.pw --step  # step through replay
   playwright-repl --replay tests/         # replay all .pw files in folder
   playwright-repl --replay a.pw b.pw      # replay multiple files
+  playwright-repl --bridge --command "snapshot"  # run one command and exit
   echo "open https://example.com" | playwright-repl  # pipe commands
 `);
   process.exit(0);

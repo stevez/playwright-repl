@@ -50,6 +50,7 @@ playwright-repl --bridge                      # start bridge server, wait for ex
 playwright-repl --bridge --replay script.pw   # replay a script via bridge
 playwright-repl --bridge --replay examples/   # replay all .pw files
 playwright-repl --bridge --bridge-port 9877   # custom port (default 9876)
+playwright-repl --bridge --command "snapshot"  # run one command and exit
 ```
 
 The extension connects automatically — no need to open the side panel.
@@ -77,6 +78,9 @@ playwright-repl --replay session.pw --step
 # Start REPL with recording enabled
 playwright-repl --record my-test.pw
 
+# Run a single command and exit
+playwright-repl --bridge --command "snapshot"
+
 # Pipe commands
 echo -e "goto https://example.com\nsnapshot" | playwright-repl
 ```
@@ -97,6 +101,7 @@ Both modes auto-detect keyword commands and JavaScript expressions. For DOM acce
 | `--headless` | Run browser in headless mode (default: headed) |
 | `--bridge` | Connect to existing Chrome via WebSocket bridge |
 | `--bridge-port <port>` | Bridge server port (default: `9876`) |
+| `--command <cmd>` | Run a single command, print output, and exit |
 | `--config <file>` | Path to config file |
 | `--replay <files...>` | Replay `.pw` or `.js` file(s) or folder(s) |
 | `--record <file>` | Start REPL with recording to file |

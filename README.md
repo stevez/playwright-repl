@@ -75,6 +75,14 @@ pw> screenshot
 
 Standalone launches a fresh Chromium with the extension pre-installed — keyword commands and JavaScript both work. Use `--headless` for CI/scripting.
 
+**Single-command mode** — run one command and exit, useful for automation tools like Claude Code:
+
+```bash
+playwright-repl --bridge --command "snapshot"
+playwright-repl --bridge --command "goto https://example.com"
+playwright-repl --bridge --command "click \"Interested\""
+```
+
 > **[Full CLI docs](packages/cli/README.md)**
 
 ---
