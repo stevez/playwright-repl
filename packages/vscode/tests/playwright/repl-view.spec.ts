@@ -26,6 +26,7 @@ const replHtml = `<!DOCTYPE html>
 <body class="repl-view">
   <div id="output"></div>
   <div id="input-row">
+    <div id="autocomplete-dropdown"></div>
     <span id="prompt">pw&gt;</span>
     <textarea id="command-input" rows="1" placeholder="Type a command..."></textarea>
   </div>

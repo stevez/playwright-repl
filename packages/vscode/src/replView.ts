@@ -5,7 +5,7 @@
 import { WebviewBase } from './webviewBase';
 import type { IBrowserManager } from './browser';
 import * as vscodeTypes from './vscodeTypes';
-import { COMMANDS, CATEGORIES, ALIASES } from '@playwright-repl/core';
+import { COMMANDS, CATEGORIES, ALIASES, buildCompletionItems } from '@playwright-repl/core';
 
 function core() {
   return { COMMANDS, CATEGORIES, ALIASES };
@@ -93,9 +93,48 @@ export class ReplView extends WebviewBase {
         #command-input:disabled {
           opacity: 0.5;
         }
+        #input-row {
+          position: relative;
+        }
+        #autocomplete-dropdown {
+          position: absolute;
+          bottom: 100%;
+          left: 0; right: 0;
+          max-height: 200px;
+          overflow-y: auto;
+          background: var(--vscode-editorSuggestWidget-background, var(--vscode-editorWidget-background));
+          border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border));
+          border-radius: 3px;
+          z-index: 100;
+          display: none;
+        }
+        #autocomplete-dropdown.visible { display: block; }
+        .ac-item {
+          padding: 2px 8px;
+          display: flex;
+          justify-content: space-between;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: inherit;
+        }
+        .ac-item.ac-selected, .ac-item:hover {
+          background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+          color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground));
+        }
+        .ac-cmd { flex: none; }
+        .ac-desc {
+          color: var(--vscode-descriptionForeground);
+          margin-left: 12px;
+          font-size: 0.9em;
+          opacity: 0.8;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
       </style>
       <div id="output"></div>
       <div id="input-row">
+        <div id="autocomplete-dropdown"></div>
         <span id="prompt">pw&gt;</span>
         <textarea id="command-input" rows="1" placeholder="Type a command..." autofocus></textarea>
       </div>
@@ -116,6 +155,7 @@ export class ReplView extends WebviewBase {
     const connected = this._browserManager?.isRunning() ?? false;
     this._appendOutput('Playwright REPL\nType commands. Use ↑↓ for history.', 'info');
     this._appendOutput(connected ? 'Connected to browser.' : 'Waiting for browser... Launch with Ctrl+Shift+P → "Launch Browser"', connected ? 'info' : 'error');
+    this.postMessage('completionItems', { items: buildCompletionItems() });
   }
 
   private async _execute(command: string) {
