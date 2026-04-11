@@ -29,7 +29,11 @@ function showDropdown(items: CompletionItem[]) {
   for (let i = 0; i < items.length; i++) {
     const el = document.createElement('div');
     el.className = 'ac-item' + (i === 0 ? ' ac-selected' : '');
-    el.innerHTML = `<span class="ac-cmd">${escapeHtml(items[i].cmd)}</span><span class="ac-desc">${escapeHtml(items[i].desc)}</span>`;
+    const prefix = input.value.slice(0, input.selectionStart);
+    const matchLen = prefix.length;
+    const cmd = items[i].cmd;
+    const highlighted = `<b>${escapeHtml(cmd.slice(0, matchLen))}</b>${escapeHtml(cmd.slice(matchLen))}`;
+    el.innerHTML = `<span class="ac-cmd">${highlighted}</span><span class="ac-desc">${escapeHtml(items[i].desc)}</span>`;
     el.addEventListener('mousedown', (e) => {
       e.preventDefault(); // prevent blur
       acceptCompletion(i);
