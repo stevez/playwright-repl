@@ -350,6 +350,15 @@ export class Extension implements RunHooks {
           this._logger.error('Assert builder error:', (e as Error).message);
         }
       }),
+      vscode.commands.registerCommand('playwright-repl.repl.clear', () => {
+        this._replView.clear();
+      }),
+      vscode.commands.registerCommand('playwright-repl.repl.toggleFilter', () => {
+        this._replView.toggleFilter();
+      }),
+      vscode.commands.registerCommand('playwright-repl.repl.find', () => {
+        this._replView.toggleSearch();
+      }),
     ];
 
     const configObserver = new WorkspaceObserver(this._vscode, () => this._scheduleRebuildModels(), this._isUnderTest);

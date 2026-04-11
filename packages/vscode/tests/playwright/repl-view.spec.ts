@@ -24,6 +24,20 @@ const replHtml = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
 <body class="repl-view">
+  <div id="filter-bar" style="display:none">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="command">Commands</button>
+    <button class="filter-btn" data-filter="output">Output</button>
+    <button class="filter-btn" data-filter="error">Errors</button>
+    <button class="filter-btn" data-filter="info">Info</button>
+  </div>
+  <div id="search-bar" style="display:none">
+    <input id="search-input" type="text" placeholder="Find…" />
+    <span id="search-count"></span>
+    <button class="filter-btn" id="search-prev">&#x2191;</button>
+    <button class="filter-btn" id="search-next">&#x2193;</button>
+    <button class="filter-btn" id="search-close">&#x2715;</button>
+  </div>
   <div id="output"></div>
   <div id="input-row">
     <div id="autocomplete-dropdown"></div>
@@ -181,4 +195,107 @@ test('should restore history from extension', async ({ replPage }) => {
   await input.press('Home');
   await input.press('ArrowUp');
   await expect(input).toHaveValue('old2');
+});
+
+// ─── Filter tests ────────────────────────────────────────────────────────
+
+test('should toggle filter bar visibility', async ({ replPage }) => {
+  const filterBar = replPage.locator('#filter-bar');
+  await expect(filterBar).not.toBeVisible();
+
+  await postToWebview(replPage, 'toggleFilter');
+  await expect(filterBar).toBeVisible();
+
+  await postToWebview(replPage, 'toggleFilter');
+  await expect(filterBar).not.toBeVisible();
+});
+
+test('should filter output by type', async ({ replPage }) => {
+  // Add lines of different types
+  await typeCommand(replPage, 'test command');
+  await postToWebview(replPage, 'output', { text: 'some output', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'an error', type: 'error' });
+  await postToWebview(replPage, 'output', { text: 'info note', type: 'info' });
+
+  // Show filter bar and filter to errors only
+  await postToWebview(replPage, 'toggleFilter');
+  await replPage.locator('.filter-btn[data-filter="error"]').click();
+
+  // Error line visible, others hidden
+  await expect(replPage.locator('.line-error')).toBeVisible();
+  await expect(replPage.locator('.line-command')).toBeHidden();
+  await expect(replPage.locator('.line-output')).toBeHidden();
+  await expect(replPage.locator('.line-info')).toBeHidden();
+
+  // Switch back to all
+  await replPage.locator('.filter-btn[data-filter="all"]').click();
+  await expect(replPage.locator('.line-command')).toBeVisible();
+  await expect(replPage.locator('.line-output')).toBeVisible();
+  await expect(replPage.locator('.line-error')).toBeVisible();
+  await expect(replPage.locator('.line-info')).toBeVisible();
+});
+
+// ─── Search tests ────────────────────────────────────────────────────────
+
+test('should toggle search bar visibility', async ({ replPage }) => {
+  const searchBar = replPage.locator('#search-bar');
+  await expect(searchBar).not.toBeVisible();
+
+  await postToWebview(replPage, 'toggleSearch');
+  await expect(searchBar).toBeVisible();
+  await expect(replPage.locator('#search-input')).toBeFocused();
+
+  await postToWebview(replPage, 'toggleSearch');
+  await expect(searchBar).not.toBeVisible();
+});
+
+test('should highlight matching lines on search', async ({ replPage }) => {
+  await postToWebview(replPage, 'output', { text: 'hello world', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'goodbye world', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'hello again', type: 'output' });
+
+  await postToWebview(replPage, 'toggleSearch');
+  await replPage.locator('#search-input').fill('hello');
+
+  // Two lines should be highlighted
+  await expect(replPage.locator('.search-highlight')).toHaveCount(2);
+  await expect(replPage.locator('#search-count')).toHaveText('1/2');
+});
+
+test('should navigate search results', async ({ replPage }) => {
+  await postToWebview(replPage, 'output', { text: 'apple pie', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'banana split', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'apple sauce', type: 'output' });
+
+  await postToWebview(replPage, 'toggleSearch');
+  await replPage.locator('#search-input').fill('apple');
+
+  await expect(replPage.locator('#search-count')).toHaveText('1/2');
+
+  // Navigate to next
+  await replPage.locator('#search-next').click();
+  await expect(replPage.locator('#search-count')).toHaveText('2/2');
+
+  // Navigate to previous (wraps around)
+  await replPage.locator('#search-prev').click();
+  await expect(replPage.locator('#search-count')).toHaveText('1/2');
+});
+
+test('should close search with Escape', async ({ replPage }) => {
+  await postToWebview(replPage, 'toggleSearch');
+  await replPage.locator('#search-input').fill('test');
+  await replPage.locator('#search-input').press('Escape');
+
+  await expect(replPage.locator('#search-bar')).not.toBeVisible();
+});
+
+// ─── Clear test ──────────────────────────────────────────────────────────
+
+test('should clear output via clear message', async ({ replPage }) => {
+  await postToWebview(replPage, 'output', { text: 'line 1', type: 'output' });
+  await postToWebview(replPage, 'output', { text: 'line 2', type: 'output' });
+  await expect(replPage.locator('#output .line')).toHaveCount(2);
+
+  await postToWebview(replPage, 'clear');
+  await expect(replPage.locator('#output')).toBeEmpty();
 });

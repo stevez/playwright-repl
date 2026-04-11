@@ -180,6 +180,10 @@ window.addEventListener('message', event => {
     output.scrollTop = output.scrollHeight;
   } else if (method === 'clear') {
     output.textContent = '';
+  } else if (method === 'toggleFilter') {
+    toggleFilterBar();
+  } else if (method === 'toggleSearch') {
+    toggleSearchBar();
   } else if (method === 'processing') {
     input.disabled = params.processing;
     if (!params.processing) input.focus();
@@ -304,6 +308,124 @@ function renderCollapsible<T>(
   });
 
   return details;
+}
+
+// ─── Filter ──────────────────────────────────────────────────────────────
+
+const filterBar = document.getElementById('filter-bar')!;
+let activeFilter = 'all';
+
+function toggleFilterBar() {
+  const showing = filterBar.style.display === 'none' || filterBar.style.display === '';
+  filterBar.style.display = showing ? 'flex' : 'none';
+  if (!showing)
+    applyFilter('all');
+}
+
+filterBar.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.filter-btn') as HTMLElement | null;
+  if (!btn || !btn.dataset.filter) return;
+  applyFilter(btn.dataset.filter);
+});
+
+function applyFilter(filter: string) {
+  activeFilter = filter;
+  // Update active button
+  for (const btn of filterBar.querySelectorAll('.filter-btn'))
+    btn.classList.toggle('active', (btn as HTMLElement).dataset.filter === filter);
+  // Show/hide lines
+  for (const line of output.querySelectorAll('.line')) {
+    const el = line as HTMLElement;
+    if (filter === 'all') {
+      el.style.display = '';
+    } else {
+      el.style.display = el.classList.contains(`line-${filter}`) ? '' : 'none';
+    }
+  }
+}
+
+// ─── Search ──────────────────────────────────────────────────────────────
+
+const searchBar = document.getElementById('search-bar')!;
+const searchInput = document.getElementById('search-input') as HTMLInputElement;
+const searchCount = document.getElementById('search-count')!;
+let searchMatches: HTMLElement[] = [];
+let searchIndex = -1;
+
+function toggleSearchBar() {
+  const showing = searchBar.style.display === 'none' || searchBar.style.display === '';
+  searchBar.style.display = showing ? 'flex' : 'none';
+  if (showing) {
+    searchInput.focus();
+    searchInput.select();
+  } else {
+    clearSearchHighlights();
+  }
+}
+
+searchInput.addEventListener('input', () => {
+  performSearch(searchInput.value);
+});
+
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (e.shiftKey) navigateSearch(-1);
+    else navigateSearch(1);
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    toggleSearchBar();
+  }
+});
+
+document.getElementById('search-prev')!.addEventListener('click', () => navigateSearch(-1));
+document.getElementById('search-next')!.addEventListener('click', () => navigateSearch(1));
+document.getElementById('search-close')!.addEventListener('click', () => toggleSearchBar());
+
+function performSearch(query: string) {
+  clearSearchHighlights();
+  if (!query) {
+    searchCount.textContent = '';
+    return;
+  }
+
+  const lower = query.toLowerCase();
+  const lines = output.querySelectorAll('.line');
+  for (const line of lines) {
+    const el = line as HTMLElement;
+    const text = el.textContent || '';
+    if (text.toLowerCase().includes(lower)) {
+      el.classList.add('search-highlight');
+      searchMatches.push(el);
+    }
+  }
+
+  if (searchMatches.length > 0) {
+    searchIndex = 0;
+    searchMatches[0].classList.add('search-highlight-current');
+    searchMatches[0].scrollIntoView({ block: 'nearest' });
+    searchCount.textContent = `1/${searchMatches.length}`;
+  } else {
+    searchCount.textContent = 'No results';
+  }
+}
+
+function navigateSearch(direction: number) {
+  if (searchMatches.length === 0) return;
+  searchMatches[searchIndex].classList.remove('search-highlight-current');
+  searchIndex = (searchIndex + direction + searchMatches.length) % searchMatches.length;
+  searchMatches[searchIndex].classList.add('search-highlight-current');
+  searchMatches[searchIndex].scrollIntoView({ block: 'nearest' });
+  searchCount.textContent = `${searchIndex + 1}/${searchMatches.length}`;
+}
+
+function clearSearchHighlights() {
+  for (const el of searchMatches) {
+    el.classList.remove('search-highlight', 'search-highlight-current');
+  }
+  searchMatches = [];
+  searchIndex = -1;
 }
 
 // Request history on load

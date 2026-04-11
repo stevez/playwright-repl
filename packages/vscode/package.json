@@ -135,8 +135,45 @@
         "category": "Playwright REPL",
         "command": "playwright-repl.assertBuilder",
         "title": "Assert Builder"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.repl.clear",
+        "icon": "$(clear-all)",
+        "title": "Clear REPL"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.repl.toggleFilter",
+        "icon": "$(filter)",
+        "title": "Filter Output"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.repl.find",
+        "icon": "$(search)",
+        "title": "Find in REPL"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "playwright-repl.repl.clear",
+          "group": "navigation@1",
+          "when": "view == playwright-repl.replView"
+        },
+        {
+          "command": "playwright-repl.repl.toggleFilter",
+          "group": "navigation@2",
+          "when": "view == playwright-repl.replView"
+        },
+        {
+          "command": "playwright-repl.repl.find",
+          "group": "navigation@3",
+          "when": "view == playwright-repl.replView"
+        }
+      ]
+    },
     "configuration": {
       "title": "Playwright REPL",
       "properties": {

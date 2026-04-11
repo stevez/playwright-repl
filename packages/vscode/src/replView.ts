@@ -109,6 +109,65 @@ export class ReplView extends WebviewBase {
         .obj-number { color: var(--vscode-debugTokenExpression-number, #b5cea8); }
         .obj-boolean { color: var(--vscode-debugTokenExpression-boolean, #569cd6); }
         .obj-null { color: var(--vscode-descriptionForeground); font-style: italic; }
+        /* Filter bar */
+        #filter-bar {
+          display: none;
+          padding: 2px 8px;
+          border-bottom: 1px solid var(--vscode-panel-border);
+          gap: 4px;
+          align-items: center;
+        }
+        .filter-btn {
+          background: transparent;
+          border: 1px solid transparent;
+          color: var(--vscode-descriptionForeground);
+          font-family: inherit;
+          font-size: 0.9em;
+          padding: 1px 6px;
+          border-radius: 3px;
+          cursor: pointer;
+        }
+        .filter-btn:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+        }
+        .filter-btn.active {
+          color: var(--vscode-editor-foreground);
+          border-color: var(--vscode-focusBorder);
+          background: var(--vscode-toolbar-activeBackground, rgba(127,127,127,0.1));
+        }
+        /* Search bar */
+        #search-bar {
+          display: none;
+          padding: 2px 8px;
+          border-bottom: 1px solid var(--vscode-panel-border);
+          align-items: center;
+          gap: 4px;
+        }
+        #search-input {
+          flex: 1;
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          font-family: inherit;
+          font-size: inherit;
+          padding: 2px 4px;
+          border-radius: 2px;
+          outline: none;
+        }
+        #search-input:focus {
+          border-color: var(--vscode-focusBorder);
+        }
+        #search-count {
+          color: var(--vscode-descriptionForeground);
+          font-size: 0.9em;
+          white-space: nowrap;
+        }
+        .search-highlight {
+          background: var(--vscode-editor-findMatchHighlightBackground, rgba(234,92,0,0.33));
+        }
+        .search-highlight-current {
+          background: var(--vscode-editor-findMatchBackground, rgba(161,121,0,0.4));
+        }
         #input-row {
           position: relative;
         }
@@ -150,6 +209,20 @@ export class ReplView extends WebviewBase {
           white-space: nowrap;
         }
       </style>
+      <div id="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="command">Commands</button>
+        <button class="filter-btn" data-filter="output">Output</button>
+        <button class="filter-btn" data-filter="error">Errors</button>
+        <button class="filter-btn" data-filter="info">Info</button>
+      </div>
+      <div id="search-bar">
+        <input id="search-input" type="text" placeholder="Find…" />
+        <span id="search-count"></span>
+        <button class="filter-btn" id="search-prev" title="Previous">&#x2191;</button>
+        <button class="filter-btn" id="search-next" title="Next">&#x2193;</button>
+        <button class="filter-btn" id="search-close" title="Close">&#x2715;</button>
+      </div>
       <div id="output"></div>
       <div id="input-row">
         <div id="autocomplete-dropdown"></div>
@@ -347,5 +420,17 @@ export class ReplView extends WebviewBase {
 
   private _setProcessing(processing: boolean) {
     this.postMessage('processing', { processing });
+  }
+
+  clear() {
+    this.postMessage('clear');
+  }
+
+  toggleFilter() {
+    this.postMessage('toggleFilter');
+  }
+
+  toggleSearch() {
+    this.postMessage('toggleSearch');
   }
 }
