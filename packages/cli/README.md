@@ -57,6 +57,31 @@ The extension connects automatically — no need to open the side panel.
 
 > Requires the [Dramaturg Chrome extension](../extension/README.md).
 
+### HTTP Mode
+
+Add `--http` to any mode to start an HTTP server alongside the REPL. This lets other processes send commands without starting a new browser session — ideal for AI tools, scripts, and CI.
+
+```bash
+# Terminal 1: Start REPL with HTTP server
+playwright-repl --http                        # standalone + HTTP (port 9223)
+playwright-repl --bridge --http               # bridge + HTTP
+playwright-repl --http --http-port 9224       # custom port
+
+# Terminal 2: Send commands via HTTP (fast — reuses existing session)
+playwright-repl --http --command "snapshot"
+playwright-repl --http --command "click e5"
+```
+
+The HTTP server exposes:
+- `GET /health` — check if server is alive
+- `POST /run` — run a command: `{"command": "snapshot"}`
+- `POST /run-script` — run a multi-line script: `{"script": "...", "language": "pw"}`
+
+Works with `curl` too:
+```bash
+curl -X POST http://localhost:9223/run -d '{"command":"snapshot"}'
+```
+
 ## Usage
 
 ```bash
@@ -101,6 +126,8 @@ Both modes auto-detect keyword commands and JavaScript expressions. For DOM acce
 | `--headless` | Run browser in headless mode (default: headed) |
 | `--bridge` | Connect to existing Chrome via WebSocket bridge |
 | `--bridge-port <port>` | Bridge server port (default: `9876`) |
+| `--http` | Start HTTP server for external command access (port `9223`) |
+| `--http-port <port>` | HTTP server port (default: `9223`) |
 | `--command <cmd>` | Run a single command, print output, and exit |
 | `--config <file>` | Path to config file |
 | `--replay <files...>` | Replay `.pw` or `.js` file(s) or folder(s) |

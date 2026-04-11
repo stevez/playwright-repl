@@ -278,6 +278,32 @@ Each agent has access to `run_command` and `run_script` via the MCP server and r
 - **Prefer keyword commands** for common actions — they're shorter and more reliable than raw Playwright API
 - **Fall back to Playwright API** when keyword commands are ambiguous (e.g. two elements match the same text) — use `exact: true` or scope with a locator chain
 
+## HTTP Server
+
+The MCP server also starts an HTTP server on port `9223` for fast CLI command access. When the MCP server is running, you can send commands from the terminal without MCP protocol overhead:
+
+```bash
+# Send commands to the running MCP server via HTTP
+playwright-repl --http --command "snapshot"
+playwright-repl --http --command "click e5"
+
+# Or directly with curl
+curl -X POST http://localhost:9223/run -d '{"command":"snapshot"}'
+```
+
+Custom HTTP port:
+
+```json
+{
+  "mcpServers": {
+    "playwright-repl": {
+      "command": "playwright-repl-mcp",
+      "args": ["--http-port", "9224"]
+    }
+  }
+}
+```
+
 ## Custom port
 
 By default the MCP server listens on port `9876`. To use a different port:

@@ -2,12 +2,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import http from 'node:http';
 import { COMMANDS, CATEGORIES } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
 import { createBridgeRunner } from './bridge.js';
 import { createEvaluateRunner } from './evaluate.js';
 import { createStandaloneRunner } from './standalone.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, LOG_FILE } from './logger.js';
+import type { Runner } from './types.js';
 // ─── Process exit handlers — log why the process dies ───────────────────────
 
 process.on('uncaughtException', (err) => {
@@ -54,6 +56,70 @@ if (standalone) {
 const { runner, descriptions } = runnerModule;
 
 logStartup(standalone ? 'standalone' : 'bridge', `log → ${LOG_FILE}`);
+
+// ─── HTTP server for --command --http piggybacking ──────────────────────────
+
+const httpPort = (() => {
+    const idx = argv.indexOf('--http-port');
+    if (idx !== -1 && argv[idx + 1]) return parseInt(argv[idx + 1], 10);
+    return 9223;
+})();
+
+startHttpServer(httpPort, runner);
+
+function startHttpServer(port: number, r: Runner) {
+    const server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'GET' && req.url === '/health') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok' }));
+            return;
+        }
+        if (req.method === 'POST' && req.url === '/run') {
+            try {
+                const body = await readBody(req);
+                const { command } = JSON.parse(body);
+                const result = await r.runCommand(command);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (e: unknown) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
+            }
+            return;
+        }
+        if (req.method === 'POST' && req.url === '/run-script') {
+            try {
+                const body = await readBody(req);
+                const { script, language } = JSON.parse(body);
+                const result = await r.runScript(script, language || 'pw');
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (e: unknown) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
+            }
+            return;
+        }
+        res.writeHead(404);
+        res.end('Not found');
+    });
+    server.listen(port, () => {
+        logEvent(`HTTP server on port ${port}`);
+    });
+    server.on('error', (e: Error) => {
+        logEvent(`HTTP server failed: ${e.message}`);
+    });
+}
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let data = '';
+        req.on('data', (chunk: string) => data += chunk);
+        req.on('end', () => resolve(data));
+        req.on('error', reject);
+    });
+}
 
 // ─── MCP server ──────────────────────────────────────────────────────────────
 
