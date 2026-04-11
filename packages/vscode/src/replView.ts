@@ -99,7 +99,9 @@ export class ReplView extends WebviewBase {
         #autocomplete-dropdown {
           position: absolute;
           bottom: 100%;
-          left: 0; right: 0;
+          left: 8px;
+          min-width: 200px;
+          max-width: 400px;
           max-height: 200px;
           overflow-y: auto;
           background: var(--vscode-editorSuggestWidget-background, var(--vscode-editorWidget-background));
