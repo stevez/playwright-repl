@@ -82,6 +82,27 @@ Works with `curl` too:
 curl -X POST http://localhost:9223/run -d '{"command":"snapshot"}'
 ```
 
+## pw-cli — Quick Command Shorthand
+
+`pw-cli` is a shorthand for `playwright-repl --http --command`. When given arguments, it sends the command via HTTP to a running session (REPL, MCP, or VS Code):
+
+```bash
+pw-cli "snapshot"                # → playwright-repl --http --command "snapshot"
+pw-cli "click e5"                # → playwright-repl --http --command "click e5"
+pw-cli "await page.title()"     # JavaScript works too
+pw-cli                           # no args → starts interactive REPL
+```
+
+Requires a running `--http` server (or MCP server) on port 9223. Start one first:
+
+```bash
+# Option 1: REPL with HTTP
+playwright-repl --http
+
+# Option 2: MCP server (HTTP starts automatically)
+# (launched by Claude Desktop / Claude Code)
+```
+
 ## Usage
 
 ```bash

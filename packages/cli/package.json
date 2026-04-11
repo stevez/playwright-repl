@@ -4,7 +4,8 @@
   "description": "Interactive REPL for Playwright — keyword commands, recording, and replay",
   "type": "module",
   "bin": {
-    "playwright-repl": "./dist/playwright-repl.js"
+    "playwright-repl": "./dist/playwright-repl.js",
+    "pw-cli": "./dist/pw-cli.js"
   },
   "main": "./dist/index.js",
   "exports": {
