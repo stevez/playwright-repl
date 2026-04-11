@@ -21,10 +21,106 @@ import { Disposable, EventEmitter, Event } from '../../../src/upstream/events';
 import { minimatch } from 'minimatch';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import which from 'which';
-import { Browser, Page } from '@playwright/test';
+import { Browser, BrowserContext, Page } from '@playwright/test';
 import { CancellationToken } from '../../../src/vscodeTypes';
 
 /* eslint-disable no-restricted-properties */
+
+// ─── WebviewPagePool ───
+// Worker-scoped pool that reuses a single BrowserContext and lazily-created
+// Pages across tests. Pages are created on first access and reset (not
+// destroyed) between tests, avoiding expensive context/page re-creation.
+
+type WebviewSlot = {
+  page: Page;
+  /** Swap the handler that receives messages from the page (via exposeFunction). */
+  setMessageHandler(handler: (data: any) => void): void;
+  /** Swap the handler that receives visibility changes (via page 'load' event). */
+  setVisibilityHandler(handler: (state: 'visible' | 'hidden') => void): void;
+};
+
+export class WebviewPagePool {
+  private _context: BrowserContext | null = null;
+  private _slots = new Map<string, WebviewSlot>();
+
+  constructor(private _browser: Browser, private _extensionDir: string) {}
+
+  /**
+   * Return the reusable Page for `name`. On first call the page is created
+   * inside a shared BrowserContext; subsequent calls return the cached page.
+   *
+   * `html` is the webview HTML to serve at http://localhost/ (set by the
+   * extension during resolveWebviewView).
+   */
+  async getOrCreatePage(
+    name: string,
+    html: { current: string },
+    messageHandler: { current: (data: any) => void },
+    visibilityHandler: { current: (state: 'visible' | 'hidden') => void },
+  ): Promise<Page> {
+    const existing = this._slots.get(name);
+    if (existing) {
+      // Reuse — swap handlers and re-navigate to pick up new html.
+      existing.setMessageHandler(data => messageHandler.current(data));
+      existing.setVisibilityHandler(state => visibilityHandler.current(state));
+      await existing.page.goto('http://localhost');
+      return existing.page;
+    }
+
+    // First time — create context (once) and page.
+    if (!this._context) {
+      this._context = await this._browser.newContext();
+    }
+    const page = await this._context.newPage();
+
+    // Mutable handler refs — swapped per test via setters.
+    let msgHandler = (data: any) => messageHandler.current(data);
+    let visHandler = (state: 'visible' | 'hidden') => visibilityHandler.current(state);
+
+    await page.route('**/*', async route => {
+      const url = route.request().url();
+      if (!url.startsWith('http://localhost/'))
+        await route.continue();
+      else if (url === 'http://localhost/')
+        await route.fulfill({ body: html.current });
+      else if (url === 'http://localhost/hidden')
+        await route.fulfill({ body: 'hidden webview' });
+      else {
+        const suffix = url.substring('http://localhost/'.length);
+        const buffer = fs.readFileSync(path.join(this._extensionDir, suffix));
+        await route.fulfill({ body: buffer });
+      }
+    });
+
+    page.on('load', () => {
+      const url = page.url();
+      if (url === 'http://localhost/')
+        visHandler('visible');
+      else if (url === 'http://localhost/hidden')
+        visHandler('hidden');
+    });
+
+    await page.addInitScript(() => {
+      (globalThis as any).acquireVsCodeApi = () => globalThis;
+    });
+    await page.goto('http://localhost');
+    await page.exposeFunction('postMessage', (data: any) => msgHandler(data));
+
+    this._slots.set(name, {
+      page,
+      setMessageHandler: h => { msgHandler = h; },
+      setVisibilityHandler: h => { visHandler = h; },
+    });
+
+    return page;
+  }
+
+  async close() {
+    await this._context?.close();
+    this._context = null;
+    this._slots.clear();
+  }
+}
 
 export class Uri {
   scheme = 'file';
@@ -989,8 +1085,10 @@ export class VSCode {
   readonly extensions: any[] = [];
   private _webviewProviders = new Map<string, any>();
   private _browser: Browser;
+  private _pool?: WebviewPagePool;
   private _webViewsByPanelType = new Map<string, Set<Page>>();
   readonly webViews = new Map<string, Page>();
+  private _pendingWebviews = new Map<string, () => Promise<Page>>();
   readonly commandLog: string[] = [];
   readonly l10n = new L10n();
   lastWithProgressData: any;
@@ -1002,7 +1100,7 @@ export class VSCode {
   readonly diagnosticsCollections: DiagnosticsCollection[] = [];
   private _clipboardText = '';
 
-  constructor(readonly versionNumber: number, baseDir: string, browser: Browser) {
+  constructor(readonly versionNumber: number, baseDir: string, browser: Browser, pool?: WebviewPagePool) {
     this.version = String(versionNumber);
     const workspaceStateStorage = new Map();
     const workspaceState = {
@@ -1011,6 +1109,7 @@ export class VSCode {
     };
     this.context = { subscriptions: [], extensionUri: Uri.file(baseDir), workspaceState };
     this._browser = browser;
+    this._pool = pool;
     (globalThis as any).__logForTest = (message: any) => this.connectionLog.push(message);
     const commands = new Map<string, () => Promise<void>>();
     this.commands.registerCommand = (name: string, callback: () => Promise<void>) => {
@@ -1230,18 +1329,100 @@ export class VSCode {
     for (const extension of this.extensions)
       await extension.activate();
 
-    for (const [name, provider] of this._webviewProviders) {
-      const { webview, pagePromise } = this._createWebviewAndPage();
-      provider?.resolveWebviewView({ webview, onDidChangeVisibility: () => disposable });
-      const page = await pagePromise;
-      if (page)
-        this.webViews.set(name, page);
+    if (this._pool) {
+      // Deferred mode: create webview mocks and resolve providers, but don't
+      // create pages yet.  Pages are created lazily via webView().
+      for (const [name, provider] of this._webviewProviders) {
+        const htmlRef = { current: '' };
+        const messageHandlerRef = { current: (_data: any) => {} };
+        const visibilityHandlerRef = { current: (_state: 'visible' | 'hidden') => {} };
+        const didReceiveMessage = new EventEmitter<any>();
+        const didChangeVisibility = new EventEmitter<'visible' | 'hidden'>();
+
+        messageHandlerRef.current = (data: any) => didReceiveMessage.fire(data);
+        visibilityHandlerRef.current = (state: 'visible' | 'hidden') => didChangeVisibility.fire(state);
+
+        const webview: any = {};
+        webview.asWebviewUri = (uri: Uri) => path.relative(this.context.extensionUri.fsPath, uri.fsPath).replace(/\\/g, '/');
+        webview.onDidReceiveMessage = didReceiveMessage.event;
+        webview.onDidChangeVisibility = didChangeVisibility.event;
+        webview.cspSource = 'http://localhost/';
+
+        let initializedPage: Page | undefined;
+        const pendingMessages: any[] = [];
+        webview.postMessage = (data: any) => {
+          if (!initializedPage) {
+            pendingMessages.push(data);
+            return;
+          }
+          initializedPage.evaluate((data: any) => {
+            const event = new globalThis.Event('message');
+            (event as any).data = data;
+            (globalThis as any).dispatchEvent(event);
+          }, data).catch(() => {});
+        };
+
+        provider?.resolveWebviewView({ webview, onDidChangeVisibility: () => disposable });
+
+        // Capture html after resolveWebviewView sets it.
+        htmlRef.current = webview.html || '';
+
+        // Store a lazy creator — page is only created when webView() is called.
+        this._pendingWebviews.set(name, async () => {
+          // Update html ref in case it changed.
+          htmlRef.current = webview.html || '';
+          const page = await this._pool!.getOrCreatePage(name, htmlRef, messageHandlerRef, visibilityHandlerRef);
+          initializedPage = page;
+          for (const m of pendingMessages)
+            webview.postMessage(m);
+          pendingMessages.length = 0;
+          return page;
+        });
+
+        // Dispose event emitters when this VSCode instance is disposed.
+        this.context.subscriptions.push(didReceiveMessage, didChangeVisibility);
+      }
+    } else {
+      // Legacy mode: create pages eagerly (no pool).
+      for (const [name, provider] of this._webviewProviders) {
+        const { webview, pagePromise } = this._createWebviewAndPage();
+        provider?.resolveWebviewView({ webview, onDidChangeVisibility: () => disposable });
+        const page = await pagePromise;
+        if (page)
+          this.webViews.set(name, page);
+      }
     }
+  }
+
+  /**
+   * Lazily get (or create) the Page for a webview provider.
+   * When using a WebviewPagePool, the page is created on first call and
+   * reused from the pool on subsequent calls (even across tests).
+   * Falls back to the eager webViews map when no pool is used.
+   */
+  async webView(name: string): Promise<Page> {
+    // Already materialized?
+    const existing = this.webViews.get(name);
+    if (existing)
+      return existing;
+
+    // Lazy creation via pool.
+    const creator = this._pendingWebviews.get(name);
+    if (creator) {
+      const page = await creator();
+      this.webViews.set(name, page);
+      this._pendingWebviews.delete(name);
+      return page;
+    }
+
+    throw new Error(`No webview provider registered for "${name}"`);
   }
 
   dispose() {
     for (const d of this.context.subscriptions)
       d.dispose();
+    this._pendingWebviews.clear();
+    this.webViews.clear();
   }
 
   webViewsByPanelType(viewType: string) {
@@ -1357,7 +1538,7 @@ export class VSCode {
 
   async renderProjectTree(): Promise<string> {
     const result: string[] = [''];
-    const webView = this.webViews.get('playwright-repl.settingsView')!;
+    const webView = await this.webView('playwright-repl.settingsView');
     const selectedConfig = await webView.getByTestId('models').evaluate((e: HTMLSelectElement) => e.selectedOptions[0].textContent);
     result.push(`    config: ${selectedConfig}`);
     const projectLocators = await webView.getByTestId('projects').locator('div').locator('label').filter({ visible: true }).all();

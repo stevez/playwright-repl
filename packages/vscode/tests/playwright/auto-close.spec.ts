@@ -44,7 +44,7 @@ test('should be closed with Close all Browsers button', async ({ activate }) => 
     `
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   const closeAllBrowsers = webView.getByRole('button', { name: 'Close all browsers' });
   await expect(closeAllBrowsers).toBeDisabled();
   const reusedBrowser = await vscode.extensions[0].reusedBrowserForTest();
@@ -104,7 +104,7 @@ test('should enact "Show Browser" setting change after test finishes', async ({ 
   const reusedBrowser = vscode.extensions[0].reusedBrowserForTest();
   await expect.poll(() => !!reusedBrowser._backend, 'wait until test started').toBeTruthy();
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByRole('checkbox', { name: 'Show Browser' }).uncheck();
   await expect.poll(() => !!reusedBrowser._backend, 'contrary to setting change, browser stays open during test run').toBeTruthy();
   latch.open();

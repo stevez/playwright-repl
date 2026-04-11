@@ -17,7 +17,7 @@
 import { expect as baseExpect, test as baseTest, Browser, BrowserContextOptions, chromium, Page } from '@playwright/test';
 // @ts-ignore
 import { Extension } from '../../dist/extension';
-import { TestController, VSCode, WorkspaceFolder, TestRun, TestItem } from './mock/vscode';
+import { TestController, VSCode, WebviewPagePool, WorkspaceFolder, TestRun, TestItem } from './mock/vscode';
 
 import crypto from 'crypto';
 import fs from 'fs';
@@ -43,6 +43,10 @@ type TestFixtures = {
   vscode: VSCode,
   activate: (files: { [key: string]: string }, options?: { rootDir?: string, workspaceFolders?: [string, any][], env?: Record<string, any>, runGlobalSetupOnEachRun?: boolean }) => Promise<ActivateResult>;
   createLatch: () => Latch;
+};
+
+type WorkerFixtures = {
+  webviewPool: WebviewPagePool;
 };
 
 export type WorkerOptions = {
@@ -117,13 +121,19 @@ function l10Bundles() {
   return _l10Bundles;
 }
 
-export const test = baseTest.extend<TestFixtures, WorkerOptions>({
+export const test = baseTest.extend<TestFixtures, WorkerOptions & WorkerFixtures>({
   showBrowser: [false, { option: true, scope: 'worker' }],
   showTrace: [undefined, { option: true, scope: 'worker' }],
   vsCodeVersion: [1.86, { option: true, scope: 'worker' }],
 
-  vscode: async ({ browser, vsCodeVersion }, use) => {
-    const vscode = new VSCode(vsCodeVersion, path.resolve(__dirname, '../..'), browser);
+  webviewPool: [async ({ browser }, use) => {
+    const pool = new WebviewPagePool(browser, path.resolve(__dirname, '../..'));
+    await use(pool);
+    await pool.close();
+  }, { scope: 'worker' }],
+
+  vscode: async ({ browser, webviewPool, vsCodeVersion }, use) => {
+    const vscode = new VSCode(vsCodeVersion, path.resolve(__dirname, '../..'), browser, webviewPool);
     await use(vscode);
 
     if (process.env.VALIDATE_L10N) {
@@ -210,7 +220,7 @@ export async function waitForPage(browser: Browser, params?: BrowserContextOptio
 
 export async function enableConfigs(vscode: VSCode, labels: string[]) {
   let success = false;
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   while (!success) {
     vscode.window.mockQuickPick = async (items: TestItem[]) => {
       let allFound = true;
@@ -231,12 +241,12 @@ export async function enableConfigs(vscode: VSCode, labels: string[]) {
 }
 
 export async function selectConfig(vscode: VSCode, label: string) {
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByTestId('models').selectOption({ label });
 }
 
 export async function enableProjects(vscode: VSCode, projects: string[]) {
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   for (const project of projects)
     await expect(webView.getByTestId('projects').getByLabel(project)).toBeVisible();
   for (const checkbox of await webView.getByTestId('projects').locator('label').all()) {

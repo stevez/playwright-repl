@@ -138,7 +138,7 @@ test('should order configs intuitively', async ({ activate }) => {
     'playwright.config.ts': `module.exports = {};`,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.locator('body')).toMatchAriaSnapshot(`
     - combobox "Select Playwright Config":
       - option "playwright.config.ts"
@@ -194,7 +194,7 @@ test('git checkout should not lead to duplicate configs', { annotation: { type: 
   ]);
 
   await expect.poll(async () => {
-    const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+    const webView = await vscode.webView('playwright-repl.settingsView');
     const [testItems] = await Promise.all([
       new Promise<TestItem[]>(resolve => { vscode.window.mockQuickPick = resolve; }),
       webView.getByTitle('Toggle Playwright Configs').click(),

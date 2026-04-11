@@ -1088,7 +1088,7 @@ test('Run global setup should be disabled if there is no global setup or webserv
     -   tests
       -   test.spec.ts
   `);
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.getByRole('button', { name: 'Run global setup' })).toBeDisabled();
 
   await workspaceFolder.changeFile('playwright.config.js', `module.exports = { globalSetup: './global-setup.js' }`);

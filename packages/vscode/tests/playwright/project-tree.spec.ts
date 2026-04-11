@@ -173,7 +173,7 @@ test('should hide project section when there is just one', async ({ activate }) 
     }`
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.getByRole('heading', { name: 'PROJECTS' })).not.toBeVisible();
 });
 
@@ -191,7 +191,7 @@ test('should treat project as enabled when UI for it is hidden', async ({ activa
     `,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
 
   await enableProjects(vscode, ['projectTwo']);
   await expect(vscode).toHaveProjectTree(`

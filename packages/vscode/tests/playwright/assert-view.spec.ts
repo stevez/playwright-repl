@@ -5,17 +5,12 @@
  */
 
 import { expect, test } from './utils';
-
-test.beforeEach(async ({ showBrowser }) => {
-  test.skip(showBrowser);
-});
-
 test('should show pick button and assertion type dropdown on activate', async ({ activate }) => {
   const { vscode } = await activate({
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   await expect(assertView.locator('#pickBtn')).toBeVisible();
   await expect(assertView.locator('#assertType')).toBeVisible();
   await expect(assertView.locator('#assertType option')).not.toHaveCount(0);
@@ -26,7 +21,7 @@ test('should populate locator and assertion when showAssertion is called', async
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   const extension = vscode.extensions[0];
 
   // Simulate picking an element — call showAssertion on the assert view
@@ -48,7 +43,7 @@ test('should rebuild assertion when type changes', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   const extension = vscode.extensions[0];
 
   const assertViewInstance = (extension as any)._assertView;
@@ -68,7 +63,7 @@ test('should toggle negate checkbox to add .not.', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   const extension = vscode.extensions[0];
 
   const assertViewInstance = (extension as any)._assertView;
@@ -88,7 +83,7 @@ test('should switch to snapshot mode', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   const extension = vscode.extensions[0];
 
   const assertViewInstance = (extension as any)._assertView;
@@ -109,7 +104,7 @@ test('should show arg input for types that need arguments', async ({ activate })
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const assertView = vscode.webViews.get('playwright-repl.assertView')!;
+  const assertView = await vscode.webView('playwright-repl.assertView');
   const extension = vscode.extensions[0];
 
   const assertViewInstance = (extension as any)._assertView;

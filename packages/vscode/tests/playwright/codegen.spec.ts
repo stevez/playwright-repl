@@ -49,7 +49,7 @@ test('should generate code', async ({ activate }) => {
     `,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByRole('checkbox', { name: 'default' }).setChecked(false);
   await webView.getByRole('checkbox', { name: 'germany' }).setChecked(true);
   await webView.getByText('Record new').click();
@@ -89,7 +89,7 @@ test('running test should stop the recording', async ({ activate, showBrowser })
     `,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByText('Record new').click();
   await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual({ message: 'recording\u2026' });
 
@@ -128,7 +128,7 @@ test('Record at Cursor should respect custom testId', async ({ activate, showBro
   expect(editor.document.uri.path).toContain('test.spec.ts');
   editor.selection = new vscode.Selection(4, 0, 4, 0);
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByText('Record at cursor').click();
   await expect.poll(() => vscode.lastWithProgressData, { timeout: 0 }).toEqual({ message: 'recording\u2026' });
 

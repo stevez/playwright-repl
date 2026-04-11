@@ -504,7 +504,7 @@ test('should only watch a test from the enabled project when multiple projects s
 
   await selectConfig(vscode, `playwright-2.config.js`);
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   // Wait for the projects to be loaded.
   await expect(webView.getByTestId('projects').locator('div').locator('label')).toHaveCount(2);
   // Disable the project from config 2.

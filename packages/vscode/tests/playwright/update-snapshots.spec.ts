@@ -33,7 +33,7 @@ for (const mode of ['3-way', 'overwrite', 'patch'] as const) {
       `,
     });
 
-    const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+    const webView = await vscode.webView('playwright-repl.settingsView');
     await webView.getByRole('combobox', { name: 'Update method' }).selectOption(mode);
     await webView.getByRole('combobox', { name: 'Update snapshots' }).selectOption('missing');
 
@@ -84,7 +84,7 @@ for (const mode of ['3-way' , 'overwrite', 'patch'] as const) {
       `,
     });
 
-    const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+    const webView = await vscode.webView('playwright-repl.settingsView');
     await webView.getByRole('combobox', { name: 'Update method' }).selectOption(mode);
     await webView.getByRole('combobox', { name: 'Update snapshots' }).selectOption('all');
 

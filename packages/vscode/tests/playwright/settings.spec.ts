@@ -16,6 +16,8 @@
 
 import { enableProjects, expect, test } from './utils';
 
+// Skip in headed mode: activate() forces reuseBrowser=true, breaking tests
+// that assert on default setting values.
 test.beforeEach(async ({ showBrowser }) => {
   test.skip(showBrowser);
 });
@@ -38,7 +40,7 @@ test('should toggle setting from webview', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   const configuration = vscode.workspace.getConfiguration('playwright-repl');
 
   expect(configuration.get('reuseBrowser')).toBe(false);
@@ -61,7 +63,7 @@ test('should select-all/unselect-all', async ({ activate }) => {
 
   await enableProjects(vscode, ['foo']);
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
 
   await expect(webView.locator('body')).toMatchAriaSnapshot(`
     - heading "PROJECTS":
@@ -106,7 +108,7 @@ test('should reflect changes to setting', async ({ activate }) => {
   await vscode.commands.executeCommand('playwright-repl.toggle.reuseBrowser');
   expect(configuration.get('reuseBrowser')).toBe(true);
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.getByLabel('Show browser')).toBeChecked();
 });
 
@@ -115,7 +117,7 @@ test('should open test results', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await webView.getByText('Reveal test output').click();
   expect(vscode.commandLog.filter(f => f !== 'testing.getExplorerSelection')).toEqual(['testing.showMostRecentOutput']);
 });
@@ -198,7 +200,7 @@ test('should sync project enabled state to workspace settings', async ({ activat
 
   await enableProjects(vscode, ['foo']);
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
 
   await expect(webView.getByTestId('projects')).toMatchAriaSnapshot(`
     - checkbox "foo" [checked]
@@ -271,7 +273,7 @@ test('should read project enabled state from workspace settings', async ({ vscod
     `,
   });
 
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.getByTestId('projects')).toMatchAriaSnapshot(`
     - checkbox "foo" [checked]
     - checkbox "bar" [checked=false]

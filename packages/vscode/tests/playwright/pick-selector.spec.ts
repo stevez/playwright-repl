@@ -27,7 +27,7 @@ test('should pick locator and dismiss the toolbar', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const settingsView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const settingsView = await vscode.webView('playwright-repl.settingsView');
   await settingsView.getByText('Pick locator').click();
   await waitForRecorderMode(vscode, 'inspecting');
 
@@ -39,7 +39,7 @@ test('should pick locator and dismiss the toolbar', async ({ activate }) => {
   `);
   await page.locator('h1').first().click();
 
-  const locatorsView = vscode.webViews.get('playwright-repl.locatorsView')!;
+  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
   await expect(locatorsView.locator('body')).toMatchAriaSnapshot(`
     - text: Locator
     - textbox "Locator": "getByRole('heading', { name: 'Hello' })"
@@ -62,7 +62,7 @@ test('should highlight locator on edit', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const settingsView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const settingsView = await vscode.webView('playwright-repl.settingsView');
   await settingsView.getByText('Pick locator').click();
   await waitForRecorderMode(vscode, 'inspecting');
 
@@ -74,7 +74,7 @@ test('should highlight locator on edit', async ({ activate }) => {
   `);
   const box = await page.getByRole('heading', { name: 'Hello' }).boundingBox();
 
-  const locatorsView = vscode.webViews.get('playwright-repl.locatorsView')!;
+  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
   await locatorsView.getByRole('textbox', { name: 'Locator' }).fill('h1');
 
   await expect(page.locator('x-pw-highlight')).toBeVisible();
@@ -86,7 +86,7 @@ test('should copy locator to clipboard', async ({ activate }) => {
     'playwright.config.js': `module.exports = {}`,
   });
 
-  const locatorsView = vscode.webViews.get('playwright-repl.locatorsView')!;
+  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
   await locatorsView.getByRole('checkbox', { name: 'Copy on pick' }).check();
   await locatorsView.getByRole('button', { name: 'Pick locator' }).first().click();
   await waitForRecorderMode(vscode, 'inspecting');
@@ -107,7 +107,7 @@ test('should pick locator and use the testIdAttribute from the config', async ({
     'playwright.config.js': `module.exports = { use: { testIdAttribute: 'data-testerid' } }`,
   });
 
-  const settingsView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const settingsView = await vscode.webView('playwright-repl.settingsView');
   await settingsView.getByText('Pick locator').click();
   await waitForRecorderMode(vscode, 'inspecting');
 
@@ -122,7 +122,7 @@ test('should pick locator and use the testIdAttribute from the config', async ({
   `);
   await page.locator('div').click();
 
-  const locatorsView = vscode.webViews.get('playwright-repl.locatorsView')!;
+  const locatorsView = await vscode.webView('playwright-repl.locatorsView');
   await expect(locatorsView.locator('body')).toMatchAriaSnapshot(`
     - text: Locator
     - textbox "Locator": "getByTestId('hello')"
@@ -142,7 +142,7 @@ test('running test should dismiss the toolbar', async ({ activate, showBrowser }
     `,
   });
 
-  const settingsView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const settingsView = await vscode.webView('playwright-repl.settingsView');
   await settingsView.getByRole('button', { name: 'Pick locator' }).click();
   await waitForRecorderMode(vscode, 'inspecting');
 

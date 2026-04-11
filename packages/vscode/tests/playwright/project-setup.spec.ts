@@ -67,7 +67,7 @@ test('should run setup and teardown projects (1)', async ({ activate }) => {
   expect(output).toContain('from-teardown');
 
   // Ensure the rendered order of the projects is correct.
-  const webView = vscode.webViews.get('playwright-repl.settingsView')!;
+  const webView = await vscode.webView('playwright-repl.settingsView');
   await expect(webView.getByTestId('projects').locator('div').locator('label')).toHaveText([
     'setup',
     'test',
