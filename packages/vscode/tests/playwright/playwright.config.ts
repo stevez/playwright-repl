@@ -22,7 +22,7 @@ export default defineConfig<WorkerOptions>({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 2,
-  workers: process.env.CI ? 2 : 4,
+  workers: process.env.CI ? 4 : 4,
   reporter: process.env.CI ? [
     ['list'],
     ['blob'],

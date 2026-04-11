@@ -7,8 +7,8 @@ import { vscode } from './common';
 const output = document.getElementById('output')!;
 const input = document.getElementById('command-input') as HTMLTextAreaElement;
 
-let history: string[] = [];
-let historyIndex = -1;
+let commandHistory: string[] = [];
+let commandHistoryIndex = -1;
 let savedInput = '';
 
 // ─── Input handling ───────────────────────────────────────────────────────
@@ -20,26 +20,26 @@ input.addEventListener('keydown', (e: KeyboardEvent) => {
     if (!command) return;
     appendLine(command, 'command');
     vscode.postMessage({ method: 'execute', params: { command } });
-    history.unshift(command);
-    if (history.length > 100) history.pop();
-    historyIndex = -1;
+    commandHistory.unshift(command);
+    if (commandHistory.length > 100) commandHistory.pop();
+    commandHistoryIndex = -1;
     savedInput = '';
     input.value = '';
     resetHeight();
   } else if (e.key === 'ArrowUp' && input.selectionStart === 0 && !input.value.includes('\n')) {
     e.preventDefault();
-    if (historyIndex < history.length - 1) {
-      if (historyIndex === -1) savedInput = input.value;
-      historyIndex++;
-      input.value = history[historyIndex]!;
+    if (commandHistoryIndex < commandHistory.length - 1) {
+      if (commandHistoryIndex === -1) savedInput = input.value;
+      commandHistoryIndex++;
+      input.value = commandHistory[commandHistoryIndex]!;
     }
   } else if (e.key === 'ArrowDown' && input.selectionEnd === input.value.length && !input.value.includes('\n')) {
     e.preventDefault();
-    if (historyIndex > 0) {
-      historyIndex--;
-      input.value = history[historyIndex]!;
-    } else if (historyIndex === 0) {
-      historyIndex = -1;
+    if (commandHistoryIndex > 0) {
+      commandHistoryIndex--;
+      input.value = commandHistory[commandHistoryIndex]!;
+    } else if (commandHistoryIndex === 0) {
+      commandHistoryIndex = -1;
       input.value = savedInput;
     }
   }
@@ -81,7 +81,7 @@ window.addEventListener('message', event => {
     input.disabled = params.processing;
     if (!params.processing) input.focus();
   } else if (method === 'history') {
-    history = params.history;
+    commandHistory = params.history;
   }
 });
 
