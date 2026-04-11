@@ -93,6 +93,22 @@ export class ReplView extends WebviewBase {
         #command-input:disabled {
           opacity: 0.5;
         }
+        /* Object tree */
+        details.obj-tree { margin: 2px 0; }
+        details.obj-tree > summary {
+          cursor: pointer;
+          list-style: revert;
+          color: var(--vscode-editor-foreground);
+        }
+        details.obj-tree > summary:hover {
+          background: var(--vscode-list-hoverBackground);
+        }
+        .obj-row { padding-left: 16px; line-height: 1.4; }
+        .obj-key { color: var(--vscode-debugTokenExpression-name, #9cdcfe); }
+        .obj-string { color: var(--vscode-debugTokenExpression-string, #ce9178); }
+        .obj-number { color: var(--vscode-debugTokenExpression-number, #b5cea8); }
+        .obj-boolean { color: var(--vscode-debugTokenExpression-boolean, #569cd6); }
+        .obj-null { color: var(--vscode-descriptionForeground); font-style: italic; }
         #input-row {
           position: relative;
         }
@@ -176,31 +192,6 @@ export class ReplView extends WebviewBase {
       return;
     }
 
-    // Intercept 'page' — show useful page info instead of raw object
-    if (command.trim() === 'page') {
-      this._setProcessing(true);
-      try {
-        const result = await this._browserManager.runCommand('await JSON.stringify({ url: page.url(), title: await page.title(), viewport: await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.clientHeight, dpr: window.devicePixelRatio })) })');
-        if (result.text && !result.isError) {
-          const info = JSON.parse(result.text);
-          const vp = info.viewport ? `${info.viewport.width}x${info.viewport.height}` : 'auto';
-          const dpr = info.viewport?.dpr && info.viewport.dpr !== 1 ? ` @${info.viewport.dpr}x` : '';
-          this._appendOutput(
-            `URL:      ${info.url}\n` +
-            `Title:    ${info.title}\n` +
-            `Viewport: ${vp}${dpr}`,
-            'output',
-          );
-        } else {
-          this._appendOutput(result.text || 'Could not get page info', 'error');
-        }
-      } catch (e: unknown) {
-        this._appendOutput(`Error: ${(e as Error).message}`, 'error');
-      }
-      this._setProcessing(false);
-      return;
-    }
-
     this._setProcessing(true);
     this._commandCount++;
     const start = Date.now();
@@ -218,7 +209,13 @@ export class ReplView extends WebviewBase {
       if (result.text) {
         // Strip markdown section headers
         const text = result.text.replace(/^### \w[\w ]*\n/gm, '');
-        this._appendOutput(text, result.isError ? 'error' : 'output');
+
+        // Try to render as object tree if it's JSON
+        const structured = result.isError ? null : this._tryParseStructured(text);
+        if (structured !== null)
+          this.postMessage('structuredOutput', { data: structured });
+        else
+          this._appendOutput(text, result.isError ? 'error' : 'output');
       }
       if (!result.text && !result.image) {
         this._appendOutput('Done.', 'info');
@@ -310,6 +307,17 @@ export class ReplView extends WebviewBase {
     }
 
     return false;
+  }
+
+  /** Try to parse text as a JSON object or array. Returns null for primitives/strings/failures. */
+  private _tryParseStructured(text: string): unknown {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null) return parsed;
+    } catch {}
+    return null;
   }
 
   private _appendOutput(text: string, type: 'output' | 'error' | 'info') {

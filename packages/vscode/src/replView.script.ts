@@ -187,6 +187,9 @@ window.addEventListener('message', event => {
     commandHistory = params.history;
   } else if (method === 'completionItems') {
     completionItems = params.items;
+  } else if (method === 'structuredOutput') {
+    output.appendChild(renderValue(params.data, true));
+    output.scrollTop = output.scrollHeight;
   }
 });
 
@@ -201,6 +204,106 @@ function appendLine(text: string, type: 'command' | 'output' | 'error' | 'info')
     output.appendChild(el);
   }
   output.scrollTop = output.scrollHeight;
+}
+
+// ─── Object tree rendering ───────────────────────────────────────────────
+
+function renderValue(value: unknown, topLevel = false): HTMLElement {
+  if (value === null) {
+    const span = document.createElement('span');
+    span.className = 'obj-null';
+    span.textContent = 'null';
+    return span;
+  }
+  if (value === undefined) {
+    const span = document.createElement('span');
+    span.className = 'obj-null';
+    span.textContent = 'undefined';
+    return span;
+  }
+  if (typeof value === 'string') {
+    const span = document.createElement('span');
+    span.className = 'obj-string';
+    span.textContent = `"${value}"`;
+    return span;
+  }
+  if (typeof value === 'number') {
+    const span = document.createElement('span');
+    span.className = 'obj-number';
+    span.textContent = String(value);
+    return span;
+  }
+  if (typeof value === 'boolean') {
+    const span = document.createElement('span');
+    span.className = 'obj-boolean';
+    span.textContent = String(value);
+    return span;
+  }
+  if (Array.isArray(value)) {
+    return renderCollapsible(`Array(${value.length})`, value, topLevel, (v, container) => {
+      for (let i = 0; i < v.length; i++) {
+        const row = document.createElement('div');
+        row.className = 'obj-row';
+        const key = document.createElement('span');
+        key.className = 'obj-key';
+        key.textContent = `${i}: `;
+        row.appendChild(key);
+        row.appendChild(renderValue(v[i]));
+        container.appendChild(row);
+      }
+    });
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>);
+    const preview = keys.slice(0, 3).map(k => `${k}: …`).join(', ');
+    const label = `{${preview}${keys.length > 3 ? ', …' : ''}}`;
+    return renderCollapsible(label, value as Record<string, unknown>, topLevel, (v, container) => {
+      for (const k of Object.keys(v)) {
+        const row = document.createElement('div');
+        row.className = 'obj-row';
+        const key = document.createElement('span');
+        key.className = 'obj-key';
+        key.textContent = `${k}: `;
+        row.appendChild(key);
+        row.appendChild(renderValue((v as Record<string, unknown>)[k]));
+        container.appendChild(row);
+      }
+    });
+  }
+  // Fallback
+  const span = document.createElement('span');
+  span.textContent = String(value);
+  return span;
+}
+
+function renderCollapsible<T>(
+  label: string,
+  data: T,
+  open: boolean,
+  populate: (data: T, container: HTMLElement) => void,
+): HTMLElement {
+  const details = document.createElement('details');
+  details.className = 'obj-tree line';
+  if (open) details.open = true;
+
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  details.appendChild(summary);
+
+  // Lazy: populate children on first open
+  let populated = false;
+  if (open) {
+    populate(data, details);
+    populated = true;
+  }
+  details.addEventListener('toggle', () => {
+    if (details.open && !populated) {
+      populate(data, details);
+      populated = true;
+    }
+  });
+
+  return details;
 }
 
 // Request history on load
