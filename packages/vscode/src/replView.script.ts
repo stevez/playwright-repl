@@ -61,31 +61,25 @@ function acceptCompletion(index?: number) {
   const idx = index ?? selectedIndex;
   if (idx < 0 || idx >= filteredItems.length) return;
   const item = filteredItems[idx];
-  // Replace the current word with the completed command
-  const prefix = getCurrentWord();
-  const before = input.value.slice(0, input.selectionStart - prefix.length);
-  const after = input.value.slice(input.selectionStart);
-  input.value = before + item.cmd + (after || ' ');
-  input.selectionStart = input.selectionEnd = before.length + item.cmd.length + (after ? 0 : 1);
+  // Replace entire input with the completed command + trailing space
+  input.value = item.cmd + ' ';
+  input.selectionStart = input.selectionEnd = input.value.length;
   hideDropdown();
   input.focus();
 }
 
-function getCurrentWord(): string {
-  const text = input.value.slice(0, input.selectionStart);
-  // Find word start (from cursor back to start or last space/newline)
-  const match = text.match(/[\w.\-]+$/);
-  return match ? match[0] : '';
-}
-
 function updateAutocomplete() {
-  const word = getCurrentWord();
-  if (word.length === 0 || input.value.includes('\n')) {
+  const text = input.value.slice(0, input.selectionStart);
+  if (text.length === 0 || input.value.includes('\n')) {
     hideDropdown();
     return;
   }
-  const lower = word.toLowerCase();
-  const matches = completionItems.filter(item => item.cmd.toLowerCase().startsWith(lower) && item.cmd !== word);
+  // Match against full input — same logic as CLI ghost completion:
+  // when input contains a space, only match commands that also contain a space
+  const candidates = text.includes(' ')
+    ? completionItems.filter(item => item.cmd.includes(' '))
+    : completionItems;
+  const matches = candidates.filter(item => item.cmd.startsWith(text) && item.cmd !== text);
   if (matches.length === 0) {
     hideDropdown();
     return;
