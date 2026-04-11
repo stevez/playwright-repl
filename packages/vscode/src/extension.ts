@@ -826,6 +826,7 @@ export class Extension implements RunHooks {
       needsNode: (filePath: string) => boolean;
       compile: (filePath: string) => Promise<string>;
       parseAllResults: (text: string) => { status: string; duration: number; errors: { message: string }[] }[];
+      findResultByName: (lines: string[], testName: string) => { status: string; duration: number; errors: { message: string }[] };
     };
 
     // Collect test items — only use direct bridge for leaf test items (not folders)
@@ -924,24 +925,25 @@ export class Extension implements RunHooks {
       const result = await bridge.runScript(script, 'javascript');
       const outputText = result.text || '';
       testRun.appendOutput(outputText.replace(/\n/g, '\r\n'));
-      const results = bridgeUtils.parseAllResults(outputText);
-
-      // Map results back to test items
+      // Map results back to test items by name (not index — results include
+      // skipped tests from grep filtering, so indices don't match testItems)
+      const outputLines = outputText.split('\n');
       for (let i = 0; i < testItems.length; i++) {
         const testItem = testItems[i];
-        const testResult = results[i];
 
-        if (!testResult || result.isError) {
+        if (result.isError) {
           testRun.failed(testItem, [{ message: result.text || 'Bridge execution failed' }], 0);
           continue;
         }
+
+        const testResult = bridgeUtils.findResultByName(outputLines, fullNames[i]);
 
         if (testResult.status === 'passed')
           testRun.passed(testItem, testResult.duration);
         else if (testResult.status === 'skipped')
           testRun.skipped(testItem);
         else
-          testRun.failed(testItem, testResult.errors.map(e => ({ message: e.message })), testResult.duration);
+          testRun.failed(testItem, testResult.errors.map((e: { message: string }) => ({ message: e.message })), testResult.duration);
       }
     }
 
