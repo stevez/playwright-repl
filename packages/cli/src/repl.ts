@@ -1123,7 +1123,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
         log(`${c.green}✓${c.reset} Browser ready (with extension)`);
         if (opts.command) {
           const result = await conn.run(opts.command);
-          displayBridgeResult(result, silent);
+          process.stdout.write((result.text ?? '') + '\n');
           await conn.close();
           process.exit(result.isError ? 1 : 0);
         }
@@ -1166,7 +1166,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     if (opts.command) {
       await srv.waitForConnection(30000);
       const result = await srv.run(opts.command);
-      displayBridgeResult(result, silent);
+      process.stdout.write((result.text ?? '') + '\n');
       srv.close();
       process.exit(result.isError ? 1 : 0);
     }
@@ -1214,7 +1214,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       return; // unreachable, but satisfies TS control-flow
     }
     const result = await conn.run(parsed);
-    displayBridgeResult(result, silent);
+    process.stdout.write((result.text ?? '') + '\n');
     conn.close();
     process.exit(result.isError ? 1 : 0);
   }
