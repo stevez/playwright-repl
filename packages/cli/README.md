@@ -25,6 +25,27 @@ npm install -g playwright-repl
 npx playwright install chromium
 ```
 
+## AI Skills
+
+playwright-repl includes an AI skill file that teaches agents (Claude Code, Cursor, etc.) how to use `pw-cli` via Bash — no MCP needed.
+
+### Claude Code
+
+```bash
+# Copy the skill to your project
+mkdir -p .claude/skills
+cp node_modules/playwright-repl/skills/SKILL.md .claude/skills/playwright-repl.md
+```
+
+### Cursor
+
+```bash
+mkdir -p .cursor/skills
+cp node_modules/playwright-repl/skills/SKILL.md .cursor/skills/playwright-repl.md
+```
+
+The skill defines `allowed-tools: Bash(pw-cli:*)` so the agent can run browser commands directly.
+
 ## Connection Modes
 
 | Mode | Flag | How it works |
