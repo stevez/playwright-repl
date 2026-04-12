@@ -14,7 +14,7 @@ import { startRepl } from './repl.js';
 import { minimist } from '@playwright-repl/core';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'bridge', 'http', 'help'],
+  boolean: ['headed', 'headless', 'bridge', 'http', 'interactive', 'help'],
   string: ['http-port', 'bridge-port', 'command'],
   alias: { h: 'help' },
 });
@@ -58,6 +58,7 @@ if (positional.length > 0) {
     http: args.http as boolean,
     httpPort: args['http-port'] ? parseInt(args['http-port'] as string, 10) : undefined,
     bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
+    interactive: args.interactive as boolean,
     headed: args.headless ? false : args.headed ? true : undefined,
   }).catch((err: Error) => {
     console.error(`Fatal: ${err.message}`);

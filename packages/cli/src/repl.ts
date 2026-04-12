@@ -33,6 +33,7 @@ export interface ReplOpts extends EngineOpts {
   engine?: boolean;
   http?: boolean;
   httpPort?: number;
+  interactive?: boolean;
   includeSnapshot?: boolean;
   verbose?: boolean;
 }
@@ -965,6 +966,12 @@ interface CommandRunner {
   runScript?(script: string, language: string): Promise<{ text?: string; isError?: boolean }>;
 }
 
+function httpTs(): string {
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function startHttpServer(port: number, runner: CommandRunner, log: (...args: unknown[]) => void): Promise<http.Server> {
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
@@ -977,13 +984,20 @@ function startHttpServer(port: number, runner: CommandRunner, log: (...args: unk
       }
 
       if (req.method === 'POST' && req.url === '/run') {
+        const t0 = Date.now();
+        let command = '';
         try {
           const body = await readBody(req);
-          const { command } = JSON.parse(body);
+          ({ command } = JSON.parse(body));
+          log(`${c.dim}[${httpTs()}] →${c.reset} ${command}`);
           const result = await runner.run(command);
+          const ms = Date.now() - t0;
+          const mark = result.isError ? `${c.red}✗${c.reset}` : `${c.green}✓${c.reset}`;
+          log(`${c.dim}[${httpTs()}]${c.reset} ${mark} ${command} ${c.dim}(${ms}ms)${c.reset}`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
         } catch (e: unknown) {
+          log(`${c.dim}[${httpTs()}]${c.reset} ${c.red}✗${c.reset} ${command} ${c.dim}— ${(e as Error).message}${c.reset}`);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
         }
@@ -991,15 +1005,25 @@ function startHttpServer(port: number, runner: CommandRunner, log: (...args: unk
       }
 
       if (req.method === 'POST' && req.url === '/run-script') {
+        const t0 = Date.now();
+        let language = 'javascript';
         try {
           const body = await readBody(req);
-          const { script, language } = JSON.parse(body);
+          const parsed = JSON.parse(body);
+          const script = parsed.script;
+          language = parsed.language || 'javascript';
+          const preview = String(script).split('\n')[0].slice(0, 60);
+          log(`${c.dim}[${httpTs()}] → [${language}]${c.reset} ${preview}${String(script).length > preview.length ? '…' : ''}`);
           const result = runner.runScript
-            ? await runner.runScript(script, language || 'javascript')
+            ? await runner.runScript(script, language)
             : await runner.run(script);
+          const ms = Date.now() - t0;
+          const mark = result.isError ? `${c.red}✗${c.reset}` : `${c.green}✓${c.reset}`;
+          log(`${c.dim}[${httpTs()}]${c.reset} ${mark} [${language}] ${c.dim}(${ms}ms)${c.reset}`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
         } catch (e: unknown) {
+          log(`${c.dim}[${httpTs()}]${c.reset} ${c.red}✗${c.reset} [${language}] ${c.dim}— ${(e as Error).message}${c.reset}`);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ text: (e as Error).message, isError: true }));
         }
@@ -1027,25 +1051,41 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
+/** Block until SIGINT/SIGTERM. Used by --http console mode (no readline loop). */
+function waitForShutdown(log: (...args: unknown[]) => void): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const onSignal = (sig: string) => {
+      log(`${c.dim}Received ${sig}, shutting down...${c.reset}`);
+      resolve();
+    };
+    process.once('SIGINT', () => onSignal('SIGINT'));
+    process.once('SIGTERM', () => onSignal('SIGTERM'));
+  });
+}
+
 /** Try to send --command via HTTP to an already-running --http server. */
 async function tryHttpCommand(command: string, port: number): Promise<boolean> {
   try {
     const result = await new Promise<{ text?: string; isError?: boolean }>((resolve, reject) => {
       const body = JSON.stringify({ command });
-      const req = http.request({ hostname: '127.0.0.1', port, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 3000 }, res => {
+      const req = http.request({ hostname: '127.0.0.1', port, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
         let data = '';
         res.on('data', (chunk: string) => data += chunk);
         res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid response')); } });
       });
       req.on('error', reject);
-      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
       req.write(body);
       req.end();
     });
-    process.stdout.write((result.text ?? '') + '\n');
+    const text = (result.text ?? '').replace(/^\s*\n+|\n+\s*$/g, '');
+    if (text) process.stdout.write(text + '\n');
     process.exit(result.isError ? 1 : 0);
-  } catch {
-    return false; // Server not running, fall back
+  } catch (e: unknown) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'ECONNREFUSED' || code === 'ENOTFOUND') return false; // Server not running, fall back
+    // Server is running but request errored — surface the real error, don't pretend the server is down
+    console.error(`HTTP request failed: ${(e as Error).message}`);
+    process.exit(1);
   }
   return false; // unreachable
 }
@@ -1094,6 +1134,13 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
             log(`${c.yellow}⚠${c.reset} HTTP server failed: ${(e as Error).message}`);
           }
         }
+        // --http runs as a console (no readline) unless --interactive is also set
+        if (opts.http && !opts.interactive && !(opts.replay && opts.replay.length > 0)) {
+          log(`${c.dim}Console mode — send commands via HTTP. Ctrl+C to exit.${c.reset}\n`);
+          await waitForShutdown(log);
+          await conn.close();
+          process.exit(0);
+        }
         log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
         if (opts.replay && opts.replay.length > 0) {
           await runBridgeReplayMode(opts, conn as any);
@@ -1132,6 +1179,11 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     }
     if (opts.replay && opts.replay.length > 0) {
       await runBridgeReplayMode(opts, srv);
+    } else if (opts.http && !opts.interactive) {
+      log(`${c.dim}Console mode — send commands via HTTP. Ctrl+C to exit.${c.reset}\n`);
+      await waitForShutdown(log);
+      srv.close();
+      process.exit(0);
     } else {
       log('Waiting for extension to connect...');
       await startBridgeLoop(opts, srv);
