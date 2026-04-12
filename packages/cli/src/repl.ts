@@ -700,7 +700,7 @@ function isComplete(code: string): boolean {
 
 // ─── Bridge shared helpers ───────────────────────────────────────────────────
 
-function displayBridgeResult(result: EngineResult, silent: boolean): void {
+function displayBridgeResult(result: EngineResult, silent: boolean, command?: string): void {
   if (result.image) {
     const isPdf = result.image.startsWith('data:application/pdf');
     const outDir = path.join(os.homedir(), isPdf ? 'pw-pdfs' : 'pw-screenshots');
@@ -718,6 +718,16 @@ function displayBridgeResult(result: EngineResult, silent: boolean): void {
     } else {
       console.log(result.isError ? `${c.red}${result.text}${c.reset}` : result.text);
     }
+  }
+
+  // Save snapshot to file when command is snapshot (or includes snapshot output)
+  const cmd = command?.trim().toLowerCase() ?? '';
+  if (!result.isError && result.text && (cmd === 'snapshot' || cmd === 's')) {
+    const outDir = path.join(os.homedir(), 'pw-snapshots');
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, `pw-snapshot-${Date.now()}.yaml`);
+    fs.writeFileSync(outPath, result.text);
+    if (!silent) console.log(`${c.dim}Snapshot saved to ${outPath}${c.reset}`);
   }
 }
 
@@ -759,7 +769,7 @@ async function runSingleBridgeFile(
 
     const result = await srv.run(cmd);
     const elapsed = (performance.now() - startTime).toFixed(0);
-    displayBridgeResult(result, silent);
+    displayBridgeResult(result, silent, cmd);
     log(`${c.dim}(${elapsed}ms)${c.reset}`);
 
     if (result.isError) {
@@ -918,7 +928,7 @@ async function startBridgeLoop(opts: ReplOpts, srv: BridgeServer): Promise<void>
     const runOpts = opts.includeSnapshot ? { includeSnapshot: true } : undefined;
     const result = await srv.run(command, runOpts);
     const elapsed = (performance.now() - startTime).toFixed(0);
-    displayBridgeResult(result, silent);
+    displayBridgeResult(result, silent, command);
     log(`${c.dim}(${elapsed}ms)${c.reset}`);
   }
 
@@ -1122,7 +1132,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
         log(`${c.green}✓${c.reset} Browser ready (with extension)`);
         if (opts.command) {
           const result = await conn.run(opts.command);
-          process.stdout.write((result.text ?? '') + '\n');
+          displayBridgeResult(result, silent, opts.command);
           await conn.close();
           process.exit(result.isError ? 1 : 0);
         }
@@ -1165,7 +1175,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     if (opts.command) {
       await srv.waitForConnection(30000);
       const result = await srv.run(opts.command);
-      process.stdout.write((result.text ?? '') + '\n');
+      displayBridgeResult(result, silent, opts.command);
       srv.close();
       process.exit(result.isError ? 1 : 0);
     }
@@ -1213,7 +1223,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       return; // unreachable, but satisfies TS control-flow
     }
     const result = await conn.run(parsed);
-    process.stdout.write((result.text ?? '') + '\n');
+    displayBridgeResult(result, silent, opts.command);
     conn.close();
     process.exit(result.isError ? 1 : 0);
   }
