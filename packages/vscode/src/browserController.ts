@@ -37,6 +37,7 @@ export class BrowserController {
   private _vscode: vscodeTypes.VSCode;
   private _logger: vscodeTypes.LogOutputChannel;
   private _browserManager?: BrowserManager;
+  private _launchPromise?: Promise<void>;
   private _recorder?: Recorder;
   private _picker?: Picker;
   private _lastCdpUrl: string | undefined;
@@ -92,14 +93,23 @@ export class BrowserController {
       this._browserManager = this._createBrowserManager(this._logger);
     if (this._browserManager.isRunning())
       return;
+    if (this._launchPromise)
+      return this._launchPromise;
     const resolvedFolder = workspaceFolder
       || this._vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    await this._browserManager.launch({
-      browser: 'chromium',
-      headless: false,
-      workspaceFolder: resolvedFolder,
-    });
-    this._notifyViewsConnected();
+    this._launchPromise = (async () => {
+      try {
+        await this._browserManager!.launch({
+          browser: 'chromium',
+          headless: false,
+          workspaceFolder: resolvedFolder,
+        });
+        this._notifyViewsConnected();
+      } finally {
+        this._launchPromise = undefined;
+      }
+    })();
+    return this._launchPromise;
   }
 
   async stop() {
