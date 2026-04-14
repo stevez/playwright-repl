@@ -130,9 +130,10 @@ describe('BrowserController', () => {
     expect(views.replView.notifyBrowserDisconnected).toHaveBeenCalled();
   });
 
-  it('startRecording should warn when browser not running', async () => {
+  it('startRecording should auto-launch and warn if launch fails', async () => {
     await controller.startRecording();
-    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Launch browser first.');
+    expect(mockBm.launch).toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Could not launch browser.');
   });
 
   it('stopRecording should update settingsView', () => {
@@ -140,9 +141,10 @@ describe('BrowserController', () => {
     expect(views.settingsView.setRecording).toHaveBeenCalledWith(false);
   });
 
-  it('pickLocator should warn when browser not running', async () => {
+  it('pickLocator should auto-launch and warn if launch fails', async () => {
     await controller.pickLocator();
-    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Launch browser first.');
+    expect(mockBm.launch).toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Could not launch browser.');
   });
 
   it('onWillRunTests should return connection info when browser is running with CDP', async () => {

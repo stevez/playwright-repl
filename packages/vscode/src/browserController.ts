@@ -127,8 +127,9 @@ export class BrowserController {
   // ─── Recording ──────────────────────────────────────────────────────────
 
   async startRecording() {
+    await this.ensureLaunched();
     if (!this._browserManager?.isRunning()) {
-      this._vscode.window.showWarningMessage('Launch browser first.');
+      this._vscode.window.showWarningMessage('Could not launch browser.');
       return;
     }
     if (!this._recorder)
@@ -145,8 +146,9 @@ export class BrowserController {
   // ─── Picker ─────────────────────────────────────────────────────────────
 
   async pickLocator() {
+    await this.ensureLaunched();
     if (!this._browserManager?.isRunning()) {
-      this._vscode.window.showWarningMessage('Launch browser first.');
+      this._vscode.window.showWarningMessage('Could not launch browser.');
       return;
     }
     this._ensurePicker();

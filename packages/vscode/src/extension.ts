@@ -232,7 +232,10 @@ export class Extension implements RunHooks {
           await vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
           return;
         }
-        await this._reusedBrowser.inspect(this._models);
+        if (this._settingsModel.showBrowser.get())
+          await this._browserController.pickLocator();
+        else
+          await this._reusedBrowser.inspect(this._models);
       }),
       vscode.commands.registerCommand('playwright-repl.closeBrowsers', () => {
         this._reusedBrowser.closeAllBrowsers();
@@ -254,7 +257,10 @@ export class Extension implements RunHooks {
         try {
           await this._settingsModel.showBrowser.set(true);
           await this._showBrowserForRecording(file, project);
-          await this._reusedBrowser.record(model, project.project);
+          if (showBrowser)
+            await this._browserController.startRecording();
+          else
+            await this._reusedBrowser.record(model, project.project);
         } finally {
           await this._settingsModel.showBrowser.set(showBrowser);
         }
@@ -263,9 +269,13 @@ export class Extension implements RunHooks {
         const model = this._models.selectedModel();
         if (!model)
           return vscode.window.showWarningMessage(messageNoPlaywrightTestsFound);
-        const openTestCase = this._testUnderDebug?.testCase ?? (this._settingsModel.showBrowser.get() ? this._lastBeganTest : undefined);
-        const project = openTestCase ? ancestorProject(openTestCase) : model.enabledProjects()[0]?.project;
-        await this._reusedBrowser.record(model, project);
+        if (this._settingsModel.showBrowser.get()) {
+          await this._browserController.startRecording();
+        } else {
+          const openTestCase = this._testUnderDebug?.testCase ?? undefined;
+          const project = openTestCase ? ancestorProject(openTestCase) : model.enabledProjects()[0]?.project;
+          await this._reusedBrowser.record(model, project);
+        }
       }),
       vscode.commands.registerCommand('playwright-repl.toggleModels', async () => {
         this._settingsView.toggleModels();
