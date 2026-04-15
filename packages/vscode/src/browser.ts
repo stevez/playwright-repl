@@ -110,11 +110,12 @@ export class BrowserManager implements IBrowserManager {
     try {
       const http = await import('node:http');
       const versionData = await new Promise<any>((resolve, reject) => {
-        http.get(`http://127.0.0.1:${cdpPort}/json/version`, res => {
+        const timer = setTimeout(() => { req.destroy(); reject(new Error('CDP discovery timed out')); }, 5000);
+        const req = http.get(`http://127.0.0.1:${cdpPort}/json/version`, res => {
           let data = '';
           res.on('data', (chunk: string) => data += chunk);
-          res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
-        }).on('error', reject);
+          res.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+        }).on('error', (e) => { clearTimeout(timer); reject(e); });
       });
       if (versionData.webSocketDebuggerUrl) {
         this._cdpUrl = versionData.webSocketDebuggerUrl;

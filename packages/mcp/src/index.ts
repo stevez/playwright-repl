@@ -82,7 +82,7 @@ function startHttpServer(port: number, r: Runner) {
                 const body = await readBody(req);
                 ({ command } = JSON.parse(body));
                 logHttp(`→ ${command}`);
-                const result = await r.runCommand(command);
+                const result = await withTimeout(r.runCommand(command), 30000, `Command timed out after 30s: ${command}`);
                 const ms = Date.now() - t0;
                 logHttp(`${result.isError ? '✗' : '✓'} ${command} (${ms}ms)`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -104,7 +104,7 @@ function startHttpServer(port: number, r: Runner) {
                 language = parsed.language || 'pw';
                 const preview = script.split('\n')[0].slice(0, 60);
                 logHttp(`→ [${language}] ${preview}${script.length > preview.length ? '…' : ''}`);
-                const result = await r.runScript(script, language as 'pw' | 'javascript');
+                const result = await withTimeout(r.runScript(script, language as 'pw' | 'javascript'), 30000, `Script timed out after 30s`);
                 const ms = Date.now() - t0;
                 logHttp(`${result.isError ? '✗' : '✓'} [${language}] (${ms}ms)`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -127,12 +127,26 @@ function startHttpServer(port: number, r: Runner) {
     });
 }
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        promise.then(
+            (v) => { clearTimeout(timer); resolve(v); },
+            (e) => { clearTimeout(timer); reject(e); },
+        );
+    });
+}
+
+function readBody(req: http.IncomingMessage, timeoutMs = 5000): Promise<string> {
     return new Promise((resolve, reject) => {
         let data = '';
+        const timer = setTimeout(() => {
+            req.destroy();
+            reject(new Error(`Request body read timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
         req.on('data', (chunk: string) => data += chunk);
-        req.on('end', () => resolve(data));
-        req.on('error', reject);
+        req.on('end', () => { clearTimeout(timer); resolve(data); });
+        req.on('error', (e: Error) => { clearTimeout(timer); reject(e); });
     });
 }
 

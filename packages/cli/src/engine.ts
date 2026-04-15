@@ -96,7 +96,10 @@ export class Engine {
     // Launch/connect mode.
     {
       // Launch/connect mode: eagerly create context for immediate feedback.
-      const browser = await deps.createBrowser(config, clientInfo);
+      const browser = await Promise.race([
+        deps.createBrowser(config, clientInfo),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Browser launch timed out after 30s')), 30000)),
+      ]);
       const browserContext = browser.contexts()[0] || await browser.newContext();
       this._browserContext = browserContext;
       this._close = () => browser.close();
@@ -316,7 +319,7 @@ export class Engine {
       }
 
       try {
-        const res = await fetch(`${cdpUrl}/json/version`);
+        const res = await fetch(`${cdpUrl}/json/version`, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) {
           console.warn(`Reconnect attempt ${attempt}: CDP responded with status ${res.status}`);
           continue;

@@ -71,7 +71,13 @@ export class BridgeServer {
 
             ws.on('pong', () => { (ws as any)._alive = true; });
             ws.on('message', (data) => {
-                const msg = JSON.parse(String(data));
+                let msg;
+                try {
+                    msg = JSON.parse(String(data));
+                } catch (e) {
+                    console.error(`[bridge ${ts()}] malformed message: ${(e as Error).message}`);
+                    return;
+                }
                 // Events from extension (recording, picker) — no request ID
                 if (msg._event) {
                     this._onEvent?.(msg);
@@ -106,28 +112,38 @@ export class BridgeServer {
         }, 30000);
     }
 
-    async run(command: string, opts?: { includeSnapshot?: boolean }): Promise<EngineResult> {
+    async run(command: string, opts?: { includeSnapshot?: boolean; timeout?: number }): Promise<EngineResult> {
         if (!this.connected) {
             try { await this.waitForConnection(10000); }
             catch { return { text: 'Extension not connected', isError: true }; }
         }
         const id = Math.random().toString(36).slice(2);
+        const timeoutMs = opts?.timeout ?? 30000;
         return new Promise((resolve) => {
-            this.pending.set(id, resolve);
+            const timer = setTimeout(() => {
+                this.pending.delete(id);
+                resolve({ text: `Command timed out after ${timeoutMs}ms: ${command}`, isError: true });
+            }, timeoutMs);
+            this.pending.set(id, (result) => { clearTimeout(timer); resolve(result); });
             const msg: Record<string, unknown> = { id, command, type: 'command' };
             if (opts?.includeSnapshot) msg.includeSnapshot = true;
             this.socket!.send(JSON.stringify(msg));
         });
     }
 
-    async runScript(script: string, language: 'pw' | 'javascript' = 'pw'): Promise<EngineResult> {
+    async runScript(script: string, language: 'pw' | 'javascript' = 'pw', opts?: { timeout?: number }): Promise<EngineResult> {
         if (!this.connected) {
             try { await this.waitForConnection(10000); }
             catch { return { text: 'Extension not connected', isError: true }; }
         }
         const id = Math.random().toString(36).slice(2);
+        const timeoutMs = opts?.timeout ?? 30000;
         return new Promise((resolve) => {
-            this.pending.set(id, resolve);
+            const timer = setTimeout(() => {
+                this.pending.delete(id);
+                resolve({ text: `Script timed out after ${timeoutMs}ms`, isError: true });
+            }, timeoutMs);
+            this.pending.set(id, (result) => { clearTimeout(timer); resolve(result); });
             this.socket!.send(JSON.stringify({ id, command: script, type: 'script', language }));
         });
     }

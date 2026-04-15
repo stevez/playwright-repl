@@ -88,16 +88,18 @@ export class EvaluateConnection {
 
     // Get the extension's service worker
     let sw = this._context.serviceWorkers()[0];
-    if (!sw) sw = await this._context.waitForEvent('serviceworker');
+    if (!sw) sw = await this._context.waitForEvent('serviceworker', { timeout: 10000 });
     this._sw = sw;
 
     // Wait for handleBridgeCommand to be available
-    await sw.evaluate(async () => {
+    const ready = await sw.evaluate(async () => {
       for (let i = 0; i < 50; i++) {
-        if ((self as any).handleBridgeCommand) return;
+        if ((self as any).handleBridgeCommand) return true;
         await new Promise(r => setTimeout(r, 100));
       }
+      return false;
     });
+    if (!ready) throw new Error('Service worker handleBridgeCommand not available after 5s');
 
     // Navigate to blank page so the extension can attach to a tab
     const page = this._context.pages()[0] || await this._context.newPage();
