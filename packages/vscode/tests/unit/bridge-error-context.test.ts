@@ -64,10 +64,65 @@ describe('buildBridgeErrorContext', () => {
       'my test',
       path.join(wsFolder, 'tests', 'example.spec.ts'),
       'error',
-      wsFolder,
+      { workspaceFolder: wsFolder },
     );
 
     expect(result).toContain(`tests${path.sep}example.spec.ts >> my test`);
     expect(result).not.toContain(wsFolder);
+  });
+
+  it('includes page snapshot when provided', () => {
+    const result = buildBridgeErrorContext(
+      'my test',
+      '/fake/tests/todo.spec.ts',
+      'error',
+      { pageSnapshot: '- button "click me" [ref=e1]' },
+    );
+
+    expect(result).toContain('# Page snapshot');
+    expect(result).toContain('- button "click me" [ref=e1]');
+  });
+
+  it('uses code fences when useCodeFences is true', () => {
+    const result = buildBridgeErrorContext(
+      'my test',
+      '/fake/tests/todo.spec.ts',
+      'error message',
+      { useCodeFences: true, pageSnapshot: '- button' },
+    );
+
+    expect(result).toContain('```');
+    expect(result).toContain('```yaml');
+  });
+
+  it('annotates the failing line with > marker and ^ pointer', () => {
+    const spy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      "import { test, expect } from '@playwright/test';\ntest('should fail', async () => {\n  expect(1).toBe(2);\n});\n"
+    );
+
+    const result = buildBridgeErrorContext(
+      'should fail',
+      '/fake/tests/todo.spec.ts:3:13',
+      'Error at tests/todo.spec.ts:3:13 — assertion failed',
+    );
+
+    // The failing line (3) should be marked with >
+    expect(result).toMatch(/>\s*3\s*\|\s+expect\(1\)/);
+    // The ^ pointer should be on the next line
+    expect(result).toContain('^');
+
+    spy.mockRestore();
+  });
+
+  it('parses line:column from error and uses it in Location', () => {
+    const result = buildBridgeErrorContext(
+      'my test',
+      '/fake/tests/todo.spec.ts',
+      'Error at tests/todo.spec.ts:42:10 — something broke',
+      { workspaceFolder: '/fake' },
+    );
+
+    expect(result).toContain('Location: tests');
+    expect(result).toContain(':42:10');
   });
 });

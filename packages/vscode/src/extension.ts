@@ -952,9 +952,12 @@ export class Extension implements RunHooks {
 
         if (result.isError) {
           const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
-          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, result.text || 'Bridge execution failed', wsFolder);
-          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, aiContext);
-          testRun.failed(testItem, [this._testMessageFromText(result.text || 'Bridge execution failed', aiContext)], 0);
+          const errorText = result.text || 'Bridge execution failed';
+          const pageSnapshot = await this._tryCaptureSnapshot(bridge);
+          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true });
+          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false });
+          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, mdContext);
+          testRun.failed(testItem, [this._testMessageFromText(errorText, panelContext)], 0);
           continue;
         }
 
@@ -967,9 +970,11 @@ export class Extension implements RunHooks {
         else {
           const errorMsg = testResult.errors.map((e: { message: string }) => e.message).join('\n');
           const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
-          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, wsFolder);
-          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, aiContext);
-          testRun.failed(testItem, [this._testMessageFromText(errorMsg, aiContext)], testResult.duration);
+          const pageSnapshot = await this._tryCaptureSnapshot(bridge);
+          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true });
+          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false });
+          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, mdContext);
+          testRun.failed(testItem, [this._testMessageFromText(errorMsg, panelContext)], testResult.duration);
         }
       }
     }
@@ -1002,6 +1007,20 @@ export class Extension implements RunHooks {
       }
     };
     return testListener;
+  }
+
+  /**
+   * Best-effort: capture a page snapshot from the bridge for use in error-context.
+   * Returns undefined if the snapshot fails (e.g. page is closed).
+   */
+  private async _tryCaptureSnapshot(bridge: { run: (cmd: string, opts?: { timeout?: number }) => Promise<{ text?: string; isError?: boolean }> }): Promise<string | undefined> {
+    try {
+      const result = await bridge.run('snapshot', { timeout: 3000 });
+      if (result.isError || !result.text) return undefined;
+      return result.text;
+    } catch {
+      return undefined;
+    }
   }
 
   private _extractAIContext(result: reporterTypes.TestResult): string | undefined {
