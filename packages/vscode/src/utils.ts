@@ -236,6 +236,46 @@ export function uriToPath(uri: vscodeTypes.Uri): string {
   return normalizePath(uri.fsPath);
 }
 
+/**
+ * Build error-context markdown for bridge-mode test failures.
+ * Matches the format Playwright 1.53+ generates for "Fix with AI" integration.
+ */
+export function buildBridgeErrorContext(testName: string, filePath: string, errorMessage: string): string {
+  const relativePath = path.relative(process.cwd(), filePath);
+  const lines: string[] = [
+    '# Instructions',
+    '',
+    '- Following Playwright test failed.',
+    '- Explain why, be concise, respect Playwright best practices.',
+    '- Provide a snippet of code with the fix, if possible.',
+    '',
+    '# Test info',
+    '',
+    `- Name: ${relativePath} >> ${testName}`,
+    `- Location: ${relativePath}`,
+    '',
+    '# Error details',
+    '',
+    '```',
+    errorMessage,
+    '```',
+  ];
+
+  // Include test source if the file is readable
+  try {
+    const source = fs.readFileSync(filePath, 'utf-8');
+    lines.push('', '# Test source', '', '```ts');
+    const sourceLines = source.split('\n');
+    for (let i = 0; i < sourceLines.length; i++)
+      lines.push(`  ${i + 1} | ${sourceLines[i]}`);
+    lines.push('```');
+  } catch {
+    // File not readable — skip source section
+  }
+
+  return lines.join('\n');
+}
+
 // See uriToPath for details.
 export function normalizePath(fsPath: string): string {
   if (process.platform === 'win32' && fsPath?.length && fsPath[0] !== '/' && fsPath[0] !== '\\')

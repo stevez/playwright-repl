@@ -25,7 +25,7 @@ import { SettingsModel } from './settingsModel';
 import { SettingsView } from './settingsView';
 import { RunHooks, TestModel, TestModelCollection, TestProject } from './testModel';
 import { configError, disabledProjectName as disabledProject, TestTree } from './testTree';
-import { NodeJSNotFoundError, getPlaywrightInfo, stripAnsi, stripBabelFrame, uriToPath } from './utils';
+import { NodeJSNotFoundError, buildBridgeErrorContext, getPlaywrightInfo, stripAnsi, stripBabelFrame, uriToPath } from './utils';
 import * as vscodeTypes from './vscodeTypes';
 import { WorkspaceChange, WorkspaceObserver } from './workspaceObserver';
 import { registerTerminalLinkProvider } from './terminalLinkProvider';
@@ -951,7 +951,8 @@ export class Extension implements RunHooks {
         const testItem = testItems[i];
 
         if (result.isError) {
-          testRun.failed(testItem, [{ message: result.text || 'Bridge execution failed' }], 0);
+          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, result.text || 'Bridge execution failed');
+          testRun.failed(testItem, [this._testMessageFromText(result.text || 'Bridge execution failed', aiContext)], 0);
           continue;
         }
 
@@ -961,8 +962,11 @@ export class Extension implements RunHooks {
           testRun.passed(testItem, testResult.duration);
         else if (testResult.status === 'skipped')
           testRun.skipped(testItem);
-        else
-          testRun.failed(testItem, testResult.errors.map((e: { message: string }) => ({ message: e.message })), testResult.duration);
+        else {
+          const errorMsg = testResult.errors.map((e: { message: string }) => e.message).join('\n');
+          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg);
+          testRun.failed(testItem, [this._testMessageFromText(errorMsg, aiContext)], testResult.duration);
+        }
       }
     }
 
