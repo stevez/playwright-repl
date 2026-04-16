@@ -240,8 +240,8 @@ export function uriToPath(uri: vscodeTypes.Uri): string {
  * Build error-context markdown for bridge-mode test failures.
  * Matches the format Playwright 1.53+ generates for "Fix with AI" integration.
  */
-export function buildBridgeErrorContext(testName: string, filePath: string, errorMessage: string): string {
-  const relativePath = path.relative(process.cwd(), filePath);
+export function buildBridgeErrorContext(testName: string, filePath: string, errorMessage: string, workspaceFolder?: string): string {
+  const relativePath = path.relative(workspaceFolder || path.dirname(filePath), filePath);
   const lines: string[] = [
     '# Instructions',
     '',
@@ -256,24 +256,36 @@ export function buildBridgeErrorContext(testName: string, filePath: string, erro
     '',
     '# Error details',
     '',
-    '```',
     errorMessage,
-    '```',
   ];
 
   // Include test source if the file is readable
+  // Note: cannot use ``` codeblocks — VS Code markdown does not support them inside <details>
   try {
     const source = fs.readFileSync(filePath, 'utf-8');
-    lines.push('', '# Test source', '', '```ts');
+    lines.push('', '# Test source', '');
     const sourceLines = source.split('\n');
     for (let i = 0; i < sourceLines.length; i++)
       lines.push(`  ${i + 1} | ${sourceLines[i]}`);
-    lines.push('```');
   } catch {
     // File not readable — skip source section
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Write error-context markdown to test-results directory for inspection and CI artifacts.
+ */
+export function writeBridgeErrorContext(testName: string, workspaceFolder: string, aiContext: string): void {
+  try {
+    const safeName = testName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-');
+    const dir = path.join(workspaceFolder, 'test-results', safeName);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'error-context.md'), aiContext);
+  } catch {
+    // Best-effort — don't break test reporting if write fails
+  }
 }
 
 // See uriToPath for details.

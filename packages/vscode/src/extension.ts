@@ -25,7 +25,7 @@ import { SettingsModel } from './settingsModel';
 import { SettingsView } from './settingsView';
 import { RunHooks, TestModel, TestModelCollection, TestProject } from './testModel';
 import { configError, disabledProjectName as disabledProject, TestTree } from './testTree';
-import { NodeJSNotFoundError, buildBridgeErrorContext, getPlaywrightInfo, stripAnsi, stripBabelFrame, uriToPath } from './utils';
+import { NodeJSNotFoundError, buildBridgeErrorContext, writeBridgeErrorContext, getPlaywrightInfo, stripAnsi, stripBabelFrame, uriToPath } from './utils';
 import * as vscodeTypes from './vscodeTypes';
 import { WorkspaceChange, WorkspaceObserver } from './workspaceObserver';
 import { registerTerminalLinkProvider } from './terminalLinkProvider';
@@ -951,7 +951,9 @@ export class Extension implements RunHooks {
         const testItem = testItems[i];
 
         if (result.isError) {
-          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, result.text || 'Bridge execution failed');
+          const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
+          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, result.text || 'Bridge execution failed', wsFolder);
+          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, aiContext);
           testRun.failed(testItem, [this._testMessageFromText(result.text || 'Bridge execution failed', aiContext)], 0);
           continue;
         }
@@ -964,7 +966,9 @@ export class Extension implements RunHooks {
           testRun.skipped(testItem);
         else {
           const errorMsg = testResult.errors.map((e: { message: string }) => e.message).join('\n');
-          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg);
+          const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
+          const aiContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, wsFolder);
+          if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, aiContext);
           testRun.failed(testItem, [this._testMessageFromText(errorMsg, aiContext)], testResult.duration);
         }
       }

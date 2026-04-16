@@ -19,6 +19,8 @@ describe('buildBridgeErrorContext', () => {
     expect(result).toContain('expect(received).toBe(expected)');
     expect(result).toContain('Expected: 2');
     expect(result).toContain('Received: 1');
+    // No code fences — VS Code markdown doesn't support them inside <details>
+    expect(result).not.toContain('```');
   });
 
   it('includes test source when file is readable', () => {
@@ -56,14 +58,16 @@ describe('buildBridgeErrorContext', () => {
     spy.mockRestore();
   });
 
-  it('uses relative file path in test info', () => {
+  it('uses relative file path in test info when workspace folder is provided', () => {
+    const wsFolder = '/home/user/project';
     const result = buildBridgeErrorContext(
       'my test',
-      path.join(process.cwd(), 'tests', 'example.spec.ts'),
+      path.join(wsFolder, 'tests', 'example.spec.ts'),
       'error',
+      wsFolder,
     );
 
     expect(result).toContain(`tests${path.sep}example.spec.ts >> my test`);
-    expect(result).not.toContain(process.cwd());
+    expect(result).not.toContain(wsFolder);
   });
 });
