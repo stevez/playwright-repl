@@ -242,6 +242,8 @@ export interface BridgeErrorContextOptions {
   pageSnapshot?: string;
   /** Use ``` code fences (true for md file) or plain indented text (false for inline TestMessage). */
   useCodeFences?: boolean;
+  /** Fallback line (1-based) when error message has no parseable location. Typically the test declaration line. */
+  fallbackLine?: number;
 }
 
 /**
@@ -302,9 +304,10 @@ function buildCodeFrame(filePath: string, errorLoc: { line: number; column: numb
  * Matches the format Playwright 1.53+ generates for "Fix with AI" integration.
  */
 export function buildBridgeErrorContext(testName: string, filePath: string, errorMessage: string, options: BridgeErrorContextOptions = {}): string {
-  const { workspaceFolder, pageSnapshot, useCodeFences = false } = options;
+  const { workspaceFolder, pageSnapshot, useCodeFences = false, fallbackLine } = options;
   const relativePath = path.relative(workspaceFolder || path.dirname(filePath), filePath);
-  const errorLoc = parseErrorLocation(errorMessage, filePath);
+  const parsedLoc = parseErrorLocation(errorMessage, filePath);
+  const errorLoc = parsedLoc || (fallbackLine !== undefined ? { line: fallbackLine, column: 1 } : undefined);
   const locationString = errorLoc ? `${relativePath}:${errorLoc.line}:${errorLoc.column}` : relativePath;
   const cleanError = stripAnsi(errorMessage || '');
 

@@ -954,10 +954,14 @@ export class Extension implements RunHooks {
           const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
           const errorText = result.text || 'Bridge execution failed';
           const pageSnapshot = await this._tryCaptureSnapshot(bridge);
-          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true });
-          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false });
+          const fallbackLine = testItem.range ? testItem.range.start.line + 1 : undefined;
+          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true, fallbackLine });
+          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorText, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false, fallbackLine });
           if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, mdContext);
-          testRun.failed(testItem, [this._testMessageFromText(errorText, panelContext)], 0);
+          const testMessage = this._testMessageFromText(errorText, panelContext);
+          if (testItem.uri && testItem.range)
+            testMessage.location = new this._vscode.Location(testItem.uri, testItem.range.start);
+          testRun.failed(testItem, [testMessage], 0);
           continue;
         }
 
@@ -971,10 +975,14 @@ export class Extension implements RunHooks {
           const errorMsg = testResult.errors.map((e: { message: string }) => e.message).join('\n');
           const wsFolder = this._vscode.workspace.getWorkspaceFolder(testItem.uri!)?.uri.fsPath;
           const pageSnapshot = await this._tryCaptureSnapshot(bridge);
-          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true });
-          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false });
+          const fallbackLine = testItem.range ? testItem.range.start.line + 1 : undefined;
+          const mdContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: true, fallbackLine });
+          const panelContext = buildBridgeErrorContext(fullNames[i], filePath, errorMsg, { workspaceFolder: wsFolder, pageSnapshot, useCodeFences: false, fallbackLine });
           if (wsFolder) writeBridgeErrorContext(fullNames[i], wsFolder, mdContext);
-          testRun.failed(testItem, [this._testMessageFromText(errorMsg, panelContext)], testResult.duration);
+          const testMessage = this._testMessageFromText(errorMsg, panelContext);
+          if (testItem.uri && testItem.range)
+            testMessage.location = new this._vscode.Location(testItem.uri, testItem.range.start);
+          testRun.failed(testItem, [testMessage], testResult.duration);
         }
       }
     }
