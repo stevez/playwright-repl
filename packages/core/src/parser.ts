@@ -87,18 +87,31 @@ function tokenize(line: string): string[] {
   const tokens: string[] = [];
   let current = '';
   let inQuote: string | null = null;
+  // Track parenthesis depth — inside parens, whitespace and quotes are preserved
+  // so CSS locators like `div:has-text("RFCP")` stay as a single token.
+  let parenDepth = 0;
 
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (inQuote) {
       if (ch === inQuote) {
         inQuote = null;
+        // Quotes inside parens are part of the CSS syntax — keep them
+        if (parenDepth > 0) current += ch;
       } else {
         current += ch;
       }
     } else if (ch === '"' || ch === "'") {
       inQuote = ch;
-    } else if (ch === ' ' || ch === '\t') {
+      // Quotes inside parens are part of the CSS syntax — keep them
+      if (parenDepth > 0) current += ch;
+    } else if (ch === '(') {
+      parenDepth++;
+      current += ch;
+    } else if (ch === ')') {
+      parenDepth = Math.max(0, parenDepth - 1);
+      current += ch;
+    } else if ((ch === ' ' || ch === '\t') && parenDepth === 0) {
       if (current) {
         tokens.push(current);
         current = '';

@@ -101,6 +101,57 @@ describe('parseInput', () => {
   });
 });
 
+// ─── CSS locator pseudo-classes (Playwright non-standard CSS) ───────────────
+
+describe('CSS locator pseudo-classes', () => {
+  it('preserves quotes inside :has-text() — double quotes', () => {
+    const args = parseInput('highlight div:has-text("RFCP")');
+    expect(args._).toEqual(['highlight', 'div:has-text("RFCP")']);
+  });
+
+  it('preserves quotes inside :has-text() — single quotes', () => {
+    const args = parseInput("highlight div:has-text('RFCP')");
+    expect(args._).toEqual(['highlight', "div:has-text('RFCP')"]);
+  });
+
+  it('preserves spaces inside :has-text()', () => {
+    const args = parseInput('highlight div:has-text("Hello World")');
+    expect(args._).toEqual(['highlight', 'div:has-text("Hello World")']);
+  });
+
+  it('preserves quotes inside :text()', () => {
+    const args = parseInput('highlight button:text("Submit")');
+    expect(args._).toEqual(['highlight', 'button:text("Submit")']);
+  });
+
+  it('preserves quotes inside :text-is()', () => {
+    const args = parseInput('highlight span:text-is("Exact")');
+    expect(args._).toEqual(['highlight', 'span:text-is("Exact")']);
+  });
+
+  it('preserves quotes inside :text-matches() with regex', () => {
+    const args = parseInput('highlight div:text-matches("^RFCP$")');
+    expect(args._).toEqual(['highlight', 'div:text-matches("^RFCP$")']);
+  });
+
+  it('handles nested parens in :has()', () => {
+    const args = parseInput('highlight div:has(button:has-text("OK"))');
+    expect(args._).toEqual(['highlight', 'div:has(button:has-text("OK"))']);
+  });
+
+  it('still tokenizes normally outside parens', () => {
+    const args = parseInput('click "Submit" --force');
+    expect(args._).toEqual(['click', 'Submit']);
+    expect(args.force).toBe(true);
+  });
+
+  it('handles CSS locator followed by normal flag', () => {
+    const args = parseInput('highlight div:has-text("RFCP") --clear');
+    expect(args._).toEqual(['highlight', 'div:has-text("RFCP")']);
+    expect(args.clear).toBe(true);
+  });
+});
+
 describe('ALIASES', () => {
   it('maps most aliases to known commands', () => {
     // verify-* aliases map to commands handled as knownExtras in repl.ts,
