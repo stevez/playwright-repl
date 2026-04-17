@@ -654,8 +654,17 @@ export function parseReplCommand(input: string): ParseResult {
   // Resolve to DirectExecution, TabOperation, or unrecognised ParsedArgs
   const resolved = resolveArgs(args);
 
-  // DirectExecution
-  if (isDirect(resolved)) return resolved;
+  // DirectExecution — wrap with frame context if --frame was specified
+  if (isDirect(resolved)) {
+    const frameSel = args.frame;
+    if (frameSel && typeof frameSel === 'string') {
+      // Temporarily shadow `page` with the frame so all page-script functions
+      // operate inside the iframe. The original `page` is used to locate the frame.
+      const frameExpr = `await page.locator(${ser(frameSel)}).contentFrame()`;
+      return { jsExpr: `await (async (__page) => { const page = __page; return ${resolved.jsExpr}; })(${frameExpr})` };
+    }
+    return resolved;
+  }
 
   // Unknown command
   const cmdName = args._[0];

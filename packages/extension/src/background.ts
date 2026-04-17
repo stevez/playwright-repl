@@ -260,7 +260,7 @@ async function startRecording(): Promise<{ ok: boolean; url?: string; error?: st
     const tabId = await getActiveTabId();
     if (!tabId) return { ok: false, error: 'No active tab' };
     const tab = await chrome.tabs.get(tabId);
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] });
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['content/recorder.js'] });
     recordingTabId = tabId;
     return { ok: true, url: tab.url ?? '' };
   } catch (e) {
@@ -279,7 +279,7 @@ async function stopRecording(): Promise<{ ok: boolean }> {
 // Re-inject recorder after navigation (page reload / SPA navigation)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === recordingTabId && changeInfo.status === 'complete') {
-    chrome.scripting.executeScript({ target: { tabId }, files: ['content/recorder.js'] }).catch(e => console.debug('[pw-repl] recorder re-inject:', e));
+    chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['content/recorder.js'] }).catch(e => console.debug('[pw-repl] recorder re-inject:', e));
   }
 });
 

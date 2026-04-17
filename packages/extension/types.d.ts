@@ -32,7 +32,7 @@ declare namespace chrome {
 
   namespace scripting {
     interface ScriptInjection {
-      target: { tabId: number };
+      target: { tabId: number; allFrames?: boolean };
       files?: string[];
       func?: () => void;
     }

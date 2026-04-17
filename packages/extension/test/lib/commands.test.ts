@@ -202,6 +202,40 @@ describe("highlight", () => {
   });
 });
 
+// ─── --frame flag ───────────────────────────────────────────────────────────
+
+describe("--frame flag", () => {
+  it("wraps click with frame context", () => {
+    const { jsExpr } = direct('click "Bis 45 km/h" --frame "#oevd-iframe"');
+    expect(jsExpr).toContain('page.locator("#oevd-iframe").contentFrame()');
+    expect(jsExpr).toContain('"Bis 45 km/h"');
+  });
+
+  it("wraps highlight with frame context", () => {
+    const { jsExpr } = direct('highlight "Submit" --frame "#myframe"');
+    expect(jsExpr).toContain('page.locator("#myframe").contentFrame()');
+    expect(jsExpr).toContain('highlightByText');
+  });
+
+  it("wraps check with frame context", () => {
+    const { jsExpr } = direct('check radio "Accept" --frame "#oevd-iframe"');
+    expect(jsExpr).toContain('page.locator("#oevd-iframe").contentFrame()');
+    expect(jsExpr).toContain('"Accept"');
+  });
+
+  it("wraps fill with frame context", () => {
+    const { jsExpr } = direct('fill "Email" "test@example.com" --frame "#form-frame"');
+    expect(jsExpr).toContain('page.locator("#form-frame").contentFrame()');
+    expect(jsExpr).toContain('"Email"');
+    expect(jsExpr).toContain('"test@example.com"');
+  });
+
+  it("does not wrap when --frame is absent", () => {
+    const { jsExpr } = direct('click "Submit"');
+    expect(jsExpr).not.toContain('contentFrame');
+  });
+});
+
 describe("press", () => {
   it("routes role+name+key to pressKeyByRole", () => {
     const { jsExpr } = direct('press textbox "What needs to be done?" Enter');

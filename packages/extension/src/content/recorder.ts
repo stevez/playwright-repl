@@ -16,6 +16,68 @@ export const SPECIAL_KEYS = new Set([
     'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
 ]);
 
+// ─── Frame detection ─────────────────────────────────────────────────────
+
+/**
+ * Detect if we're inside an iframe and compute a CSS selector for it.
+ * Returns null if we're in the top frame.
+ *
+ * For same-origin iframes, `window.frameElement` gives us the <iframe> element
+ * in the parent document. For cross-origin iframes, `window.frameElement` is null
+ * due to security restrictions — we fall back to using the frame's src URL.
+ */
+function detectFrameSelector(): string | null {
+    if (window === window.top) return null;
+
+    try {
+        // Same-origin: window.frameElement is accessible
+        const frame = window.frameElement;
+        if (frame) {
+            // Prefer id selector
+            if (frame.id) return `#${CSS.escape(frame.id)}`;
+            // Prefer name attribute
+            const name = frame.getAttribute('name');
+            if (name) return `iframe[name="${name}"]`;
+            // Prefer src attribute
+            const src = frame.getAttribute('src');
+            if (src) return `iframe[src="${src}"]`;
+            // Fall back to tag + nth-of-type
+            const parent = frame.parentElement;
+            if (parent) {
+                const siblings = Array.from(parent.querySelectorAll(':scope > iframe'));
+                const idx = siblings.indexOf(frame);
+                if (siblings.length === 1) return 'iframe';
+                return `iframe:nth-of-type(${idx + 1})`;
+            }
+            return 'iframe';
+        }
+    } catch { /* cross-origin — frameElement throws */ }
+
+    // Cross-origin fallback: use location to build a src-based selector
+    // This is a best-effort approach
+    try {
+        const src = window.location.href;
+        if (src && src !== 'about:blank') return `iframe[src="${src}"]`;
+    } catch { /* cannot access location */ }
+
+    return 'iframe';
+}
+
+/** Cached frame selector — computed once on init */
+let frameSelector: string | null = null;
+
+/**
+ * Wrap recorded commands with frame context if we're inside an iframe.
+ * Prepends --frame flag to PW and .contentFrame() to JS.
+ */
+function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; js: string } {
+    if (!frameSelector) return cmds;
+    return {
+        pw: `${cmds.pw} --frame "${frameSelector}"`,
+        js: `await page.locator(${JSON.stringify(frameSelector)}).contentFrame().${cmds.js.replace(/^await page\./, '')}`,
+    };
+}
+
 // ─── Fill buffering state machine ─────────────────────────────────────────
 
 export let pendingFill: { el: Element; value: string } | null = null;
@@ -46,14 +108,14 @@ export function onClickCapture(e: MouseEvent) {
         if (hoverTarget) {
             const hoverCmds = buildCommands('hover', hoverTarget);
             if (hoverCmds) {
-                chrome.runtime.sendMessage({ type: 'recorded-action', action: hoverCmds });
+                chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(hoverCmds) });
             }
         }
     }
 
     const cmds = buildCommands('click', target);
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+        chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
     }
 }
 
@@ -68,7 +130,7 @@ export function onInputCapture(e: Event) {
         pendingFill.value = value;
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-fill-update', action: wrapWithFrameContext(cmds) });
         }
     } else {
         // Different element or first input — flush old, start new
@@ -76,7 +138,7 @@ export function onInputCapture(e: Event) {
         pendingFill = { el: target, value };
         const cmds = buildCommands('fill', target, { value });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
     }
 }
@@ -91,7 +153,7 @@ export function onChangeCapture(e: Event) {
         const checked = (target as HTMLInputElement).checked;
         const cmds = buildCommands(checked ? 'check' : 'uncheck', target);
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
         return;
     }
@@ -102,7 +164,7 @@ export function onChangeCapture(e: Event) {
         const option = target.value;
         const cmds = buildCommands('select', target, { option });
         if (cmds) {
-            chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+            chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
         }
         return;
     }
@@ -127,7 +189,7 @@ export function onKeyDownCapture(e: KeyboardEvent) {
         ? buildCommands('press', target, { key: e.key })
         : { pw: `press ${e.key}`, js: `await page.keyboard.press(${escapeString(e.key)});` };
     if (cmds) {
-        chrome.runtime.sendMessage({ type: 'recorded-action', action: cmds });
+        chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
     }
 }
 
@@ -160,6 +222,9 @@ export function init() {
     // Guard against double-injection
     if ((window as any).__pw_recorder_active) return;
     (window as any).__pw_recorder_active = true;
+
+    // Detect iframe context once on init
+    frameSelector = detectFrameSelector();
 
     chrome.runtime.onMessage.addListener(onMessage);
     document.addEventListener('click', onClickCapture, true);

@@ -193,6 +193,7 @@ type PageScriptFn = (...args: unknown[]) => Promise<void>;
  */
 export function resolveArgs(args: ParsedArgs): ParsedArgs {
   const cmdName = args._[0];
+  const frameSel = args.frame ? String(args.frame) : undefined;
 
   // ── Unified verify command → run-code translation ──────────
   if (cmdName === 'verify') {
@@ -316,6 +317,13 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
       ? `return await ${args._[1]}`
       : args._[1];
     args = { _: ['run-code', `async (page) => { ${body} }`] };
+  }
+
+  // ── --frame: wrap run-code to operate inside an iframe ──
+  if (frameSel && args._[0] === 'run-code' && args._[1]) {
+    const inner = args._[1];
+    // Wrap: resolve the frame, then call the inner function with the frame as "page"
+    args = { _: ['run-code', `async (page) => { const __frame = await page.locator(${JSON.stringify(frameSel)}).contentFrame(); return await (${inner})(__frame); }`] };
   }
 
   return args;

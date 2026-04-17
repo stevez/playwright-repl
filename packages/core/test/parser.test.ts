@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { describe, it, expect } from 'vitest';
-import { parseInput, ALIASES, ALL_COMMANDS, booleanOptions } from '../src/parser.js';
+import { parseInput, resolveArgs, ALIASES, ALL_COMMANDS, booleanOptions } from '../src/parser.js';
 
 describe('parseInput', () => {
   it('parses a basic command', () => {
@@ -184,6 +184,29 @@ describe('--in option', () => {
     // minimist treats --in as a string option with value "dialog"
     expect(args.in).toBe('dialog');
     expect(args).not.toHaveProperty('in-role');
+  });
+});
+
+describe('--frame flag', () => {
+  it('parses --frame as a string option', () => {
+    const args = parseInput('click "Bis 45 km/h" --frame "#oevd-iframe"');
+    expect(args.frame).toBe('#oevd-iframe');
+    expect(args._).toEqual(['click', 'Bis 45 km/h']);
+  });
+
+  it('wraps run-code with frame resolution in resolveArgs', () => {
+    const args = parseInput('click "Submit" --frame "#myframe"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('page.locator("#myframe").contentFrame()');
+    expect(resolved.frame).toBeUndefined();
+  });
+
+  it('does not wrap when --frame is absent', () => {
+    const args = parseInput('click "Submit"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).not.toContain('contentFrame');
   });
 });
 
