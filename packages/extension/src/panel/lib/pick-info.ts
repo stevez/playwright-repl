@@ -248,7 +248,9 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot);
     if (pwCommand) pwCommand += pwFlags;
 
-    let { assertJs, assertPw } = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
+    const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
+    const assertJs = assertion.assertJs;
+    let assertPw = assertion.assertPw;
     if (assertPw) assertPw += pwFlags;
 
     return {
