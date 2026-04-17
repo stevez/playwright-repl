@@ -68,6 +68,18 @@ function parseAriaSnapshot(snapshot: string): { element: AriaNode; parent?: Aria
 }
 
 /**
+ * Extract frame selector from a JS locator that contains .contentFrame().
+ * e.g. `locator('#oevd-iframe').contentFrame().getByRole('radio', { name: 'Bis 45 km/h' })`
+ * → { frameSelector: '#oevd-iframe', innerLocator: "getByRole('radio', { name: 'Bis 45 km/h' })" }
+ * Returns null if no frame context is present.
+ */
+function extractFrameContext(locator: string): { frameSelector: string; innerLocator: string } | null {
+    const match = locator.match(/^locator\(['"](.+?)['"]\)\.contentFrame\(\)\.(.+)$/);
+    if (match) return { frameSelector: match[1], innerLocator: match[2] };
+    return null;
+}
+
+/**
  * Extract role + name from a JS locator string (lightweight fallback).
  * e.g. `getByRole('button', { name: 'Submit' })` → { role: 'button', name: 'Submit' }
  */
@@ -226,8 +238,18 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     const jsLocator = cdpLocator ?? info.locator;
     const locator = `page.${jsLocator}`;
     const jsExpression = `await page.${jsLocator}.highlight();`;
-    const pwCommand = derivePwCommand({ ...info, locator: jsLocator }, ariaSnapshot);
-    const { assertJs, assertPw } = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
+
+    // Extract context flags from JS locator — applied to all PW commands
+    const frame = extractFrameContext(jsLocator);
+    const innerLocator = frame ? frame.innerLocator : jsLocator;
+    const exact = /exact:\s*true/.test(innerLocator);
+    const pwFlags = (exact ? ' --exact' : '') + (frame ? ` --frame "${frame.frameSelector}"` : '');
+
+    let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot);
+    if (pwCommand) pwCommand += pwFlags;
+
+    let { assertJs, assertPw } = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
+    if (assertPw) assertPw += pwFlags;
 
     return {
         locator,

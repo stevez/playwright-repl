@@ -320,9 +320,9 @@ describe('buildPickResult', () => {
             attributes: { role: 'tab' },
         }));
         expect(result.locator).toBe("page.getByRole('tab', { name: 'npm', exact: true }).first()");
-        expect(result.pwCommand).toBe('highlight tab "npm" --nth 0');
+        expect(result.pwCommand).toBe('highlight tab "npm" --nth 0 --exact');
         expect(result.assertJs).toBe("await expect(page.getByRole('tab', { name: 'npm', exact: true }).first()).toContainText('npm');");
-        expect(result.assertPw).toBe('verify-element tab "npm" --nth 0');
+        expect(result.assertPw).toBe('verify-element tab "npm" --nth 0 --exact');
     });
 
     it('handles locator with exact: true and .nth(1)', () => {
@@ -332,8 +332,8 @@ describe('buildPickResult', () => {
             text: 'npm',
             attributes: { role: 'tab' },
         }));
-        expect(result.pwCommand).toBe('highlight tab "npm" --nth 1');
-        expect(result.assertPw).toBe('verify-element tab "npm" --nth 1');
+        expect(result.pwCommand).toBe('highlight tab "npm" --nth 1 --exact');
+        expect(result.assertPw).toBe('verify-element tab "npm" --nth 1 --exact');
     });
 
     it('handles role without exact (no disambiguation)', () => {
@@ -432,5 +432,22 @@ describe('buildPickResult', () => {
             text: 'Delete',
         }), null, '- listitem:\n  - button "Delete"');
         expect(result.pwCommand).toBe('highlight button "Delete" --in listitem');
+    });
+
+    // ─── Frame context ───────────────────────────────────────────────────
+
+    it('includes --frame in pwCommand when locator has .contentFrame()', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('#oevd-iframe').contentFrame().getByRole('radio', { name: 'Bis 45 km/h' })",
+            tag: 'input',
+            text: 'Bis 45 km/h',
+        }), "locator('#oevd-iframe').contentFrame().getByRole('radio', { name: 'Bis 45 km/h' })");
+        expect(result.pwCommand).toContain('--frame "#oevd-iframe"');
+        expect(result.pwCommand).toContain('Bis 45 km/h');
+    });
+
+    it('does not include --frame when no .contentFrame() in locator', () => {
+        const result = buildPickResult(makeInfo());
+        expect(result.pwCommand).not.toContain('--frame');
     });
 });

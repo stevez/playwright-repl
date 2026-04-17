@@ -352,6 +352,17 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
     if (!currentPage) return { ok: false, error: 'No active page' };
   }
 
+  // Validate that currentPage is still alive — re-attach if stale
+  try {
+    await currentPage.title();
+  } catch (e) {
+    console.debug('[pw-repl] pick: stale page detected, re-attaching...', e);
+    currentPage = null;
+    const tabId = await getActiveTabId();
+    if (tabId) await attachToTab(tabId);
+    if (!currentPage) return { ok: false, error: 'Page connection lost — please try again' };
+  }
+
   try {
     const locator = await currentPage.pickLocator();
     const locatorStr = locator.toString();
