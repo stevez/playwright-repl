@@ -35,6 +35,7 @@ export interface AIProvider {
     ariaSnapshot: string,
     locator: string,
   ): Promise<AssertionSuggestion[]>;
+  polishCode(code: string, pageSnapshot?: string): Promise<string>;
 }
 
 export class NoModelsAvailableError extends Error {
@@ -95,9 +96,30 @@ export class VSCodeLMProvider implements AIProvider {
 
     return parseSuggestions(fullText);
   }
+
+  async polishCode(code: string, pageSnapshot?: string): Promise<string> {
+    const lm = (this._vscode as any).lm;
+    if (!lm?.selectChatModels)
+      throw new NoModelsAvailableError();
+
+    const models = await lm.selectChatModels();
+    if (!models.length) throw new NoModelsAvailableError();
+    const model = models[0];
+
+    const messages = [
+      this._vscode.LanguageModelChatMessage.User(buildPolishSystemPrompt()),
+      this._vscode.LanguageModelChatMessage.User(buildPolishUserPrompt(code, pageSnapshot)),
+    ];
+
+    const response = await model.sendRequest(messages, {}, new this._vscode.CancellationTokenSource().token);
+    let fullText = '';
+    for await (const chunk of response.text) fullText += chunk;
+
+    return parsePolishResponse(fullText, code);
+  }
 }
 
-// ─── Prompt construction ────────────────────────────────────────────────────
+// ─── Assertion prompt construction ─────────────────────────────────────────
 
 export function buildSystemPrompt(): string {
   return `You are a Playwright test expert helping developers write meaningful assertions.
@@ -172,4 +194,54 @@ export function parseSuggestions(responseText: string): AssertionSuggestion[] {
     result.push(suggestion);
   }
   return result.slice(0, 5); // Cap at 5 suggestions
+}
+
+// ─── Polish prompt construction ────────────────────────────────────────────
+
+export function buildPolishSystemPrompt(): string {
+  return `You are a Playwright test expert. Given test body code, improve it while preserving its intent.
+
+CRITICAL RULES:
+- Return ONLY the improved code. No prose, no explanation, no code fences.
+- PRESERVE the test's intent — do NOT change what the test verifies or add unrelated actions.
+- Return EXACTLY the same structure as the input — if the input is a full test() block, return a full test() block. If the input is just a code fragment, return just the improved fragment.
+- Do NOT add imports, describe() wrappers, or test() wrappers that weren't in the input.
+- If the code is already clean and idiomatic, return it EXACTLY unchanged.
+- Preserve the EXACT original indentation — every line must have the same leading whitespace as the input.
+
+Improvements (apply only when beneficial):
+1. LOCATORS: Replace fragile CSS selectors with semantic locators.
+   Prefer: getByRole() > getByText() > getByTestId() > getByLabel() > CSS.
+2. ASSERTIONS: Add assertions only when clearly missing after state-changing actions.
+3. REDUNDANCY: Remove duplicate or unnecessary steps.
+4. COMMENTS: Add brief comments only for complex multi-step flows (3+ actions).
+
+Do NOT:
+- Rewrite simple tests that are already correct.
+- Add navigation steps the original code doesn't have.
+- Change assertion targets or values.
+- Add comments to single-line test bodies.`;
+}
+
+export function buildPolishUserPrompt(code: string, pageSnapshot?: string): string {
+  const parts: string[] = [];
+  parts.push('Code to polish:', code);
+  if (pageSnapshot) {
+    parts.push('', 'Current page state (may not reflect the code being polished — use as optional context only):');
+    parts.push(pageSnapshot.slice(0, 3000));
+  }
+  return parts.join('\n');
+}
+
+// ─── Polish response parsing ───────────────────────────────────────────────
+
+export function parsePolishResponse(responseText: string, originalCode: string): string {
+  let code = responseText.trim();
+  // Strip code fences if the model wrapped the response
+  const fenceMatch = code.match(/^```(?:typescript|ts|javascript|js)?\s*\n([\s\S]*?)\n```$/);
+  if (fenceMatch) code = fenceMatch[1].trim();
+  // If response is empty or looks like prose, return original
+  if (!code || /^(Here|I |The |This |Sure|Let me)/i.test(code))
+    return originalCode;
+  return code;
 }

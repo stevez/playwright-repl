@@ -38,6 +38,7 @@ import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
 import { VSCodeLMProvider } from './ai/provider';
+import { polishWithAI } from './ai/polish';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -370,6 +371,18 @@ export class Extension implements RunHooks {
       }),
       vscode.commands.registerCommand('playwright-repl.repl.find', () => {
         this._replView.toggleSearch();
+      }),
+      vscode.commands.registerCommand('playwright-repl.polishWithAI', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const aiProvider = new VSCodeLMProvider(vscode);
+        if (!await aiProvider.isAvailable()) {
+          vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
+          return;
+        }
+        const selection = editor.selection;
+        const range = selection.isEmpty ? undefined : new vscode.Range(selection.start, selection.end);
+        await polishWithAI(vscode, aiProvider, editor, this._browserController.browserManager, range);
       }),
     ];
 

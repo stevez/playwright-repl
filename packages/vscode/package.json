@@ -153,9 +153,29 @@
         "command": "playwright-repl.repl.find",
         "icon": "$(search)",
         "title": "Find in REPL"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.polishWithAI",
+        "icon": "$(sparkle)",
+        "title": "Polish with AI"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "playwright-repl.polishWithAI",
+          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "playwright-repl.polishWithAI",
+          "when": "editorHasSelection && resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
+          "group": "1_modification@99"
+        }
+      ],
       "view/title": [
         {
           "command": "playwright-repl.repl.clear",
