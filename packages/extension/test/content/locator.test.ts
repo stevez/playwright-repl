@@ -542,6 +542,95 @@ describe('locator', () => {
             const pair = generateLocatorPair(btn);
             expect(pair.ancestor).toBeUndefined();
         });
+
+        it('uses heading context for PW --in when no container role exists', () => {
+            document.body.innerHTML = `
+                <div>
+                    <h3>Robot Framework</h3>
+                    <div><a href="/rf">RFCP® Certified</a></div>
+                </div>
+                <div>
+                    <h3>Testspezialist</h3>
+                    <div><a href="/ts">RFCP® Certified</a></div>
+                </div>`;
+            const links = document.querySelectorAll('a');
+            const pair0 = generateLocatorPair(links[0]);
+            expect(pair0.js).toContain('.first()');
+            expect(pair0.pw).toBe("getByRole('link', { name: 'RFCP® Certified' })");
+            expect(pair0.ancestor).toEqual({ role: '', text: 'Robot Framework' });
+
+            const pair1 = generateLocatorPair(links[1]);
+            expect(pair1.js).toContain('.nth(1)');
+            expect(pair1.pw).toBe("getByRole('link', { name: 'RFCP® Certified' })");
+            expect(pair1.ancestor).toEqual({ role: '', text: 'Testspezialist' });
+        });
+
+        it('falls back to .nth() when heading text is not unique', () => {
+            document.body.innerHTML = `
+                <div>
+                    <h3>Section</h3>
+                    <div><a href="/a">Same Link</a></div>
+                </div>
+                <div>
+                    <h3>Section</h3>
+                    <div><a href="/b">Same Link</a></div>
+                </div>`;
+            const links = document.querySelectorAll('a');
+            const pair = generateLocatorPair(links[0]);
+            expect(pair.js).toContain('.first()');
+            expect(pair.pw).toContain('.first()');
+            expect(pair.ancestor).toBeUndefined();
+        });
+
+        it('finds heading in nested wrapper before target branch', () => {
+            document.body.innerHTML = `
+                <div>
+                    <div><h2>Alpha</h2></div>
+                    <div><button>Go</button></div>
+                </div>
+                <div>
+                    <div><h2>Beta</h2></div>
+                    <div><button>Go</button></div>
+                </div>`;
+            const buttons = document.querySelectorAll('button');
+            const pair = generateLocatorPair(buttons[1]);
+            expect(pair.pw).toBe("getByRole('button', { name: 'Go' })");
+            expect(pair.ancestor).toEqual({ role: '', text: 'Beta' });
+        });
+
+        it('finds label in banner/accordion preceding the target branch', () => {
+            document.body.innerHTML = `
+                <div>
+                    <div role="banner"><p>Testspezialist</p><button>Aufklappen</button></div>
+                    <div><a href="/rf">RFCP® Certified</a></div>
+                </div>
+                <div>
+                    <div role="banner"><p>Robot Framework</p><button>Zuklappen</button></div>
+                    <div><a href="/rf2">RFCP® Certified</a></div>
+                </div>`;
+            const links = document.querySelectorAll('a');
+            const pair0 = generateLocatorPair(links[0]);
+            expect(pair0.pw).toBe("getByRole('link', { name: 'RFCP® Certified' })");
+            expect(pair0.ancestor).toEqual({ role: '', text: 'Testspezialist' });
+
+            const pair1 = generateLocatorPair(links[1]);
+            expect(pair1.ancestor).toEqual({ role: '', text: 'Robot Framework' });
+        });
+
+        it('finds label in plain div (no role) before target branch', () => {
+            document.body.innerHTML = `
+                <div>
+                    <div class="title">Section A</div>
+                    <div><a href="/a">Same Link</a></div>
+                </div>
+                <div>
+                    <div class="title">Section B</div>
+                    <div><a href="/b">Same Link</a></div>
+                </div>`;
+            const links = document.querySelectorAll('a');
+            const pair = generateLocatorPair(links[1]);
+            expect(pair.ancestor).toEqual({ role: '', text: 'Section B' });
+        });
     });
 
     // ─── locatorToPwArgs ───────────────────────────────────────────────────
@@ -866,6 +955,26 @@ describe('locator', () => {
             const editButtons = [...document.querySelectorAll('button')].filter(b => b.textContent === 'Edit');
             const cmds = buildCommands('click', editButtons[1]);
             expect(cmds!.pw).toBe('click button "Edit" --in row "Bob"');
+        });
+
+        it('uses text-only --in from heading context instead of --nth', () => {
+            document.body.innerHTML = `
+                <div>
+                    <h3>Robot Framework</h3>
+                    <div><a href="/rf">RFCP® Certified</a></div>
+                </div>
+                <div>
+                    <h3>Testspezialist</h3>
+                    <div><a href="/ts">RFCP® Certified</a></div>
+                </div>`;
+            const links = document.querySelectorAll('a');
+            const cmds0 = buildCommands('click', links[0]);
+            expect(cmds0!.pw).toBe('click link "RFCP® Certified" --in "Robot Framework"');
+            expect(cmds0!.js).toContain('.first()');
+            expect(cmds0!.js).toContain('.click()');
+
+            const cmds1 = buildCommands('click', links[1]);
+            expect(cmds1!.pw).toBe('click link "RFCP® Certified" --in "Testspezialist"');
         });
     });
 

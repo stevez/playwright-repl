@@ -144,6 +144,67 @@ function findContainerAncestor(el: Element): { ancestor: Element; role: string }
     return null;
 }
 
+// ─── Heading-based context disambiguation ────────────────────────────────
+
+/**
+ * Find the first short leaf text in an element, skipping button content.
+ * Generic approach — works for headings, banners, labels, or any structure.
+ */
+function findLeafText(node: Node): string {
+    for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            const text = (child.textContent || '').trim();
+            if (text && text.length >= 2 && text.length <= 50) return text;
+        }
+        if (child.nodeType === Node.ELEMENT_NODE) {
+            const el = child as Element;
+            if (el.matches('button') || el.closest('button')) continue;
+            const text = findLeafText(el);
+            if (text) return text;
+        }
+    }
+    return '';
+}
+
+/**
+ * Walk up from el, find the nearest preceding sibling with distinctive text.
+ * Skips siblings that contain links — those are peer items, not section labels.
+ */
+function findNearestHeading(el: Element): { container: Element; text: string } | null {
+    let current = el.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+        for (const child of current.children) {
+            if (child.contains(el)) break; // stop at el's branch
+            // Skip peer items — section labels don't contain navigation links
+            if (child.matches('a') || child.querySelector('a')) continue;
+            const text = findLeafText(child);
+            if (text) return { container: current, text };
+        }
+        current = current.parentElement;
+    }
+    return null;
+}
+
+/**
+ * Try heading-based disambiguation: if each duplicate match has a unique
+ * nearest heading, return the heading text for the target element.
+ */
+function tryHeadingContext(el: Element, matches: Element[]): string | null {
+    const result = findNearestHeading(el);
+    if (!result) return null;
+
+    // Check uniqueness: only one match should share this heading text
+    let count = 0;
+    for (const match of matches) {
+        const mResult = findNearestHeading(match);
+        if (mResult && mResult.text === result.text) {
+            count++;
+            if (count > 1) return null;
+        }
+    }
+    return count === 1 ? result.text : null;
+}
+
 /**
  * Try to disambiguate using ancestor context.
  * Returns a chained locator like:
@@ -345,26 +406,46 @@ const ROLE_SHORTHANDS: Record<string, string> = { listitem: 'list' };
  */
 export function generateLocatorPair(el: Element): { js: string; pw: string; ancestor?: { role: string; text: string } } {
     const jsLocator = generateLocator(el);
-    if (!jsLocator.includes('.filter(')) return { js: jsLocator, pw: jsLocator };
 
-    // JS used ancestor context — extract ancestor info for PW --in flag
-    const role = getImplicitRole(el)!;
-    const name = getAccessibleName(el);
-    const container = findContainerAncestor(el);
-    const contextText = container ? getContextText(container.ancestor, el) : '';
-
-    if (container && contextText) {
-        const pwLocator = `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
-        const shortRole = ROLE_SHORTHANDS[container.role] ?? container.role;
-        return { js: jsLocator, pw: pwLocator, ancestor: { role: shortRole, text: contextText } };
+    // No disambiguation needed — return as-is
+    if (!jsLocator.includes('.filter(') && !jsLocator.includes('.nth(') && !jsLocator.includes('.first()')) {
+        return { js: jsLocator, pw: jsLocator };
     }
 
-    // No ancestor context — fall back to .nth()
-    const matches = findByRoleAndName(role, name);
-    const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
-    const idx = matches.indexOf(el);
-    const pwLocator = idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
-    return { js: jsLocator, pw: pwLocator };
+    // JS used ancestor context (.filter chain) — extract ancestor info for PW --in flag
+    if (jsLocator.includes('.filter(')) {
+        const role = getImplicitRole(el)!;
+        const name = getAccessibleName(el);
+        const container = findContainerAncestor(el);
+        const contextText = container ? getContextText(container.ancestor, el) : '';
+
+        if (container && contextText) {
+            const pwLocator = `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+            const shortRole = ROLE_SHORTHANDS[container.role] ?? container.role;
+            return { js: jsLocator, pw: pwLocator, ancestor: { role: shortRole, text: contextText } };
+        }
+
+        // .filter() present but no container context — fall back to .nth()
+        const matches = findByRoleAndName(role, name);
+        const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)}, exact: true })`;
+        const idx = matches.indexOf(el);
+        const pwLocator = idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
+        return { js: jsLocator, pw: pwLocator };
+    }
+
+    // .nth()/.first() — try heading context for PW --in flag
+    const role = getImplicitRole(el);
+    const name = getAccessibleName(el);
+    if (role && name) {
+        const matches = findByRoleAndName(role, name);
+        const headingText = tryHeadingContext(el, matches);
+        if (headingText) {
+            const pwLocator = `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+            return { js: jsLocator, pw: pwLocator, ancestor: { role: '', text: headingText } };
+        }
+    }
+
+    return { js: jsLocator, pw: jsLocator };
 }
 
 // ─── Element classification ─────────────────────────────────────────────
@@ -400,7 +481,9 @@ export function buildCommands(action: string, el: Element, opts?: {
     const role = getImplicitRole(el);
     const pwArgs = locatorToPwArgs(pwLocator, role);
     const q = (s: string) => `"${s}"`;
-    const inFlag = ancestor ? ` --in ${ancestor.role} ${q(ancestor.text)}` : '';
+    const inFlag = ancestor
+        ? ` --in ${ancestor.role ? `${ancestor.role} ` : ''}${q(ancestor.text)}`
+        : '';
 
     switch (action) {
         case 'hover':

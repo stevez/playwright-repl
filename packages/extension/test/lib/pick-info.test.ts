@@ -450,4 +450,53 @@ describe('buildPickResult', () => {
         const result = buildPickResult(makeInfo());
         expect(result.pwCommand).not.toContain('--frame');
     });
+
+    // ─── Heading context (--in instead of --nth) ─────────────────────────
+
+    it('replaces --nth with --in when headingContext provided', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'RFCP® Certified', exact: true }).nth(1)",
+            tag: 'a',
+            text: 'RFCP® Certified',
+            attributes: { href: '/rf' },
+        }), null, undefined, 'Robot Framework');
+        expect(result.pwCommand).toBe('highlight link "RFCP® Certified" --in "Robot Framework" --exact');
+        expect(result.pwCommand).not.toContain('--nth');
+    });
+
+    it('adds --in even without --nth when headingContext provided', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'RFCP® Certified' })",
+            tag: 'a',
+            text: 'RFCP® Certified',
+            attributes: { href: '/rf' },
+        }), null, undefined, 'Robot Framework');
+        expect(result.pwCommand).toBe('highlight link "RFCP® Certified" --in "Robot Framework"');
+        // assertion should also get --in
+        expect(result.assertPw).toContain('--in "Robot Framework"');
+    });
+
+    it('keeps --nth when no headingContext', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'RFCP® Certified', exact: true }).nth(1)",
+            tag: 'a',
+            text: 'RFCP® Certified',
+            attributes: { href: '/rf' },
+        }), null, undefined, null);
+        expect(result.pwCommand).toContain('--nth 1');
+        expect(result.pwCommand).not.toContain('--in');
+    });
+
+    it('prefers aria snapshot parent over headingContext', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('checkbox', { name: 'reading', exact: true }).first()",
+            tag: 'input',
+            text: '',
+            attributes: { type: 'checkbox' },
+            checked: true,
+        }), null, '- listitem:\n  - checkbox "reading"', 'Some Heading');
+        // aria snapshot provides listitem parent — use that, not heading
+        expect(result.pwCommand).toContain('--in listitem');
+        expect(result.pwCommand).not.toContain('Some Heading');
+    });
 });

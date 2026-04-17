@@ -372,6 +372,29 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
       for (const attr of el.attributes) attrs[attr.name] = attr.value;
       const tag = el.tagName;
       const inputType = (attrs.type || '').toLowerCase();
+
+      // Detect nearest preceding sibling text (for --in context)
+      // Generic: finds first short leaf text, skipping buttons — works for headings, banners, labels
+      function leafText(node: Node): string {
+        for (const c of node.childNodes) {
+          if (c.nodeType === 3) { const t = (c.textContent || '').trim(); if (t && t.length >= 2 && t.length <= 50) return t; }
+          if (c.nodeType === 1) { const e = c as Element; if (e.matches('button') || e.closest('button')) continue; const t = leafText(e); if (t) return t; }
+        }
+        return '';
+      }
+      let headingContext: string | null = null;
+      let cur = el.parentElement;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        for (const child of cur.children) {
+          if (child.contains(el)) break;
+          if (child.matches('a') || child.querySelector('a')) continue; // skip peer items with links
+          const t = leafText(child);
+          if (t) { headingContext = t; break; }
+        }
+        if (headingContext) break;
+        cur = cur.parentElement;
+      }
+
       return {
         tag,
         text: (el as HTMLElement).innerText?.slice(0, 200) ?? '',
@@ -383,6 +406,7 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
         value: ('value' in el) ? (el as HTMLInputElement).value : undefined,
         checked: (tag === 'INPUT' && (inputType === 'checkbox' || inputType === 'radio'))
           ? (el as HTMLInputElement).checked : undefined,
+        headingContext,
       };
     }).catch(() => null);
 

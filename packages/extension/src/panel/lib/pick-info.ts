@@ -97,9 +97,11 @@ function parseJsLocator(locator: string): { role?: string; name?: string } {
 /**
  * Derive a .pw keyword command from aria snapshot + locator.
  * Uses aria snapshot as primary source; falls back to JS locator parsing.
+ * When headingContext is provided and --nth is present, replaces --nth with --in "heading".
  */
-function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string): string | null {
+function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingContext?: string | null): string | null {
     const nth = extractNth(info.locator);
+    const headingIn = headingContext ? ` --in "${headingContext}"` : '';
 
     // Primary: derive from aria snapshot
     if (ariaSnapshot) {
@@ -112,19 +114,23 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string): string |
                 const parentName = parent.name ? ` "${parent.name}"` : '';
                 inFlag = ` --in ${parent.role}${parentName}`;
             }
+            // Prefer heading --in over --nth when no aria parent context exists
+            if (!inFlag && headingIn) {
+                return `highlight ${element.role}${nameArg}${headingIn}`;
+            }
             return `highlight ${element.role}${nameArg}${nth}${inFlag}`;
         }
     }
 
     // Fallback: parse JS locator string
     const { role, name } = parseJsLocator(info.locator);
-    if (role && name) return `highlight ${role} "${name}"${nth}`;
-    if (role) return `highlight ${role}${nth}`;
-    if (name) return `highlight "${name}"${nth}`;
+    if (role && name) return `highlight ${role} "${name}"${headingIn || nth}`;
+    if (role) return `highlight ${role}${headingIn || nth}`;
+    if (name) return `highlight "${name}"${headingIn || nth}`;
 
     // Last resort: element text
     const text = info.text?.trim();
-    if (text && text.length <= 80) return `highlight "${text}"${nth}`;
+    if (text && text.length <= 80) return `highlight "${text}"${headingIn || nth}`;
 
     return null;
 }
@@ -234,7 +240,7 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
  * Uses aria snapshot (when available) to derive .pw commands from
  * Playwright's semantic model instead of regex-parsing the JS locator.
  */
-export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | null, ariaSnapshot?: string): PickResultData {
+export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | null, ariaSnapshot?: string, headingContext?: string | null): PickResultData {
     const jsLocator = cdpLocator ?? info.locator;
     const locator = `page.${jsLocator}`;
     const jsExpression = `await page.${jsLocator}.highlight();`;
@@ -243,15 +249,16 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     const frame = extractFrameContext(jsLocator);
     const innerLocator = frame ? frame.innerLocator : jsLocator;
     const exact = /exact:\s*true/.test(innerLocator);
-    const pwFlags = (exact ? ' --exact' : '') + (frame ? ` --frame "${frame.frameSelector}"` : '');
+    const extraFlags = (exact ? ' --exact' : '') + (frame ? ` --frame "${frame.frameSelector}"` : '');
+    const headingIn = headingContext ? ` --in "${headingContext}"` : '';
 
-    let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot);
-    if (pwCommand) pwCommand += pwFlags;
+    let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot, headingContext);
+    if (pwCommand) pwCommand += extraFlags; // --in already inside derivePwCommand
 
     const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
     const assertJs = assertion.assertJs;
     let assertPw = assertion.assertPw;
-    if (assertPw) assertPw += pwFlags;
+    if (assertPw) assertPw += headingIn + extraFlags; // assertions need --in added here
 
     return {
         locator,
