@@ -180,6 +180,41 @@ function call(fn: any, ...args: unknown[]): string {
   return `await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
 }
 
+/**
+ * Build a JS expression that scopes to the nearest ancestor containing inText + targetText,
+ * then calls fn with the scoped locator as `page`.
+ * First tries role-based scoping, then falls back to DOM proximity via locator.evaluate().
+ */
+function callScoped(fn: any, inText: string, targetText: string, ...args: unknown[]): string {
+  return `await (async () => {
+    let __scope = page;
+    const __roles = ['region', 'group', 'article', 'listitem', 'dialog', 'form'];
+    for (const __r of __roles) {
+      const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
+      if (await __c.getByText(${ser(targetText)}, { exact: true }).count() > 0) { __scope = __c; break; }
+    }
+    if (__scope === page) {
+      try {
+        const __sel = await page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el, tgt) => {
+          let a = el.parentElement;
+          while (a && a !== document.body) {
+            if (a.textContent.includes(tgt)) {
+              const id = '__pw_in_' + Math.random().toString(36).slice(2);
+              a.setAttribute('data-pw-in', id);
+              return '[data-pw-in="' + id + '"]';
+            }
+            a = a.parentElement;
+          }
+          return null;
+        }, ${ser(targetText)});
+        if (__sel) __scope = page.locator(__sel);
+      } catch {}
+    }
+    return await (${fn.toString()})(__scope, ${args.map(ser).join(', ')});
+  })()`;
+}
+
+
 // ─── Known boolean options ───────────────────────────────────────────────────
 
 const BOOLEAN_OPTIONS = new Set([
@@ -266,11 +301,15 @@ function parseInput(line: string): ParsedArgs | null {
       if (BOOLEAN_OPTIONS.has(key)) {
         opts[key] = true;
         i++;
-      } else if (key === 'in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--')) {
-        // --in takes two values: container role and text
+      } else if (key === 'in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--') && /^[a-z]+$/.test(tokens[i + 1])) {
+        // --in <role> <text> — role-based container context
         opts['in-role'] = tokens[i + 1];
         opts['in-text'] = tokens[i + 2];
         i += 3;
+      } else if (key === 'in' && i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) {
+        // --in <text> — text-only container context (no role)
+        opts['in-text'] = tokens[i + 1];
+        i += 2;
       } else if (i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) {
         opts[key] = tokens[i + 1];
         i += 2;
@@ -417,10 +456,14 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       const exact = args.exact ? true : undefined;
       const isSelector = /[.#[\]>:=]/.test(loc);
       // highlight <role> "<name>" → getByRole(role, { name })
+      const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
+      const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
       if (!isSelector && args._.length >= 3 && /^[a-z]+$/.test(loc)) {
         const name = args._.slice(2).join(' ');
-        return { jsExpr: call(highlightByRole, loc, name, nth) };
+        if (inText && !inRole) return { jsExpr: callScoped(highlightByRole, inText, name, loc, name, nth) };
+        return { jsExpr: call(highlightByRole, loc, name, nth, inRole, inText) };
       }
+      if (!isSelector && inText && !inRole) return { jsExpr: callScoped(highlightByText, inText, loc, loc, nth, exact) };
       return isSelector
         ? { jsExpr: call(highlightBySelector, loc, nth) }
         : { jsExpr: call(highlightByText, loc, nth, exact) };
@@ -462,6 +505,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
     if (ROLE_ACTIONS[cmdName]) {
       const name = args._.slice(2).join(' ');
+      if (inText && !inRole) return { jsExpr: callScoped(actionByRole, inText, name, role, name, ROLE_ACTIONS[cmdName], nth) };
       return { jsExpr: call(actionByRole, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText) };
     }
     if (cmdName === 'fill') {
@@ -649,6 +693,7 @@ export function parseReplCommand(input: string): ParseResult {
 
   // Parse input (tokenize + alias + options)
   const args = parseInput(input);
+  console.log('[pw-repl] parseInput result:', JSON.stringify(args));
   if (!args) return { error: 'Empty command' };
 
   // Resolve to DirectExecution, TabOperation, or unrecognised ParsedArgs

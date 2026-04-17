@@ -185,6 +185,13 @@ describe('--in option', () => {
     expect(args.in).toBe('dialog');
     expect(args).not.toHaveProperty('in-role');
   });
+
+  it('parses --in with text-only (no role) into in-text', () => {
+    const args = parseInput('click radio "Nein" --in "Rechnungsadresse abweichend?"');
+    expect(args['in-text']).toBe('Rechnungsadresse abweichend?');
+    expect(args).not.toHaveProperty('in-role');
+    expect(args._).toEqual(['click', 'radio', 'Nein']);
+  });
 });
 
 describe('--frame flag', () => {

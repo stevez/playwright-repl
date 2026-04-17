@@ -184,6 +184,11 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc[action]();
@@ -194,6 +199,11 @@ export async function fillByRole(page, role, name, value, nth, inRole, inText) {
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.fill(value);
@@ -204,6 +214,11 @@ export async function selectByRole(page, role, name, value, nth, inRole, inText)
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.selectOption(value);
@@ -221,8 +236,17 @@ export async function highlightByText(page, text, nth?, exact?) {
     : 'Highlighted ' + count + ' element' + (count !== 1 ? 's' : '');
 }
 
-export async function highlightByRole(page, role, name, nth) {
+export async function highlightByRole(page, role, name, nth, inRole?, inText?) {
   let loc = page.getByRole(role, { name, exact: true });
+  if (inRole !== undefined && inText !== undefined) {
+    const cr = ({ list: 'listitem' })[inRole] || inRole;
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
+  }
   const count = await loc.count();
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.highlight();
@@ -386,6 +410,11 @@ export async function pressKeyByRole(page, role, name, key, nth, inRole, inText)
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
   await loc.press(key);

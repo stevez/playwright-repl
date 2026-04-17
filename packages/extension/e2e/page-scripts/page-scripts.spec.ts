@@ -14,7 +14,7 @@ import {
     verifyText, verifyElement, verifyValue, verifyList, verifyTitle, verifyUrl,
     verifyNoText, verifyNoElement, verifyVisible, verifyInputValue,
     actionByText, fillByText, selectByText, checkByText, uncheckByText,
-    highlightByText, highlightBySelector,
+    highlightByText, highlightByRole, highlightBySelector,
     chainAction,
     goBack, goForward, gotoUrl, reloadPage,
     waitMs,
@@ -224,6 +224,12 @@ test.describe('highlight', () => {
     test('highlightBySelector returns message', async ({ page }) => {
         const result = await highlightBySelector(page, 'h1');
         expect(result).toMatch(/^Highlighted \d+ element/);
+    });
+
+    test('highlightByRole with text-only --in scopes to section', async ({ page }) => {
+        // "Yes" radio appears 3 times — text-only --in scopes to the right section
+        const scopedResult = await highlightByRole(page, 'radio', 'Yes', undefined, undefined, 'Billing Address');
+        expect(scopedResult).toBe('Highlighted 1 element');
     });
 });
 

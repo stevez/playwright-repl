@@ -149,9 +149,15 @@ export function parseInput(line: string): ParsedArgs | null {
   }
 
   // Pre-process --in <role> <text> → --in-role <role> --in-text <text>
+  // Or --in <text> → --in-text <text> (text-only, no role)
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === '--in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--')) {
+    if (tokens[i] === '--in' && i + 2 < tokens.length && !tokens[i + 1].startsWith('--') && !tokens[i + 2].startsWith('--') && /^[a-z]+$/.test(tokens[i + 1])) {
       tokens.splice(i, 3, '--in-role', tokens[i + 1], '--in-text', tokens[i + 2]);
+      break;
+    }
+    if (tokens[i] === '--in' && i + 1 < tokens.length && !tokens[i + 1].startsWith('--') && !/^[a-z]+$/.test(tokens[i + 1])) {
+      // Text-only --in: keep in-text only, page-scripts will try common roles
+      tokens.splice(i, 2, '--in-text', tokens[i + 1]);
       break;
     }
   }

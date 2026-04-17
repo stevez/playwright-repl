@@ -236,6 +236,31 @@ describe("--frame flag", () => {
   });
 });
 
+// ─── --in text-only ─────────────────────────────────────────────────────────
+
+describe("--in text-only", () => {
+  it("passes inText to actionByRole for role-based click", () => {
+    const { jsExpr } = direct('click radio "Nein" --in "Rechnungsadresse abweichend?"');
+    expect(jsExpr).toContain('actionByRole');
+    expect(jsExpr).toContain('"Nein"');
+    expect(jsExpr).toContain('"Rechnungsadresse abweichend?"');
+  });
+
+  it("passes inText to highlightByRole", () => {
+    const { jsExpr } = direct('highlight radio "Nein" --in "Rechnungsadresse abweichend?"');
+    expect(jsExpr).toContain('highlightByRole');
+    expect(jsExpr).toContain('"Nein"');
+    expect(jsExpr).toContain('"Rechnungsadresse abweichend?"');
+  });
+
+  it("still parses role+text --in correctly", () => {
+    const { jsExpr } = direct('click button "Submit" --in dialog "Settings"');
+    expect(jsExpr).toContain('actionByRole');
+    expect(jsExpr).toContain('"dialog"');
+    expect(jsExpr).toContain('"Settings"');
+  });
+});
+
 describe("press", () => {
   it("routes role+name+key to pressKeyByRole", () => {
     const { jsExpr } = direct('press textbox "What needs to be done?" Enter');
