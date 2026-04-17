@@ -206,7 +206,7 @@ describe("background.ts message handlers", () => {
   it("record-start injects recorder content script and returns url", async () => {
     const result = await sendMessage({ type: 'record-start' });
     expect(chrome.scripting.executeScript).toHaveBeenCalledWith(
-      expect.objectContaining({ target: { tabId: 42 }, files: ['content/recorder.js'] })
+      expect.objectContaining({ target: { tabId: 42, allFrames: true }, files: ['content/recorder.js'] })
     );
     expect(result).toEqual({ ok: true, url: 'https://example.com' });
   });
