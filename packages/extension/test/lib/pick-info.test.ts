@@ -434,6 +434,27 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).toBe('highlight button "Delete" --in listitem');
     });
 
+    it('prefers aria element name over JS locator name (full vs substring)', () => {
+        // Playwright getByRole uses substring matching — JS locator name may be partial.
+        // Aria snapshot has the full accessible name — prefer it for PW commands.
+        const result = buildPickResult(makeInfo({
+            locator: "locator('[id=\"#category--9-content\"]').getByRole('link', { name: 'RFCP® Robot Framework®' })",
+            tag: 'a',
+            text: 'RFCP® Robot Framework® Certified Professional',
+        }), null, '- link "RFCP® Robot Framework® Certified Professional"', 'Testspezialist i');
+        expect(result.pwCommand).toBe('highlight link "RFCP® Robot Framework® Certified Professional" --in "Testspezialist i"');
+    });
+
+    it('prefers aria name + replaces --nth with heading --in', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('[id=\"#category--9-content\"]').getByRole('link', { name: 'RFCP® Robot Framework®' }).nth(1)",
+            tag: 'a',
+            text: 'RFCP® Robot Framework® Certified Professional',
+        }), null, '- link "RFCP® Robot Framework® Certified Professional"', 'Testspezialist');
+        expect(result.pwCommand).toBe('highlight link "RFCP® Robot Framework® Certified Professional" --in "Testspezialist"');
+        expect(result.pwCommand).not.toContain('--nth');
+    });
+
     // ─── Frame context ───────────────────────────────────────────────────
 
     it('includes --frame in pwCommand when locator has .contentFrame()', () => {
@@ -462,6 +483,9 @@ describe('buildPickResult', () => {
         }), null, undefined, 'Robot Framework');
         expect(result.pwCommand).toBe('highlight link "RFCP® Certified" --in "Robot Framework" --exact');
         expect(result.pwCommand).not.toContain('--nth');
+        // assertion should also replace --nth with --in
+        expect(result.assertPw).toContain('--in "Robot Framework"');
+        expect(result.assertPw).not.toContain('--nth');
     });
 
     it('adds --in even without --nth when headingContext provided', () => {

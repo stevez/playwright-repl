@@ -377,7 +377,15 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
       // Generic: finds first short leaf text, skipping buttons — works for headings, banners, labels
       function leafText(node: Node): string {
         for (const c of node.childNodes) {
-          if (c.nodeType === 3) { const t = (c.textContent || '').trim(); if (t && t.length >= 2 && t.length <= 50) return t; }
+          if (c.nodeType === 3) {
+            const t = (c.textContent || '').trim();
+            if (t && t.length >= 2 && t.length <= 50) {
+              // Use parent element's full text to match what --in sees at runtime
+              // (child elements like info icons contribute to the element's text content)
+              const full = (c.parentElement?.textContent || '').trim();
+              return (full.length <= 50) ? full : t;
+            }
+          }
           if (c.nodeType === 1) { const e = c as Element; if (e.matches('button') || e.closest('button')) continue; const t = leafText(e); if (t) return t; }
         }
         return '';

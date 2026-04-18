@@ -79,54 +79,89 @@ function extractFrameContext(locator: string): { frameSelector: string; innerLoc
     return null;
 }
 
+// ─── JS Locator Parsing ──────────────────────────────────────────────
+
+type ParsedLocator = {
+    method: string;       // 'getByRole', 'getByText', 'getByLabel', etc.
+    role?: string;        // only for getByRole
+    name?: string;        // primary argument (role name, text, label, etc.)
+};
+
 /**
- * Extract role + name from a JS locator string (lightweight fallback).
- * e.g. `getByRole('button', { name: 'Submit' })` → { role: 'button', name: 'Submit' }
+ * Parse a JS locator string to extract method, role, and name.
+ * Handles chained locators by finding the last getBy* call.
+ * e.g. `getByRole('button', { name: 'Submit' })` → { method: 'getByRole', role: 'button', name: 'Submit' }
+ * e.g. `getByText('Hello')` → { method: 'getByText', name: 'Hello' }
+ * e.g. `getByRole('listitem').filter(...).getByRole('button', { name: 'Delete' })` → last getByRole wins
  */
-function parseJsLocator(locator: string): { role?: string; name?: string } {
-    const roleNameMatch = locator.match(/getByRole\(['"](.+?)['"],\s*\{[^}]*name:\s*['"](.+?)['"]/);
-    if (roleNameMatch) return { role: roleNameMatch[1], name: roleNameMatch[2] };
-    const roleMatch = locator.match(/getByRole\(['"](.+?)['"]\)/);
-    if (roleMatch) return { role: roleMatch[1] };
-    // getByLabel/getByText/getByPlaceholder/getByTestId — name only
-    const getByMatch = locator.match(/getBy\w+\(['"](.+?)['"]\)/);
-    if (getByMatch) return { name: getByMatch[1] };
-    return {};
+function parseJsLocator(locator: string): ParsedLocator {
+    // Strip page. prefix and nth suffixes
+    const s = locator
+        .replace(/^page\./, '')
+        .replace(/\.(first|last)\(\)$/, '')
+        .replace(/\.nth\(\d+\)$/, '');
+
+    // Find last getByRole (negative lookahead ensures no later getBy* call)
+    // Use [^'"]+ to prevent matching across quote boundaries during backtracking
+    const roleMatch = s.match(/getByRole\(['"]([^'"]+)['"](?:,\s*\{([^}]*)\})?\)(?!.*getBy)/);
+    if (roleMatch) {
+        const nameMatch = roleMatch[2]?.match(/name:\s*['"]([^'"]+)['"]/);
+        return { method: 'getByRole', role: roleMatch[1], name: nameMatch?.[1] };
+    }
+
+    // Find last getBy* call (non-role)
+    for (const method of ['getByText', 'getByLabel', 'getByPlaceholder', 'getByTestId', 'getByTitle', 'getByAltText']) {
+        const re = new RegExp(`${method}\\(['"]([^'"]+)['"](?:,\\s*\\{[^}]*\\})?\\)(?!.*getBy)`);
+        const m = s.match(re);
+        if (m) return { method, name: m[1] };
+    }
+
+    // CSS/XPath locator
+    if (/locator\(/.test(s)) return { method: 'locator' };
+
+    return { method: 'unknown' };
 }
 
 /**
- * Derive a .pw keyword command from aria snapshot + locator.
- * Uses aria snapshot as primary source; falls back to JS locator parsing.
- * When headingContext is provided and --nth is present, replaces --nth with --in "heading".
+ * Derive a .pw keyword command from JS locator (primary) + aria snapshot (for --in context).
+ * The JS locator is the single source of truth for role, name, and options.
+ * Aria snapshot provides: (1) role enrichment for non-getByRole locators,
+ * (2) parent container for --in flag.
+ * When headingContext is provided and no aria parent exists, replaces --nth with --in "heading".
  */
 function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingContext?: string | null): string | null {
+    const parsed = parseJsLocator(info.locator);
     const nth = extractNth(info.locator);
     const headingIn = headingContext ? ` --in "${headingContext}"` : '';
 
-    // Primary: derive from aria snapshot
-    if (ariaSnapshot) {
-        const parsed = parseAriaSnapshot(ariaSnapshot);
-        if (parsed) {
-            const { element, parent } = parsed;
-            const nameArg = element.name ? ` "${element.name}"` : '';
-            let inFlag = '';
-            if (parent && parent.role !== element.role) {
-                const parentName = parent.name ? ` "${parent.name}"` : '';
-                inFlag = ` --in ${parent.role}${parentName}`;
-            }
-            // Prefer heading --in over --nth when no aria parent context exists
-            if (!inFlag && headingIn) {
-                return `highlight ${element.role}${nameArg}${headingIn}`;
-            }
-            return `highlight ${element.role}${nameArg}${nth}${inFlag}`;
-        }
+    // Parse aria snapshot once for role enrichment and --in context
+    const ariaParsed = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot) : null;
+
+    // Role: from JS locator, enriched by aria element when not available
+    const role = parsed.role ?? ariaParsed?.element.role;
+
+    // Name: prefer aria element name (full accessible name) over JS locator name
+    // (which may be a substring — Playwright's getByRole uses substring matching by default)
+    const name = ariaParsed?.element.name || parsed.name;
+
+    // --in: from aria parent (when parent role differs from element role)
+    let inFlag = '';
+    if (ariaParsed?.parent && ariaParsed.parent.role !== role) {
+        const parentName = ariaParsed.parent.name ? ` "${ariaParsed.parent.name}"` : '';
+        inFlag = ` --in ${ariaParsed.parent.role}${parentName}`;
     }
 
-    // Fallback: parse JS locator string
-    const { role, name } = parseJsLocator(info.locator);
-    if (role && name) return `highlight ${role} "${name}"${headingIn || nth}`;
-    if (role) return `highlight ${role}${headingIn || nth}`;
-    if (name) return `highlight "${name}"${headingIn || nth}`;
+    // Build command
+    const parts = ['highlight'];
+    if (role) parts.push(role);
+    if (name) parts.push(`"${name}"`);
+
+    if (role || name) {
+        const base = parts.join(' ');
+        // Prefer heading --in over --nth when no aria parent context exists
+        if (!inFlag && headingIn) return `${base}${headingIn}`;
+        return `${base}${nth}${inFlag}`;
+    }
 
     // Last resort: element text
     const text = info.text?.trim();
@@ -144,37 +179,21 @@ function extractPwName(pwCommand: string): string | null {
 }
 
 /**
- * Extract the name/text argument from a JS locator string like `page.getByText('Submit')`.
- * Used as fallback when pwCommand is null (e.g. content script locator was CSS).
- */
-function extractLocatorName(locator: string): string | null {
-    const roleNameMatch = locator.match(/getByRole\(['"](.+?)['"],\s*\{[^}]*name:\s*['"](.+?)['"]/);
-    if (roleNameMatch) return roleNameMatch[2];
-    const textMatch = locator.match(/getByText\(['"](.+?)['"]\)/);
-    if (textMatch) return textMatch[1];
-    const labelMatch = locator.match(/getByLabel\(['"](.+?)['"]\)/);
-    if (labelMatch) return labelMatch[1];
-    const testIdMatch = locator.match(/getByTestId\(['"](.+?)['"]\)/);
-    if (testIdMatch) return testIdMatch[1];
-    const placeholderMatch = locator.match(/getByPlaceholder\(['"](.+?)['"]\)/);
-    if (placeholderMatch) return placeholderMatch[1];
-    return null;
-}
-
-/**
  * Derive assertion strings (JS + PW) based on element type.
  * Priority: checked > value > text > visible.
  */
-function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: string | null, ariaSnapshot?: string): { assertJs: string; assertPw: string } {
+function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: string | null, ariaSnapshot?: string, headingContext?: string | null): { assertJs: string; assertPw: string } {
     const tag = info.tag;
     const inputType = info.attributes?.type?.toLowerCase() ?? '';
-    // Extract name from pw command, falling back to JS locator string
-    const name = (pwCommand ? extractPwName(pwCommand) : null) ?? extractLocatorName(locator);
+    // Extract name from pw command, falling back to JS locator parsing
+    const parsed = parseJsLocator(locator);
+    const name = (pwCommand ? extractPwName(pwCommand) : null) ?? parsed.name ?? null;
     const quotedName = name ? `"${name}"` : null;
     // Extract role from aria snapshot, element attributes, or JS locator
     const ariaRole = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot)?.element.role : null;
-    const role = ariaRole || info.attributes?.role || parseJsLocator(locator)?.role || null;
-    const nth = extractNth(locator);
+    const role = ariaRole || info.attributes?.role || parsed.role || null;
+    // Suppress --nth when heading context will replace it (same as derivePwCommand)
+    const nth = headingContext ? '' : extractNth(locator);
 
     // Checkbox/radio → checked assertion
     if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio') && info.checked !== undefined) {
@@ -255,10 +274,10 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot, headingContext);
     if (pwCommand) pwCommand += extraFlags; // --in already inside derivePwCommand
 
-    const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot);
+    const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot, headingContext);
     const assertJs = assertion.assertJs;
     let assertPw = assertion.assertPw;
-    if (assertPw) assertPw += headingIn + extraFlags; // assertions need --in added here
+    if (assertPw) assertPw += headingIn + extraFlags; // assertions get --in only when replacing --nth
 
     return {
         locator,
