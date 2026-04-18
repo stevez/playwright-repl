@@ -15,7 +15,7 @@
     "url": "https://github.com/stevez/playwright-repl"
   },
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Testing",
@@ -159,12 +159,23 @@
         "command": "playwright-repl.polishWithAI",
         "icon": "$(sparkle)",
         "title": "Polish with AI"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.fixWithAIAgent",
+        "icon": "$(sparkle)",
+        "title": "Fix with AI Agent"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "playwright-repl.polishWithAI",
+          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
+          "group": "navigation"
+        },
+        {
+          "command": "playwright-repl.fixWithAIAgent",
           "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
           "group": "navigation"
         }
@@ -174,6 +185,11 @@
           "command": "playwright-repl.polishWithAI",
           "when": "editorHasSelection && resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
           "group": "1_modification@99"
+        },
+        {
+          "command": "playwright-repl.fixWithAIAgent",
+          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
+          "group": "1_modification@98"
         }
       ],
       "view/title": [
@@ -329,7 +345,7 @@
     "@types/babel__traverse": "^7.20.3",
     "@types/node": "^18.11.9",
     "@types/stack-utils": "^2.0.1",
-    "@types/vscode": "1.93.0",
+    "@types/vscode": "1.106.0",
     "@types/which": "^3.0.3",
     "@types/ws": "^8.5.3",
     "@vercel/nft": "^1.5.0",

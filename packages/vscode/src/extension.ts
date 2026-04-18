@@ -39,6 +39,7 @@ import { ReplView } from './replView';
 import { AssertView } from './assertView';
 import { VSCodeLMProvider } from './ai/provider';
 import { polishWithAI } from './ai/polish';
+import { agentWithAI } from './ai/agent';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -383,6 +384,22 @@ export class Extension implements RunHooks {
         const selection = editor.selection;
         const range = selection.isEmpty ? undefined : new vscode.Range(selection.start, selection.end);
         await polishWithAI(vscode, aiProvider, editor, this._browserController.browserManager, range);
+      }),
+      vscode.commands.registerCommand('playwright-repl.fixWithAIAgent', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const aiProvider = new VSCodeLMProvider(vscode);
+        if (!await aiProvider.isAvailable()) {
+          vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
+          return;
+        }
+        await this._browserController.ensureLaunched();
+        const browserManager = this._browserController.browserManager;
+        if (!browserManager?.isRunning()) {
+          vscode.window.showWarningMessage('Browser must be running for AI Agent. Launch the browser first.');
+          return;
+        }
+        await agentWithAI(vscode, editor, browserManager);
       }),
     ];
 
