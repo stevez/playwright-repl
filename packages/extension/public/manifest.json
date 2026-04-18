@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dramaturg",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "Playwright engineer's companion — console, editor, runner, debugger, and recorder in a Chrome side panel.",
   "permissions": [
     "activeTab",

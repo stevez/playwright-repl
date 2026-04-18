@@ -42,7 +42,8 @@ Interactive command panel in the bottom bar. Type keyword commands (`snapshot`, 
 - Inline screenshot display
 - PDF save
 - Execution timing
-- Local commands: `help`, `.aliases`, `.status`, `.history`, `locator`, `page`
+- Local commands: `video-start`, `video-stop`, `video-chapter`, `tracing-start`, `tracing-stop`
+- `--in` flag for scoping commands to containers, `--frame` for iframe elements
 
 <img src="https://raw.githubusercontent.com/stevez/playwright-repl/main/packages/vscode/images/repl.gif" width="75%">
 
@@ -64,10 +65,11 @@ Build and verify Playwright assertions interactively:
 1. **Pick Locator** — pick an element or type a locator manually
 2. **Select Matcher** — 13 matchers, smart-filtered by element type
 3. **Verify** — run the assertion against the live page, see pass/fail instantly
+4. **AI Suggest** — get AI-suggested assertions based on the picked element
 
 Matchers: `toContainText`, `toHaveText`, `toBeVisible`, `toBeHidden`, `toBeAttached`, `toBeEnabled`, `toBeDisabled`, `toBeChecked`, `toHaveValue`, `toHaveAttribute`, `toHaveCount`, `toHaveURL`, `toHaveTitle`
 
-Supports negation (`not` checkbox) and editable assertions.
+Supports negation (`not` checkbox), editable assertions, and AI-suggested assertions.
 
 <img src="https://raw.githubusercontent.com/stevez/playwright-repl/main/packages/vscode/images/assert.gif" width="75%">
 

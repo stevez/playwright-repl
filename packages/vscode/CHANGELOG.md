@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.26.0
+
+**2026-04-17**
+
+### Features
+
+- Iframe support — `--frame` flag for interacting with elements inside iframes
+- `--in` scoping — text-based flag scopes commands to containers
+- Auto-generate `--in` — picker replaces `--nth` with heading context
+- Polish with AI — AI-powered test code improvement
+- AI-suggested assertions in AssertBuilder
+- Fix with AI — AI context for bridge-mode test failures
+
+### Fixes
+
+- Picker: stale page detection, `--frame` and `--exact` in pick results
+- Picker: full accessible name used for PW commands
+- Dedupe concurrent browser launches
+- Route pick/recording through BrowserController when showBrowser is on
+
 ## 0.25.0
 
 **2026-04-11**

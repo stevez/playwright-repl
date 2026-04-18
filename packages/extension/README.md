@@ -7,6 +7,7 @@ Chrome side panel extension that runs the full Playwright API directly inside yo
 | **Console** | Auto-detects input type — `.pw` keywords or Playwright API / JavaScript |
 | **Script Editor** | Syntax highlighting, pass/fail gutter, autocomplete, run/step/stop |
 | **JS Debugger** | Breakpoints, step over/into/out, variables with scope inspection |
+| **Element Picker** | Pick elements visually, get locators, assertions, and ARIA snapshots |
 | **Recorder** | Captures clicks, fills, navigations as `.pw` commands and Playwright code |
 | **Object Tree** | Expandable CDP object tree, like Chrome DevTools |
 | **Tab Switcher** | Switch active target to any open tab from the toolbar |
@@ -71,7 +72,7 @@ Click **Record**, interact with the page — clicks, hovers, fills, and navigati
 - **`.pw` commands** — `goto`, `click`, `fill`, `press` — ready to replay
 - **JS Playwright code** — `await page.click(...)` — ready to paste into a test
 
-Ambiguous elements are disambiguated with ancestor context (e.g. `click "Save" --in "Settings"`).
+Ambiguous elements are disambiguated with ancestor context (e.g. `click "Save" --in "Settings"`). Iframe elements use the `--frame` flag (e.g. `click "Submit" --frame "#my-iframe"`).
 
 ## Tab Management
 

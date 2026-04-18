@@ -314,12 +314,14 @@ Short aliases are CLI-only.
 
 ### Locator Flags
 
-All text-based interaction commands support `--nth` and `--exact`:
+All text-based interaction commands support these flags:
 
 | Flag | Description |
 |------|-------------|
 | `--nth <n>` | Select the nth visible match (0-indexed) |
 | `--exact` | Exact text match only — skip the fallback chain |
+| `--in <text>` | Scope command to a container matching text |
+| `--frame <selector>` | Target an element inside an iframe |
 
 ```
 pw> click "Submit" --nth 0           # click the first "Submit"
@@ -333,6 +335,8 @@ pw> highlight "npm" --nth 0          # highlight just the first match
 → Highlighted 1 of 24
 pw> highlight --clear                # dismiss the highlight overlay
 → Cleared
+pw> click "Delete" --in listitem "reading"   # click within a specific container
+pw> click "Submit" --frame "#my-iframe"      # click inside an iframe
 ```
 
 ### Inspection

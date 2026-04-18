@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.26.0
+
+**2026-04-17**
+
+### Features
+
+- **Iframe support**: Record and replay with `--frame` flag — interact with elements inside iframes. ([#737](https://github.com/stevez/playwright-repl/pull/737))
+- **`--in` scoping**: Text-based `--in` flag scopes commands to containers (e.g., `click "Delete" --in listitem "reading"`). ([#741](https://github.com/stevez/playwright-repl/pull/741))
+- **Auto-generate `--in`**: Picker replaces `--nth` with `--in` using nearby heading context for more readable commands. ([#743](https://github.com/stevez/playwright-repl/pull/743))
+- **Polish with AI**: AI-powered command to improve test code quality. ([#729](https://github.com/stevez/playwright-repl/pull/729))
+- **AI-suggested assertions**: AssertBuilder suggests assertions using AI. ([#728](https://github.com/stevez/playwright-repl/pull/728))
+- **Fix with AI**: AI context for bridge-mode test failures. ([#725](https://github.com/stevez/playwright-repl/pull/725))
+
+### Fixes
+
+- **Picker**: Stale page detection, `--frame` and `--exact` in pick results. ([#739](https://github.com/stevez/playwright-repl/pull/739))
+- **Picker**: Full accessible name used for PW commands (aria snapshot name over JS locator substring). ([#744](https://github.com/stevez/playwright-repl/pull/744))
+- **Picker**: Heading context captures full element text for `--in` matching. ([#744](https://github.com/stevez/playwright-repl/pull/744))
+- **CSS tokenizer**: Preserve quotes and spaces inside parens for CSS pseudo-class locators. ([#727](https://github.com/stevez/playwright-repl/pull/727))
+- **Timeouts**: Prevent silent hangs in bridge, service worker, and HTTP endpoints. ([#717](https://github.com/stevez/playwright-repl/pull/717))
+- **Child process**: Use `close` instead of `exit` to prevent truncated output. ([#716](https://github.com/stevez/playwright-repl/pull/716))
+- **VS Code**: Dedupe concurrent browser launches. ([#711](https://github.com/stevez/playwright-repl/pull/711))
+- **VS Code**: Route pick/recording through BrowserController when showBrowser is on. ([#713](https://github.com/stevez/playwright-repl/pull/713))
+- **Video**: Remove in-page REC overlay from video capture. ([#709](https://github.com/stevez/playwright-repl/pull/709))
+
+### Refactors
+
+- **Picker**: Derive PW commands by parsing JS locator as single source of truth, replacing dual-path aria+regex approach. ([#744](https://github.com/stevez/playwright-repl/pull/744))
+
+### Tests
+
+- Unit tests for MCP, bridge-server, and runner packages. ([#718](https://github.com/stevez/playwright-repl/pull/718), [#719](https://github.com/stevez/playwright-repl/pull/719), [#720](https://github.com/stevez/playwright-repl/pull/720))
+
 ## v0.25.0
 
 **2026-04-11**
