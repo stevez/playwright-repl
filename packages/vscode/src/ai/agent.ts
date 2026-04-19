@@ -8,6 +8,8 @@
 import type * as vscodeTypes from '../vscodeTypes';
 import type { IBrowserManager } from '../browser';
 import { parsePolishResponse, selectModel } from './provider';
+import { Linter } from 'eslint/universal';
+import playwrightPlugin from 'eslint-plugin-playwright';
 
 // ─── Test Detection ──────────────────────────────────────────────────────────
 
@@ -112,7 +114,21 @@ const AGENT_TOOLS = [
       required: ['testName'],
     },
   },
+  {
+    name: 'lint',
+    description: 'Run eslint-plugin-playwright rules against the current file. Returns lint violations (missing awaits, deprecated APIs, raw locators, etc.). Use this during the review phase to catch anti-patterns.',
+    inputSchema: { type: 'object' as const, properties: {} },
+  },
 ];
+
+// ─── Linter ──────────────────────────────────────────────────────────────────
+
+const linter = new Linter();
+const recommendedConfig = (playwrightPlugin as any).configs['flat/recommended'];
+const lintConfig = {
+  ...recommendedConfig,
+  languageOptions: { ecmaVersion: 2022 as const, sourceType: 'module' as const },
+};
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
@@ -164,14 +180,16 @@ ${goal ? `4. **User instruction** — ${goal}\n` : ''}
 - **run_command**: Execute a single REPL command (goto, click, fill, press, snapshot, etc.).
 - **run_script**: Run multi-line JavaScript in the browser context for complex operations.
 - **run_test**: Run a specific test by name from the current file. Compiles the full file (including beforeEach, fixtures) and returns pass/fail with errors.
+- **lint**: Run eslint-plugin-playwright rules on the current file. Returns violations like missing awaits, deprecated APIs, raw locators, etc.
 
 ## Workflow
 1. Use \`snapshot\` to understand the current page state.
 2. Use \`run_test\` to see if the test currently passes or fails.
 3. If it fails — fix the issues (wrong locators, missing waits, incorrect assertions).
 4. Polish and review the code using the best practices above.
-5. Use \`run_test\` again to verify your final code passes.
-6. Only return the final code AFTER verifying it passes with \`run_test\`.
+5. Use \`lint\` to check for Playwright anti-patterns and fix any violations.
+6. Use \`run_test\` again to verify your final code passes.
+7. Only return the final code AFTER verifying it passes with \`run_test\`.
 
 ## Constraints
 - All tools run in the browser context (Chrome extension service worker). Node.js APIs are NOT available.
@@ -217,6 +235,14 @@ async function executeTool(
     case 'run_script': {
       const result = await browserManager.runScript(input.code as string, 'javascript');
       return result.isError ? `ERROR: ${result.text}` : (result.text || 'OK');
+    }
+    case 'lint': {
+      const code = editor.document.getText();
+      const messages = linter.verify(code, lintConfig);
+      if (messages.length === 0) return 'No lint violations found.';
+      return messages
+        .map(m => `Line ${m.line}:${m.column} [${m.ruleId}] ${m.message}`)
+        .join('\n');
     }
     case 'run_test': {
       const testResult = await runTestFromFile(editor, input.testName as string, browserManager);
@@ -280,16 +306,13 @@ export async function aiAssist(
   userPrompt?: string,
 ): Promise<void> {
   const log = (msg: string) => logger?.info(`[AI Assist] ${msg}`);
-  // Determine target range
+  // Determine target range: selection > test block under cursor > whole file
   const selection = editor.selection;
+  const doc = editor.document;
   const targetRange = (selection && !selection.isEmpty)
     ? new vscode.Range(selection.start, selection.end)
-    : detectTestRange(vscode, editor);
-
-  if (!targetRange) {
-    vscode.window.showWarningMessage('Place your cursor inside a test() function, or select code to fix.');
-    return;
-  }
+    : detectTestRange(vscode, editor)
+      || new vscode.Range(new vscode.Position(0, 0), new vscode.Position(doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length));
 
   log(`Target range: lines ${targetRange.start.line + 1}-${targetRange.end.line + 1}`);
 
