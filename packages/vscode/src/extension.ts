@@ -37,8 +37,8 @@ import { findTestEndPosition } from './babelHighlightUtil';
 import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
+import { AiChatView } from './aiChatView';
 import { VSCodeLMProvider } from './ai/provider';
-import { aiAssist } from './ai/agent';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -98,6 +98,7 @@ export class Extension implements RunHooks {
   private _browserController!: BrowserController;
   private _replView!: ReplView;
   private _assertView!: AssertView;
+  private _aiChatView!: AiChatView;
 
   private _modelRebuild?: { result: Promise<void>; token: vscodeTypes.CancellationTokenSource; needsAnother: boolean; };
 
@@ -206,6 +207,8 @@ export class Extension implements RunHooks {
     this._replView = new ReplView(vscode, this._context.extensionUri);
     this._assertView = new AssertView(vscode, this._context.extensionUri);
     this._assertView.setAIProvider(new VSCodeLMProvider(vscode));
+    this._aiChatView = new AiChatView(vscode, this._context.extensionUri);
+    this._aiChatView.setLogger(this._logger);
     this._browserController = new BrowserController(vscode, this._logger);
     this._browserController.setViews(this._replView, this._locatorsView, this._assertView, this._settingsView);
     const messageNoPlaywrightTestsFound = this._vscode.l10n.t('No Playwright tests found.');
@@ -374,30 +377,16 @@ export class Extension implements RunHooks {
       }),
       vscode.commands.registerCommand('playwright-repl.aiAssist', async () => {
         this._logger.info('[AI Assist] Command triggered');
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) { this._logger.info('[AI Assist] No active editor'); return; }
-        const aiProvider = new VSCodeLMProvider(vscode);
-        if (!await aiProvider.isAvailable()) {
-          this._logger.info('[AI Assist] No AI model available');
-          vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
-          return;
-        }
-        // Browser is optional — AI Assist works headless (run_test via subprocess)
+        // Pass browser manager to the chat view
         const browserManager = this._browserController.browserManager?.isRunning()
           ? this._browserController.browserManager
           : undefined;
-        if (browserManager)
-          this._logger.info('[AI Assist] Browser running — will reuse for snapshot/run_command');
-        else
-          this._logger.info('[AI Assist] No browser — running headless (run_test only)');
-        this._logger.info('[AI Assist] Showing input box...');
-        const userPrompt = await vscode.window.showInputBox({
-          prompt: 'What should AI do? (leave empty for auto fix/polish/review)',
-          placeHolder: 'e.g. "add assertions for all visible headings"',
-        });
-        if (userPrompt === undefined) return; // cancelled
-        this._logger.info(`[AI Assist] Starting... prompt: ${userPrompt || '(auto)'}`);
-        await aiAssist(vscode, editor, browserManager, this._logger, userPrompt || undefined);
+        this._aiChatView.setBrowserManager(browserManager);
+        // Focus the AI Chat panel — user types prompt in the webview
+        await this._aiChatView.startAssist();
+      }),
+      vscode.commands.registerCommand('playwright-repl.aiChat.clear', () => {
+        this._aiChatView.clear();
       }),
     ];
 

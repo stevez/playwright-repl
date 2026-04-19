@@ -159,6 +159,12 @@
         "command": "playwright-repl.aiAssist",
         "icon": "$(sparkle)",
         "title": "AI Assist"
+      },
+      {
+        "category": "Playwright REPL",
+        "command": "playwright-repl.aiChat.clear",
+        "icon": "$(clear-all)",
+        "title": "Clear AI Chat"
       }
     ],
     "menus": {
@@ -191,6 +197,11 @@
           "command": "playwright-repl.repl.find",
           "group": "navigation@3",
           "when": "view == playwright-repl.replView"
+        },
+        {
+          "command": "playwright-repl.aiChat.clear",
+          "group": "navigation@1",
+          "when": "view == playwright-repl.aiChatView"
         }
       ]
     },
@@ -276,6 +287,11 @@
           "id": "assertContainer",
           "title": "Assert",
           "icon": "images/playwright-logo.png"
+        },
+        {
+          "id": "aiChatContainer",
+          "title": "AI Chat",
+          "icon": "images/playwright-logo.png"
         }
       ]
     },
@@ -306,6 +322,13 @@
           "type": "webview",
           "id": "playwright-repl.assertView",
           "name": "Assert"
+        }
+      ],
+      "aiChatContainer": [
+        {
+          "type": "webview",
+          "id": "playwright-repl.aiChatView",
+          "name": "AI Chat"
         }
       ]
     }

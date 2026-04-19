@@ -13,6 +13,19 @@ import playwrightPlugin from 'eslint-plugin-playwright';
 import { execFile } from 'child_process';
 import path from 'path';
 
+// ─── Agent Event Protocol ────────────────────────────────────────────────────
+
+export type AgentEvent =
+  | { type: 'text'; value: string }
+  | { type: 'toolCallStart'; name: string; input: Record<string, unknown>; callId: string }
+  | { type: 'toolCallEnd'; name: string; callId: string; result: string }
+  | { type: 'iteration'; current: number; max: number }
+  | { type: 'verifyStart'; testName: string }
+  | { type: 'verifyEnd'; testName: string; passed: boolean; output: string }
+  | { type: 'codeApplied'; code: string }
+  | { type: 'done'; summary: string }
+  | { type: 'error'; message: string };
+
 // ─── Test Detection ──────────────────────────────────────────────────────────
 
 /** Detect the full range of the test() call enclosing the cursor. */
@@ -70,7 +83,8 @@ function detectTestRange(
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_ITERATIONS = 10;
+const MAX_ITERATIONS_AUTO = 5;   // auto mode: test → fix → verify
+const MAX_ITERATIONS_CUSTOM = 3; // custom prompt: use tools, respond
 
 const AGENT_TOOLS = [
   {
@@ -134,68 +148,34 @@ const lintConfig = {
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
-function buildAgentSystemPrompt(userPrompt?: string): string {
-  const goal = userPrompt
-    ? `Follow the user's instructions: "${userPrompt}"`
-    : '';
-
-  return `You are a Playwright test assistant. You have browser tools to interact with a live page.
-
-Your job is to **fix**, **polish**, and **review** the given test code in a single pass.
-
-## Playwright Best Practices
-
-Follow these practices when polishing and reviewing:
-
-**Locators** — use user-facing attributes, never implementation details:
-- Prefer: getByRole() > getByText() > getByLabel() > getByPlaceholder() > getByTestId()
-- Avoid: CSS selectors, XPath, page.$(), page.$$(), page.evaluate() when a locator works
-- Use \`filter({ hasText })\` and \`locator()\` chaining instead of complex selectors
-
-**Assertions** — use web-first assertions (they auto-wait and auto-retry):
-- Use \`expect(locator).toBeVisible()\` — never \`waitForSelector()\`
-- Use \`expect(page).toHaveURL()\` / \`toHaveTitle()\` for navigation
-- Use \`toHaveText()\`, \`toHaveValue()\`, \`toHaveAttribute()\` for content checks
-- Add assertions after every state-changing action (click, fill, navigate)
-- Prefer specific assertions (toHaveText("Submit")) over generic ones (toBeVisible)
-
-**Anti-patterns** — fix these when found:
-- Replace \`page.waitForTimeout()\` with web-first assertions
-- Replace \`page.waitForSelector()\` with \`expect(locator).toBeVisible()\`
-- Replace \`elementHandle\` API with locators
-- Remove \`force: true\` unless absolutely necessary
-- Remove redundant or duplicate steps
-
-**Readability**:
-- Extract repeated locator chains into variables
-- Add brief comments for complex multi-step flows (3+ actions)
-
-## Steps
-
-1. **Fix** — run the test; if it fails, diagnose and fix until it passes.
-2. **Polish** — apply the best practices above, even when the test already passes.
-3. **Review** — check for flaky patterns, missing assertions, and anti-patterns.
-${goal ? `4. **User instruction** — ${goal}\n` : ''}
-## Available tools
+const TOOLS_DESCRIPTION = `## Available tools
 - **snapshot**: Get the page's accessibility tree to understand what's on the page.
 - **screenshot**: Take a screenshot to see visual layout, styling, or issues the ARIA tree can't show.
 - **run_command**: Execute a single REPL command (goto, click, fill, press, snapshot, etc.).
 - **run_script**: Run multi-line JavaScript in the browser context for complex operations.
-- **run_test**: Run a specific test by name from the current file. Compiles the full file (including beforeEach, fixtures) and returns pass/fail with errors.
-- **lint**: Run eslint-plugin-playwright rules on the current file. Returns violations like missing awaits, deprecated APIs, raw locators, etc.
+- **run_test**: Run a specific test by name from the current file. Returns pass/fail with errors.
+- **lint**: Run eslint-plugin-playwright rules on the current file. Returns violations.`;
+
+const BEST_PRACTICES = `## Playwright Best Practices
+**Locators**: getByRole() > getByText() > getByLabel() > getByPlaceholder() > getByTestId(). Avoid CSS/XPath.
+**Assertions**: Use web-first assertions (toBeVisible, toHaveText, toHaveURL). Never waitForSelector/waitForTimeout.
+**Anti-patterns**: Replace page.$eval, elementHandle API, force:true. Remove redundant steps.
+**Readability**: Extract repeated locators into variables. Brief comments for complex flows.`;
+
+function buildAutoSystemPrompt(): string {
+  return `You are a Playwright test assistant. Fix, polish, and review the given test code.
+
+${BEST_PRACTICES}
+
+${TOOLS_DESCRIPTION}
 
 ## Workflow
-1. Use \`snapshot\` to understand the current page state.
-2. Use \`run_test\` to see if the test currently passes or fails.
-3. If it fails — fix the issues (wrong locators, missing waits, incorrect assertions).
-4. Polish and review the code using the best practices above.
-5. Use \`lint\` to check for Playwright anti-patterns and fix any violations.
-6. Use \`run_test\` again to verify your final code passes.
-7. Only return the final code AFTER verifying it passes with \`run_test\`.
-
-## Constraints
-- All tools run in the browser context (Chrome extension service worker). Node.js APIs are NOT available.
-- Do NOT use require(), fs, path, or any Node.js modules in run_script.
+1. Run \`run_test\` to see if the test passes or fails.
+2. If it fails — fix the issues.
+3. Polish: improve locators, assertions, readability.
+4. Run \`lint\` to catch anti-patterns, fix violations.
+5. Run \`run_test\` again to verify your final code passes.
+6. Return the final code AFTER verifying it passes.
 
 ## Output Rules
 - Return ONLY the final improved code. No prose, no explanation, no code fences.
@@ -203,6 +183,28 @@ ${goal ? `4. **User instruction** — ${goal}\n` : ''}
 - Return the EXACT same structure as the input (full test() block or code fragment).
 - Preserve the original indentation style.
 - Do NOT add imports, describe() wrappers, or test() wrappers that weren't in the input.`;
+}
+
+function buildCustomSystemPrompt(userPrompt: string): string {
+  return `You are a Playwright test assistant. Follow the user's instructions.
+
+${BEST_PRACTICES}
+
+${TOOLS_DESCRIPTION}
+
+## Instructions
+${userPrompt}
+
+## Guidelines
+- Use the tools above as needed to accomplish the task.
+- If the user asks for information (e.g. "run lint", "show me"), use the appropriate tool and report the results as text.
+- If the user asks you to modify code, return ONLY the modified code. No prose, no code fences.
+- If no code changes are needed, explain your findings in plain text.
+- Be concise and direct.`;
+}
+
+function buildAgentSystemPrompt(userPrompt?: string): string {
+  return userPrompt ? buildCustomSystemPrompt(userPrompt) : buildAutoSystemPrompt();
 }
 
 // ─── Tool Execution ───────────────────────────────────────────────────────────
@@ -336,11 +338,14 @@ function findWorkspaceRoot(filePath: string): string {
 
 export async function aiAssist(
   vscode: vscodeTypes.VSCode,
-  editor: vscodeTypes.TextEditor,
+  initialEditor: vscodeTypes.TextEditor,
   browserManager: IBrowserManager | undefined,
   logger?: vscodeTypes.LogOutputChannel,
   userPrompt?: string,
+  onEvent?: (event: AgentEvent) => void,
+  token?: vscodeTypes.CancellationToken,
 ): Promise<void> {
+  let editor = initialEditor;
   const log = (msg: string) => logger?.info(`[AI Assist] ${msg}`);
   // Determine target range: selection > test block under cursor > whole file
   const selection = editor.selection;
@@ -384,145 +389,161 @@ export async function aiAssist(
     ),
   ];
 
-  // Run agent loop with progress
+  // ─── Agent loop ─────────────────────────────────────────────────────────
+
   let finalCode: string | undefined;
-  let lastRunTestName: string | undefined; // track full test name from agent's run_test calls
-  let codeAlreadyApplied = false; // set when auto-verify applies + saves the code
+  let lastRunTestName: string | undefined;
+  let codeAlreadyApplied = false;
 
-  try {
-    finalCode = await vscode.window.withProgress(
-      {
-        location: 15 /* ProgressLocation.Notification */,
-        title: 'AI Assist',
-        cancellable: true,
-      },
-      async (progress, token) => {
-        for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-          if (token.isCancellationRequested) return undefined;
+  const emit = onEvent || (() => {});
 
-          progress.report({ message: `iteration ${iteration + 1}/${MAX_ITERATIONS}` });
+  /** Ensure the editor is visible before editing (it may have lost focus to the chat panel). */
+  async function showEditor() {
+    editor = await vscode.window.showTextDocument(editor.document, editor.viewColumn, false);
+  }
 
-          // Force tool use on the first iteration so the AI inspects before changing
-          let tools = AGENT_TOOLS;
-          let toolMode: number | undefined;
-          if (iteration === 0) {
-            if (hasBrowser) {
-              // Force snapshot when browser is available
-              tools = [AGENT_TOOLS[0]]; // snapshot only
-              toolMode = 2; /* LanguageModelChatToolMode.Required */
-            } else {
-              // Headless: force lint on first iteration (no args needed)
-              tools = AGENT_TOOLS.filter(t => t.name === 'lint');
-              toolMode = 2;
-            }
-          }
-          const response = await model.sendRequest(messages, { tools, toolMode }, token);
+  async function runAgentLoop(loopToken: vscodeTypes.CancellationToken): Promise<string | undefined> {
+    const maxIterations = userPrompt ? MAX_ITERATIONS_CUSTOM : MAX_ITERATIONS_AUTO;
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      if (loopToken.isCancellationRequested) return undefined;
 
-          // Collect text and tool call parts from the stream
-          const textParts: string[] = [];
-          const toolCalls: Array<{ callId: string; name: string; input: Record<string, unknown> }> = [];
+      emit({ type: 'iteration', current: iteration + 1, max: maxIterations });
 
-          for await (const chunk of response.stream) {
-            if (chunk instanceof (vscode as any).LanguageModelTextPart) {
-              textParts.push(chunk.value);
-            } else if (chunk instanceof (vscode as any).LanguageModelToolCallPart) {
-              toolCalls.push({ callId: chunk.callId, name: chunk.name, input: chunk.input });
-            }
-          }
+      // Force tool use on the first iteration (only for auto mode, not custom prompts)
+      let tools = AGENT_TOOLS;
+      let toolMode: number | undefined;
+      if (iteration === 0 && !userPrompt) {
+        if (hasBrowser) {
+          tools = [AGENT_TOOLS[0]]; // force snapshot
+          toolMode = 2;
+        } else {
+          tools = AGENT_TOOLS.filter(t => t.name === 'lint'); // force lint
+          toolMode = 2;
+        }
+      }
+      const response = await model.sendRequest(messages, { tools, toolMode }, loopToken);
 
-          log(`Iteration ${iteration + 1}: ${toolCalls.length} tool calls, ${textParts.join('').length} chars text`);
+      // Collect text and tool call parts from the stream
+      const textParts: string[] = [];
+      const toolCalls: Array<{ callId: string; name: string; input: Record<string, unknown> }> = [];
 
-          // No tool calls — model is done, text is the final answer
-          if (toolCalls.length === 0) {
-            const finalText = textParts.join('');
-            log('Model returned final answer (no tool calls)');
-            log(`Response:\n${finalText}`);
+      for await (const chunk of response.stream) {
+        if (chunk instanceof (vscode as any).LanguageModelTextPart) {
+          textParts.push(chunk.value);
+          emit({ type: 'text', value: chunk.value });
+        } else if (chunk instanceof (vscode as any).LanguageModelToolCallPart) {
+          toolCalls.push({ callId: chunk.callId, name: chunk.name, input: chunk.input });
+        }
+      }
 
-            // Auto-verify: run the test before accepting the code
-            const candidateCode = parsePolishResponse(finalText, originalText);
-            const verifyName = lastRunTestName || extractTestName(candidateCode);
-            if (verifyName && candidateCode.trim() !== originalText.trim()) {
-              progress.report({ message: 'verifying...' });
-              // Apply code and save so run_test compiles the latest file
-              await editor.edit(eb => eb.replace(targetRange, candidateCode));
-              await editor.document.save();
-              const verifyResult = await runTestFromFile(editor, verifyName, browserManager);
-              log(`Auto-verify "${verifyName}": ${verifyResult.slice(0, 200)}`);
-              // Check for pass: bridge shim uses ✓/✗, Playwright CLI uses "N passed"/"N failed"
-              const hasPassed = verifyResult.includes('✓') || /\d+ passed/.test(verifyResult);
-              const hasFailed = verifyResult.includes('✗') || /[1-9]\d* failed/.test(verifyResult);
-              const failed = !hasPassed || hasFailed;
-              if (failed && iteration < MAX_ITERATIONS - 1) {
-                // Revert and feed error back to the agent
-                await vscode.commands.executeCommand('undo');
-                await editor.document.save();
-                log('Test failed — feeding error back to agent');
-                messages.push(
-                  vscode.LanguageModelChatMessage.Assistant(finalText),
-                  vscode.LanguageModelChatMessage.User(
-                    `I applied your code and ran the test "${verifyName}", but it FAILED:\n\n${verifyResult}\n\n`
-                    + 'Please fix the code and return the corrected version. Remember to preserve the original test structure.',
-                  ),
-                );
-                continue; // retry
-              }
-              // Auto-verify passed — code is already in the editor
-              codeAlreadyApplied = true;
-            }
+      log(`Iteration ${iteration + 1}: ${toolCalls.length} tool calls, ${textParts.join('').length} chars text`);
 
-            return finalText;
-          }
+      // No tool calls — model is done, text is the final answer
+      if (toolCalls.length === 0) {
+        const finalText = textParts.join('');
+        log('Model returned final answer (no tool calls)');
+        log(`Response:\n${finalText}`);
 
-          // Execute tool calls and feed results back
-          for (const tc of toolCalls) {
-            if (token.isCancellationRequested) return undefined;
-
-            progress.report({ message: `iteration ${iteration + 1}/${MAX_ITERATIONS} — ${tc.name}` });
-
-            log(`Tool call: ${tc.name}(${JSON.stringify(tc.input)})`);
-
-            // Track the full test name (with describe prefix) from run_test calls
-            if (tc.name === 'run_test' && tc.input.testName)
-              lastRunTestName = tc.input.testName as string;
-
-            let result: ToolResult;
-            try {
-              result = await executeTool(tc.name, tc.input, browserManager, editor);
-            } catch (e: unknown) {
-              result = `ERROR: ${(e as Error).message}`;
-            }
-
-            const resultSummary = typeof result === 'string' ? result.slice(0, 500) : `[image ${result.mime}]`;
-            log(`Tool result: ${resultSummary}`);
-
-            const resultParts: any[] = typeof result === 'string'
-              ? [new (vscode as any).LanguageModelTextPart(result)]
-              : [(vscode as any).LanguageModelDataPart.image(result.image, result.mime)];
-
-            const LMMessage = vscode.LanguageModelChatMessage;
+        // Auto-verify: run the test before accepting the code
+        const candidateCode = parsePolishResponse(finalText, originalText);
+        const verifyName = lastRunTestName || extractTestName(candidateCode);
+        if (verifyName && candidateCode.trim() !== originalText.trim()) {
+          emit({ type: 'verifyStart', testName: verifyName });
+          await showEditor();
+          await editor.edit(eb => eb.replace(targetRange, candidateCode));
+          await editor.document.save();
+          const verifyResult = await runTestFromFile(editor, verifyName, browserManager);
+          log(`Auto-verify "${verifyName}": ${verifyResult.slice(0, 200)}`);
+          const hasPassed = verifyResult.includes('✓') || /\d+ passed/.test(verifyResult);
+          const hasFailed = verifyResult.includes('✗') || /[1-9]\d* failed/.test(verifyResult);
+          const failed = !hasPassed || hasFailed;
+          emit({ type: 'verifyEnd', testName: verifyName, passed: !failed, output: verifyResult });
+          if (failed && iteration < maxIterations - 1) {
+            await vscode.commands.executeCommand('undo');
+            await editor.document.save();
+            log('Test failed — feeding error back to agent');
             messages.push(
-              (LMMessage as any).Assistant([
-                new (vscode as any).LanguageModelToolCallPart(tc.callId, tc.name, tc.input),
-              ]),
-              (LMMessage as any).User([
-                new (vscode as any).LanguageModelToolResultPart(tc.callId, resultParts),
-              ]),
+              vscode.LanguageModelChatMessage.Assistant(finalText),
+              vscode.LanguageModelChatMessage.User(
+                `I applied your code and ran the test "${verifyName}", but it FAILED:\n\n${verifyResult}\n\n`
+                + 'Please fix the code and return the corrected version. Remember to preserve the original test structure.',
+              ),
             );
+            continue;
           }
+          codeAlreadyApplied = true;
         }
 
-        // Max iterations reached — ask model for final answer without tools
-        progress.report({ message: 'finishing up...' });
-        const finalResponse = await model.sendRequest(messages, {}, token);
-        let text = '';
-        for await (const chunk of finalResponse.text) text += chunk;
-        return text;
-      },
-    );
+        return finalText;
+      }
+
+      // Execute tool calls and feed results back
+      for (const tc of toolCalls) {
+        if (loopToken.isCancellationRequested) return undefined;
+
+        log(`Tool call: ${tc.name}(${JSON.stringify(tc.input)})`);
+        emit({ type: 'toolCallStart', name: tc.name, input: tc.input, callId: tc.callId });
+
+        if (tc.name === 'run_test' && tc.input.testName)
+          lastRunTestName = tc.input.testName as string;
+
+        let result: ToolResult;
+        try {
+          result = await executeTool(tc.name, tc.input, browserManager, editor);
+        } catch (e: unknown) {
+          result = `ERROR: ${(e as Error).message}`;
+        }
+
+        const resultSummary = typeof result === 'string' ? result.slice(0, 500) : `[image ${result.mime}]`;
+        log(`Tool result: ${resultSummary}`);
+        emit({ type: 'toolCallEnd', name: tc.name, callId: tc.callId, result: resultSummary });
+
+        const resultParts: any[] = typeof result === 'string'
+          ? [new (vscode as any).LanguageModelTextPart(result)]
+          : [(vscode as any).LanguageModelDataPart.image(result.image, result.mime)];
+
+        const LMMessage = vscode.LanguageModelChatMessage;
+        messages.push(
+          (LMMessage as any).Assistant([
+            new (vscode as any).LanguageModelToolCallPart(tc.callId, tc.name, tc.input),
+          ]),
+          (LMMessage as any).User([
+            new (vscode as any).LanguageModelToolResultPart(tc.callId, resultParts),
+          ]),
+        );
+      }
+    }
+
+    // Max iterations reached — ask model for final answer without tools
+    const finalResponse = await model.sendRequest(messages, {}, loopToken);
+    let text = '';
+    for await (const chunk of finalResponse.text) {
+      text += chunk;
+      emit({ type: 'text', value: chunk });
+    }
+    return text;
+  }
+
+  // ─── Run the loop ──────────────────────────────────────────────────────
+
+  try {
+    if (onEvent && token) {
+      // Streaming path: events go to the chat panel, use provided token
+      finalCode = await runAgentLoop(token);
+    } else {
+      // Notification path: withProgress for backward compat
+      finalCode = await vscode.window.withProgress(
+        { location: 15, title: 'AI Assist', cancellable: true },
+        (_progress, progressToken) => runAgentLoop(progressToken),
+      );
+    }
   } catch (e: unknown) {
-    if ((e as Error).message?.includes('Cancelled') || (e as Error).message?.includes('canceled'))
+    const msg = (e as Error).message || '';
+    if (msg.includes('Cancelled') || msg.includes('canceled') || msg.includes('no choices')) {
+      emit({ type: 'done', summary: 'Cancelled.' });
       return;
-    vscode.window.showErrorMessage(`AI Assist failed: ${(e as Error).message}`);
+    }
+    emit({ type: 'error', message: msg });
     return;
   }
 
@@ -531,21 +552,24 @@ export async function aiAssist(
   log(`Final code: ${finalCode.length} chars`);
 
   try {
-    // Detect prose responses (reviews, explanations) vs code
-    const isProse = /^(Here|I |The |This |Sure|Let me|##|Based on|\*\*)/im.test(finalCode.trim());
-    if (isProse) {
-      log('Response is prose — showing in output channel');
-      if (logger) {
+    // Check if the response looks like code (contains test/function patterns) vs prose
+    const looksLikeCode = /(?:test|it|describe|import|export|const |let |var |async |await |function )\s*[\(\{]/.test(finalCode.trim());
+    if (!looksLikeCode) {
+      log('Response is prose');
+      if (!onEvent && logger) {
         logger.appendLine('\n── AI Assist ──────────────────────────────────');
         logger.appendLine(finalCode);
         logger.appendLine('───────────────────────────────────────────────\n');
-        logger.show(true); // true = preserve focus on editor
+        logger.show(true);
       }
+      emit({ type: 'done', summary: 'Review complete.' });
       return;
     }
 
     if (codeAlreadyApplied) {
       log('Code already applied and verified by auto-verify');
+      emit({ type: 'codeApplied', code: finalCode });
+      emit({ type: 'done', summary: 'Code applied and verified.' });
       return;
     }
 
@@ -555,18 +579,23 @@ export async function aiAssist(
 
     if (polished.trim() === originalText.trim()) {
       log('No changes needed');
+      emit({ type: 'done', summary: 'Code looks good — no changes needed.' });
       vscode.window.showInformationMessage('Code looks good — no changes needed.');
       return;
     }
 
     // Replace code (user can Ctrl+Z to revert)
     log('Replacing editor content...');
+    await showEditor();
     const success = await editor.edit(editBuilder => {
       editBuilder.replace(targetRange, polished);
     });
     log(`Replace result: ${success}`);
+    emit({ type: 'codeApplied', code: polished });
+    emit({ type: 'done', summary: 'Code applied.' });
   } catch (e: unknown) {
     log(`Error in final step: ${(e as Error).message}\n${(e as Error).stack}`);
+    emit({ type: 'error', message: (e as Error).message });
     vscode.window.showErrorMessage(`AI Assist failed: ${(e as Error).message}`);
   }
 }
