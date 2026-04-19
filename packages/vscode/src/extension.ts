@@ -382,16 +382,15 @@ export class Extension implements RunHooks {
           vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
           return;
         }
-        if (!this._browserController.browserManager?.isRunning()) {
-          this._logger.info('[AI Assist] Launching browser...');
-          await this._browserController.ensureLaunched();
-        }
-        const browserManager = this._browserController.browserManager;
-        if (!browserManager?.isRunning()) {
-          this._logger.info('[AI Assist] Browser not running');
-          vscode.window.showWarningMessage('Browser must be running for AI Assist. Launch the browser first.');
-          return;
-        }
+        // Browser is optional — AI Assist works headless (run_test via subprocess)
+        const browserManager = this._browserController.browserManager?.isRunning()
+          ? this._browserController.browserManager
+          : undefined;
+        if (browserManager)
+          this._logger.info('[AI Assist] Browser running — will reuse for snapshot/run_command');
+        else
+          this._logger.info('[AI Assist] No browser — running headless (run_test only)');
+        this._logger.info('[AI Assist] Showing input box...');
         const userPrompt = await vscode.window.showInputBox({
           prompt: 'What should AI do? (leave empty for auto fix/polish/review)',
           placeHolder: 'e.g. "add assertions for all visible headings"',

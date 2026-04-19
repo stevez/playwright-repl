@@ -10,6 +10,8 @@ import type { IBrowserManager } from '../browser';
 import { parsePolishResponse, selectModel } from './provider';
 import { Linter } from 'eslint/universal';
 import playwrightPlugin from 'eslint-plugin-playwright';
+import { execFile } from 'child_process';
+import path from 'path';
 
 // ─── Test Detection ──────────────────────────────────────────────────────────
 
@@ -30,7 +32,7 @@ function detectTestRange(
       if (line[j] === '}') braceDepth++;
       if (line[j] === '{') braceDepth--;
     }
-    if (braceDepth < 0 && /(?:^|\s)test\s*\(/.test(line)) {
+    if (braceDepth < 0 && /(?:^|\s)(?:test|it)\s*\(/.test(line)) {
       testOpenLine = i;
       break;
     }
@@ -210,15 +212,17 @@ type ToolResult = string | { image: Uint8Array; mime: string };
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
-  browserManager: IBrowserManager,
+  browserManager: IBrowserManager | undefined,
   editor: vscodeTypes.TextEditor,
 ): Promise<ToolResult> {
   switch (name) {
     case 'snapshot': {
+      if (!browserManager?.isRunning()) return 'ERROR: Browser not running. snapshot requires a running browser.';
       const result = await browserManager.runCommand('snapshot');
       return result.isError ? `ERROR: ${result.text}` : (result.text || '(empty snapshot)');
     }
     case 'screenshot': {
+      if (!browserManager?.isRunning()) return 'ERROR: Browser not running. screenshot requires a running browser.';
       const result = await browserManager.runCommand('screenshot');
       if (result.isError) return `ERROR: ${result.text}`;
       if (!result.image) return 'ERROR: No screenshot returned';
@@ -229,10 +233,12 @@ async function executeTool(
       return { image: bytes, mime: match[1] };
     }
     case 'run_command': {
+      if (!browserManager?.isRunning()) return 'ERROR: Browser not running. run_command requires a running browser.';
       const result = await browserManager.runCommand(input.command as string);
       return result.isError ? `ERROR: ${result.text}` : (result.text || 'OK');
     }
     case 'run_script': {
+      if (!browserManager?.isRunning()) return 'ERROR: Browser not running. run_script requires a running browser.';
       const result = await browserManager.runScript(input.code as string, 'javascript');
       return result.isError ? `ERROR: ${result.text}` : (result.text || 'OK');
     }
@@ -258,50 +264,80 @@ async function executeTool(
 
 /** Extract the test name from a test() block, e.g. test('my test', ...) → 'my test' */
 function extractTestName(code: string): string | undefined {
-  const match = code.match(/test\s*\(\s*(['"`])(.*?)\1/);
+  const match = code.match(/(?:test|it)\s*\(\s*(['"`])(.*?)\1/);
   return match ? match[2] : undefined;
 }
 
 // ─── Main Entry Point ─────────────────────────────────────────────────────────
 
-/** Compile the editor's file and run a specific test by name via the browser framework. */
+const RUN_TEST_TIMEOUT = 60_000;
+
+/** Run a test by name via `npx playwright test --grep`. Works headless or with browser reuse. */
 async function runTestFromFile(
   editor: vscodeTypes.TextEditor,
   testName: string,
-  browserManager: IBrowserManager,
+  browserManager?: IBrowserManager,
 ): Promise<string> {
-  let compile: ((filePath: string) => Promise<string>) | undefined;
-  try {
-    const bridgeUtils = require('@playwright-repl/runner/dist/bridge-utils.cjs') as {
-      compile: (filePath: string) => Promise<string>;
-    };
-    compile = bridgeUtils.compile;
-  } catch {
-    return 'ERROR: @playwright-repl/runner not available for compilation';
-  }
-
   const filePath = editor.document.uri.fsPath;
-  let compiled: string;
-  try {
-    compiled = await compile(filePath);
-  } catch (e: unknown) {
-    return `ERROR: Compile failed: ${(e as Error).message}`;
+  // Find the workspace root (where playwright.config lives) by walking up from the file
+  const workspaceRoot = findWorkspaceRoot(filePath);
+  const escapedName = testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Build env: reuse browser via CDP if available
+  const env: Record<string, string | undefined> = { ...process.env };
+  const cdpUrl = browserManager?.isRunning() ? browserManager.cdpUrl : undefined;
+  if (cdpUrl) {
+    // Inject cdpPreload so Playwright reuses the running browser
+    try {
+      const preloadPath = require.resolve('@playwright-repl/runner/dist/cdpPreload.cjs').replace(/\\/g, '/');
+      env.NODE_OPTIONS = `${env.NODE_OPTIONS || ''} --require ${preloadPath}`.trim();
+    } catch { /* cdpPreload not available — run standalone */ }
+    env.PW_TEST_CONNECT_WS_ENDPOINT = cdpUrl;
   }
 
-  const escapedName = testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  let script = 'globalThis.__resetTestState();\n';
-  script += 'globalThis.__setGrepExact(' + JSON.stringify(`^${escapedName}$`) + ');\n';
-  script += compiled + '\n';
-  script += 'await globalThis.__runTests();';
+  // Use relative path from workspace root — Playwright treats file args as regex patterns
+  const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
+  const args = [
+    'playwright', 'test',
+    `"${relativePath}"`,
+    '--grep', `"${escapedName}"`,
+    '--reporter=line',
+    '--workers=1',
+  ];
 
-  const result = await browserManager.runScript(script, 'javascript');
-  return result.isError ? `FAILED:\n${result.text}` : `PASSED:\n${result.text || 'All tests passed'}`;
+  return new Promise<string>(resolve => {
+    execFile('npx', args, { cwd: workspaceRoot, env, timeout: RUN_TEST_TIMEOUT, shell: true }, (error, stdout, stderr) => {
+      const output = (stdout + '\n' + stderr).trim();
+      if (error && error.killed)
+        return resolve(`TIMEOUT: Test exceeded ${RUN_TEST_TIMEOUT / 1000}s limit.\n\n${output}`);
+      // Playwright test exits with code 1 on failure — that's expected
+      if (output.includes('passed') || output.includes('failed'))
+        return resolve(output);
+      if (error)
+        return resolve(`ERROR: ${error.message}\n\n${output}`);
+      resolve(output);
+    });
+  });
+}
+
+/** Walk up from a file path to find the directory containing playwright.config. */
+function findWorkspaceRoot(filePath: string): string {
+  const fs = require('fs') as typeof import('fs');
+  let dir = path.dirname(filePath);
+  while (dir !== path.dirname(dir)) {
+    for (const ext of ['ts', 'js', 'mts', 'mjs']) {
+      if (fs.existsSync(path.join(dir, `playwright.config.${ext}`)))
+        return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return path.dirname(filePath); // fallback
 }
 
 export async function aiAssist(
   vscode: vscodeTypes.VSCode,
   editor: vscodeTypes.TextEditor,
-  browserManager: IBrowserManager,
+  browserManager: IBrowserManager | undefined,
   logger?: vscodeTypes.LogOutputChannel,
   userPrompt?: string,
 ): Promise<void> {
@@ -333,13 +369,17 @@ export async function aiAssist(
   // Include full file context so the AI knows test names, describes, and beforeEach hooks
   const fullFileText = editor.document.getText();
 
-  // Build initial messages — no snapshot included, AI must call snapshot tool itself
+  const hasBrowser = !!browserManager;
+
+  // Build initial messages
   const messages: any[] = [
     vscode.LanguageModelChatMessage.User(buildAgentSystemPrompt(userPrompt)),
     vscode.LanguageModelChatMessage.User(
       `Here is the full test file for context:\n\n${fullFileText}\n\n`
       + `Here is the specific test code to improve (lines ${targetRange.start.line + 1}-${targetRange.end.line + 1}):\n\n${originalText}\n\n`
-      + 'IMPORTANT: Start by calling the snapshot tool to see the current page state before making any changes. '
+      + (hasBrowser
+        ? 'IMPORTANT: Start by calling the snapshot tool to see the current page state before making any changes. '
+        : 'NOTE: No browser is running. Browser tools (snapshot, screenshot, run_command, run_script) are unavailable. Use run_test and lint to verify changes. ')
       + 'When using run_test, use the FULL test name including describe() prefixes separated by " > ".',
     ),
   ];
@@ -362,9 +402,20 @@ export async function aiAssist(
 
           progress.report({ message: `iteration ${iteration + 1}/${MAX_ITERATIONS}` });
 
-          // Force snapshot on first iteration so the AI inspects the page
-          const tools = iteration === 0 ? [AGENT_TOOLS[0]] : AGENT_TOOLS; // snapshot only on first
-          const toolMode = iteration === 0 ? 2 /* LanguageModelChatToolMode.Required */ : undefined;
+          // Force tool use on the first iteration so the AI inspects before changing
+          let tools = AGENT_TOOLS;
+          let toolMode: number | undefined;
+          if (iteration === 0) {
+            if (hasBrowser) {
+              // Force snapshot when browser is available
+              tools = [AGENT_TOOLS[0]]; // snapshot only
+              toolMode = 2; /* LanguageModelChatToolMode.Required */
+            } else {
+              // Headless: force lint on first iteration (no args needed)
+              tools = AGENT_TOOLS.filter(t => t.name === 'lint');
+              toolMode = 2;
+            }
+          }
           const response = await model.sendRequest(messages, { tools, toolMode }, token);
 
           // Collect text and tool call parts from the stream
@@ -397,8 +448,10 @@ export async function aiAssist(
               await editor.document.save();
               const verifyResult = await runTestFromFile(editor, verifyName, browserManager);
               log(`Auto-verify "${verifyName}": ${verifyResult.slice(0, 200)}`);
-              const passed = verifyResult.includes('✓') && !verifyResult.includes('✗');
-              const failed = !passed;
+              // Check for pass: bridge shim uses ✓/✗, Playwright CLI uses "N passed"/"N failed"
+              const hasPassed = verifyResult.includes('✓') || /\d+ passed/.test(verifyResult);
+              const hasFailed = verifyResult.includes('✗') || /[1-9]\d* failed/.test(verifyResult);
+              const failed = !hasPassed || hasFailed;
               if (failed && iteration < MAX_ITERATIONS - 1) {
                 // Revert and feed error back to the agent
                 await vscode.commands.executeCommand('undo');
@@ -439,7 +492,7 @@ export async function aiAssist(
               result = `ERROR: ${(e as Error).message}`;
             }
 
-            const resultSummary = typeof result === 'string' ? result.slice(0, 200) : `[image ${result.mime}]`;
+            const resultSummary = typeof result === 'string' ? result.slice(0, 500) : `[image ${result.mime}]`;
             log(`Tool result: ${resultSummary}`);
 
             const resultParts: any[] = typeof result === 'string'
