@@ -38,8 +38,7 @@ import { createRequire } from 'node:module';
 import { ReplView } from './replView';
 import { AssertView } from './assertView';
 import { VSCodeLMProvider } from './ai/provider';
-import { polishWithAI } from './ai/polish';
-import { agentWithAI } from './ai/agent';
+import { aiAssist } from './ai/agent';
 import { BrowserController } from './browserController';
 
 const stackUtils = new StackUtils({
@@ -373,38 +372,33 @@ export class Extension implements RunHooks {
       vscode.commands.registerCommand('playwright-repl.repl.find', () => {
         this._replView.toggleSearch();
       }),
-      vscode.commands.registerCommand('playwright-repl.polishWithAI', async () => {
+      vscode.commands.registerCommand('playwright-repl.aiAssist', async () => {
+        this._logger.info('[AI Assist] Command triggered');
         const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+        if (!editor) { this._logger.info('[AI Assist] No active editor'); return; }
         const aiProvider = new VSCodeLMProvider(vscode);
         if (!await aiProvider.isAvailable()) {
+          this._logger.info('[AI Assist] No AI model available');
           vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
           return;
         }
-        const selection = editor.selection;
-        const range = selection.isEmpty ? undefined : new vscode.Range(selection.start, selection.end);
-        await polishWithAI(vscode, aiProvider, editor, this._browserController.browserManager, range);
-      }),
-      vscode.commands.registerCommand('playwright-repl.fixWithAIAgent', async () => {
-        this._logger.info('[AI Agent] Command triggered');
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) { this._logger.info('[AI Agent] No active editor'); return; }
-        const aiProvider = new VSCodeLMProvider(vscode);
-        if (!await aiProvider.isAvailable()) {
-          this._logger.info('[AI Agent] No AI model available');
-          vscode.window.showWarningMessage('No AI model available. Install GitHub Copilot or another LLM extension.');
-          return;
+        if (!this._browserController.browserManager?.isRunning()) {
+          this._logger.info('[AI Assist] Launching browser...');
+          await this._browserController.ensureLaunched();
         }
-        this._logger.info('[AI Agent] Launching browser...');
-        await this._browserController.ensureLaunched();
         const browserManager = this._browserController.browserManager;
         if (!browserManager?.isRunning()) {
-          this._logger.info('[AI Agent] Browser not running');
-          vscode.window.showWarningMessage('Browser must be running for AI Agent. Launch the browser first.');
+          this._logger.info('[AI Assist] Browser not running');
+          vscode.window.showWarningMessage('Browser must be running for AI Assist. Launch the browser first.');
           return;
         }
-        this._logger.info('[AI Agent] Starting agent...');
-        await agentWithAI(vscode, editor, browserManager, this._logger);
+        const userPrompt = await vscode.window.showInputBox({
+          prompt: 'What should AI do? (leave empty for auto fix/polish/review)',
+          placeHolder: 'e.g. "add assertions for all visible headings"',
+        });
+        if (userPrompt === undefined) return; // cancelled
+        this._logger.info(`[AI Assist] Starting... prompt: ${userPrompt || '(auto)'}`);
+        await aiAssist(vscode, editor, browserManager, this._logger, userPrompt || undefined);
       }),
     ];
 

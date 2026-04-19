@@ -156,40 +156,24 @@
       },
       {
         "category": "Playwright REPL",
-        "command": "playwright-repl.polishWithAI",
+        "command": "playwright-repl.aiAssist",
         "icon": "$(sparkle)",
-        "title": "Polish with AI"
-      },
-      {
-        "category": "Playwright REPL",
-        "command": "playwright-repl.fixWithAIAgent",
-        "icon": "$(sparkle)",
-        "title": "Fix with AI Agent"
+        "title": "AI Assist"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "playwright-repl.polishWithAI",
-          "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
-          "group": "navigation"
-        },
-        {
-          "command": "playwright-repl.fixWithAIAgent",
+          "command": "playwright-repl.aiAssist",
           "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
-          "command": "playwright-repl.polishWithAI",
-          "when": "editorHasSelection && resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
-          "group": "1_modification@99"
-        },
-        {
-          "command": "playwright-repl.fixWithAIAgent",
+          "command": "playwright-repl.aiAssist",
           "when": "resourceFilename =~ /\\.(spec|test)\\.[tj]sx?$/",
-          "group": "1_modification@98"
+          "group": "1_modification@99"
         }
       ],
       "view/title": [
