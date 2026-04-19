@@ -156,6 +156,11 @@ describe('VSCodeLMProvider', () => {
       CancellationTokenSource: class {
         token = {};
       },
+      workspace: {
+        getConfiguration: () => ({
+          get: () => '',
+        }),
+      },
     };
   }
 
