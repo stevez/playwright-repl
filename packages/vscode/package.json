@@ -218,6 +218,16 @@
           "default": {},
           "description": "%configuration.playwright-repl.env%"
         },
+        "playwright-repl.aiModel": {
+          "type": "string",
+          "default": "",
+          "description": "Language model ID for AI features (e.g. 'gpt-4.1', 'claude-haiku-4.5'). Leave empty to auto-select."
+        },
+        "playwright-repl.aiVendor": {
+          "type": "string",
+          "default": "",
+          "description": "Language model vendor for AI features (e.g. 'openai', 'copilot'). Leave empty to auto-select."
+        },
         "playwright-repl.reuseBrowser": {
           "type": "boolean",
           "default": false,

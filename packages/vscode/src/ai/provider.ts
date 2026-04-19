@@ -56,6 +56,25 @@ const VALID_TYPES = new Set([
   'toHaveTitle', 'toHaveURL',
 ]);
 
+// ─── Model Selection ────────────────────────────────────────────────────────
+
+/** Select a model using aiModel/aiVendor settings, shared by all AI features. */
+export async function selectModel(vscode: vscodeTypes.VSCode): Promise<any | undefined> {
+  const lm = (vscode as any).lm;
+  if (!lm?.selectChatModels) return undefined;
+
+  const config = vscode.workspace.getConfiguration('playwright-repl');
+  const preferredModel = config.get<string>('aiModel') || '';
+  const preferredVendor = config.get<string>('aiVendor') || '';
+
+  const selector: Record<string, string> = {};
+  if (preferredVendor) selector.vendor = preferredVendor;
+  if (preferredModel) selector.family = preferredModel;
+
+  const models = await lm.selectChatModels(Object.keys(selector).length ? selector : undefined);
+  return models.length ? models[0] : undefined;
+}
+
 // ─── Implementation ─────────────────────────────────────────────────────────
 
 export class VSCodeLMProvider implements AIProvider {
@@ -63,10 +82,7 @@ export class VSCodeLMProvider implements AIProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const lm = (this._vscode as any).lm;
-      if (!lm?.selectChatModels) return false;
-      const models = await lm.selectChatModels();
-      return models.length > 0;
+      return !!(await selectModel(this._vscode));
     } catch {
       return false;
     }
@@ -77,13 +93,8 @@ export class VSCodeLMProvider implements AIProvider {
     ariaSnapshot: string,
     locator: string,
   ): Promise<AssertionSuggestion[]> {
-    const lm = (this._vscode as any).lm;
-    if (!lm?.selectChatModels)
-      throw new NoModelsAvailableError();
-
-    const models = await lm.selectChatModels();
-    if (!models.length) throw new NoModelsAvailableError();
-    const model = models[0];
+    const model = await selectModel(this._vscode);
+    if (!model) throw new NoModelsAvailableError();
 
     const messages = [
       this._vscode.LanguageModelChatMessage.User(buildSystemPrompt()),
@@ -98,13 +109,8 @@ export class VSCodeLMProvider implements AIProvider {
   }
 
   async polishCode(code: string, pageSnapshot?: string): Promise<string> {
-    const lm = (this._vscode as any).lm;
-    if (!lm?.selectChatModels)
-      throw new NoModelsAvailableError();
-
-    const models = await lm.selectChatModels();
-    if (!models.length) throw new NoModelsAvailableError();
-    const model = models[0];
+    const model = await selectModel(this._vscode);
+    if (!model) throw new NoModelsAvailableError();
 
     const messages = [
       this._vscode.LanguageModelChatMessage.User(buildPolishSystemPrompt()),
