@@ -255,7 +255,7 @@ jobs:
           key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
         working-directory: packages/vscode
 
       - name: Run unit tests
