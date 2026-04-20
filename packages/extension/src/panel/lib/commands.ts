@@ -210,7 +210,11 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
         if (__sel) __scope = page.locator(__sel);
       } catch {}
     }
-    return await (${fn.toString()})(__scope, ${args.map(ser).join(', ')});
+    try {
+      return await (${fn.toString()})(__scope, ${args.map(ser).join(', ')});
+    } finally {
+      await page.evaluate(() => document.querySelectorAll('[data-pw-in]').forEach(el => el.removeAttribute('data-pw-in'))).catch(() => {});
+    }
   })()`;
 }
 
