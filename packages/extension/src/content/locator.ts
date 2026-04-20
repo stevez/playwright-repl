@@ -183,6 +183,9 @@ function findNearestHeading(el: Element): { container: Element; text: string } |
             if (child.contains(el)) break; // stop at el's branch
             // Skip peer items — section labels don't contain navigation links
             if (child.matches('a') || child.querySelector('a')) continue;
+            // Skip peer radio/checkbox labels — "Ja" label is not a heading for "Nein"
+            if (child.querySelector('input[type="radio"], input[type="checkbox"]')) continue;
+            if (child.matches('input[type="radio"], input[type="checkbox"]')) continue;
             const text = findLeafText(child);
             if (text) return { container: current, text };
         }

@@ -1001,6 +1001,32 @@ describe('locator', () => {
             expect(cmds!.js).toContain("getByText('Bis 45 km/h', { exact: true })");
         });
 
+        it('generates --in for both Ja and Nein radios in yes/no groups (#771)', () => {
+            document.body.innerHTML = `
+                <div>
+                    <span>Abweichender Sachbearbeiter?</span>
+                    <div>
+                        <label><input type="radio" name="q1" value="ja"> Ja</label>
+                        <label><input type="radio" name="q1" value="nein"> Nein</label>
+                    </div>
+                </div>
+                <div>
+                    <span>Newsletter abonnieren?</span>
+                    <div>
+                        <label><input type="radio" name="q2" value="ja"> Ja</label>
+                        <label><input type="radio" name="q2" value="nein"> Nein</label>
+                    </div>
+                </div>`;
+            const radios = document.querySelectorAll('input[type="radio"]');
+            // "Ja" in first group
+            const jaCmd = buildCommands('check', radios[0]);
+            expect(jaCmd!.pw).toContain('--in "Abweichender Sachbearbeiter?"');
+            // "Nein" in first group — should also get --in, not --nth
+            const neinCmd = buildCommands('check', radios[1]);
+            expect(neinCmd!.pw).toContain('--in "Abweichender Sachbearbeiter?"');
+            expect(neinCmd!.pw).not.toContain('--nth');
+        });
+
         it('uses text-only --in from heading context instead of --nth', () => {
             document.body.innerHTML = `
                 <div>

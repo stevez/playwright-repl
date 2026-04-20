@@ -396,6 +396,8 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
         for (const child of cur.children) {
           if (child.contains(el)) break;
           if (child.matches('a') || child.querySelector('a')) continue; // skip peer items with links
+          if (child.querySelector('input[type="radio"], input[type="checkbox"]')) continue; // skip peer radio/checkbox labels
+          if (child.matches('input[type="radio"], input[type="checkbox"]')) continue;
           const t = leafText(child);
           if (t) { headingContext = t; break; }
         }
