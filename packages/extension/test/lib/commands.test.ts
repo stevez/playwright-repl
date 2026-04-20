@@ -259,6 +259,36 @@ describe("--in text-only", () => {
     expect(jsExpr).toContain('"dialog"');
     expect(jsExpr).toContain('"Settings"');
   });
+
+  it("scopes text-based click with --in via callScoped", () => {
+    const { jsExpr } = direct('click "Bis 45 km/h" --in "Moped, Roller"');
+    expect(jsExpr).toContain('actionByText');
+    expect(jsExpr).toContain('"Moped, Roller"');
+    expect(jsExpr).toContain('"Bis 45 km/h"');
+    expect(jsExpr).toContain('getByRole');
+    expect(jsExpr).toContain('data-pw-in');
+  });
+
+  it("scopes text-based check with --in via callScoped", () => {
+    const { jsExpr } = direct('check "Newsletter" --in "Preferences"');
+    expect(jsExpr).toContain('checkByText');
+    expect(jsExpr).toContain('"Preferences"');
+    expect(jsExpr).toContain('data-pw-in');
+  });
+
+  it("scopes text-based fill with --in via callScoped", () => {
+    const { jsExpr } = direct('fill "Email" user@example.com --in "Contact"');
+    expect(jsExpr).toContain('fillByText');
+    expect(jsExpr).toContain('"Contact"');
+    expect(jsExpr).toContain('"Email"');
+    expect(jsExpr).toContain('data-pw-in');
+  });
+
+  it("does not scope text-based click without --in", () => {
+    const { jsExpr } = direct('click "Submit"');
+    expect(jsExpr).toContain('actionByText');
+    expect(jsExpr).not.toContain('data-pw-in');
+  });
 });
 
 describe("press", () => {

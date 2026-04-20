@@ -217,6 +217,45 @@ describe('--frame flag', () => {
   });
 });
 
+describe('--in with text locators (resolveArgs)', () => {
+  it('scopes text-based click with --in', () => {
+    const args = parseInput('click "Bis 45 km/h" --in "Moped, Roller"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('actionByText');
+    expect(resolved._[1]).toContain('"Moped, Roller"');
+    expect(resolved._[1]).toContain('"Bis 45 km/h"');
+    // Should use scoping logic (role-based fallback + data-pw-in)
+    expect(resolved._[1]).toContain('getByRole');
+    expect(resolved._[1]).toContain('data-pw-in');
+  });
+
+  it('scopes text-based check with --in', () => {
+    const args = parseInput('check "Newsletter" --in "Preferences"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('checkByText');
+    expect(resolved._[1]).toContain('"Preferences"');
+  });
+
+  it('scopes text-based fill with --in', () => {
+    const args = parseInput('fill "Email" user@example.com --in "Contact"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('fillByText');
+    expect(resolved._[1]).toContain('"Contact"');
+    expect(resolved._[1]).toContain('"Email"');
+  });
+
+  it('does not scope text-based click without --in', () => {
+    const args = parseInput('click "Submit"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('actionByText');
+    expect(resolved._[1]).not.toContain('data-pw-in');
+  });
+});
+
 describe('booleanOptions', () => {
   it('includes expected options', () => {
     expect(booleanOptions.has('headed')).toBe(true);

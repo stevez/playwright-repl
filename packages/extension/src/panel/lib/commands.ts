@@ -536,10 +536,16 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     const fn = textFns[cmdName];
     const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
     const exact = args.exact ? true : undefined;
-    if (fn === actionByText)
+    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
+    if (fn === actionByText) {
+      if (inText) return { jsExpr: callScoped(fn, inText, textArg, textArg, cmdName, nth, exact) };
       return { jsExpr: call(fn, textArg, cmdName, nth, exact) };
-    if (cmdName === 'fill' || cmdName === 'select')
+    }
+    if (cmdName === 'fill' || cmdName === 'select') {
+      if (inText) return { jsExpr: callScoped(fn, inText, textArg, textArg, extraArgs[0] || '', nth, exact) };
       return { jsExpr: call(fn, textArg, extraArgs[0] || '', nth, exact) };
+    }
+    if (inText) return { jsExpr: callScoped(fn, inText, textArg, textArg, nth, exact) };
     return { jsExpr: call(fn, textArg, nth, exact) };
   }
 

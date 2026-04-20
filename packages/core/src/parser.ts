@@ -9,7 +9,7 @@
 
 import { minimist, COMMANDS } from './resolve.js';
 import {
-  buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  buildRunCode, buildRunCodeScoped, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   verifyVisible, verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
@@ -303,9 +303,11 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
     const fn = textFns[cmdName];
     const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
     const exact = args.exact === true ? true : undefined;
-    if (fn === actionByText) args = buildRunCode(fn, textArg, cmdName, nth, exact);
-    else if (cmdName === 'fill' || cmdName === 'select') args = buildRunCode(fn, textArg, extraArgs[0] || '', nth, exact);
-    else args = buildRunCode(fn, textArg, nth, exact);
+    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
+    const build = inText ? (f: PageScriptFn, ...a: unknown[]) => buildRunCodeScoped(f, inText, textArg, ...a) : buildRunCode;
+    if (fn === actionByText) args = build(fn, textArg, cmdName, nth, exact);
+    else if (cmdName === 'fill' || cmdName === 'select') args = build(fn, textArg, extraArgs[0] || '', nth, exact);
+    else args = build(fn, textArg, nth, exact);
   }
 
   // ── go-back / go-forward → evaluate history.back/forward ──

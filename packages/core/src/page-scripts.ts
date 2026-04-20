@@ -30,6 +30,46 @@ export function buildRunCode(fn, ...args) {
   return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
 }
 
+/**
+ * Like buildRunCode, but scopes the page to an ancestor containing both
+ * inText and targetText. Mirrors callScoped() in the extension.
+ */
+export function buildRunCodeScoped(fn, inText, targetText, ...args) {
+  const filtered = args.filter(a => a !== undefined);
+  const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
+  const inSer = JSON.stringify(inText);
+  const tgtSer = JSON.stringify(targetText);
+  return { _: ['run-code', `async (page) => {
+  let __scope = page;
+  for (const __r of ['region','group','article','listitem','dialog','form']) {
+    const __c = page.getByRole(__r).filter({ hasText: ${inSer} });
+    if (await __c.getByText(${tgtSer}, { exact: true }).count() > 0) { __scope = __c; break; }
+  }
+  if (__scope === page) {
+    try {
+      const __sel = await page.getByText(${inSer}, { exact: true }).first().evaluate((el, tgt) => {
+        let a = el.parentElement;
+        while (a && a !== document.body) {
+          if (a.textContent.includes(tgt)) {
+            const id = '__pw_in_' + Math.random().toString(36).slice(2);
+            a.setAttribute('data-pw-in', id);
+            return '[data-pw-in="' + id + '"]';
+          }
+          a = a.parentElement;
+        }
+        return null;
+      }, ${tgtSer});
+      if (__sel) __scope = page.locator(__sel);
+    } catch {}
+  }
+  try {
+    return await (${fn.toString()})(__scope, ${serialized});
+  } finally {
+    await page.evaluate(() => document.querySelectorAll('[data-pw-in]').forEach(el => el.removeAttribute('data-pw-in'))).catch(() => {});
+  }
+}`] };
+}
+
 // ─── Verify functions ───────────────────────────────────────────────────────
 
 export async function verifyText(page, text) {

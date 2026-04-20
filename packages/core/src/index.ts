@@ -7,7 +7,7 @@ export { parseInput, ALIASES, ALL_COMMANDS, booleanOptions, resolveArgs } from '
 export { buildCompletionItems } from './completion-data.js';
 export { c, prettyJson } from './colors.js';
 export {
-  buildRunCode, verifyText, verifyElement, verifyValue, verifyList,
+  buildRunCode, buildRunCodeScoped, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
   verifyVisible, verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
