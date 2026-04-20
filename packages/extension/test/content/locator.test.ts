@@ -127,6 +127,11 @@ describe('locator', () => {
             expect(getImplicitRole(el)).toBe('listitem');
         });
 
+        it('returns null for STRONG (no implicit role)', () => {
+            const el = document.createElement('strong');
+            expect(getImplicitRole(el)).toBeNull();
+        });
+
         it('returns null for unknown elements', () => {
             const el = document.createElement('div');
             expect(getImplicitRole(el)).toBeNull();
@@ -390,6 +395,13 @@ describe('locator', () => {
             el.setAttribute('title', 'Tooltip text');
             document.body.appendChild(el);
             expect(generateLocator(el)).toBe("getByTitle('Tooltip text')");
+        });
+
+        it('uses getByText for STRONG element (no implicit role)', () => {
+            const el = document.createElement('strong');
+            el.textContent = 'Node.js';
+            document.body.appendChild(el);
+            expect(generateLocator(el)).toBe("getByText('Node.js', { exact: true })");
         });
 
         it('uses getByText with exact: true for element with short text', () => {

@@ -458,7 +458,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       if (/^e\d+$/.test(loc)) return { jsExpr: call(highlightByRef, loc) };
       const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
       const exact = args.exact ? true : undefined;
-      const isSelector = /[.#[\]>:=]/.test(loc);
+      const isSelector = /^[.#]|\[|^[a-z]+[:.#]/.test(loc);
       // highlight <role> "<name>" → getByRole(role, { name })
       const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
       const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
