@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 jobs:
-  build-and-test:
+  build:
     name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
@@ -49,9 +49,6 @@ jobs:
         run: pnpm run lint
         working-directory: packages/extension
 
-      - name: Run tests
-        run: pnpm -r run test
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -65,9 +62,9 @@ jobs:
             packages/vscode/dist/
           retention-days: 1
 
-  extension-tests:
-    name: extension (${{ matrix.os }})
-    needs: build-and-test
+  core-cli-runner-mcp:
+    name: core+cli+runner+mcp (${{ matrix.os }})
+    needs: build
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -106,70 +103,21 @@ jobs:
           name: dist-${{ matrix.os }}
           path: packages
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/ms-playwright
-            ~/Library/Caches/ms-playwright
-          key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Run core tests
+        run: pnpm run test
+        working-directory: packages/core
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
-        working-directory: packages/extension
+      - name: Run CLI tests
+        run: pnpm run test
+        working-directory: packages/cli
 
-      - name: Run extension component tests
-        run: pnpm run test:component
-        working-directory: packages/extension
+      - name: Run runner tests
+        run: pnpm run test
+        working-directory: packages/runner
 
-      - name: Run extension E2E tests
-        run: pnpm exec playwright test
-        working-directory: packages/extension
-
-      - name: Merge extension coverage
-        run: pnpm run coverage:merge
-        working-directory: packages/extension
-
-  cli-e2e:
-    name: cli-e2e (${{ matrix.os }})
-    needs: build-and-test
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: nm-cache
-        with:
-          path: |
-            node_modules
-            packages/*/node_modules
-          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ matrix.os }}
-          path: packages
+      - name: Run MCP tests
+        run: pnpm run test
+        working-directory: packages/mcp
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -187,9 +135,78 @@ jobs:
         run: node dist/playwright-repl.js --headless --replay examples/
         working-directory: packages/cli
 
-  vscode-tests:
+  extension:
+    name: extension (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: nm-cache
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: packages
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        working-directory: packages/extension
+
+      - name: Run unit tests
+        run: pnpm run test:coverage
+        working-directory: packages/extension
+
+      - name: Run component tests
+        run: pnpm run test:component
+        working-directory: packages/extension
+
+      - name: Run E2E tests
+        run: pnpm exec playwright test
+        working-directory: packages/extension
+
+      - name: Merge coverage
+        run: pnpm run coverage:merge
+        working-directory: packages/extension
+
+  vscode:
     name: vscode (${{ matrix.os }})
-    needs: build-and-test
+    needs: build
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -240,17 +257,21 @@ jobs:
         run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
         working-directory: packages/vscode
 
-      - name: Run VS Code extension mock tests
+      - name: Run unit tests
+        run: pnpm run test:coverage
+        working-directory: packages/vscode
+
+      - name: Run mock tests
         run: pnpm exec playwright test --config tests/playwright/playwright.config.ts --project default
         working-directory: packages/vscode
         timeout-minutes: 10
 
-      - name: Merge VS Code extension coverage
+      - name: Merge coverage
         run: pnpm run coverage:merge
         working-directory: packages/vscode
 
       # VS Code E2E tests disabled — flaky on CI, works locally
-      # - name: Run VS Code extension E2E tests
+      # - name: Run E2E tests
       #   run: ${{ runner.os == 'Linux' && 'xvfb-run' || '' }} pnpm exec playwright test --config e2e/playwright.config.ts
       #   working-directory: packages/vscode
       #   timeout-minutes: 5
