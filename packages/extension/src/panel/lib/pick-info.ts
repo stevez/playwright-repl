@@ -282,7 +282,6 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     const innerLocator = frame ? frame.innerLocator : jsLocator;
     const exact = /exact:\s*true/.test(innerLocator);
     const extraFlags = (exact ? ' --exact' : '') + (frame ? ` --frame "${frame.frameSelector}"` : '');
-    const headingIn = headingContext ? ` --in "${headingContext}"` : '';
 
     let pwCommand = derivePwCommand({ ...info, locator: innerLocator }, ariaSnapshot, headingContext);
     if (pwCommand) pwCommand += extraFlags; // --in already inside derivePwCommand
