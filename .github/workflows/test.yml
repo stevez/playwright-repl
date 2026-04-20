@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 jobs:
-  build:
+  build-and-test:
     name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
@@ -29,7 +29,17 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: nm-cache
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build and type check (with sourcemaps for coverage)
@@ -38,6 +48,9 @@ jobs:
       - name: Lint extension
         run: pnpm run lint
         working-directory: packages/extension
+
+      - name: Run tests
+        run: pnpm -r run test
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -52,42 +65,9 @@ jobs:
             packages/vscode/dist/
           retention-days: 1
 
-  unit-tests:
-    name: unit (${{ matrix.os }})
-    needs: build
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ matrix.os }}
-
-      - name: Run tests
-        run: pnpm -r run test
-
   extension-tests:
     name: extension (${{ matrix.os }})
-    needs: build
+    needs: build-and-test
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -107,13 +87,24 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: nm-cache
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist-${{ matrix.os }}
+          path: packages
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -141,7 +132,7 @@ jobs:
 
   cli-e2e:
     name: cli-e2e (${{ matrix.os }})
-    needs: build
+    needs: build-and-test
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -161,13 +152,24 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: nm-cache
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist-${{ matrix.os }}
+          path: packages
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -187,7 +189,7 @@ jobs:
 
   vscode-tests:
     name: vscode (${{ matrix.os }})
-    needs: build
+    needs: build-and-test
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -207,13 +209,24 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: nm-cache
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: nm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist-${{ matrix.os }}
+          path: packages
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
