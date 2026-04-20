@@ -8,8 +8,8 @@ on:
   workflow_call:
 
 jobs:
-  test:
-    name: test (${{ matrix.os }}, node 22)
+  build:
+    name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -35,14 +35,94 @@ jobs:
       - name: Build and type check (with sourcemaps for coverage)
         run: pnpm run build:dev
 
-      - name: Run tests
-        run: pnpm -r run test
-
       - name: Lint extension
         run: pnpm run lint
         working-directory: packages/extension
 
-      # Install Playwright browsers (all packages now use 1.59 stable)
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            packages/core/dist/
+            packages/cli/dist/
+            packages/mcp/dist/
+            packages/runner/dist/
+            packages/extension/dist/
+            packages/vscode/dist/
+          retention-days: 1
+
+  unit-tests:
+    name: unit (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+
+      - name: Run tests
+        run: pnpm -r run test
+
+  extension-tests:
+    name: extension (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
         working-directory: packages/extension
@@ -51,11 +131,6 @@ jobs:
         run: pnpm run test:component
         working-directory: packages/extension
 
-      - name: Run CLI E2E tests
-        run: node dist/playwright-repl.js --headless --replay examples/
-        working-directory: packages/cli
-
-
       - name: Run extension E2E tests
         run: pnpm exec playwright test
         working-directory: packages/extension
@@ -63,6 +138,94 @@ jobs:
       - name: Merge extension coverage
         run: pnpm run coverage:merge
         working-directory: packages/extension
+
+  cli-e2e:
+    name: cli-e2e (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        working-directory: packages/cli
+
+      - name: Run CLI E2E tests
+        run: node dist/playwright-repl.js --headless --replay examples/
+        working-directory: packages/cli
+
+  vscode-tests:
+    name: vscode (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        working-directory: packages/vscode
 
       - name: Run VS Code extension mock tests
         run: pnpm exec playwright test --config tests/playwright/playwright.config.ts --project default
