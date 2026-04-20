@@ -122,14 +122,20 @@ jobs:
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
+        id: pw-cache
         with:
           path: |
             ~/.cache/ms-playwright
             ~/Library/Caches/ms-playwright
           key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      - name: Install Playwright system dependencies
+        if: runner.os == 'Linux' && steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install-deps chromium chrome
+        working-directory: packages/cli
+
       - name: Install Playwright browsers
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        run: pnpm exec playwright install chromium chrome
         working-directory: packages/cli
 
       - name: Run CLI E2E tests
@@ -179,14 +185,20 @@ jobs:
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
+        id: pw-cache
         with:
           path: |
             ~/.cache/ms-playwright
             ~/Library/Caches/ms-playwright
           key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      - name: Install Playwright system dependencies
+        if: runner.os == 'Linux' && steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install-deps chromium chrome
+        working-directory: packages/extension
+
       - name: Install Playwright browsers
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium chrome
+        run: pnpm exec playwright install chromium chrome
         working-directory: packages/extension
 
       - name: Run unit tests
@@ -248,14 +260,20 @@ jobs:
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
+        id: pw-cache
         with:
           path: |
             ~/.cache/ms-playwright
             ~/Library/Caches/ms-playwright
           key: playwright-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      - name: Install Playwright system dependencies
+        if: runner.os == 'Linux' && steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install-deps chromium
+        working-directory: packages/vscode
+
       - name: Install Playwright browsers
-        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+        run: pnpm exec playwright install chromium
         working-directory: packages/vscode
 
       - name: Run unit tests
