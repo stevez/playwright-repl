@@ -101,6 +101,33 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('click');
     });
 
+    test('clicking inside a <frame> uses frame tag, not iframe (#769)', async ({ sidePanel, testPage }) => {
+      const ctx = testPage.context();
+      // Serve frameset pages via route so they're same-origin (file:// treats frames as cross-origin)
+      await ctx.route('https://test.local/frameset.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><frameset><frame name="main" src="https://test.local/frame-content.html" /></frameset></html>',
+      }));
+      await ctx.route('https://test.local/frame-content.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<button>Arbeitskorb</button>',
+      }));
+
+      await testPage.goto('https://test.local/frameset.html');
+      await testPage.bringToFront();
+      await sidePanel.attachToActiveTab();
+
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.frame({ name: 'main' })!.getByRole('button', { name: 'Arbeitskorb' }).click();
+
+      await sidePanel.waitForEditorText('click button "Arbeitskorb"');
+      const editorText = await sidePanel.getEditorText();
+      expect(editorText).toContain('--frame "frame[name=');
+      expect(editorText).not.toContain('iframe');
+    });
+
     test('stop recording resets button state', async ({ sidePanel }) => {
       await sidePanel.recordBtn.click();
       await expect(sidePanel.recordBtn).toHaveClass(/recording/, { timeout: 10000 });
