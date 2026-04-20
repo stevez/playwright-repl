@@ -156,16 +156,19 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
     if (role) parts.push(role);
     if (name) parts.push(`"${name}"`);
 
+    // Only add heading --in when replacing --nth or complex CSS scoping (locator()/filter())
+    const needsScoping = nth || /\.locator\(|\.filter\(|^locator\(/.test(info.locator);
+
     if (role || name) {
         const base = parts.join(' ');
-        // Prefer heading --in over --nth when no aria parent context exists
-        if (!inFlag && headingIn) return `${base}${headingIn}`;
+        // Prefer heading --in over --nth / complex CSS scoping when no aria parent context exists
+        if (!inFlag && headingIn && needsScoping) return `${base}${headingIn}`;
         return `${base}${nth}${inFlag}`;
     }
 
     // Last resort: element text
     const text = info.text?.trim();
-    if (text && text.length <= 80) return `highlight "${text}"${headingIn || nth}`;
+    if (text && text.length <= 80) return `highlight "${text}"${(needsScoping && headingIn) || nth}`;
 
     return null;
 }
@@ -193,7 +196,9 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     const ariaRole = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot)?.element.role : null;
     const role = ariaRole || info.attributes?.role || parsed.role || null;
     // Suppress --nth when heading context will replace it (same as derivePwCommand)
-    const nth = headingContext ? '' : extractNth(locator);
+    const rawNth = extractNth(locator);
+    const needsScoping = rawNth || /\.locator\(|\.filter\(|^locator\(/.test(locator);
+    const nth = (headingContext && needsScoping) ? '' : rawNth;
 
     // Checkbox/radio → checked assertion
     if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio') && info.checked !== undefined) {
@@ -277,7 +282,8 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot, headingContext);
     const assertJs = assertion.assertJs;
     let assertPw = assertion.assertPw;
-    if (assertPw) assertPw += headingIn + extraFlags; // assertions get --in only when replacing --nth
+    const assertNeedsScoping = extractNth(innerLocator) || /\.locator\(|\.filter\(|^locator\(/.test(innerLocator);
+    if (assertPw) assertPw += (assertNeedsScoping && headingIn ? headingIn : '') + extraFlags; // assertions get --in only when replacing --nth or complex scoping
 
     return {
         locator,

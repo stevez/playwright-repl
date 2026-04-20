@@ -488,16 +488,28 @@ describe('buildPickResult', () => {
         expect(result.assertPw).not.toContain('--nth');
     });
 
-    it('adds --in even without --nth when headingContext provided', () => {
+    it('does not add --in when no --nth needed (unique locator)', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByRole('link', { name: 'RFCP® Certified' })",
             tag: 'a',
             text: 'RFCP® Certified',
             attributes: { href: '/rf' },
         }), null, undefined, 'Robot Framework');
-        expect(result.pwCommand).toBe('highlight link "RFCP® Certified" --in "Robot Framework"');
-        // assertion should also get --in
-        expect(result.assertPw).toContain('--in "Robot Framework"');
+        expect(result.pwCommand).toBe('highlight link "RFCP® Certified"');
+        expect(result.pwCommand).not.toContain('--in');
+        expect(result.assertPw).not.toContain('--in');
+    });
+
+    it('does not add --in for sibling headings (playwright.dev scenario)', () => {
+        // "Test isolation" and "Auto-wait and web-first assertions" are siblings,
+        // not parent-child — --in would fail at runtime (#762)
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('heading', { name: 'Test isolation' })",
+            tag: 'h2',
+            text: 'Test isolation',
+        }), null, undefined, 'Auto-wait and web-first assertions');
+        expect(result.pwCommand).toBe('highlight heading "Test isolation"');
+        expect(result.pwCommand).not.toContain('--in');
     });
 
     it('keeps --nth when no headingContext', () => {
