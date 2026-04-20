@@ -523,6 +523,18 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).not.toContain('--in');
     });
 
+    it('extracts --in from chained getByRole().getByLabel() locator (#774)', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('group', { name: 'Rechnungsadresse' }).getByLabel('Ja')",
+            tag: 'input',
+            text: '',
+            attributes: { type: 'radio' },
+            checked: true,
+        }), null, '- radio "Ja"', null);
+        expect(result.pwCommand).toContain('--in group "Rechnungsadresse"');
+        expect(result.pwCommand).toContain('"Ja"');
+    });
+
     it('prefers aria snapshot parent over headingContext', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByRole('checkbox', { name: 'reading', exact: true }).first()",

@@ -22,7 +22,8 @@ type AriaNode = { role: string; name: string };
  * e.g. `- listitem:` → { role: 'listitem', name: '' }
  */
 function parseAriaLine(line: string): AriaNode | null {
-    const trimmed = line.replace(/^\s*-\s*/, '').replace(/:$/, '');
+    const trimmed = line.replace(/^\s*-\s*/, '').replace(/:$/, '')
+        .replace(/\s*\[[\w\s=]+\]\s*$/, ''); // strip aria attributes like [checked], [disabled]
     // role "name" or role 'name'
     const match = trimmed.match(/^(\w[\w-]*)\s+["'](.+?)["']$/);
     if (match) return { role: match[1], name: match[2] };
@@ -144,9 +145,16 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
     // (which may be a substring — Playwright's getByRole uses substring matching by default)
     const name = ariaParsed?.element.name || parsed.name;
 
-    // --in: from aria parent (when parent role differs from element role)
+    // --in: from chained locator (getByRole('group', { name: 'X' }).getByLabel('Y'))
+    // or from aria parent (when parent role differs from element role)
     let inFlag = '';
-    if (ariaParsed?.parent && ariaParsed.parent.role !== role) {
+    const chainMatch = info.locator.match(/getByRole\(['"]([^'"]+)['"](?:,\s*\{([^}]*)\})?\)\.getBy/);
+    if (chainMatch && chainMatch[1] !== role) {
+        const containerRole = chainMatch[1];
+        const nameMatch = chainMatch[2]?.match(/name:\s*['"]([^'"]+)['"]/);
+        const containerName = nameMatch ? ` "${nameMatch[1]}"` : '';
+        inFlag = ` --in ${containerRole}${containerName}`;
+    } else if (ariaParsed?.parent && ariaParsed.parent.role !== role) {
         const parentName = ariaParsed.parent.name ? ` "${ariaParsed.parent.name}"` : '';
         inFlag = ` --in ${ariaParsed.parent.role}${parentName}`;
     }
@@ -282,8 +290,10 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     const assertion = deriveAssertion(info, locator, pwCommand, ariaSnapshot, headingContext);
     const assertJs = assertion.assertJs;
     let assertPw = assertion.assertPw;
-    const assertNeedsScoping = extractNth(innerLocator) || /\.locator\(|\.filter\(|^locator\(/.test(innerLocator);
-    if (assertPw) assertPw += (assertNeedsScoping && headingIn ? headingIn : '') + extraFlags; // assertions get --in only when replacing --nth or complex scoping
+    // Carry --in from pwCommand (covers both chain-based and heading-based --in)
+    const inMatch = pwCommand?.match(/\s(--in\s+.+?)(?:\s--|\s*$)/);
+    if (assertPw && inMatch) assertPw += ` ${inMatch[1]}`;
+    if (assertPw) assertPw += extraFlags;
 
     return {
         locator,
