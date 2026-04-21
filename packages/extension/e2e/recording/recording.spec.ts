@@ -101,7 +101,7 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('click');
     });
 
-    test('filling input in legacy table form uses text locator, not getByRole (#768)', async ({ sidePanel, testPage }) => {
+    test('filling input in legacy table form uses CSS selector, not getByRole (#768)', async ({ sidePanel, testPage }) => {
       await sidePanel.startRecording();
 
       await testPage.bringToFront();
@@ -110,9 +110,10 @@ test.describe('Recording flow', () => {
 
       await sidePanel.waitForEditorText('fill');
       const editorText = await sidePanel.getEditorText();
-      // Should use informal label as text-based locator, NOT getByRole('textbox', ...)
-      expect(editorText).toContain('"Benutzerkennung:*"');
+      // Informal labels (adjacent cell text) can't be resolved by Playwright at runtime.
+      // Should use CSS selector (e.g. input#LoginName) which always works.
       expect(editorText).toContain('"testuser"');
+      expect(editorText).toContain('css');
       expect(editorText).not.toContain('textbox "Benutzerkennung:*"');
     });
 

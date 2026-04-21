@@ -101,22 +101,8 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
         const text = (clone.textContent || '').trim();
         if (text) return text;
     }
-    // Informal association: preceding table cell or sibling text (common in legacy forms).
-    // Not returned here — use getInformalLabel() for text-based locators.
-    return '';
-}
-
-/**
- * Get label text from informal DOM associations (e.g. preceding table cell).
- * These labels are NOT in the browser's accessibility tree, so they cannot be
- * used with getByRole(). Use only for text-based locator commands (fill, select).
- */
-export function getInformalLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
-    const cell = el.closest('td, th');
-    if (cell?.previousElementSibling) {
-        const text = (cell.previousElementSibling.textContent || '').trim();
-        if (text && text.length <= 80) return text;
-    }
+    // Informal associations (e.g. preceding table cell) are intentionally excluded —
+    // they produce names that Playwright's getByRole/getByLabel can't resolve (#768).
     return '';
 }
 
@@ -530,17 +516,14 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'fill': {
             const val = opts?.value ?? '';
-            // Bare role without name (e.g. "textbox") or CSS fallback — try informal label
-            const needsAlt = isCssFallback || /^[a-z]+$/.test(pwArgs);
-            const informal = needsAlt && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)
-                ? getInformalLabel(el) : '';
+            // Bare role without name (e.g. "textbox") makes fill ambiguous:
+            // `fill textbox "val"` parses as fill(role=textbox, name="val", value="")
+            // Fall back to CSS selector which always works at runtime.
             let fillLoc = pwArgs;
             let fillPrefix = cssPrefix;
-            if (informal) {
-                fillLoc = q(informal);
-                fillPrefix = '';  // text-based, not CSS
-            } else if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
+            if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
                 fillLoc = q(buildCssSelector(el));
+                fillPrefix = 'css ';
             }
             return {
                 pw: `fill ${fillPrefix}${fillLoc} ${q(val)}${inFlag}`,
@@ -562,17 +545,12 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'select': {
             const optVal = opts?.option ?? '';
-            // Same bare-role / CSS fallback guard as fill
-            const selNeedsAlt = isCssFallback || /^[a-z]+$/.test(pwArgs);
-            const selInformal = selNeedsAlt && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)
-                ? getInformalLabel(el) : '';
+            // Same bare-role guard as fill
             let selLoc = pwArgs;
             let selPrefix = cssPrefix;
-            if (selInformal) {
-                selLoc = q(selInformal);
-                selPrefix = '';
-            } else if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
+            if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
                 selLoc = q(buildCssSelector(el));
+                selPrefix = 'css ';
             }
             return {
                 pw: `select ${selPrefix}${selLoc} ${q(optVal)}${inFlag}`,
