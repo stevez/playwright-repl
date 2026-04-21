@@ -355,6 +355,25 @@ describe("--in text-only", () => {
     expect(jsExpr).toContain('actionByText');
     expect(jsExpr).not.toContain('data-pw-in');
   });
+
+  it("DOM fallback tries exact first for --in text (preserves existing behavior)", () => {
+    const { jsExpr } = direct('click "Nein" --in "Rechnungsadresse abweichend?"');
+    // Exact match should be tried first — this is the common case
+    expect(jsExpr).toContain('getByText("Rechnungsadresse abweichend?", { exact: true })');
+  });
+
+  it("DOM fallback falls back to substring when exact finds nothing (#734)", () => {
+    const { jsExpr } = direct('click "Bis 45 km/h" --in "Moped, Roller"');
+    // Should try exact first, then fall back to substring
+    // so "Moped, Roller" still matches "Moped, Roller, Mokick..."
+    expect(jsExpr).toContain('getByText("Moped, Roller", { exact: true })');
+    expect(jsExpr).toContain('getByText("Moped, Roller")');
+    // Both paths should exist — exact and substring fallback
+    const exactCount = (jsExpr.match(/getByText\("Moped, Roller",\s*\{ exact: true \}\)/g) || []).length;
+    const substringCount = (jsExpr.match(/getByText\("Moped, Roller"\)/g) || []).length;
+    expect(exactCount).toBeGreaterThanOrEqual(1);
+    expect(substringCount).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("press", () => {

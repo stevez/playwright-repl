@@ -193,8 +193,10 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
     : targetRole
       ? `await __c.getByRole(${ser(targetRole)}).count() > 0`
       : `false`;
+  // Try exact match first, then fall back to substring (consistent with actionByText)
+  const anchorCode = `(() => { let a = page.getByText(${ser(inText)}, { exact: true }); return a.count().then(c => c > 0 ? a : page.getByText(${ser(inText)})); })()`;
   const fallbackCheck = targetText
-    ? `page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el, tgt) => {
+    ? `(await ${anchorCode}).first().evaluate((el, tgt) => {
           let a = el.parentElement;
           while (a && a !== document.body) {
             if (a.textContent.includes(tgt)) {
@@ -206,7 +208,7 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
           }
           return null;
         }, ${ser(targetText)})`
-    : `page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el) => {
+    : `(await ${anchorCode}).first().evaluate((el) => {
           let a = el.parentElement;
           while (a && a !== document.body) {
             const id = '__pw_in_' + Math.random().toString(36).slice(2);

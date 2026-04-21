@@ -254,6 +254,25 @@ describe('--in with text locators (resolveArgs)', () => {
     expect(resolved._[1]).toContain('actionByText');
     expect(resolved._[1]).not.toContain('data-pw-in');
   });
+
+  it('DOM fallback tries exact first for --in text (preserves existing behavior)', () => {
+    const args = parseInput('click "Nein" --in "Rechnungsadresse abweichend?"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // When --in text matches exactly, exact should be tried first
+    expect(code).toContain('getByText("Rechnungsadresse abweichend?", { exact: true })');
+  });
+
+  it('DOM fallback falls back to substring when exact finds nothing (#734)', () => {
+    const args = parseInput('click "Bis 45 km/h" --in "Moped, Roller"');
+    const resolved = resolveArgs(args);
+    const code = resolved._[1];
+    // Should try exact first, then fall back to substring
+    // so "Moped, Roller" still matches "Moped, Roller, Mokick..."
+    expect(code).toContain('getByText("Moped, Roller", { exact: true })');
+    expect(code).toContain('__anchor.count()');
+    expect(code).toContain('__anchor = page.getByText("Moped, Roller")');
+  });
 });
 
 describe('booleanOptions', () => {

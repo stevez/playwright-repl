@@ -3,6 +3,7 @@ import {
     getImplicitRole,
     getAccessibleName,
     getLabel,
+    getInformalLabel,
     findByRoleAndName,
     findAllByRoleAndName,
     isHoverRevealed,
@@ -247,16 +248,39 @@ describe('locator', () => {
             expect(getLabel(input)).toBe('Name');
         });
 
-        it('detects informal label from preceding table cell', () => {
+        it('does not return informal label from preceding table cell (#768)', () => {
             document.body.innerHTML = '<table><tr><td>Benutzerkennung:*</td><td><input type="text"></td></tr></table>';
             const input = document.querySelector('input') as HTMLInputElement;
-            expect(getLabel(input)).toBe('Benutzerkennung:*');
+            // Informal labels are not in the accessibility tree — getLabel returns empty
+            expect(getLabel(input)).toBe('');
         });
 
         it('returns empty when preceding cell has no text', () => {
             document.body.innerHTML = '<table><tr><td></td><td><input type="text"></td></tr></table>';
             const input = document.querySelector('input') as HTMLInputElement;
             expect(getLabel(input)).toBe('');
+        });
+    });
+
+    // ─── getInformalLabel ─────────────────────────────────────────────────
+
+    describe('getInformalLabel', () => {
+        it('returns text from preceding table cell', () => {
+            document.body.innerHTML = '<table><tr><td>Benutzerkennung:*</td><td><input type="text"></td></tr></table>';
+            const input = document.querySelector('input') as HTMLInputElement;
+            expect(getInformalLabel(input)).toBe('Benutzerkennung:*');
+        });
+
+        it('returns empty when no preceding cell', () => {
+            document.body.innerHTML = '<table><tr><td><input type="text"></td></tr></table>';
+            const input = document.querySelector('input') as HTMLInputElement;
+            expect(getInformalLabel(input)).toBe('');
+        });
+
+        it('returns empty for non-table input', () => {
+            document.body.innerHTML = '<input type="text">';
+            const input = document.querySelector('input') as HTMLInputElement;
+            expect(getInformalLabel(input)).toBe('');
         });
     });
 
@@ -997,12 +1021,15 @@ describe('locator', () => {
             expect(cmds!.js).toContain(".fill('user')");
         });
 
-        it('uses label from preceding table cell for fill', () => {
+        it('uses informal label from preceding table cell for fill (#768)', () => {
             document.body.innerHTML = '<table><tr><td>Username:</td><td><input type="text"></td></tr></table>';
             const input = document.querySelector('input')!;
             const cmds = buildCommands('fill', input, { value: 'admin' });
+            // Informal label used as text-based locator (not getByRole)
             expect(cmds!.pw).toContain('"Username:"');
             expect(cmds!.pw).toContain('"admin"');
+            // Should NOT include role prefix — informal labels can't be resolved by getByRole
+            expect(cmds!.pw).not.toMatch(/^fill textbox "Username:"/);
         });
 
         it('adds --exact for text-based click locator', () => {

@@ -47,7 +47,9 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   }
   if (__scope === page) {
     try {
-      const __sel = await page.getByText(${inSer}, { exact: true }).first().evaluate((el, tgt) => {
+      let __anchor = page.getByText(${inSer}, { exact: true });
+      if (await __anchor.count() === 0) __anchor = page.getByText(${inSer});
+      const __sel = await __anchor.first().evaluate((el, tgt) => {
         let a = el.parentElement;
         while (a && a !== document.body) {
           if (a.textContent.includes(tgt)) {
