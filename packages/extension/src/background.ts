@@ -620,7 +620,7 @@ async function handleBridgeCommand(msg: {
 }): Promise<BridgeResult> {
   // Recording/picker commands — handled before currentPage check
   const cmd = msg.command.trim();
-  console.log('[bridge] command:', JSON.stringify(cmd), 'type:', msg.scriptType);
+  console.debug('[bridge] command:', JSON.stringify(cmd), 'type:', msg.scriptType);
   if (cmd === 'record-start') {
     const r = await startRecording();
     return { text: r.ok ? `Recording started${r.url ? ': ' + r.url : ''}` : (r.error || 'Failed'), isError: !r.ok };

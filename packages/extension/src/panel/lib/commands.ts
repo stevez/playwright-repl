@@ -773,7 +773,7 @@ export function parseReplCommand(input: string): ParseResult {
 
   // Parse input (tokenize + alias + options)
   const args = parseInput(input);
-  console.log('[pw-repl] parseInput result:', JSON.stringify(args));
+  console.debug('[pw-repl] parseInput result:', JSON.stringify(args));
   if (!args) return { error: 'Empty command' };
 
   // Resolve to DirectExecution, TabOperation, or unrecognised ParsedArgs
