@@ -194,7 +194,7 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
       ? `await __c.getByRole(${ser(targetRole)}).count() > 0`
       : `false`;
   // Try exact match first, then fall back to substring (consistent with actionByText)
-  const anchorCode = `(() => { let a = page.getByText(${ser(inText)}, { exact: true }); return a.count().then(c => c > 0 ? a : page.getByText(${ser(inText)})); })()`;
+  const anchorCode = `(async () => { const __e = page.getByText(${ser(inText)}, { exact: true }); return (await __e.count()) > 0 ? __e : page.getByText(${ser(inText)}); })()`;
   const fallbackCheck = targetText
     ? `(await ${anchorCode}).first().evaluate((el, tgt) => {
           let a = el.parentElement;
@@ -233,7 +233,8 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
     try {
       return await (${fn.toString()})(__scope, ${args.map(ser).join(', ')});
     } finally {
-      await page.evaluate(() => document.querySelectorAll('[data-pw-in]').forEach(el => el.removeAttribute('data-pw-in'))).catch(() => {});
+      if (typeof page.evaluate === 'function')
+        await page.evaluate(() => document.querySelectorAll('[data-pw-in]').forEach(el => el.removeAttribute('data-pw-in'))).catch(() => {});
     }
   })()`;
 }
