@@ -32,6 +32,15 @@
         <li class="todo-item"><span>only item</span><button class="destroy">Delete</button></li>
     </ul>
 
+    <!-- Legacy table form: labels in adjacent cells, no <label> association (#768) -->
+    <h2>Legacy Form</h2>
+    <table border="1" cellpadding="5">
+        <tr>
+            <td><span class="_LabelClass">Benutzerkennung:*</span></td>
+            <td><input type="text" required size="20" name="LoginName" id="LoginName" value="" maxlength="40"></td>
+        </tr>
+    </table>
+
     <!-- Table with repeated action buttons per row -->
     <h2>Users</h2>
     <table border="1" cellpadding="8">

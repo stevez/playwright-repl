@@ -101,6 +101,21 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('click');
     });
 
+    test('filling input in legacy table form uses text locator, not getByRole (#768)', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.locator('#LoginName').fill('testuser');
+      await testPage.locator('#LoginName').press('Tab');
+
+      await sidePanel.waitForEditorText('fill');
+      const editorText = await sidePanel.getEditorText();
+      // Should use informal label as text-based locator, NOT getByRole('textbox', ...)
+      expect(editorText).toContain('"Benutzerkennung:*"');
+      expect(editorText).toContain('"testuser"');
+      expect(editorText).not.toContain('textbox "Benutzerkennung:*"');
+    });
+
     test('clicking inside a <frame> uses frame tag, not iframe (#769)', async ({ sidePanel, testPage }) => {
       const ctx = testPage.context();
       // Serve frameset pages via route so they're same-origin (file:// treats frames as cross-origin)
