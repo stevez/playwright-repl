@@ -275,6 +275,62 @@ describe('--in with text locators (resolveArgs)', () => {
   });
 });
 
+describe('verify css subcommand (#787)', () => {
+  it('verify-visible css resolves to verifyCssVisible', () => {
+    const args = parseInput('verify-visible css "#LoginName"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssVisible');
+    expect(resolved._[1]).toContain('#LoginName');
+  });
+
+  it('verify-element css resolves to verifyCssElement', () => {
+    const args = parseInput('verify-element css ".my-btn"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssElement');
+    expect(resolved._[1]).toContain('.my-btn');
+  });
+
+  it('verify-no-element css resolves to verifyCssNoElement', () => {
+    const args = parseInput('verify-no-element css ".deleted"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssNoElement');
+  });
+
+  it('verify-value css resolves to verifyCssValue', () => {
+    const args = parseInput('verify-value css "#LoginName" "testuser"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssValue');
+    expect(resolved._[1]).toContain('#LoginName');
+    expect(resolved._[1]).toContain('testuser');
+  });
+
+  it('verify visible css (unified) resolves to verifyCssVisible', () => {
+    const args = parseInput('verify visible css "#LoginName"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssVisible');
+  });
+
+  it('verify element css (unified) resolves to verifyCssElement', () => {
+    const args = parseInput('verify element css ".my-btn"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyCssElement');
+  });
+
+  it('verify-visible without css still uses role-based', () => {
+    const args = parseInput('verify-visible button "Submit"');
+    const resolved = resolveArgs(args);
+    expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('verifyVisible');
+    expect(resolved._[1]).not.toContain('verifyCssVisible');
+  });
+});
+
 describe('booleanOptions', () => {
   it('includes expected options', () => {
     expect(booleanOptions.has('headed')).toBe(true);

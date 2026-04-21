@@ -130,7 +130,8 @@ export const JS_CATEGORIES: Record<string, string[]> = {
 import {
   verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue, waitForText,
+  verifyVisible, verifyCssVisible, verifyCssElement, verifyCssNoElement, verifyCssValue,
+  verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole,
   highlightByText, highlightByRole, highlightBySelector, highlightByRef, clearHighlight, chainAction, goBack, goForward,
@@ -364,6 +365,17 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   if (cmdName === 'verify') {
     const subType = args._[1];
     const rest = args._.slice(2);
+    // css subcommand: verify element css ".sel", verify visible css ".sel", etc.
+    if (rest[0] === 'css' && rest.length >= 2) {
+      const selector = rest.slice(1).join(' ');
+      if (subType === 'visible') return { jsExpr: call(verifyCssVisible, selector) };
+      if (subType === 'element') return { jsExpr: call(verifyCssElement, selector) };
+      if (subType === 'no-element') return { jsExpr: call(verifyCssNoElement, selector) };
+      if (subType === 'value' && rest.length >= 3) {
+        const sel = rest.slice(1, -1).join(' ');
+        return { jsExpr: call(verifyCssValue, sel, rest[rest.length - 1]) };
+      }
+    }
     if (subType === 'title' && rest.length > 0)
       return { jsExpr: call(verifyTitle, rest.join(' ')) };
     if (subType === 'url' && rest.length > 0)
@@ -380,6 +392,22 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       return { jsExpr: call(verifyValue, rest[0], rest.slice(1).join(' ')) };
     if (subType === 'list' && rest.length >= 2)
       return { jsExpr: call(verifyList, rest[0], rest.slice(1)) };
+  }
+
+  // ── Verify css subcommand (verify-visible css ".sel", verify-element css ".sel") ─
+  const CSS_VERIFY: Record<string, any> = {
+    'verify-visible': verifyCssVisible,
+    'verify-element': verifyCssElement,
+    'verify-no-element': verifyCssNoElement,
+  };
+  if (CSS_VERIFY[cmdName] && args._[1] === 'css' && args._.length >= 3) {
+    const selector = args._.slice(2).join(' ');
+    return { jsExpr: call(CSS_VERIFY[cmdName], selector) };
+  }
+  if (cmdName === 'verify-value' && args._[1] === 'css' && args._.length >= 4) {
+    const selector = args._.slice(2, -1).join(' ');
+    const expected = args._[args._.length - 1];
+    return { jsExpr: call(verifyCssValue, selector, expected) };
   }
 
   // ── Legacy verify-* commands ────────────────────────────────

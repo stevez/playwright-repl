@@ -130,6 +130,27 @@ export async function verifyVisible(page, role, name) {
     throw new Error('Element not visible: ' + role + ' "' + name + '"');
 }
 
+export async function verifyCssVisible(page, selector) {
+  if (!(await page.locator(selector).isVisible()))
+    throw new Error('Element not visible: css "' + selector + '"');
+}
+
+export async function verifyCssElement(page, selector) {
+  if (await page.locator(selector).count() === 0)
+    throw new Error('Element not found: css "' + selector + '"');
+}
+
+export async function verifyCssNoElement(page, selector) {
+  if (await page.locator(selector).count() > 0)
+    throw new Error('Element still exists: css "' + selector + '"');
+}
+
+export async function verifyCssValue(page, selector, expected) {
+  const v = await page.locator(selector).inputValue();
+  if (v !== expected)
+    throw new Error('Expected "' + expected + '", got "' + v + '"');
+}
+
 export async function verifyInputValue(page, label, expected) {
   let loc = page.getByLabel(label);
   if (await loc.count() === 0) loc = page.getByRole('spinbutton', { name: label });

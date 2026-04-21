@@ -11,7 +11,8 @@ import { minimist, COMMANDS } from './resolve.js';
 import {
   buildRunCode, buildRunCodeScoped, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue, waitForText,
+  verifyVisible, verifyCssVisible, verifyCssElement, verifyCssNoElement, verifyCssValue,
+  verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
@@ -206,27 +207,52 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
     const subType = args._[1];
     const rest = args._.slice(2);
     let translated: ParsedArgs | null = null;
-    if (subType === 'title' && rest.length > 0)
-      translated = buildRunCode(verifyTitle as PageScriptFn, rest.join(' '));
-    else if (subType === 'url' && rest.length > 0)
-      translated = buildRunCode(verifyUrl as PageScriptFn, rest.join(' '));
-    else if (subType === 'text' && rest.length > 0)
-      translated = buildRunCode(verifyText as PageScriptFn, rest.join(' '));
-    else if (subType === 'no-text' && rest.length > 0)
-      translated = buildRunCode(verifyNoText as PageScriptFn, rest.join(' '));
-    else if (subType === 'element' && rest.length >= 2)
-      translated = buildRunCode(verifyElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'no-element' && rest.length >= 2)
-      translated = buildRunCode(verifyNoElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'value' && rest.length >= 2)
-      translated = buildRunCode(verifyValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'visible' && rest.length >= 2)
-      translated = buildRunCode(verifyVisible as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'input-value' && rest.length >= 2)
-      translated = buildRunCode(verifyInputValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
-    else if (subType === 'list' && rest.length >= 2)
-      translated = buildRunCode(verifyList as PageScriptFn, rest[0], rest.slice(1));
+    // css subcommand: verify element css ".sel", verify visible css ".sel", etc.
+    if (rest[0] === 'css' && rest.length >= 2) {
+      const selector = rest.slice(1).join(' ');
+      if (subType === 'visible') translated = buildRunCode(verifyCssVisible as PageScriptFn, selector);
+      else if (subType === 'element') translated = buildRunCode(verifyCssElement as PageScriptFn, selector);
+      else if (subType === 'no-element') translated = buildRunCode(verifyCssNoElement as PageScriptFn, selector);
+      else if (subType === 'value' && rest.length >= 3) {
+        const sel = rest.slice(1, -1).join(' ');
+        translated = buildRunCode(verifyCssValue as PageScriptFn, sel, rest[rest.length - 1]);
+      }
+    }
+    if (!translated) {
+      if (subType === 'title' && rest.length > 0)
+        translated = buildRunCode(verifyTitle as PageScriptFn, rest.join(' '));
+      else if (subType === 'url' && rest.length > 0)
+        translated = buildRunCode(verifyUrl as PageScriptFn, rest.join(' '));
+      else if (subType === 'text' && rest.length > 0)
+        translated = buildRunCode(verifyText as PageScriptFn, rest.join(' '));
+      else if (subType === 'no-text' && rest.length > 0)
+        translated = buildRunCode(verifyNoText as PageScriptFn, rest.join(' '));
+      else if (subType === 'element' && rest.length >= 2)
+        translated = buildRunCode(verifyElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
+      else if (subType === 'no-element' && rest.length >= 2)
+        translated = buildRunCode(verifyNoElement as PageScriptFn, rest[0], rest.slice(1).join(' '));
+      else if (subType === 'value' && rest.length >= 2)
+        translated = buildRunCode(verifyValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
+      else if (subType === 'visible' && rest.length >= 2)
+        translated = buildRunCode(verifyVisible as PageScriptFn, rest[0], rest.slice(1).join(' '));
+      else if (subType === 'input-value' && rest.length >= 2)
+        translated = buildRunCode(verifyInputValue as PageScriptFn, rest[0], rest.slice(1).join(' '));
+      else if (subType === 'list' && rest.length >= 2)
+        translated = buildRunCode(verifyList as PageScriptFn, rest[0], rest.slice(1));
+    }
     if (translated) args = translated;
+  }
+
+  // ── Verify css subcommand (verify-visible css ".sel", verify-element css ".sel") ─
+  if ((cmdName === 'verify-visible' || cmdName === 'verify-element' || cmdName === 'verify-no-element') && args._[1] === 'css' && args._.length >= 3) {
+    const selector = args._.slice(2).join(' ');
+    const fn = cmdName === 'verify-visible' ? verifyCssVisible : cmdName === 'verify-element' ? verifyCssElement : verifyCssNoElement;
+    args = buildRunCode(fn as PageScriptFn, selector);
+  }
+  if (cmdName === 'verify-value' && args._[1] === 'css' && args._.length >= 4) {
+    const selector = args._.slice(2, -1).join(' ');
+    const expected = args._[args._.length - 1];
+    args = buildRunCode(verifyCssValue as PageScriptFn, selector, expected);
   }
 
   // ── Legacy verify-* commands (backward compat) ─────────────
