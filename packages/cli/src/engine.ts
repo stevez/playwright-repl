@@ -142,21 +142,43 @@ export class Engine {
         } else {
           const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
           let locExpr: string;
+          // highlight css <selector> → explicit CSS selector
+          if (parts[0] === 'css') {
+            const selector = parts.slice(1).join(' ');
+            locExpr = `page.locator(${JSON.stringify(selector)})`;
           // highlight <role> "<name>" → getByRole(role, { name })
-          if (parts.length >= 2 && /^[a-z]+$/.test(parts[0])) {
+          } else if (parts.length >= 2 && /^[a-z]+$/.test(parts[0])) {
             const role = parts[0];
             const name = parts.slice(1).join(' ');
             locExpr = `page.getByRole(${JSON.stringify(role)}, { name: ${JSON.stringify(name)}, exact: true })`;
           } else {
             const loc = parts.join(' ');
-            const isSelector = /[.#\[\]>:=]/.test(loc);
-            locExpr = isSelector
-              ? `page.locator(${JSON.stringify(loc)})`
-              : `page.getByText(${JSON.stringify(loc)})`;
+            locExpr = `page.getByText(${JSON.stringify(loc)})`;
           }
           if (nth !== undefined) locExpr += `.nth(${nth})`;
           args = { _: ['run-code', `async (page) => { await ${locExpr}.highlight(); return "Highlighted"; }`] };
         }
+      }
+    }
+
+    // ── css subcommand → run-code translation ──
+    const CSS_ACTIONS: Record<string, string> = {
+      click: 'click', dblclick: 'dblclick', hover: 'hover',
+      check: 'check', uncheck: 'uncheck',
+      fill: 'fill', select: 'selectOption',
+    };
+    if (CSS_ACTIONS[args._[0]] && args._[1] === 'css') {
+      const action = CSS_ACTIONS[args._[0]];
+      const needsValue = action === 'fill' || action === 'selectOption';
+      const selectorParts = needsValue ? args._.slice(2, -1) : args._.slice(2);
+      const selector = selectorParts.join(' ');
+      if (selector) {
+        const locExpr = `page.locator(${JSON.stringify(selector)})`;
+        const value = needsValue ? args._[args._.length - 1] : undefined;
+        const actionCall = value
+          ? `${locExpr}.${action}(${JSON.stringify(value)})`
+          : `${locExpr}.${action}()`;
+        args = { _: ['run-code', `async (page) => { await ${actionCall}; return "Done"; }`] };
       }
     }
 

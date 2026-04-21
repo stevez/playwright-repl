@@ -244,8 +244,8 @@ describe('Engine', () => {
       });
     });
 
-    it('uses page.locator() for CSS selectors', async () => {
-      await engine.run({ _: ['highlight', '.btn'] });
+    it('uses page.locator() for css subcommand', async () => {
+      await engine.run({ _: ['highlight', 'css', '.btn'] });
       expect(mocks.callTool).toHaveBeenCalledWith(
         'browser_run_code',
         expect.objectContaining({ code: expect.stringContaining('page.locator(".btn").highlight()') }),

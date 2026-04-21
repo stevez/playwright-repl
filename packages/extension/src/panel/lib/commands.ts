@@ -32,8 +32,8 @@ export const COMMANDS: Record<string, CommandInfo> = {
                               examples: ['goto https://example.com'] },
     'help':                 { desc: 'Show available commands', usage: 'help [command]',
                               examples: ['help', 'help click'] },
-    'highlight':            { desc: 'Highlight element on page', usage: 'highlight <text|selector>',
-                              examples: ['highlight "Submit"', 'highlight .btn-primary'] },
+    'highlight':            { desc: 'Highlight element on page', usage: 'highlight <text|role|css>',
+                              examples: ['highlight "Submit"', 'highlight css .btn-primary'] },
     'history':              { desc: 'Show command history' },
     'history clear':        { desc: 'Clear command history' },
     'hover':                { desc: 'Hover over element', usage: 'hover <text> | hover <ref>' },
@@ -456,22 +456,41 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     if (loc) {
       // highlight <ref> → use aria-ref selector
       if (/^e\d+$/.test(loc)) return { jsExpr: call(highlightByRef, loc) };
+      // highlight css <selector> → explicit CSS selector
+      if (loc === 'css') {
+        const selector = args._.slice(2).join(' ');
+        if (!selector) return args; // fall through to MCP
+        const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+        return { jsExpr: call(highlightBySelector, selector, nth) };
+      }
       const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
       const exact = args.exact ? true : undefined;
-      const isSelector = /^[.#]|\[|^[a-z]+[:.#]/.test(loc);
       // highlight <role> "<name>" → getByRole(role, { name })
       const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
       const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
-      if (!isSelector && args._.length >= 3 && /^[a-z]+$/.test(loc)) {
+      if (args._.length >= 3 && /^[a-z]+$/.test(loc)) {
         const name = args._.slice(2).join(' ');
         if (inText && !inRole) return { jsExpr: callScoped(highlightByRole, inText, name, loc, name, nth) };
         return { jsExpr: call(highlightByRole, loc, name, nth, inRole, inText) };
       }
-      if (!isSelector && inText && !inRole) return { jsExpr: callScoped(highlightByText, inText, loc, loc, nth, exact) };
-      return isSelector
-        ? { jsExpr: call(highlightBySelector, loc, nth) }
-        : { jsExpr: call(highlightByText, loc, nth, exact) };
+      if (inText && !inRole) return { jsExpr: callScoped(highlightByText, inText, loc, loc, nth, exact) };
+      return { jsExpr: call(highlightByText, loc, nth, exact) };
     }
+  }
+
+  // ── css subcommand (e.g. click css .btn, hover css div.menu) ─
+  const CSS_ACTIONS: Record<string, string> = {
+    click: 'click', dblclick: 'dblclick', hover: 'hover',
+    check: 'check', uncheck: 'uncheck',
+    fill: 'fill', select: 'selectOption',
+  };
+  if (CSS_ACTIONS[cmdName] && args._[1] === 'css') {
+    const needsValue = cmdName === 'fill' || cmdName === 'select';
+    const selectorParts = needsValue ? args._.slice(2, -1) : args._.slice(2);
+    const selector = selectorParts.join(' ');
+    const action = CSS_ACTIONS[cmdName];
+    const value = needsValue ? args._[args._.length - 1] : undefined;
+    if (selector) return { jsExpr: call(chainAction, selector, action, value) };
   }
 
   // ── >> chaining ─────────────────────────────────────────────

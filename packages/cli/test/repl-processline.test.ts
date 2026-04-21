@@ -345,10 +345,10 @@ describe('processLine', () => {
     expect(output).toContain('Unknown command');
   });
 
-  it('passes highlight command through to engine', async () => {
+  it('passes highlight css command through to engine', async () => {
     const ctx = makeCtx();
-    await processLine(ctx, 'highlight .btn');
-    expect(ctx.conn.run).toHaveBeenCalledWith(expect.objectContaining({ _: ['highlight', '.btn'] }));
+    await processLine(ctx, 'highlight css .btn');
+    expect(ctx.conn.run).toHaveBeenCalledWith(expect.objectContaining({ _: ['highlight', 'css', '.btn'] }));
   });
 
   it('passes >> chained selector through to engine', async () => {

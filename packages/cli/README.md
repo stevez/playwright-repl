@@ -345,7 +345,7 @@ pw> click "Submit" --frame "#my-iframe"      # click inside an iframe
 |---------|-------|-------------|
 | `snapshot` | `s` | Accessibility tree with element refs |
 | `screenshot` | `ss` | Take a screenshot (saved to file) |
-| `highlight <text\|selector>` | `hl` | Highlight matching elements on page |
+| `highlight <text\|role\|css>` | `hl` | Highlight matching elements on page |
 | `eval <expr>` | `e` | Evaluate JavaScript in browser context |
 | `console` | `con` | Browser console messages |
 | `network` | `net` | Network requests log |

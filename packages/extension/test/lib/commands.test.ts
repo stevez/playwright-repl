@@ -172,8 +172,8 @@ describe("highlight", () => {
     expect(jsExpr).toContain('"Submit"');
   });
 
-  it("routes CSS selector to highlightBySelector", () => {
-    const { jsExpr } = direct("highlight .btn-primary");
+  it("routes css subcommand to highlightBySelector", () => {
+    const { jsExpr } = direct("highlight css .btn-primary");
     expect(jsExpr).toContain('highlightBySelector');
     expect(jsExpr).toContain('".btn-primary"');
   });
@@ -183,22 +183,48 @@ describe("highlight", () => {
     expect(jsExpr).toContain('clearHighlight');
   });
 
-  it("preserves quotes inside :has-text() CSS pseudo-class", () => {
-    const { jsExpr } = direct('highlight div:has-text("RFCP")');
+  it("routes css with :has-text() pseudo-class", () => {
+    const { jsExpr } = direct('highlight css div:has-text("RFCP")');
     expect(jsExpr).toContain('highlightBySelector');
     expect(jsExpr).toContain('has-text(\\"RFCP\\")');
   });
 
-  it("preserves single quotes inside :has-text()", () => {
-    const { jsExpr } = direct("highlight div:has-text('RFCP')");
-    expect(jsExpr).toContain('highlightBySelector');
-    expect(jsExpr).toContain("has-text('RFCP')");
+  it("routes text with dot as text, not CSS", () => {
+    const { jsExpr } = direct('highlight "Node.js"');
+    expect(jsExpr).toContain('highlightByText');
+    expect(jsExpr).toContain('"Node.js"');
+  });
+});
+
+// ─── css subcommand ──────────────────────────────────────────────────────────
+
+describe("css subcommand", () => {
+  it("routes click css to locator", () => {
+    const { jsExpr } = direct("click css .btn-primary");
+    expect(jsExpr).toContain('chainAction');
+    expect(jsExpr).toContain('".btn-primary"');
+    expect(jsExpr).toContain('"click"');
   });
 
-  it("preserves spaces inside :has-text()", () => {
-    const { jsExpr } = direct('highlight div:has-text("Hello World")');
-    expect(jsExpr).toContain('highlightBySelector');
-    expect(jsExpr).toContain('has-text(\\"Hello World\\")');
+  it("routes hover css to locator", () => {
+    const { jsExpr } = direct("hover css div.menu-item");
+    expect(jsExpr).toContain('chainAction');
+    expect(jsExpr).toContain('"div.menu-item"');
+    expect(jsExpr).toContain('"hover"');
+  });
+
+  it("routes fill css with value", () => {
+    const { jsExpr } = direct('fill css .input "hello"');
+    expect(jsExpr).toContain('chainAction');
+    expect(jsExpr).toContain('".input"');
+    expect(jsExpr).toContain('"fill"');
+    expect(jsExpr).toContain('"hello"');
+  });
+
+  it("routes check css to locator", () => {
+    const { jsExpr } = direct('check css input[type="checkbox"]');
+    expect(jsExpr).toContain('chainAction');
+    expect(jsExpr).toContain('"check"');
   });
 });
 
