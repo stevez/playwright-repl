@@ -186,16 +186,15 @@ function call(fn: any, ...args: unknown[]): string {
  * First tries role-based scoping, then falls back to DOM proximity via locator.evaluate().
  */
 function callScoped(fn: any, inText: string, targetText: string, ...args: unknown[]): string {
-  return `await (async () => {
-    let __scope = page;
-    const __roles = ['region', 'group', 'article', 'listitem', 'dialog', 'form'];
-    for (const __r of __roles) {
-      const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
-      if (await __c.getByText(${ser(targetText)}, { exact: true }).count() > 0) { __scope = __c; break; }
-    }
-    if (__scope === page) {
-      try {
-        const __sel = await page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el, tgt) => {
+  // For bare roles (empty targetText), use role-based scope detection
+  const targetRole = !targetText && args.length > 0 ? args[0] as string : '';
+  const scopeCheck = targetText
+    ? `await __c.getByText(${ser(targetText)}, { exact: true }).count() > 0`
+    : targetRole
+      ? `await __c.getByRole(${ser(targetRole)}).count() > 0`
+      : `false`;
+  const fallbackCheck = targetText
+    ? `page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el, tgt) => {
           let a = el.parentElement;
           while (a && a !== document.body) {
             if (a.textContent.includes(tgt)) {
@@ -206,7 +205,26 @@ function callScoped(fn: any, inText: string, targetText: string, ...args: unknow
             a = a.parentElement;
           }
           return null;
-        }, ${ser(targetText)});
+        }, ${ser(targetText)})`
+    : `page.getByText(${ser(inText)}, { exact: true }).first().evaluate((el) => {
+          let a = el.parentElement;
+          while (a && a !== document.body) {
+            const id = '__pw_in_' + Math.random().toString(36).slice(2);
+            a.setAttribute('data-pw-in', id);
+            return '[data-pw-in="' + id + '"]';
+          }
+          return null;
+        })`;
+  return `await (async () => {
+    let __scope = page;
+    const __roles = ['region', 'group', 'article', 'listitem', 'dialog', 'form'];
+    for (const __r of __roles) {
+      const __c = page.getByRole(__r).filter({ hasText: ${ser(inText)} });
+      if (${scopeCheck}) { __scope = __c; break; }
+    }
+    if (__scope === page) {
+      try {
+        const __sel = await ${fallbackCheck};
         if (__sel) __scope = page.locator(__sel);
       } catch {}
     }
@@ -468,8 +486,8 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
       // highlight <role> "<name>" → getByRole(role, { name })
       const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
       const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
-      if (args._.length >= 3 && /^[a-z]+$/.test(loc)) {
-        const name = args._.slice(2).join(' ');
+      if (/^[a-z]+$/.test(loc) && (args._.length >= 3 || inText !== undefined || nth !== undefined)) {
+        const name = args._.length >= 3 ? args._.slice(2).join(' ') : '';
         if (inText && !inRole) return { jsExpr: callScoped(highlightByRole, inText, name, loc, name, nth) };
         return { jsExpr: call(highlightByRole, loc, name, nth, inRole, inText) };
       }
@@ -521,13 +539,15 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     click: 'click', dblclick: 'dblclick', hover: 'hover',
     check: 'check', uncheck: 'uncheck',
   };
-  if (args._.length >= 3 && args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>'))) {
+  const inTextForRole = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
+  const nthForRole = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+  if (args._[1] && /^[a-z]+$/.test(args._[1]) && !args._.some(a => a.includes('>>')) && (args._.length >= 3 || inTextForRole !== undefined || nthForRole !== undefined)) {
     const role = args._[1];
-    const nth = args.nth !== undefined ? parseInt(String(args.nth), 10) : undefined;
+    const nth = nthForRole;
     const inRole = args['in-role'] !== undefined ? String(args['in-role']) : undefined;
-    const inText = args['in-text'] !== undefined ? String(args['in-text']) : undefined;
+    const inText = inTextForRole;
     if (ROLE_ACTIONS[cmdName]) {
-      const name = args._.slice(2).join(' ');
+      const name = args._.length >= 3 ? args._.slice(2).join(' ') : '';
       if (inText && !inRole) return { jsExpr: callScoped(actionByRole, inText, name, role, name, ROLE_ACTIONS[cmdName], nth) };
       return { jsExpr: call(actionByRole, role, name, ROLE_ACTIONS[cmdName], nth, inRole, inText) };
     }

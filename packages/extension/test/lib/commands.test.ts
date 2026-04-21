@@ -194,6 +194,20 @@ describe("highlight", () => {
     expect(jsExpr).toContain('highlightByText');
     expect(jsExpr).toContain('"Node.js"');
   });
+
+  it("routes bare role with --in to highlightByRole", () => {
+    const { jsExpr } = direct('highlight img --in "Built on Playwright"');
+    expect(jsExpr).toContain('highlightByRole');
+    expect(jsExpr).toContain('"img"');
+    expect(jsExpr).toContain('""');
+  });
+
+  it("routes bare role with --nth to highlightByRole", () => {
+    const { jsExpr } = direct('highlight img --nth 2');
+    expect(jsExpr).toContain('highlightByRole');
+    expect(jsExpr).toContain('"img"');
+    expect(jsExpr).toContain('2');
+  });
 });
 
 // ─── css subcommand ──────────────────────────────────────────────────────────
@@ -225,6 +239,32 @@ describe("css subcommand", () => {
     const { jsExpr } = direct('check css input[type="checkbox"]');
     expect(jsExpr).toContain('chainAction');
     expect(jsExpr).toContain('"check"');
+  });
+});
+
+// ─── bare role with --in ─────────────────────────────────────────────────────
+
+describe("bare role with --in", () => {
+  it("routes click img --in to actionByRole with empty name", () => {
+    const { jsExpr } = direct('click img --in "Section Title"');
+    expect(jsExpr).toContain('actionByRole');
+    expect(jsExpr).toContain('"img"');
+    expect(jsExpr).toContain('""');
+    expect(jsExpr).toContain('"click"');
+  });
+
+  it("routes hover navigation --in to actionByRole", () => {
+    const { jsExpr } = direct('hover navigation --in "Header"');
+    expect(jsExpr).toContain('actionByRole');
+    expect(jsExpr).toContain('"navigation"');
+    expect(jsExpr).toContain('"hover"');
+  });
+
+  it("routes click img --nth to actionByRole", () => {
+    const { jsExpr } = direct('click img --nth 3');
+    expect(jsExpr).toContain('actionByRole');
+    expect(jsExpr).toContain('"img"');
+    expect(jsExpr).toContain('"click"');
   });
 });
 

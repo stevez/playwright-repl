@@ -180,13 +180,14 @@ export async function uncheckByText(page, text, nth?, exact?) {
 // ─── Role-based actions (used by recorder output) ──────────────────────────
 
 export async function actionByRole(page, role, name, action, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
@@ -195,13 +196,14 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
 }
 
 export async function fillByRole(page, role, name, value, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
@@ -210,13 +212,14 @@ export async function fillByRole(page, role, name, value, nth, inRole, inText) {
 }
 
 export async function selectByRole(page, role, name, value, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
@@ -237,13 +240,14 @@ export async function highlightByText(page, text, nth?, exact?) {
 }
 
 export async function highlightByRole(page, role, name, nth, inRole?, inText?) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
@@ -406,13 +410,14 @@ export async function pressKey(page, target, key) {
 }
 
 export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, { name, exact: true });
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }

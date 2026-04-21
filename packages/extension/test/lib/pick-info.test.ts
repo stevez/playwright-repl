@@ -247,7 +247,7 @@ describe('buildPickResult', () => {
             attributes: {},
         }));
         expect(result.assertJs).toBe("await expect(page.getByRole('img')).toBeVisible();");
-        expect(result.assertPw).toBe('verify-text');
+        expect(result.assertPw).toBe('verify-visible img');
     });
 
     it('derives verify-element with role + name for image with alt', () => {

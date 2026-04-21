@@ -170,7 +170,8 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
     if (role || name) {
         const base = parts.join(' ');
         // Prefer heading --in over --nth / complex CSS scoping when no aria parent context exists
-        if (!inFlag && headingIn && needsScoping) return `${base}${headingIn}`;
+        // But only when name is present — bare role + --in doesn't scope reliably
+        if (!inFlag && headingIn && needsScoping && name) return `${base}${headingIn}`;
         return `${base}${nth}${inFlag}`;
     }
 
@@ -204,9 +205,10 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     const ariaRole = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot)?.element.role : null;
     const role = ariaRole || info.attributes?.role || parsed.role || null;
     // Suppress --nth when heading context will replace it (same as derivePwCommand)
+    // But only when name is present — bare role + heading doesn't scope reliably
     const rawNth = extractNth(locator);
     const needsScoping = rawNth || /\.locator\(|\.filter\(|^locator\(/.test(locator);
-    const nth = (headingContext && needsScoping) ? '' : rawNth;
+    const nth = (headingContext && needsScoping && name) ? '' : rawNth;
 
     // Checkbox/radio → checked assertion
     if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio') && info.checked !== undefined) {
@@ -254,12 +256,14 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     // Fallback → visible assertion
     const target = pwTarget();
     let assertPw: string;
-    if (role) {
-        assertPw = target ? `verify-element ${target}` : 'verify-text';
+    if (role && target) {
+        assertPw = `verify-element ${target}`;
+    } else if (role) {
+        assertPw = `verify-visible ${role}${nth}`;
     } else if (target) {
         assertPw = `verify-text ${target}`;
     } else {
-        assertPw = 'verify-text';
+        assertPw = '';
     }
     return {
         assertJs: `await expect(${locator}).toBeVisible();`,

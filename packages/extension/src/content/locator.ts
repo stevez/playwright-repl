@@ -401,7 +401,18 @@ export function generateLocator(el: Element): string {
     }
 
     // 8. Role without name
-    if (role) return `getByRole(${escapeString(role)})`;
+    if (role) {
+        const allWithRole = [...document.querySelectorAll('*')].filter(
+            e => getImplicitRole(e) === role && (!e.checkVisibility || e.checkVisibility()),
+        );
+        if (allWithRole.length === 1) return `getByRole(${escapeString(role)})`;
+        // Multiple matches — disambiguate with .nth()
+        const idx = allWithRole.indexOf(el);
+        if (idx >= 0) {
+            const base = `getByRole(${escapeString(role)})`;
+            return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
+        }
+    }
 
     // 9. CSS fallback
     return `locator(${escapeString(buildCssSelector(el))})`;
