@@ -400,18 +400,13 @@ export function generateLocator(el: Element): string {
         if (snippet) return `getByText(${escapeString(snippet)})`;
     }
 
-    // 8. Role without name
+    // 8. Role without name — only when unique on the page
     if (role) {
         const allWithRole = [...document.querySelectorAll('*')].filter(
             e => getImplicitRole(e) === role && (!e.checkVisibility || e.checkVisibility()),
         );
         if (allWithRole.length === 1) return `getByRole(${escapeString(role)})`;
-        // Multiple matches — disambiguate with .nth()
-        const idx = allWithRole.indexOf(el);
-        if (idx >= 0) {
-            const base = `getByRole(${escapeString(role)})`;
-            return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
-        }
+        // Multiple matches — fall through to CSS (nth counting may not match Playwright)
     }
 
     // 9. CSS fallback
