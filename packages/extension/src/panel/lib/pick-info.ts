@@ -179,6 +179,10 @@ function derivePwCommand(info: ElementPickInfo, ariaSnapshot?: string, headingCo
     const text = info.text?.trim();
     if (text && text.length <= 80) return `highlight "${text}"${(needsScoping && headingIn) || nth}`;
 
+    // CSS fallback — pure CSS selectors without semantic role/name/text
+    const cssMatch = info.locator.match(/^locator\(['"](.+?)['"]\)(?:\.(?:first|last)\(\)|\.nth\(\d+\))?$/);
+    if (cssMatch) return `highlight css "${cssMatch[1]}"${nth}`;
+
     return null;
 }
 
@@ -198,8 +202,10 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
     const tag = info.tag;
     const inputType = info.attributes?.type?.toLowerCase() ?? '';
     // Extract name from pw command, falling back to JS locator parsing
+    // Skip extraction for CSS fallback commands — the quoted value is a selector, not a name
     const parsed = parseJsLocator(locator);
-    const name = (pwCommand ? extractPwName(pwCommand) : null) ?? parsed.name ?? null;
+    const isCssPw = pwCommand?.includes(' css ') ?? false;
+    const name = (pwCommand && !isCssPw ? extractPwName(pwCommand) : null) ?? parsed.name ?? null;
     const quotedName = name ? `"${name}"` : null;
     // Extract role from aria snapshot, element attributes, or JS locator
     const ariaRole = ariaSnapshot ? parseAriaSnapshot(ariaSnapshot)?.element.role : null;
@@ -262,6 +268,10 @@ function deriveAssertion(info: ElementPickInfo, locator: string, pwCommand: stri
         assertPw = `verify-visible ${role}${nth}`;
     } else if (target) {
         assertPw = `verify-text ${target}`;
+    } else if (isCssPw) {
+        // CSS fallback — extract selector from pw command
+        const cssSel = extractPwName(pwCommand!);
+        assertPw = cssSel ? `verify-visible css "${cssSel}"${nth}` : '';
     } else {
         assertPw = '';
     }

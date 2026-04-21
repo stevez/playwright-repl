@@ -547,4 +547,33 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).toContain('--in listitem');
         expect(result.pwCommand).not.toContain('Some Heading');
     });
+
+    // ─── CSS fallback ─────────────────────────────────────────────────────
+
+    it('generates css fallback pw command for pure CSS selectors', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('#movie_player video')",
+            tag: 'VIDEO',
+            text: '',
+        }), null, '', null);
+        expect(result.pwCommand).toBe('highlight css "#movie_player video"');
+    });
+
+    it('generates css fallback assert for pure CSS selectors', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('#movie_player video')",
+            tag: 'VIDEO',
+            text: '',
+        }), null, '', null);
+        expect(result.assertPw).toBe('verify-visible css "#movie_player video"');
+    });
+
+    it('generates css fallback with --nth for CSS + .first()', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "locator('.item').first()",
+            tag: 'DIV',
+            text: '',
+        }), null, '', null);
+        expect(result.pwCommand).toBe('highlight css ".item" --nth 0');
+    });
 });
