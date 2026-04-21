@@ -400,22 +400,15 @@ export function generateLocator(el: Element): string {
         if (snippet) return `getByText(${escapeString(snippet)})`;
     }
 
-    // 8. Role without name
+    // 8. Role without name — only when unique on the page
     if (role) {
         const allWithRole = [...document.querySelectorAll('*')].filter(
             e => getImplicitRole(e) === role && (!e.checkVisibility || e.checkVisibility()),
         );
         if (allWithRole.length === 1) return `getByRole(${escapeString(role)})`;
-        // Multiple matches — disambiguate with .nth()
-        // Note: DOM counting may differ from Playwright's accessibility tree
-        const idx = allWithRole.indexOf(el);
-        if (idx >= 0) {
-            const base = `getByRole(${escapeString(role)})`;
-            return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
-        }
     }
 
-    // 9. CSS fallback
+    // 9. CSS fallback — use nth-of-type for deterministic targeting
     return `locator(${escapeString(buildCssSelector(el))})`;
 }
 
@@ -507,17 +500,21 @@ export function buildCommands(action: string, el: Element, opts?: {
     const inFlag = ancestor
         ? ` --in ${ancestor.role ? `${ancestor.role} ` : ''}${q(ancestor.text)}`
         : '';
+    // CSS fallback locators need "css" prefix in PW commands
+    const isCssFallback = pwLocator.startsWith('locator(');
+
+    const cssPrefix = isCssFallback ? 'css ' : '';
 
     switch (action) {
         case 'hover':
             return {
-                pw: `hover ${pwArgs}${inFlag}`,
+                pw: `hover ${cssPrefix}${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.hover();`,
             };
 
         case 'click':
             return {
-                pw: `click ${pwArgs}${inFlag}`,
+                pw: `click ${cssPrefix}${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.click();`,
             };
 
@@ -525,35 +522,35 @@ export function buildCommands(action: string, el: Element, opts?: {
             const val = opts?.value ?? '';
             // Bare role without name (e.g. "textbox") makes fill ambiguous:
             // `fill textbox "val"` parses as fill(role=textbox, name="val", value="")
-            const fillLoc = /^[a-z]+$/.test(pwArgs)
+            const fillLoc = !isCssFallback && /^[a-z]+$/.test(pwArgs)
                 ? q(buildCssSelector(el))
                 : pwArgs;
             return {
-                pw: `fill ${fillLoc} ${q(val)}${inFlag}`,
+                pw: `fill ${cssPrefix}${fillLoc} ${q(val)}${inFlag}`,
                 js: `await ${jsLoc}.fill(${escapeString(val)});`,
             };
         }
 
         case 'check':
             return {
-                pw: `check ${pwArgs}${inFlag}`,
+                pw: `check ${cssPrefix}${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.check();`,
             };
 
         case 'uncheck':
             return {
-                pw: `uncheck ${pwArgs}${inFlag}`,
+                pw: `uncheck ${cssPrefix}${pwArgs}${inFlag}`,
                 js: `await ${jsLoc}.uncheck();`,
             };
 
         case 'select': {
             const optVal = opts?.option ?? '';
             // Same bare-role guard as fill
-            const selLoc = /^[a-z]+$/.test(pwArgs)
+            const selLoc = !isCssFallback && /^[a-z]+$/.test(pwArgs)
                 ? q(buildCssSelector(el))
                 : pwArgs;
             return {
-                pw: `select ${selLoc} ${q(optVal)}${inFlag}`,
+                pw: `select ${cssPrefix}${selLoc} ${q(optVal)}${inFlag}`,
                 js: `await ${jsLoc}.selectOption(${escapeString(optVal)});`,
             };
         }
@@ -562,7 +559,7 @@ export function buildCommands(action: string, el: Element, opts?: {
             const key = opts?.key ?? '';
             if (pwArgs) {
                 return {
-                    pw: `press ${pwArgs} ${key}${inFlag}`,
+                    pw: `press ${cssPrefix}${pwArgs} ${key}${inFlag}`,
                     js: `await ${jsLoc}.press(${escapeString(key)});`,
                 };
             }
@@ -585,5 +582,32 @@ export function buildCssSelector(el: Element): string {
     if (el.id) return `${tag}#${CSS.escape(el.id)}`;
     const classes = [...el.classList].slice(0, 2).map(c => '.' + CSS.escape(c)).join('');
     if (classes) return `${tag}${classes}`;
-    return tag;
+
+    // Bare tag — build a unique path from the nearest identifiable ancestor
+    let current: Element | null = el;
+    const parts: string[] = [];
+    while (current && current !== document.body && current !== document.documentElement) {
+        const t = current.tagName.toLowerCase();
+        if (current.id) {
+            parts.unshift(`${t}#${CSS.escape(current.id)}`);
+            break;
+        }
+        const cls = [...current.classList].slice(0, 2).map(c => '.' + CSS.escape(c)).join('');
+        if (cls) {
+            parts.unshift(`${t}${cls}`);
+            break;
+        }
+        // Use nth-of-type if siblings share the tag
+        const parent = current.parentElement;
+        if (parent) {
+            const siblings = [...parent.querySelectorAll(`:scope > ${t}`)];
+            parts.unshift(siblings.length > 1
+                ? `${t}:nth-of-type(${siblings.indexOf(current) + 1})`
+                : t);
+        } else {
+            parts.unshift(t);
+        }
+        current = current.parentElement;
+    }
+    return parts.join(' > ');
 }
