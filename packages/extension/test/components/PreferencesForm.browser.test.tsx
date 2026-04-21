@@ -15,7 +15,7 @@ import PreferencesForm from '../../src/preferences/PreferencesForm';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+    mockLoadSettings.mockResolvedValue({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw', commandTimeout: 15000 });
     mockStoreSettings.mockResolvedValue(undefined);
 });
 
@@ -80,6 +80,25 @@ describe('PreferencesForm', () => {
         await vi.waitFor(() => {
             expect(mockStoreSettings).toHaveBeenCalledWith(
                 expect.objectContaining({ languageMode: 'js' }),
+            );
+        });
+    });
+
+    it('renders Command Timeout fieldset with default value in seconds', async () => {
+        const screen = await render(<PreferencesForm />);
+        await expect.element(screen.getByText('Command Timeout (seconds):')).toBeInTheDocument();
+        const input = screen.getByRole('group', { name: 'Command Timeout (seconds):' }).getByRole('spinbutton');
+        await expect.element(input).toHaveValue(15);
+    });
+
+    it('calls storeSettings when command timeout changed', async () => {
+        const screen = await render(<PreferencesForm />);
+        const input = screen.getByRole('group', { name: 'Command Timeout (seconds):' }).getByRole('spinbutton');
+        await userEvent.clear(input);
+        await userEvent.type(input, '30');
+        await vi.waitFor(() => {
+            expect(mockStoreSettings).toHaveBeenCalledWith(
+                expect.objectContaining({ commandTimeout: 30000 }),
             );
         });
     });

@@ -2,6 +2,7 @@ export type CommandResult = { text: string; isError: boolean; image?: string };
 export type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import type { CdpRemoteObject } from '@/components/Console/cdpToSerialized';
 import { parseReplCommand } from './commands';
+import { loadSettings } from './settings';
 export type ConsoleCommandResult = { cdpResult: CdpRemoteObject } | { text: string; image?: string; video?: string; duration?: number; size?: number; trace?: boolean; traceSize?: number };
 
 type CdpResult = { type?: string; value?: unknown; description?: string; objectId?: string };
@@ -23,14 +24,17 @@ export async function executeCommand(command: string): Promise<CommandResult> {
   const parsed = parseReplCommand(command);
   if ('help' in parsed) return { text: parsed.help, isError: false };
 
-  const { swDebugEval, swCallFunctionOn } = await import('@/lib/sw-debugger');
+  const [{ swDebugEval, swCallFunctionOn }, { commandTimeout }] = await Promise.all([
+    import('@/lib/sw-debugger'),
+    loadSettings(),
+  ]);
 
   let timer: ReturnType<typeof setTimeout>;
   const withTimeout = <T>(p: Promise<T>): Promise<T> =>
     Promise.race([
       p,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Command timed out after 15s')), 15000);
+        timer = setTimeout(() => reject(new Error(`Command timed out after ${commandTimeout / 1000}s`)), commandTimeout);
       }),
     ]).finally(() => clearTimeout(timer!));
 
@@ -113,7 +117,10 @@ export async function executeCommandForConsole(command: string): Promise<Console
   if ('error' in parsed) throw new Error(parsed.error);
   if ('help' in parsed) return { text: parsed.help };
 
-  const { swDebugEval } = await import('@/lib/sw-debugger');
+  const [{ swDebugEval }, { commandTimeout }] = await Promise.all([
+    import('@/lib/sw-debugger'),
+    loadSettings(),
+  ]);
   const { jsExpr } = parsed;
 
   let timer: ReturnType<typeof setTimeout>;
@@ -121,7 +128,7 @@ export async function executeCommandForConsole(command: string): Promise<Console
     Promise.race([
       p,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Command timed out after 15s')), 15000);
+        timer = setTimeout(() => reject(new Error(`Command timed out after ${commandTimeout / 1000}s`)), commandTimeout);
       }),
     ]).finally(() => clearTimeout(timer!));
 

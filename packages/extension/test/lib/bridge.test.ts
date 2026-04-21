@@ -10,6 +10,12 @@ vi.mock('@/lib/execute', () => ({
     detectMode: vi.fn(),
 }));
 
+vi.mock('@/lib/settings', () => ({
+    loadSettings: vi.fn().mockResolvedValue({ commandTimeout: 15000 }),
+}));
+
+import { loadSettings } from '@/lib/settings';
+
 vi.mock('@/lib/commands', async (importOriginal) => {
     const actual = await importOriginal() as any;
     return { ...actual, parseReplCommand: vi.fn(actual.parseReplCommand) };
@@ -149,6 +155,18 @@ describe('executeCommand', () => {
     expect(result.isError).toBe(true);
     expect(result.text).toBeTruthy();
   });
+
+  it('times out using configured commandTimeout', async () => {
+    vi.useFakeTimers();
+    vi.mocked(loadSettings).mockResolvedValue({ commandTimeout: 5000, openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+    vi.mocked(swDebugEval).mockReturnValue(new Promise(() => {})); // never resolves
+    const promise = executeCommand('snapshot');
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+    expect(result.isError).toBe(true);
+    expect(result.text).toBe('Command timed out after 5s');
+    vi.useRealTimers();
+  });
 });
 
 // ─── executeCommandForConsole ────────────────────────────────────────────────
@@ -205,5 +223,16 @@ describe('executeCommandForConsole', () => {
     vi.mocked(swDebugEval).mockResolvedValue({ result: obj });
     const result = await executeCommandForConsole('snapshot');
     expect('cdpResult' in result && result.cdpResult).toEqual(obj);
+  });
+
+  it('times out using configured commandTimeout', async () => {
+    vi.useFakeTimers();
+    vi.mocked(loadSettings).mockResolvedValue({ commandTimeout: 10000, openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+    vi.mocked(swDebugEval).mockReturnValue(new Promise(() => {})); // never resolves
+    const promise = executeCommandForConsole('snapshot');
+    const assertion = expect(promise).rejects.toThrow('Command timed out after 10s');
+    await vi.advanceTimersByTimeAsync(10000);
+    await assertion;
+    vi.useRealTimers();
   });
 });

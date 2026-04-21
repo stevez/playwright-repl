@@ -3,7 +3,7 @@ import { loadSettings, storeSettings } from '../panel/lib/settings';
 import type { PwReplSettings } from '../panel/lib/settings';
 
 export default function PreferencesForm() {
-  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw' });
+  const [settings, setSettings] = useState<PwReplSettings>({ openAs: 'sidepanel', bridgePort: 9876, languageMode: 'pw', commandTimeout: 15000 });
 
   useEffect(() => {
     loadSettings().then(setSettings);
@@ -84,6 +84,24 @@ export default function PreferencesForm() {
           />
           js
         </label>
+      </fieldset>
+      <fieldset style={{ border: 'none', padding: 0, margin: '20px 0 0' }}>
+        <legend style={{ fontWeight: 600, marginBottom: '12px' }}>Command Timeout (seconds):</legend>
+        <input
+          type="number"
+          min={1}
+          max={300}
+          value={settings.commandTimeout / 1000}
+          onChange={(e) => {
+            const next = { ...settings, commandTimeout: Number(e.target.value) * 1000 };
+            setSettings(next);
+            storeSettings(next);
+          }}
+          style={{ width: '100px', padding: '4px 8px', fontSize: '14px' }}
+        />
+        <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#888' }}>
+          Max time a command can run before timing out (default: 15).
+        </p>
       </fieldset>
       <p style={{ marginTop: '16px', fontSize: '12px', color: '#888' }}>Saved automatically.</p>
     </form>
