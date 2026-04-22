@@ -7,6 +7,18 @@ import type { PwReplSettings } from './panel/lib/settings';
 import { parseReplCommand } from './panel/lib/commands';
 import { detectMode } from './panel/lib/execute';
 
+// ─── Suppress Chrome-internal "No SW" error ─────────────────────────────────
+// Chromium's extension_function_dispatcher.cc rejects with "No SW" when the
+// service worker's render process is gone before an in-flight Chrome API call
+// completes. This is a known Chrome bug — purely console noise, no functional
+// impact.  Suppress it so it doesn't pollute the SW console during debugging.
+// https://groups.google.com/a/chromium.org/g/chromium-extensions/c/rHFKotXbm-0
+self.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  if (event.reason?.message === 'No SW' || String(event.reason) === 'Error: No SW') {
+    event.preventDefault();
+  }
+});
+
 // ─── Service worker lifecycle logging ────────────────────────────────────────
 
 chrome.runtime.onSuspend.addListener(() => {
