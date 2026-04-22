@@ -9,7 +9,7 @@ import type * as vscodeTypes from './vscodeTypes';
 import type { IBrowserManager } from './browser.js';
 
 export interface ILocatorsView {
-  showLocator(locator: string, ariaSnapshot?: string): void;
+  showLocator(locator: string, ariaSnapshot?: string, ref?: string): void;
 }
 
 export interface IAssertView {
@@ -66,10 +66,17 @@ export class Picker {
       const fullLocator = `page.${locator.toString()}`;
       this._outputChannel.appendLine(`Picked: ${fullLocator}`);
 
-      // Get aria snapshot
+      // Get aria snapshot via service worker so refs register in the backend
       let ariaSnapshot = '';
+      let ref: string | undefined;
       try {
-        ariaSnapshot = await locator.ariaSnapshot();
+        const result = await this._browserManager.runScript(`await ${fullLocator}.ariaSnapshot({ mode: 'ai' })`);
+        if (!result.isError && result.text) {
+          ariaSnapshot = result.text;
+          ref = ariaSnapshot.match(/\[ref=(e\d+)\]/)?.[1];
+          // Strip [ref=...] and [cursor=...] from display
+          ariaSnapshot = ariaSnapshot.replace(/\s*\[(?:ref|cursor)=[^\]]*\]/g, '');
+        }
       } catch {}
 
       // Derive assertion from element info
@@ -82,7 +89,7 @@ export class Picker {
         await this._vscode.env.clipboard.writeText(fullLocator);
 
       if (this._locatorsView)
-        this._locatorsView.showLocator(fullLocator, ariaSnapshot);
+        this._locatorsView.showLocator(fullLocator, ariaSnapshot, ref);
       if (this._assertView && this._sendToAssert)
         this._assertView.showAssertion(fullLocator, assertion, info, ariaSnapshot);
       this._sendToAssert = false;

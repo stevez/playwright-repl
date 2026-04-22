@@ -18,6 +18,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   private _extensionUri: vscodeTypes.Uri;
   private _locator: { locator: string, error?: string } = { locator: '' };
   private _ariaSnapshot: { yaml: string, error?: string } = { yaml: '' };
+  private _ref: string = '';
   private _settingsModel: SettingsModel;
   private _browserManager: IBrowserManager | undefined;
 
@@ -38,9 +39,10 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
   }
 
   /** Allow external callers (e.g. our bridge picker) to show a locator. */
-  public async showLocator(locator: string, ariaSnapshot?: string) {
+  public async showLocator(locator: string, ariaSnapshot?: string, ref?: string) {
     this._locator = { locator };
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
+    this._ref = ref || '';
     this._highlighted = false;
     // Focus first so the webview is resolved before we send the update
     await this._vscode.commands.executeCommand('playwright-repl.locatorsView.focus');
@@ -124,6 +126,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
       params: {
         locator: this._locator,
         ariaSnapshot: this._ariaSnapshot,
+        ref: this._ref,
       }
     });
   }
@@ -212,6 +215,12 @@ function htmlForWebview(vscode: vscodeTypes.VSCode, extensionUri: vscodeTypes.Ur
         </div>
         <input id="locator" placeholder="${vscode.l10n.t('Locator')}" aria-labelledby="locatorLabel">
         <p id="locatorError" class="error"></p>
+      </div>
+      <div id="refSection" class="section">
+        <div class="hbox">
+          <label>Ref</label>
+        </div>
+        <input id="ref" readonly aria-label="Snapshot ref">
       </div>
       <div id="ariaSection" class="section">
         <div class="hbox">
