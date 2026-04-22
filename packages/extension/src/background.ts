@@ -366,7 +366,7 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
   try {
     const locator = await currentPage.pickLocator();
     const locatorStr = locator.toString();
-    const ariaSnapshot = await locator.ariaSnapshot().catch(() => '');
+    const ariaSnapshot = await locator.ariaSnapshot({ mode: 'ai' }).catch(() => '');
     const elementInfo = await locator.evaluate((el: Element) => {
       const attrs: Record<string, string> = {};
       for (const attr of el.attributes) attrs[attr.name] = attr.value;

@@ -308,12 +308,17 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
     if (assertPw && inMatch) assertPw += ` ${inMatch[1]}`;
     if (assertPw) assertPw += extraFlags;
 
+    // Extract snapshot ref from aria snapshot (e.g. [ref=e45] → "e45")
+    const refMatch = ariaSnapshot?.match(/\[ref=(e\d+)\]/);
+    const ref = refMatch?.[1];
+
     return {
         locator,
         pwCommand,
         jsExpression,
         assertJs,
         assertPw,
+        ref,
         details: {
             tag: info.tag,
             text: info.text,
@@ -334,6 +339,9 @@ export function buildPickResult(info: ElementPickInfo, cdpLocator?: string | nul
  */
 export function pickResultToSerialized(data: PickResultData): SerializedValue {
     const props: Record<string, SerializedValue> = {};
+
+    // ref
+    if (data.ref) props.ref = { __type: 'string', v: data.ref };
 
     // locator: { js, pw }
     const locatorProps: Record<string, SerializedValue> = {

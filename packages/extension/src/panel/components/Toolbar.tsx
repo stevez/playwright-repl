@@ -311,7 +311,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
             const info = result.info;
             const pickResult = buildPickResult(info, info.locator, info.ariaSnapshot, info.headingContext);
             if (info.ariaSnapshot)
-                pickResult.ariaSnapshot = info.ariaSnapshot;
+                pickResult.ariaSnapshot = info.ariaSnapshot.replace(/\s*\[(?:ref|cursor)=[^\]]*\]/g, '');
             dispatch({ type: 'ADD_LINE', line: { text: '', type: 'info', pickResult } });
         } catch (e) {
             dispatch({ type: 'ADD_LINE', line: { text: `Pick failed: ${String(e)}`, type: 'error' } });
