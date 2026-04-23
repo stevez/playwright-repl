@@ -77,6 +77,7 @@ export function consoleExtensions(opts: Opts): Extension[] {
     });
 
     return [
+        EditorView.lineWrapping,
         customKeymap,
         javascript(),
         javascriptLanguage.data.of({ autocomplete: playwrightCompletions }),
