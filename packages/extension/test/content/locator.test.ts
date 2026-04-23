@@ -1028,7 +1028,7 @@ describe('locator', () => {
             expect(cmds!.pw).not.toContain('css');
         });
 
-        it('does not use concatenated option text for select locator (#800)', () => {
+        it('click on select uses informal label, not option text (#800)', () => {
             // Two selects with same options — role is not unique, would previously
             // fall through to textContent and generate broken getByText('option 1\noption 2')
             document.body.innerHTML = `
@@ -1044,14 +1044,12 @@ describe('locator', () => {
                     </select>
                 </td></tr></table>`;
             const selects = document.querySelectorAll('select');
-            // First select: should use informal label from adjacent span, not option text
+            // First select: should use informal label from adjacent span
             const cmds1 = buildCommands('click', selects[0]);
-            expect(cmds1!.pw).not.toContain('option 1');
-            expect(cmds1!.pw).not.toContain('option 2');
+            expect(cmds1!.pw).toBe('click "Select an option"');
             // Second select: should use informal label from table cell
             const cmds2 = buildCommands('click', selects[1]);
-            expect(cmds2!.pw).not.toContain('option 1');
-            expect(cmds2!.pw).not.toContain('option 2');
+            expect(cmds2!.pw).toBe('click "Select an option (table)"');
         });
 
         it('adds --exact for text-based click locator', () => {

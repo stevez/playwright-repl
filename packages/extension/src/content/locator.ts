@@ -126,13 +126,12 @@ export function getInformalLabel(el: Element): string {
             }
         }
     }
-    // Non-table: parent's text content excluding form elements
-    const parent = el.parentElement;
-    if (parent) {
-        const clone = parent.cloneNode(true) as HTMLElement;
-        clone.querySelectorAll('input, textarea, select, [contenteditable="true"]').forEach(c => c.remove());
-        const text = (clone.textContent || '').trim();
+    // Non-table: preceding sibling's text content
+    let prev = el.previousElementSibling;
+    while (prev) {
+        const text = (prev.textContent || '').trim();
         if (text && text.length <= 80) return text;
+        prev = prev.previousElementSibling;
     }
     return '';
 }
@@ -540,11 +539,25 @@ export function buildCommands(action: string, el: Element, opts?: {
                 js: `await ${jsLoc}.hover();`,
             };
 
-        case 'click':
+        case 'click': {
+            let clickLoc = pwArgs;
+            let clickPrefix = cssPrefix;
+            // For <select> elements, try informal label when CSS fallback or bare role (#800)
+            if (el.tagName === 'SELECT') {
+                const isBareRoleClick = !isCssFallback && /^[a-z]+$/.test(pwArgs);
+                if (isCssFallback || isBareRoleClick) {
+                    const informal = getInformalLabel(el);
+                    if (informal) {
+                        clickLoc = q(informal);
+                        clickPrefix = '';
+                    }
+                }
+            }
             return {
-                pw: `click ${cssPrefix}${pwArgs}${inFlag}`,
+                pw: `click ${clickPrefix}${clickLoc}${inFlag}`,
                 js: `await ${jsLoc}.click();`,
             };
+        }
 
         case 'fill': {
             const val = opts?.value ?? '';
