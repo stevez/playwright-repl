@@ -101,7 +101,7 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('click');
     });
 
-    test('filling input in legacy table form uses CSS selector, not getByRole (#768)', async ({ sidePanel, testPage }) => {
+    test('filling input in legacy table form uses informal label (#768)', async ({ sidePanel, testPage }) => {
       await sidePanel.startRecording();
 
       await testPage.bringToFront();
@@ -110,11 +110,11 @@ test.describe('Recording flow', () => {
 
       await sidePanel.waitForEditorText('fill');
       const editorText = await sidePanel.getEditorText();
-      // Informal labels (adjacent cell text) can't be resolved by Playwright at runtime.
-      // Should use CSS selector (e.g. input#LoginName) which always works.
+      // Informal label (adjacent cell text) is detected and used for fill.
+      // At runtime, fillByText resolves these via DOM-walking fallback.
       expect(editorText).toContain('"testuser"');
-      expect(editorText).toContain('css');
-      expect(editorText).not.toContain('textbox "Benutzerkennung:*"');
+      expect(editorText).toContain('"Benutzerkennung:*"');
+      expect(editorText).not.toContain('css');
     });
 
     test('clicking inside a <frame> uses frame tag, not iframe (#769)', async ({ sidePanel, testPage }) => {
