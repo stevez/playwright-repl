@@ -168,7 +168,8 @@ export async function fillByText(page, text, value, nth?, exact?) {
       if (sel) {
         loc = page.locator(sel);
         await loc.fill(value);
-        await page.evaluate(() => document.querySelectorAll('[data-pw-fill]').forEach(el => el.removeAttribute('data-pw-fill'))).catch(() => {});
+        if (typeof page.evaluate === 'function')
+          await page.evaluate(() => document.querySelectorAll('[data-pw-fill]').forEach(el => el.removeAttribute('data-pw-fill'))).catch(() => {});
         return;
       }
     }
@@ -181,6 +182,29 @@ export async function selectByText(page, text, value, nth?, exact?) {
   let loc = page.getByLabel(text);
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByRole('combobox', { name: text });
+    // Informal label fallback: find text, walk up DOM to locate a nearby select
+    if (await loc.count() === 0) {
+      const sel = await page.getByText(text).first().evaluate((el: Element) => {
+        let a: Element | null = el.closest('tr') || el.parentElement;
+        while (a && a !== document.body) {
+          const s = a.querySelector('select');
+          if (s) {
+            const id = '__pw_fill_' + Math.random().toString(36).slice(2);
+            s.setAttribute('data-pw-fill', id);
+            return '[data-pw-fill="' + id + '"]';
+          }
+          a = a.parentElement;
+        }
+        return null;
+      });
+      if (sel) {
+        loc = page.locator(sel);
+        await loc.selectOption(value);
+        if (typeof page.evaluate === 'function')
+          await page.evaluate(() => document.querySelectorAll('[data-pw-fill]').forEach(el => el.removeAttribute('data-pw-fill'))).catch(() => {});
+        return;
+      }
+    }
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
   await loc.selectOption(value);

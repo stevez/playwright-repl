@@ -999,16 +999,33 @@ describe('locator', () => {
             expect(cmds!.js).toContain(".fill('user')");
         });
 
-        it('uses CSS fallback for fill in legacy table form (#768)', () => {
+        it('uses informal label for fill in legacy table form (#768)', () => {
             document.body.innerHTML = '<table><tr><td>Username:</td><td><input type="text"></td></tr></table>';
             const input = document.querySelector('input')!;
             const cmds = buildCommands('fill', input, { value: 'admin' });
-            // Informal labels (adjacent cell) can't be resolved by getByRole or getByLabel.
-            // Should use CSS selector which always works at runtime.
-            expect(cmds!.pw).toContain('css');
-            expect(cmds!.pw).toContain('"admin"');
-            expect(cmds!.pw).not.toContain('textbox');
-            expect(cmds!.pw).not.toContain('Username:');
+            // Informal labels (adjacent cell text) are detected and used for fill.
+            // At runtime, fillByText resolves these via DOM-walking fallback.
+            expect(cmds!.pw).toBe('fill "Username:" "admin"');
+            expect(cmds!.pw).not.toContain('css');
+        });
+
+        it('uses informal label for fill in non-table layout (#768)', () => {
+            document.body.innerHTML = '<div><span>Password:</span><input type="password"></div>';
+            const input = document.querySelector('input')!;
+            const cmds = buildCommands('fill', input, { value: 'secret' });
+            expect(cmds!.pw).toBe('fill "Password:" "secret"');
+            expect(cmds!.pw).not.toContain('css');
+        });
+
+        it('uses informal label for select in legacy table form (#768)', () => {
+            // Options with value-only (no text) — no accessible name, triggers informal label
+            document.body.innerHTML = `<table>
+                <tr><td>Country:</td><td><select><option value="us"></option><option value="uk"></option></select></td></tr>
+            </table>`;
+            const select = document.querySelector('select')!;
+            const cmds = buildCommands('select', select, { option: 'us' });
+            expect(cmds!.pw).toBe('select "Country:" "us"');
+            expect(cmds!.pw).not.toContain('css');
         });
 
         it('adds --exact for text-based click locator', () => {

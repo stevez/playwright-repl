@@ -101,8 +101,39 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
         const text = (clone.textContent || '').trim();
         if (text) return text;
     }
-    // Informal associations (e.g. preceding table cell) are intentionally excluded —
-    // they produce names that Playwright's getByRole/getByLabel can't resolve (#768).
+    // Informal associations (e.g. preceding table cell) are excluded here because
+    // getByRole/getByLabel can't resolve them. See getInformalLabel() for fill/select.
+    return '';
+}
+
+/**
+ * Find informal label text for a form element (e.g. text in an adjacent table
+ * cell). Used by the recorder to generate `fill "Label" "value"` instead of
+ * `fill css "input#id" "value"`. Mirrors the fillByText runtime fallback in
+ * page-scripts.ts which walks up from a getByText match to find a nearby input.
+ */
+export function getInformalLabel(el: Element): string {
+    // Table layout: preceding cell's text in the same row
+    const row = el.closest('tr');
+    if (row) {
+        const cell = el.closest('td, th');
+        if (cell) {
+            let prev = cell.previousElementSibling;
+            while (prev) {
+                const text = (prev.textContent || '').trim();
+                if (text && text.length <= 80) return text;
+                prev = prev.previousElementSibling;
+            }
+        }
+    }
+    // Non-table: parent's text content excluding form elements
+    const parent = el.parentElement;
+    if (parent) {
+        const clone = parent.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('input, textarea, select, [contenteditable="true"]').forEach(c => c.remove());
+        const text = (clone.textContent || '').trim();
+        if (text && text.length <= 80) return text;
+    }
     return '';
 }
 
@@ -516,14 +547,20 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'fill': {
             const val = opts?.value ?? '';
-            // Bare role without name (e.g. "textbox") makes fill ambiguous:
-            // `fill textbox "val"` parses as fill(role=textbox, name="val", value="")
-            // Fall back to CSS selector which always works at runtime.
             let fillLoc = pwArgs;
             let fillPrefix = cssPrefix;
-            if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
-                fillLoc = q(buildCssSelector(el));
-                fillPrefix = 'css ';
+            const isBareRole = !isCssFallback && /^[a-z]+$/.test(pwArgs);
+            if (isCssFallback || isBareRole) {
+                // Try informal label (e.g. adjacent table-cell text) before CSS.
+                // At runtime, fillByText handles these via DOM-walking fallback.
+                const informal = getInformalLabel(el);
+                if (informal) {
+                    fillLoc = q(informal);
+                    fillPrefix = '';
+                } else if (isBareRole) {
+                    fillLoc = q(buildCssSelector(el));
+                    fillPrefix = 'css ';
+                }
             }
             return {
                 pw: `fill ${fillPrefix}${fillLoc} ${q(val)}${inFlag}`,
@@ -545,12 +582,18 @@ export function buildCommands(action: string, el: Element, opts?: {
 
         case 'select': {
             const optVal = opts?.option ?? '';
-            // Same bare-role guard as fill
             let selLoc = pwArgs;
             let selPrefix = cssPrefix;
-            if (!isCssFallback && /^[a-z]+$/.test(pwArgs)) {
-                selLoc = q(buildCssSelector(el));
-                selPrefix = 'css ';
+            const isBareRoleSel = !isCssFallback && /^[a-z]+$/.test(pwArgs);
+            if (isCssFallback || isBareRoleSel) {
+                const informal = getInformalLabel(el);
+                if (informal) {
+                    selLoc = q(informal);
+                    selPrefix = '';
+                } else if (isBareRoleSel) {
+                    selLoc = q(buildCssSelector(el));
+                    selPrefix = 'css ';
+                }
             }
             return {
                 pw: `select ${selPrefix}${selLoc} ${q(optVal)}${inFlag}`,
