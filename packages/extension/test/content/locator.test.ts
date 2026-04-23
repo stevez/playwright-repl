@@ -1028,6 +1028,32 @@ describe('locator', () => {
             expect(cmds!.pw).not.toContain('css');
         });
 
+        it('does not use concatenated option text for select locator (#800)', () => {
+            // Two selects with same options — role is not unique, would previously
+            // fall through to textContent and generate broken getByText('option 1\noption 2')
+            document.body.innerHTML = `
+                <span>Select an option</span>
+                <select name="list1">
+                    <option value="true">option 1</option>
+                    <option value="false">option 2</option>
+                </select>
+                <table><tr><td>Select an option (table)</td><td>
+                    <select name="list2">
+                        <option value="true">option 1</option>
+                        <option value="false">option 2</option>
+                    </select>
+                </td></tr></table>`;
+            const selects = document.querySelectorAll('select');
+            // First select: should use informal label from adjacent span, not option text
+            const cmds1 = buildCommands('click', selects[0]);
+            expect(cmds1!.pw).not.toContain('option 1');
+            expect(cmds1!.pw).not.toContain('option 2');
+            // Second select: should use informal label from table cell
+            const cmds2 = buildCommands('click', selects[1]);
+            expect(cmds2!.pw).not.toContain('option 1');
+            expect(cmds2!.pw).not.toContain('option 2');
+        });
+
         it('adds --exact for text-based click locator', () => {
             document.body.innerHTML = '<div>Bis 45 km/h</div>';
             const div = document.querySelector('div')!;

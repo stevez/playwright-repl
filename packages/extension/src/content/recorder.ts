@@ -162,7 +162,9 @@ export function onChangeCapture(e: Event) {
     // Select
     if (target instanceof HTMLSelectElement) {
         flushPendingFill();
-        const option = target.value;
+        // Use visible option text (label) instead of the value attribute (#802)
+        const selected = target.options[target.selectedIndex];
+        const option = selected ? selected.text.trim() || target.value : target.value;
         const cmds = buildCommands('select', target, { option });
         if (cmds) {
             chrome.runtime.sendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });

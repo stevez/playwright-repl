@@ -420,8 +420,9 @@ export function generateLocator(el: Element): string {
     if (title) return `getByTitle(${escapeString(title)})`;
 
     // 7. Text content — use exact matching for full text, substring for long text
+    // Skip for <select>: textContent is concatenated option texts, not useful for locating.
     const text = (el.textContent || '').trim();
-    if (text) {
+    if (text && el.tagName !== 'SELECT') {
         if (text.length <= 80) return `getByText(${escapeString(text)}, { exact: true })`;
         const snippet = text.slice(0, 50).replace(/\s+\S*$/, '');
         if (snippet) return `getByText(${escapeString(snippet)})`;

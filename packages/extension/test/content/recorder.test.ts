@@ -208,6 +208,21 @@ describe('recorder', () => {
                 })
             );
         });
+
+        it('uses option label text instead of value attribute (#802)', () => {
+            document.body.innerHTML = '<label for="m">Make</label><select id="m"><option value="62: 0255">BUECKER</option><option value="63: 0100">BMW</option></select>';
+            const select = document.querySelector('select')! as HTMLSelectElement;
+            select.value = '62: 0255';
+            const event = new Event('change', { bubbles: true });
+            Object.defineProperty(event, 'target', { value: select });
+            onChangeCapture(event);
+            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: 'recorded-action',
+                    action: expect.objectContaining({ pw: expect.stringContaining('"BUECKER"') }),
+                })
+            );
+        });
     });
 
     // ─── onKeyDownCapture ────────────────────────────────────────────────
