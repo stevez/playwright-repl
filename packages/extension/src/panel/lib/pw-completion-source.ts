@@ -285,7 +285,9 @@ export function playwrightCompletions(
 
   // ── Case 2: member completion after a dot ──────────────────────────────────
   // Matches:  page.     page.go     page.locator('#x').
-  const dotMatch = context.matchBefore(/[\w$)'"]+\.[\w$]*/);
+  // Multiline: also match .method() at start of line (after Shift+Enter) (#799)
+  const dotMatch = context.matchBefore(/[\w$)'"]+\.[\w$]*/)
+      || context.matchBefore(/\.[\w$]*/);
 
   if (dotMatch) {
     // Figure out what's typed after the dot (the partial member name)
