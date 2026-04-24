@@ -250,9 +250,6 @@ export async function uncheckByText(page, text, nth?, exact?) {
 export async function actionByRole(page, role, name, action, nth, inRole, inText) {
   const roleOpts = name ? { name, exact: true } : {};
   let loc = page.getByRole(role, roleOpts);
-  // Fall back to non-exact if exact match finds nothing (e.g. label includes
-  // extra text from child buttons like "Information anzeigen")
-  if (name && await loc.count() === 0) loc = page.getByRole(role, { name });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
@@ -270,7 +267,6 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
 export async function fillByRole(page, role, name, value, nth, inRole, inText) {
   const roleOpts = name ? { name, exact: true } : {};
   let loc = page.getByRole(role, roleOpts);
-  if (name && await loc.count() === 0) loc = page.getByRole(role, { name });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
@@ -288,7 +284,6 @@ export async function fillByRole(page, role, name, value, nth, inRole, inText) {
 export async function selectByRole(page, role, name, value, nth, inRole, inText) {
   const roleOpts = name ? { name, exact: true } : {};
   let loc = page.getByRole(role, roleOpts);
-  if (name && await loc.count() === 0) loc = page.getByRole(role, { name });
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);

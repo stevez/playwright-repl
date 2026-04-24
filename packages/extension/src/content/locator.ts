@@ -47,11 +47,40 @@ export function getImplicitRole(el: Element): string | null {
 
 // ─── Accessible name ─────────────────────────────────────────────────────
 
+/**
+ * Compute accumulated text from an element's children, following the ARIA spec:
+ * for each child, use its accessible name (respecting aria-label etc.) rather
+ * than raw textContent. This matches Playwright's name computation.
+ */
+function accumulatedText(el: Element, exclude?: Element): string {
+    const tokens: string[] = [];
+    for (const child of el.childNodes) {
+        if (exclude && child === exclude) continue;
+        if (child.nodeType === Node.TEXT_NODE) {
+            tokens.push(child.textContent || '');
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const childEl = child as Element;
+            if (exclude && childEl.contains(exclude)) {
+                tokens.push(accumulatedText(childEl, exclude));
+            } else {
+                const name = getAccessibleName(childEl);
+                // If no accessible name, recurse into children (handles
+                // wrapper elements like <pnw-tooltip-toggle> with no role)
+                tokens.push(name || accumulatedText(childEl));
+            }
+        }
+    }
+    return tokens.join('').replace(/\s+/g, ' ').trim();
+}
+
 export function getAccessibleName(el: Element): string {
     // aria-labelledby (highest priority per ARIA spec)
     const labelledBy = el.getAttribute('aria-labelledby');
     if (labelledBy) {
-        const parts = labelledBy.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean);
+        const parts = labelledBy.split(/\s+/).map(id => {
+            const ref = document.getElementById(id);
+            return ref ? accumulatedText(ref) : '';
+        }).filter(Boolean);
         if (parts.length) return parts.join(' ');
     }
 
@@ -73,7 +102,7 @@ export function getAccessibleName(el: Element): string {
         'columnheader', 'rowheader', 'tooltip', 'treeitem',
     ]);
     if (role && NAME_FROM_CONTENT.has(role)) {
-        const text = (el.textContent || '').trim();
+        const text = accumulatedText(el);
         if (text && text.length <= 80) return text;
     }
 
@@ -90,16 +119,12 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
     // Explicit label via for attribute
     if (el.id) {
         const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-        if (label) return (label.textContent || '').trim();
+        if (label) return accumulatedText(label, el);
     }
     // Implicit label (ancestor)
     const parentLabel = el.closest('label');
     if (parentLabel) {
-        // Get label text excluding the input's own text
-        const clone = parentLabel.cloneNode(true) as HTMLElement;
-        clone.querySelectorAll('input,textarea,select').forEach(c => c.remove());
-        const text = (clone.textContent || '').trim();
-        if (text) return text;
+        return accumulatedText(parentLabel, el);
     }
     // Informal associations (e.g. preceding table cell) are excluded here because
     // getByRole/getByLabel can't resolve them. See getInformalLabel() for fill/select.

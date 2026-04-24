@@ -247,6 +247,16 @@ describe('locator', () => {
             expect(getLabel(input)).toBe('Name');
         });
 
+        it('includes aria-label from child elements in label text (#802)', () => {
+            document.body.innerHTML = `
+                <label for="hersteller">Hersteller Ihres Fahrzeuges
+                    <span><a aria-label="Information anzeigen" role="button"></a></span>
+                </label>
+                <select id="hersteller"><option>A</option></select>`;
+            const select = document.querySelector('select') as HTMLSelectElement;
+            expect(getLabel(select)).toBe('Hersteller Ihres Fahrzeuges Information anzeigen');
+        });
+
         it('does not return informal label from preceding table cell (#768)', () => {
             document.body.innerHTML = '<table><tr><td>Benutzerkennung:*</td><td><input type="text"></td></tr></table>';
             const input = document.querySelector('input') as HTMLInputElement;
