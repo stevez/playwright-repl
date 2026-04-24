@@ -48,16 +48,16 @@ export function getImplicitRole(el: Element): string | null {
 // ─── Accessible name ─────────────────────────────────────────────────────
 
 export function getAccessibleName(el: Element): string {
-    // aria-label
-    const ariaLabel = el.getAttribute('aria-label');
-    if (ariaLabel) return ariaLabel.trim();
-
-    // aria-labelledby
+    // aria-labelledby (highest priority per ARIA spec)
     const labelledBy = el.getAttribute('aria-labelledby');
     if (labelledBy) {
         const parts = labelledBy.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean);
         if (parts.length) return parts.join(' ');
     }
+
+    // aria-label
+    const ariaLabel = el.getAttribute('aria-label');
+    if (ariaLabel) return ariaLabel.trim();
 
     // For inputs: associated <label>
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
@@ -113,12 +113,20 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
  * page-scripts.ts which walks up from a getByText match to find a nearby input.
  */
 export function getInformalLabel(el: Element): string {
-    // Table layout: preceding cell's text in the same row
+    // Table layout: check within the same cell first, then preceding cells
     const row = el.closest('tr');
     if (row) {
         const cell = el.closest('td, th');
         if (cell) {
-            let prev = cell.previousElementSibling;
+            // First: preceding siblings within the same cell (e.g. <td><span>Label</span><select>)
+            let prev: Element | null = el.previousElementSibling;
+            while (prev) {
+                const text = (prev.textContent || '').trim();
+                if (text && text.length <= 80) return text;
+                prev = prev.previousElementSibling;
+            }
+            // Then: preceding cell's text in the same row
+            prev = cell.previousElementSibling;
             while (prev) {
                 const text = (prev.textContent || '').trim();
                 if (text && text.length <= 80) return text;

@@ -34,11 +34,12 @@ function detectFrameSelector(): string | null {
         const frame = window.frameElement;
         if (frame) {
             const tag = frame.tagName.toLowerCase(); // 'frame' or 'iframe'
-            // Prefer id selector
-            if (frame.id) return `#${CSS.escape(frame.id)}`;
-            // Prefer name attribute
+            // Prefer name attribute — works as both a Playwright frame name
+            // and a CSS attribute selector, portable across CLI and extension
             const name = frame.getAttribute('name');
-            if (name) return `${tag}[name="${name}"]`;
+            if (name) return name;
+            // Fall back to id — used as frame identifier (page.frame(id) resolves it)
+            if (frame.id) return frame.id;
             // Prefer src attribute
             const src = frame.getAttribute('src');
             if (src) return `${tag}[src="${src}"]`;

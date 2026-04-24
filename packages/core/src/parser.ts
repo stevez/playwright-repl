@@ -356,8 +356,9 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
   // ── --frame: wrap run-code to operate inside an iframe ──
   if (frameSel && args._[0] === 'run-code' && args._[1]) {
     const inner = args._[1];
-    // Wrap: resolve the frame, then call the inner function with the frame as "page"
-    args = { _: ['run-code', `async (page) => { const __frame = await page.locator(${JSON.stringify(frameSel)}).contentFrame(); return await (${inner})(__frame); }`] };
+    // Wrap: resolve the frame, then call the inner function with the frame as "page".
+    // Try frame name first, fall back to CSS locator for selectors like "#id".
+    args = { _: ['run-code', `async (page) => { const __frame = page.frame(${JSON.stringify(frameSel)}) || await page.locator(${JSON.stringify(frameSel)}).contentFrame(); return await (${inner})(__frame); }`] };
   }
 
   return args;

@@ -768,8 +768,9 @@ export function parseReplCommand(input: string): ParseResult {
     const frameSel = args.frame;
     if (frameSel && typeof frameSel === 'string') {
       // Temporarily shadow `page` with the frame so all page-script functions
-      // operate inside the iframe. The original `page` is used to locate the frame.
-      const frameExpr = `await page.locator(${ser(frameSel)}).contentFrame()`;
+      // operate inside the iframe. Try frame name/title first (works for plain
+      // names like "oevd-iframe"), fall back to CSS locator (for "#id", "iframe[src=...]").
+      const frameExpr = `(page.frame(${ser(frameSel)}) || await page.locator(${ser(frameSel)}).contentFrame())`;
       return { jsExpr: `await (async (__page) => { const page = __page; return ${resolved.jsExpr}; })(${frameExpr})` };
     }
     return resolved;

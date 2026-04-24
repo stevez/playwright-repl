@@ -1052,6 +1052,20 @@ describe('locator', () => {
             expect(cmds2!.pw).toBe('click "Select an option (table)"');
         });
 
+        it('select in same cell as label uses within-cell sibling, not previous cell (#800)', () => {
+            document.body.innerHTML = `<table><tr>
+                <td><span>Beantragte Währung</span><br><span>Euro</span></td>
+                <td><span>Mittelgeber*</span><br>
+                    <select><option value="AA">AA</option><option value="BB">BB</option></select>
+                </td>
+            </tr></table>`;
+            const select = document.querySelector('select')!;
+            const cmds = buildCommands('click', select);
+            expect(cmds!.pw).toBe('click "Mittelgeber*"');
+            const selCmds = buildCommands('select', select, { option: 'AA' });
+            expect(selCmds!.pw).toBe('select "Mittelgeber*" "AA"');
+        });
+
         it('adds --exact for text-based click locator', () => {
             document.body.innerHTML = '<div>Bis 45 km/h</div>';
             const div = document.querySelector('div')!;
