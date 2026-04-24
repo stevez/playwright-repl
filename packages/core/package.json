@@ -20,14 +20,6 @@
     "minimist": "^1.2.8",
     "ws": "^8.19.0"
   },
-  "peerDependencies": {
-    "@playwright-repl/browser-extension": "workspace:*"
-  },
-  "peerDependenciesMeta": {
-    "@playwright-repl/browser-extension": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/ws": "^8.18.1",

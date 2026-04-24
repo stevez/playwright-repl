@@ -23,3 +23,9 @@ export { parseSnapshot, refToLocator, allRefLocators } from './snapshot-parser.j
 export type { SnapshotNode, LocatorResult, RefLocatorEntry } from './snapshot-parser.js';
 export { isLocalCommand, handleLocalCommand, isVideoCommand, handleVideoCommand, isTracingCommand, handleTracingCommand } from './local-commands.js';
 export type { LocalCommandResult } from './local-commands.js';
+export { buildSystemPrompt, buildUserMessage, buildGrammarReference } from './prompt-builder.js';
+export type { PromptContext, PromptOptions } from './prompt-builder.js';
+export { pwLineToJs, pwScriptToSpec } from './pw-to-js.js';
+export type { ConvertOptions } from './pw-to-js.js';
+export { getActiveModel, resolveConfigFromEnv, DEFAULT_MODELS, PROVIDER_BASE_URLS, PROVIDER_ENV_KEYS } from './llm-config.js';
+export type { LlmProvider, LlmModelConfig, LlmSettings } from './llm-config.js';
