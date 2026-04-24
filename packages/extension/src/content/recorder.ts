@@ -26,57 +26,82 @@ export const SPECIAL_KEYS = new Set([
  * in the parent document. For cross-origin iframes, `window.frameElement` is null
  * due to security restrictions — we fall back to using the frame's src URL.
  */
-function detectFrameSelector(): string | null {
-    if (window === window.top) return null;
-
-    try {
-        // Same-origin: window.frameElement is accessible
-        const frame = window.frameElement;
-        if (frame) {
-            const tag = frame.tagName.toLowerCase(); // 'frame' or 'iframe'
-            // Prefer name attribute — works as both a Playwright frame name
-            // and a CSS attribute selector, portable across CLI and extension
-            const name = frame.getAttribute('name');
-            if (name) return name;
-            // Fall back to id — used as frame identifier (page.frame(id) resolves it)
-            if (frame.id) return frame.id;
-            // Prefer src attribute
-            const src = frame.getAttribute('src');
-            if (src) return `${tag}[src="${src}"]`;
-            // Fall back to tag + nth-of-type
-            const parent = frame.parentElement;
-            if (parent) {
-                const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
-                const idx = siblings.indexOf(frame);
-                if (siblings.length === 1) return tag;
-                return `${tag}:nth-of-type(${idx + 1})`;
-            }
-            return tag;
-        }
-    } catch { /* cross-origin — frameElement throws */ }
-
-    // Cross-origin fallback: use location to build a src-based selector
-    // This is a best-effort approach — assume iframe (modern standard)
-    try {
-        const src = window.location.href;
-        if (src && src !== 'about:blank') return `iframe[src="${src}"]`;
-    } catch { /* cannot access location */ }
-
-    return 'iframe';
+/**
+ * Compute selectors for a single frame element.
+ * pw: plain name/id for --frame (resolved by page.frame())
+ * css: CSS selector for JS .locator().contentFrame()
+ */
+function selectorsForFrame(frame: Element): { pw: string; css: string } {
+    const tag = frame.tagName.toLowerCase(); // 'frame' or 'iframe'
+    const name = frame.getAttribute('name');
+    if (name) return { pw: name, css: `${tag}[name="${name}"]` };
+    if (frame.id) return { pw: frame.id, css: `#${CSS.escape(frame.id)}` };
+    const src = frame.getAttribute('src');
+    if (src) { const sel = `${tag}[src="${src}"]`; return { pw: sel, css: sel }; }
+    const parent = frame.parentElement;
+    if (parent) {
+        const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
+        const idx = siblings.indexOf(frame);
+        const sel = siblings.length === 1 ? tag : `${tag}:nth-of-type(${idx + 1})`;
+        return { pw: sel, css: sel };
+    }
+    return { pw: tag, css: tag };
 }
 
-/** Cached frame selector — computed once on init */
-let frameSelector: string | null = null;
+/**
+ * Detect the full frame chain from this window up to the top frame.
+ * Returns arrays of selectors, one per ancestor frame, outermost first.
+ * Returns empty arrays if we're in the top frame.
+ */
+function detectFrameChain(): { pw: string[]; css: string[] } {
+    if (window === window.top) return { pw: [], css: [] };
+
+    const pwChain: string[] = [];
+    const cssChain: string[] = [];
+    let win: Window = window;
+    while (win !== win.top) {
+        try {
+            const frame = win.frameElement;
+            if (frame) {
+                const sels = selectorsForFrame(frame);
+                pwChain.push(sels.pw);
+                cssChain.push(sels.css);
+            } else {
+                // Cross-origin: frameElement is null, use src fallback
+                try {
+                    const src = win.location.href;
+                    const sel = (src && src !== 'about:blank') ? `iframe[src="${src}"]` : 'iframe';
+                    pwChain.push(sel);
+                    cssChain.push(sel);
+                } catch { pwChain.push('iframe'); cssChain.push('iframe'); }
+                break; // Can't walk further up from cross-origin
+            }
+        } catch {
+            break; // cross-origin — frameElement throws
+        }
+        win = win.parent;
+    }
+    return { pw: pwChain.reverse(), css: cssChain.reverse() };
+}
+
+/** Cached frame chain — computed once on init */
+let framePath: { pw: string[]; css: string[] } = { pw: [], css: [] };
 
 /**
  * Wrap recorded commands with frame context if we're inside an iframe.
- * Prepends --frame flag to PW and .contentFrame() to JS.
+ * Prepends --frame flag(s) to PW and .contentFrame() chain to JS.
  */
 function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; js: string } {
-    if (!frameSelector) return cmds;
+    if (framePath.pw.length === 0) return cmds;
+    // Single frame: use plain name for PW (page.frame() resolves it)
+    // Nested frames: use CSS selectors for PW (locator().contentFrame() at each level)
+    const frameArg = framePath.pw.length === 1
+        ? framePath.pw[0]
+        : framePath.css.join(' ');
+    const jsChain = framePath.css.map(sel => `.locator(${JSON.stringify(sel)}).contentFrame()`).join('');
     return {
-        pw: `${cmds.pw} --frame "${frameSelector}"`,
-        js: `await page.locator(${JSON.stringify(frameSelector)}).contentFrame().${cmds.js.replace(/^await page\./, '')}`,
+        pw: `${cmds.pw} --frame "${frameArg}"`,
+        js: `await page${jsChain}.${cmds.js.replace(/^await page\./, '')}`,
     };
 }
 
@@ -228,7 +253,7 @@ export function init() {
     (window as any).__pw_recorder_active = true;
 
     // Detect iframe context once on init
-    frameSelector = detectFrameSelector();
+    framePath = detectFrameChain();
 
     chrome.runtime.onMessage.addListener(onMessage);
     document.addEventListener('click', onClickCapture, true);

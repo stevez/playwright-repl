@@ -357,8 +357,15 @@ export function resolveArgs(args: ParsedArgs): ParsedArgs {
   if (frameSel && args._[0] === 'run-code' && args._[1]) {
     const inner = args._[1];
     // Wrap: resolve the frame, then call the inner function with the frame as "page".
-    // Try frame name first, fall back to CSS locator for selectors like "#id".
-    args = { _: ['run-code', `async (page) => { const __frame = page.frame(${JSON.stringify(frameSel)}) || await page.locator(${JSON.stringify(frameSel)}).contentFrame(); return await (${inner})(__frame); }`] };
+    // Supports nested frames via space-separated selectors.
+    // Single frame: try page.frame(name) first; nested: locator().contentFrame() at each level.
+    const parts = frameSel.split(' ').filter(Boolean);
+    if (parts.length === 1) {
+      args = { _: ['run-code', `async (page) => { const __frame = page.frame(${JSON.stringify(parts[0])}) || await page.locator(${JSON.stringify(parts[0])}).contentFrame(); return await (${inner})(__frame); }`] };
+    } else {
+      const chain = parts.map(f => `__p = await __p.locator(${JSON.stringify(f)}).contentFrame()`).join('; ');
+      args = { _: ['run-code', `async (page) => { let __p = page; ${chain}; return await (${inner})(__p); }`] };
+    }
   }
 
   return args;

@@ -768,10 +768,21 @@ export function parseReplCommand(input: string): ParseResult {
     const frameSel = args.frame;
     if (frameSel && typeof frameSel === 'string') {
       // Temporarily shadow `page` with the frame so all page-script functions
-      // operate inside the iframe. Try frame name/title first (works for plain
-      // names like "oevd-iframe"), fall back to CSS locator (for "#id", "iframe[src=...]").
-      const frameExpr = `(page.frame(${ser(frameSel)}) || await page.locator(${ser(frameSel)}).contentFrame())`;
-      return { jsExpr: `await (async (__page) => { const page = __page; return ${resolved.jsExpr}; })(${frameExpr})` };
+      // operate inside the iframe. Supports nested frames via space-separated
+      // selectors: --frame "parent child" chains frame resolution.
+      // Use page.frame() for single plain names (fast path), locator().contentFrame()
+      // for CSS selectors and nested frames.
+      const frameParts = frameSel.split(' ').filter(Boolean);
+      if (frameParts.length === 1) {
+        // Single frame — try name first (works for plain names like "oevd-iframe")
+        const frameExpr = `(page.frame(${ser(frameParts[0])}) || await page.locator(${ser(frameParts[0])}).contentFrame())`;
+        return { jsExpr: `await (async (__page) => { const page = __page; return ${resolved.jsExpr}; })(${frameExpr})` };
+      }
+      // Nested frames — chain locator().contentFrame() at each level
+      const frameExpr = frameParts.map(f =>
+        `__p = await __p.locator(${ser(f)}).contentFrame()`
+      ).join('; ');
+      return { jsExpr: `await (async (__p) => { ${frameExpr}; const page = __p; return ${resolved.jsExpr}; })(page)` };
     }
     return resolved;
   }

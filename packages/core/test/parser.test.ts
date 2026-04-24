@@ -205,6 +205,7 @@ describe('--frame flag', () => {
     const args = parseInput('click "Submit" --frame "#myframe"');
     const resolved = resolveArgs(args);
     expect(resolved._[0]).toBe('run-code');
+    expect(resolved._[1]).toContain('page.frame("#myframe")');
     expect(resolved._[1]).toContain('page.locator("#myframe").contentFrame()');
     expect(resolved.frame).toBeUndefined();
   });
