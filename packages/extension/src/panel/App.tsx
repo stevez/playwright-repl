@@ -35,23 +35,50 @@ function App() {
     return () => onConsoleEvent(null);
   }, [dispatch]);
 
-  // Load editor mode from settings, then restore session state
+  // Restore state: check handoff (mode switch) first, then session state, then settings
   useEffect(() => {
-    loadSettings().then(s => dispatch({ type: 'SET_EDITOR_MODE', mode: s.languageMode }));
-    loadSessionState().then(session => {
-      if (!session) return;
-      if (session.editorContent) dispatch({ type: 'EDIT_EDITOR_CONTENT', content: session.editorContent });
-      if (session.editorMode) dispatch({ type: 'SET_EDITOR_MODE', mode: session.editorMode });
-      if (session.breakPoints.length) dispatch({ type: 'SET_BREAKPOINTS', breakPoints: new Set(session.breakPoints) });
-      dispatch({ type: 'SET_BOTTOM_TAB', tab: session.bottomTab });
-      if (session.editorPaneHeight && editorPaneRef.current) {
-        editorPaneRef.current.style.flex = `0 0 ${session.editorPaneHeight}px`;
+    (async () => {
+      // Handoff from side panel ↔ popup switch (#820)
+      const handoff = await chrome.runtime.sendMessage({ type: 'handoff-load' });
+      if (handoff) {
+        dispatch({ type: 'RESTORE_HANDOFF', state: {
+          editorContent: handoff.editorContent,
+          editorMode: handoff.editorMode,
+          breakPoints: new Set(handoff.breakPoints),
+          bottomTab: handoff.bottomTab,
+          outputLines: handoff.outputLines,
+          passCount: handoff.passCount,
+          failCount: handoff.failCount,
+          lineResults: handoff.lineResults,
+        }});
+        if (handoff.editorPaneHeight && editorPaneRef.current) {
+          editorPaneRef.current.style.flex = `0 0 ${handoff.editorPaneHeight}px`;
+        }
+        if (handoff.cursorPos) {
+          setTimeout(() => editorRef.current?.setCursorPos(handoff.cursorPos), 50);
+        }
+        for (const cmd of handoff.commandHistory ?? []) addCommand(cmd);
+        return; // tab attachment handled by the normal useEffect below
       }
-      if (session.cursorPos) {
-        setTimeout(() => editorRef.current?.setCursorPos(session.cursorPos), 50);
+      // Regular session state restore (#811)
+      const session = await loadSessionState();
+      if (session) {
+        if (session.editorContent) dispatch({ type: 'EDIT_EDITOR_CONTENT', content: session.editorContent });
+        if (session.editorMode) dispatch({ type: 'SET_EDITOR_MODE', mode: session.editorMode });
+        if (session.breakPoints.length) dispatch({ type: 'SET_BREAKPOINTS', breakPoints: new Set(session.breakPoints) });
+        dispatch({ type: 'SET_BOTTOM_TAB', tab: session.bottomTab });
+        if (session.editorPaneHeight && editorPaneRef.current) {
+          editorPaneRef.current.style.flex = `0 0 ${session.editorPaneHeight}px`;
+        }
+        if (session.cursorPos) {
+          setTimeout(() => editorRef.current?.setCursorPos(session.cursorPos), 50);
+        }
+        for (const cmd of session.commandHistory) addCommand(cmd);
+      } else {
+        const s = await loadSettings();
+        dispatch({ type: 'SET_EDITOR_MODE', mode: s.languageMode });
       }
-      for (const cmd of session.commandHistory) addCommand(cmd);
-    });
+    })();
   }, []);
 
   // Save session state on every meaningful change (debounced)
@@ -79,6 +106,49 @@ function App() {
     } else {
       attachedTabRef.current = null;
       dispatch({ type: 'ATTACH_FAIL' });
+    }
+  }
+
+  // Handoff: switch between side panel ↔ popup (#820)
+  async function handleModeSwitch() {
+    const handoffState = {
+      editorContent: state.editorContent,
+      editorMode: state.editorMode,
+      breakPoints: [...state.breakPoints],
+      bottomTab: state.bottomTab,
+      cursorPos: editorRef.current?.getCursorPos() ?? 0,
+      editorPaneHeight: editorPaneRef.current?.offsetHeight ?? null,
+      commandHistory: getCommandHistory(),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      outputLines: state.outputLines.map(({ getProperties: _gp, ...rest }) => rest),
+      passCount: state.passCount,
+      failCount: state.failCount,
+      lineResults: state.lineResults,
+      attachedTabId: state.attachedTabId,
+    };
+    await chrome.runtime.sendMessage({ type: 'handoff-save', state: handoffState });
+    const isPopup = new URLSearchParams(window.location.search).has('tabId');
+    if (isPopup) {
+      // Open side panel directly from the popup (preserves user gesture)
+      let windowId: number | undefined;
+      if (state.attachedTabId) {
+        const tab = await chrome.tabs.get(state.attachedTabId).catch(() => null);
+        windowId = (tab as any)?.windowId;
+      }
+      if (!windowId) {
+        const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+        windowId = ((windows as any[]).find((w: any) => w.focused) ?? windows[0])?.id;
+      }
+      if (windowId) {
+        await (chrome.sidePanel as any).open({ windowId });
+        window.close();
+      }
+    } else {
+      const res = await chrome.runtime.sendMessage({
+        type: 'handoff-to-popup',
+        tabId: state.attachedTabId,
+      });
+      if (res?.ok) window.close();
     }
   }
 
@@ -156,6 +226,7 @@ function App() {
         dispatch={dispatch}
         editorRef={editorRef}
         breakPoints={state.breakPoints}
+        onModeSwitch={handleModeSwitch}
       />
       {state.isStepDebugging && <DebugBar dispatch={dispatch} />}
 

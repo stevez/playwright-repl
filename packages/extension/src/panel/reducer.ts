@@ -43,6 +43,7 @@ export type Action =
    | { type: 'SET_BREAKPOINTS', breakPoints: Set<number>}
    | { type: 'SET_SCOPE_DATA', scopes: ScopeInfo[]}
    | { type: 'SET_BOTTOM_TAB', tab: 'console' | 'variables'}
+   | { type: 'RESTORE_HANDOFF', state: Partial<PanelState> }
 
 export const initialState : PanelState = {
     outputLines: [],
@@ -140,6 +141,8 @@ export function panelReducer(state: PanelState, action: Action): PanelState {
             return { ...state, bottomTab: action.tab }
         case 'SET_SCOPE_DATA':
             return { ...state, scopeData: action.scopes, bottomTab: action.scopes.length > 0 ? 'variables' : state.bottomTab }
+        case 'RESTORE_HANDOFF':
+            return { ...state, ...action.state }
         default:
             return state
     }

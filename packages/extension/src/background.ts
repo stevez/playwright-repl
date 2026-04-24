@@ -749,6 +749,9 @@ async function handleBridgeCommand(msg: {
 // Serialize bridge commands so concurrent messages don't race on currentPage / attachToTab.
 let commandQueue: Promise<void> = Promise.resolve();
 
+// ── Handoff state for side panel ↔ popup transfer (#820) ──
+let handoffState: any = null;
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'bridge-command') {
     const execute = () => handleBridgeCommand(msg);
@@ -855,6 +858,41 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'ping') { sendResponse({ pong: true }); return false; }
+
+  // ── Handoff: side panel ↔ popup state transfer (#820) ──
+  if (msg.type === 'handoff-save') { handoffState = msg.state; sendResponse({ ok: true }); return false; }
+  if (msg.type === 'handoff-load') { const s = handoffState; handoffState = null; sendResponse(s); return false; }
+  if (msg.type === 'handoff-to-popup') {
+    const tabId = msg.tabId;
+    chrome.windows.create({
+      url: chrome.runtime.getURL('panel/panel.html') + (tabId ? `?tabId=${tabId}&handoff=1` : '?handoff=1'),
+      type: 'popup',
+      width: 450,
+      height: 700,
+    }).then(() => sendResponse({ ok: true })).catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
+  if (msg.type === 'handoff-to-sidepanel') {
+    (async () => {
+      // Find the main browser window (not the popup window)
+      let windowId: number | undefined;
+      if (msg.tabId) {
+        const tab = await chrome.tabs.get(msg.tabId).catch(() => null);
+        windowId = tab?.windowId;
+      }
+      if (!windowId) {
+        // Find the last focused normal window (not the popup)
+        const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+        const focused = windows.find(w => w.focused) ?? windows[0];
+        windowId = focused?.id;
+      }
+      if (!windowId) throw new Error('No browser window found');
+      await chrome.sidePanel.open({ windowId });
+      sendResponse({ ok: true });
+    })().catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
+
   return false;
 });
 

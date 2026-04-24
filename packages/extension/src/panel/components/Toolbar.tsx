@@ -3,7 +3,7 @@ import type { PanelState, Action } from "@/reducer";
 import { attachToTab } from '@/lib/bridge';
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 import { swTerminateExecution, swDebugResume } from '@/lib/sw-debugger';
-import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon, ScreencastIcon } from './Icons';
+import { SunIcon, MoonIcon, FolderOpenIcon, SaveIcon, RecordIcon, StopIcon, StepForwardIcon, BugIcon, CrosshairIcon, PlugIcon, UnplugIcon, ScreencastIcon, PopOutIcon, DockIcon } from './Icons';
 import type { EditorHandle } from './CodeMirrorEditorPane';
 import { buildPickResult } from '@/lib/pick-info';
 import type { ElementPickInfo } from '@/types';
@@ -12,9 +12,11 @@ import { loadSettings, storeSettings } from '@/lib/settings'
 interface ToolbarProps extends Pick<PanelState, 'editorContent' | 'editorMode' | 'stepLine' | 'attachedUrl' | 'attachedTabId' | 'isAttaching' | 'isRunning' | 'isStepDebugging' | 'breakPoints'> {
     dispatch: React.Dispatch<Action>,
     editorRef: React.RefObject<EditorHandle | null>,
+    onModeSwitch: () => void,
 };
 
-function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, breakPoints, dispatch, editorRef }: ToolbarProps) {
+function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTabId, isAttaching, isRunning, isStepDebugging, breakPoints, dispatch, editorRef, onModeSwitch }: ToolbarProps) {
+    const isPopup = useMemo(() => new URLSearchParams(window.location.search).has('tabId'), []);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cancelRunRef = useRef(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -459,6 +461,9 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 <button id="save-btn" title="Save as .pw file" disabled={!editorContent.trim()} onClick={handleSave}><SaveIcon /></button>
                 <button onClick={() => setIsDarkMode(prev => !prev)} title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                     {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                </button>
+                <button onClick={onModeSwitch} disabled={isRunning || isRecording || isVideoRecording} title={isPopup ? 'Dock to side panel' : 'Open as popup'}>
+                    {isPopup ? <DockIcon /> : <PopOutIcon />}
                 </button>
             </div>
             <div id="toolbar-right" className="flex items-center gap-2">
