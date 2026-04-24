@@ -8,6 +8,8 @@ import { InlineValues } from '@/lib/codemirror-setup';
 export interface EditorHandle {
     insertAtCursor: (text: string) => void;
     replaceLastInsert: (text: string) => void;
+    getCursorPos: () => number;
+    setCursorPos: (pos: number) => void;
 }
 
 interface EditorPaneProps extends Pick<PanelState, 'editorContent' | 'currentRunLine' | 'lineResults' | 'editorMode'> {
@@ -53,6 +55,15 @@ function CodeMirrorEditorPane({ editorContent, editorMode, currentRunLine, lineR
             });
             lastInsertRangeRef.current = { from: range.from, to: range.from + insert.length };
             view.focus();
+        },
+        getCursorPos() {
+            return viewRef.current?.state.selection.main.head ?? 0;
+        },
+        setCursorPos(pos: number) {
+            const view = viewRef.current;
+            if (!view) return;
+            const clamped = Math.min(pos, view.state.doc.length);
+            view.dispatch({ selection: { anchor: clamped }, scrollIntoView: true });
         },
     }));
 
