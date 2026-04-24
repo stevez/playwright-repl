@@ -15,16 +15,6 @@ export interface SessionState {
   commandHistory: string[];
 }
 
-const EMPTY: SessionState = {
-  editorContent: '',
-  editorMode: 'pw',
-  breakPoints: [],
-  bottomTab: 'console',
-  cursorPos: 0,
-  editorPaneHeight: null,
-  commandHistory: [],
-};
-
 export async function saveSessionState(state: SessionState): Promise<void> {
   await chrome.storage.session.set({ [KEY]: state });
 }
