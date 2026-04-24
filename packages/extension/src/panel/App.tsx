@@ -129,20 +129,23 @@ function App() {
     await chrome.runtime.sendMessage({ type: 'handoff-save', state: handoffState });
     const isPopup = new URLSearchParams(window.location.search).has('tabId');
     if (isPopup) {
-      // Open side panel directly from the popup (preserves user gesture)
+      // Open side panel directly from the popup (preserves user gesture).
+      // Chrome API types are incomplete for sidePanel/tabs in panel context.
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       let windowId: number | undefined;
       if (state.attachedTabId) {
-        const tab = await chrome.tabs.get(state.attachedTabId).catch(() => null);
-        windowId = (tab as any)?.windowId;
+        const tab = await (chrome as any).tabs.get(state.attachedTabId).catch(() => null);
+        windowId = tab?.windowId;
       }
       if (!windowId) {
-        const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-        windowId = ((windows as any[]).find((w: any) => w.focused) ?? windows[0])?.id;
+        const windows = await (chrome as any).windows.getAll({ windowTypes: ['normal'] });
+        windowId = (windows.find((w: any) => w.focused) ?? windows[0])?.id;
       }
       if (windowId) {
-        await (chrome.sidePanel as any).open({ windowId });
+        await (chrome as any).sidePanel.open({ windowId });
         window.close();
       }
+      /* eslint-enable @typescript-eslint/no-explicit-any */
     } else {
       const res = await chrome.runtime.sendMessage({
         type: 'handoff-to-popup',
