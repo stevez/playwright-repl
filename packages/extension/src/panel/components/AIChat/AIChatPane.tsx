@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { streamText, stepCountIs } from 'ai';
 import { createModel, browserTools, lastScreenshot } from '@/lib/ai-agent';
 import { loadAISettings, type AIModelConfig } from '@/lib/settings';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface ToolCallInfo { name: string; input: Record<string, unknown>; result?: string; image?: string }
@@ -35,48 +37,49 @@ function ToolBadge({ name, input, result, image }: { name: string; input?: Recor
     );
 }
 
-// ─── Markdown rendering ─────────────────────────────────────────────────────
+// ─── Code block with copy button ────────────────────────────────────────────
 
-function renderInline(line: string, lineKey: number) {
-    // Split on **bold**, *italic*, and `code`
-    const parts: React.ReactNode[] = [];
-    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
-    let last = 0;
-    let match;
-    let key = 0;
-    while ((match = regex.exec(line)) !== null) {
-        if (match.index > last) parts.push(line.slice(last, match.index));
-        if (match[2]) parts.push(<strong key={`${lineKey}-${key++}`}>{match[2]}</strong>);
-        else if (match[3]) parts.push(<em key={`${lineKey}-${key++}`}>{match[3]}</em>);
-        else if (match[4]) parts.push(<code key={`${lineKey}-${key++}`} style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '12px' }}>{match[4]}</code>);
-        last = match.index + match[0].length;
+function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
+    const [copied, setCopied] = useState(false);
+    const code = String(children).replace(/\n$/, '');
+    const lang = className?.replace('language-', '') ?? '';
+
+    function handleCopy() {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     }
-    if (last < line.length) parts.push(line.slice(last));
-    return parts.length ? parts : ['\u00A0'];
+
+    return (
+        <div className="relative my-2 rounded border border-(--border-primary) bg-(--bg-toolbar) overflow-hidden">
+            <div className="flex items-center justify-between px-2 py-0.5 border-b border-(--border-primary)" style={{ fontSize: '11px', opacity: 0.5 }}>
+                <span>{lang}</span>
+                <button onClick={handleCopy} className="hover:opacity-100" style={{ opacity: 0.6 }}>
+                    {copied ? '✓ copied' : 'copy'}
+                </button>
+            </div>
+            <pre className="overflow-x-auto px-3 py-2 m-0" style={{ fontSize: '12px', lineHeight: '1.5' }}>
+                <code>{code}</code>
+            </pre>
+        </div>
+    );
 }
 
-function renderText(text: string) {
-    return text.split('\n').map((line, i) => {
-        // Bullet lists
-        const bulletMatch = line.match(/^(\s*)([-*])\s+(.*)/);
-        if (bulletMatch) {
-            const indent = bulletMatch[1].length;
-            return <div key={i} style={{ paddingLeft: `${indent * 8 + 12}px`, textIndent: '-12px' }}>• {renderInline(bulletMatch[3], i)}</div>;
-        }
-        // Numbered lists
-        const numMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
-        if (numMatch) {
-            const indent = numMatch[1].length;
-            return <div key={i} style={{ paddingLeft: `${indent * 8 + 16}px`, textIndent: '-16px' }}>{numMatch[2]}. {renderInline(numMatch[3], i)}</div>;
-        }
-        // Headers
-        if (line.startsWith('### ')) return <div key={i} style={{ fontWeight: 600, marginTop: '4px' }}>{renderInline(line.slice(4), i)}</div>;
-        if (line.startsWith('## ')) return <div key={i} style={{ fontWeight: 600, fontSize: '14px', marginTop: '4px' }}>{renderInline(line.slice(3), i)}</div>;
-        if (line.startsWith('# ')) return <div key={i} style={{ fontWeight: 600, fontSize: '15px', marginTop: '4px' }}>{renderInline(line.slice(2), i)}</div>;
-        // Regular line
-        return <div key={i}>{renderInline(line, i)}</div>;
-    });
-}
+// ─── Markdown components ────────────────────────────────────────────────────
+
+const markdownComponents = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    code({ className, children, ...props }: any) {
+        const isBlock = className || String(children).includes('\n');
+        if (isBlock) return <CodeBlock className={className}>{children}</CodeBlock>;
+        return <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '12px' }} {...props}>{children}</code>;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pre({ children }: any) {
+        // react-markdown wraps code blocks in <pre><code>. We handle it in code() above, so just pass through.
+        return <>{children}</>;
+    },
+};
 
 // ─── Main AI Chat Pane ──────────────────────────────────────────────────────
 
@@ -135,7 +138,36 @@ You help users interact with web pages by calling browser tools.
 Always call the snapshot tool first to see what elements are on the page before taking actions.
 Use accessible names from the snapshot, not element refs.
 When you execute browser actions, briefly describe what you did and what happened.
-Keep responses concise.`,
+Keep responses concise.
+
+When asked to generate test scripts or commands, use .pw keyword format (not JavaScript):
+  goto <url>
+  click [role] "<text>"
+  fill [role] "<label>" "<value>"
+  press <key>
+  select [role] "<label>" "<value>"
+  hover [role] "<text>"
+  check "<label>"
+  uncheck "<label>"
+  type "<text>"
+  verify-text "<text>"
+  verify-element <role> "<name>"
+  verify-title "<text>"
+  verify-url "<text>"
+  wait-for-text "<text>"
+  snapshot
+  screenshot
+
+Example .pw script:
+\`\`\`pw
+goto https://example.com
+click link "Get started"
+verify-url "/docs/intro"
+click link "Home"
+verify-text "Welcome"
+\`\`\`
+
+Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript or .js format.`,
             });
 
             let fullText = '';
@@ -230,7 +262,7 @@ Keep responses concise.`,
                                 {msg.toolCalls?.map((tc, i) => (
                                     <ToolBadge key={i} name={tc.name} input={tc.input} result={tc.result} image={tc.image} />
                                 ))}
-                                {msg.content && <div className="leading-relaxed">{renderText(msg.content)}</div>}
+                                {msg.content && <div className="leading-relaxed"><Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{msg.content}</Markdown></div>}
                             </div>
                         )}
                     </div>
