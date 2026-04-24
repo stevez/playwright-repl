@@ -17,7 +17,7 @@ export type PanelState = {
   isAttaching: boolean
   breakPoints: Set<number>
   scopeData: ScopeInfo[]
-  bottomTab: 'console' | 'variables'
+  bottomTab: 'console' | 'ai-chat' | 'variables'
 }
 
 export type Action =
@@ -42,7 +42,7 @@ export type Action =
    | { type: 'SET_EDITOR_MODE', mode: 'pw' | 'js' }
    | { type: 'SET_BREAKPOINTS', breakPoints: Set<number>}
    | { type: 'SET_SCOPE_DATA', scopes: ScopeInfo[]}
-   | { type: 'SET_BOTTOM_TAB', tab: 'console' | 'variables'}
+   | { type: 'SET_BOTTOM_TAB', tab: 'console' | 'ai-chat' | 'variables'}
    | { type: 'RESTORE_HANDOFF', state: Partial<PanelState> }
 
 export const initialState : PanelState = {
