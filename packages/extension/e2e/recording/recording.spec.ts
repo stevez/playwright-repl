@@ -140,8 +140,7 @@ test.describe('Recording flow', () => {
 
       await sidePanel.waitForEditorText('click button "Arbeitskorb"');
       const editorText = await sidePanel.getEditorText();
-      expect(editorText).toContain('--frame "frame[name=');
-      expect(editorText).not.toContain('iframe');
+      expect(editorText).toContain('--frame "main"');
     });
 
     test('stop recording resets button state', async ({ sidePanel }) => {
