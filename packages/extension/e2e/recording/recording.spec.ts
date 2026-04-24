@@ -11,6 +11,7 @@ import { test, expect } from './fixtures.js';
 test.describe('Recording flow', () => {
   test.beforeEach(async ({ sidePanel, extensionId, testPage }) => {
     await sidePanel.goto(extensionId);
+    await sidePanel.clearEditor();
 
     // Bring test page to front and attach the extension to it
     await testPage.bringToFront();

@@ -35,25 +35,22 @@ function App() {
     return () => onConsoleEvent(null);
   }, [dispatch]);
 
-  // Restore session state on init, then load settings as fallback for mode
+  // Load editor mode from settings, then restore session state
   useEffect(() => {
+    loadSettings().then(s => dispatch({ type: 'SET_EDITOR_MODE', mode: s.languageMode }));
     loadSessionState().then(session => {
-      if (session) {
-        if (session.editorContent) dispatch({ type: 'EDIT_EDITOR_CONTENT', content: session.editorContent });
-        dispatch({ type: 'SET_EDITOR_MODE', mode: session.editorMode });
-        if (session.breakPoints.length) dispatch({ type: 'SET_BREAKPOINTS', breakPoints: new Set(session.breakPoints) });
-        dispatch({ type: 'SET_BOTTOM_TAB', tab: session.bottomTab });
-        if (session.editorPaneHeight && editorPaneRef.current) {
-          editorPaneRef.current.style.flex = `0 0 ${session.editorPaneHeight}px`;
-        }
-        if (session.cursorPos) {
-          // Defer cursor restore until CodeMirror has mounted
-          setTimeout(() => editorRef.current?.setCursorPos(session.cursorPos), 50);
-        }
-        for (const cmd of session.commandHistory) addCommand(cmd);
-      } else {
-        loadSettings().then(s => dispatch({ type: 'SET_EDITOR_MODE', mode: s.languageMode }));
+      if (!session) return;
+      if (session.editorContent) dispatch({ type: 'EDIT_EDITOR_CONTENT', content: session.editorContent });
+      if (session.editorMode) dispatch({ type: 'SET_EDITOR_MODE', mode: session.editorMode });
+      if (session.breakPoints.length) dispatch({ type: 'SET_BREAKPOINTS', breakPoints: new Set(session.breakPoints) });
+      dispatch({ type: 'SET_BOTTOM_TAB', tab: session.bottomTab });
+      if (session.editorPaneHeight && editorPaneRef.current) {
+        editorPaneRef.current.style.flex = `0 0 ${session.editorPaneHeight}px`;
       }
+      if (session.cursorPos) {
+        setTimeout(() => editorRef.current?.setCursorPos(session.cursorPos), 50);
+      }
+      for (const cmd of session.commandHistory) addCommand(cmd);
     });
   }, []);
 

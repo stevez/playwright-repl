@@ -92,6 +92,16 @@ export class SidePanelPage {
   /** Navigate to the panel HTML page. */
   async goto(extensionId: string) {
     await this.page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
+    // Clear session state after load so restored content doesn't leak between tests.
+    // The panel may have already restored — clearEditor below resets it.
+    await this.page.evaluate(() => (globalThis as any).chrome?.storage?.session?.remove('panelSessionState'));
+  }
+
+  /** Select all editor content and delete it. */
+  async clearEditor() {
+    await this.editor.click();
+    await this.page.keyboard.press('ControlOrMeta+a');
+    await this.page.keyboard.press('Backspace');
   }
 
   // ─── Console Submit ──────────────────────────────────────────────────────
