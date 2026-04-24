@@ -194,11 +194,6 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                 }
             }
 
-            // fullStream already consumed all text, skip textStream
-            for await (const chunk of result.textStream) {
-                fullText += chunk;
-                setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, content: fullText } : m));
-            }
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
             if (msg !== 'This operation was aborted') {
