@@ -245,8 +245,9 @@ function resolveChainRoot(textBefore: string): string | null {
   const stripped = textBefore.replace(/\.\w*$/, "").trim();
 
   // Walk back through chained calls: foo.bar().baz() → foo
-  // Simplified: find the leftmost word token before any dot
-  const match = stripped.match(/(?:^|[\s=({[,!&|?:+\-*/%])(\w+)/);
+  // Find the leftmost word token before any dot, skipping JS keywords
+  const noKeywords = stripped.replace(/\b(await|async|const|let|var|return|new)\s+/g, '');
+  const match = noKeywords.match(/(?:^|[\s=({[,!&|?:+\-*/%])(\w+)/);
   return match ? match[1] : null;
 }
 
