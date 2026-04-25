@@ -91,6 +91,8 @@ export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const abortRef = useRef<AbortController | null>(null);
     const localMessagesRef = useRef<ChatMessage[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const inputHistoryRef = useRef<string[]>([]);
 
     // Sync from reducer → local when not streaming (e.g. after handoff restore)
     useEffect(() => {
@@ -129,6 +131,7 @@ export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
         const assistantMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', toolCalls: [] };
 
         const initial = [...messages, userMsg, assistantMsg];
+        localMessagesRef.current = initial;
         setLocalMessages(initial);
         setIsStreaming(true);
         setError(null);
@@ -150,7 +153,16 @@ export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 tools: browserTools as any,
                 stopWhen: stepCountIs(10),
+                maxRetries: 1,
                 abortSignal: abort.signal,
+                onError: ({ error }) => {
+                    console.error('[AI Chat] stream error:', error);
+                    const msg = error instanceof Error ? error.message : String(error);
+                    if (msg.includes('429')) setError('Rate limited. Wait a moment and try again.');
+                    else if (msg.includes('401') || msg.includes('403')) setError('Invalid API key. Check Preferences.');
+                    else if (msg.includes('404')) setError('Model not available. Check model name in Preferences.');
+                    else setError(msg || 'An error occurred.');
+                },
                 system: `You are a browser automation assistant for Dramaturg (playwright-repl).
 You help users interact with web pages by calling browser tools.
 Always call the snapshot tool first to see what elements are on the page before taking actions.
@@ -215,11 +227,11 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
             }
 
         } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (msg !== 'This operation was aborted') {
-                console.error('[AI Chat] error:', e);
-                setError(msg);
-            }
+            const raw = e instanceof Error ? e.message : String(e);
+            if (raw === 'This operation was aborted') return;
+            // API errors are handled by onError above; this catches
+            // model creation failures, aborts, and other exceptions.
+            if (!error) setError(raw);
         } finally {
             // Sync final messages to reducer (persists for handoff)
             dispatch({ type: 'SET_AI_CHAT_MESSAGES', messages: localMessagesRef.current });
@@ -228,31 +240,103 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
         }
     }, [activeModel, messages, isStreaming]);
 
+    const SLASH_COMMANDS = [
+        { cmd: '/explain', prompt: 'Describe what is on the current page. Take a snapshot first.', help: 'Describe what is on the page' },
+        { cmd: '/suggest', prompt: 'Suggest next actions based on the current page state. Take a snapshot first.', help: 'Suggest next actions' },
+        { cmd: '/convert', prompt: 'Convert the session commands above into a Playwright .spec.js test file.', help: 'Convert session to .spec.js' },
+        { cmd: '/clear', prompt: '', help: 'Clear chat history' },
+    ];
+
+    const [slashIndex, setSlashIndex] = useState(-1);
+    const slashMatches = input.startsWith('/')
+        ? SLASH_COMMANDS.filter(c => c.cmd.startsWith(input.split(' ')[0]))
+        : [];
+
+    function submitInput() {
+        const text = input.trim();
+        if (!text || isStreaming) return;
+        inputHistoryRef.current.push(text);
+        setHistoryIndex(-1);
+        setInput('');
+        setSlashIndex(-1);
+        if (text === '/clear') {
+            dispatch({ type: 'SET_AI_CHAT_MESSAGES', messages: [] });
+            return;
+        }
+        const match = SLASH_COMMANDS.find(c => c.prompt && text.startsWith(c.cmd));
+        if (match) {
+            const rest = text.slice(match.cmd.length).trim();
+            sendMessage(rest ? `${match.prompt} ${rest}` : match.prompt);
+        } else {
+            sendMessage(text);
+        }
+    }
+
     function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
-        if (!input.trim() || isStreaming) return;
-        const text = input;
-        setInput('');
-        sendMessage(text);
+        submitInput();
+    }
+
+    function selectSlashCommand(cmd: string) {
+        setInput(cmd + ' ');
+        setSlashIndex(-1);
     }
 
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+        if (slashMatches.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSlashIndex(i => (i + 1) % slashMatches.length);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSlashIndex(i => (i - 1 + slashMatches.length) % slashMatches.length);
+                return;
+            }
+            if ((e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) && slashIndex >= 0) {
+                e.preventDefault();
+                selectSlashCommand(slashMatches[slashIndex].cmd);
+                return;
+            }
+        }
+        const history = inputHistoryRef.current;
+        if (e.key === 'ArrowUp' && history.length > 0) {
+            e.preventDefault();
+            const next = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
+            setHistoryIndex(next);
+            setInput(history[next]);
+            return;
+        }
+        if (e.key === 'ArrowDown' && historyIndex >= 0) {
+            e.preventDefault();
+            const next = historyIndex + 1;
+            if (next >= history.length) {
+                setHistoryIndex(-1);
+                setInput('');
+            } else {
+                setHistoryIndex(next);
+                setInput(history[next]);
+            }
+            return;
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (input.trim() && !isStreaming) {
-                const text = input;
-                setInput('');
-                sendMessage(text);
-            }
+            submitInput();
         }
     }
 
     // ─── No model configured ────────────────────────────────────
     if (!activeModel) {
         return (
-            <div className="flex flex-col items-center justify-center flex-1 px-4 py-8 text-center opacity-60">
-                <p className="text-sm mb-2">No AI model configured.</p>
-                <p className="text-xs">Go to Preferences to add an API key.</p>
+            <div className="flex flex-col items-center justify-center flex-1 px-4 py-8 text-center">
+                <div className="text-2xl mb-3">✨</div>
+                <p className="text-sm mb-1 opacity-80">Set up an AI model to get started</p>
+                <p className="text-xs opacity-50 mb-3">Add an API key in Preferences to use AI Chat.</p>
+                <button
+                    onClick={() => window.open(`${location.origin}/preferences/preferences.html`)}
+                    className="px-3 py-1 text-xs rounded border border-(--border-primary) opacity-70 hover:opacity-100"
+                >Open Preferences</button>
             </div>
         );
     }
@@ -272,6 +356,15 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                     >
                         {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </select>
+                    <span className="flex-1" />
+                    {displayMessages.length > 0 && (
+                        <button
+                            onClick={() => dispatch({ type: 'SET_AI_CHAT_MESSAGES', messages: [] })}
+                            disabled={isStreaming}
+                            className="opacity-40 hover:opacity-100 disabled:opacity-20"
+                            title="Clear chat"
+                        >Clear</button>
+                    )}
                 </div>
             )}
             {/* Messages */}
@@ -311,6 +404,24 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                 </div>
             )}
 
+            {/* Slash command autocomplete */}
+            {slashMatches.length > 0 && (
+                <div className="border-t border-(--border-primary) bg-(--bg-toolbar) px-1 py-1">
+                    {slashMatches.map((c, i) => (
+                        <button
+                            key={c.cmd}
+                            onClick={() => selectSlashCommand(c.cmd)}
+                            data-active={i === slashIndex ? '' : undefined}
+                            className="flex items-center gap-2 w-full text-left px-2 py-1 rounded text-[12px]"
+                            style={{background: i === slashIndex ? 'var(--bg-button)' : 'transparent'}}
+                        >
+                            <span style={{fontWeight: 500}}>{c.cmd}</span>
+                            <span style={{opacity: 0.5}}>{c.help}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Input */}
             <form onSubmit={handleSubmit} className="flex items-end gap-1 px-3 py-1.5 border-t border-(--border-primary) bg-(--bg-toolbar)">
                 <textarea
@@ -323,14 +434,25 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                     className="flex-1 resize-none bg-transparent border-none outline-none text-[13px] py-1 min-h-[24px] max-h-[80px]"
                     style={{ color: 'var(--text-primary)' }}
                 />
-                <button
-                    type="submit"
-                    disabled={!input.trim() || isStreaming}
-                    className="px-2 py-1 text-[13px] rounded opacity-60 hover:opacity-100 disabled:opacity-20"
-                    title="Send (Enter)"
-                >
-                    ▶
-                </button>
+                {isStreaming ? (
+                    <button
+                        type="button"
+                        onClick={() => abortRef.current?.abort()}
+                        className="px-2 py-1 text-[13px] rounded opacity-60 hover:opacity-100"
+                        title="Stop"
+                    >
+                        ■
+                    </button>
+                ) : (
+                    <button
+                        type="submit"
+                        disabled={!input.trim()}
+                        className="px-2 py-1 text-[13px] rounded opacity-60 hover:opacity-100 disabled:opacity-20"
+                        title="Send (Enter)"
+                    >
+                        ▶
+                    </button>
+                )}
             </form>
         </div>
     );
