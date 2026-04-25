@@ -14,7 +14,6 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   github: 'https://models.github.ai/inference',
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createModel(config: AIModelConfig): any {
   const { provider, apiKey, model, baseUrl } = config;
 
@@ -61,7 +60,6 @@ async function runPwCommand(command: string): Promise<string> {
 const str = (desc: string) => ({ type: 'string' as const, description: desc });
 const optStr = (desc: string) => ({ type: 'string' as const, description: desc });
 const emptyObj = jsonSchema({ type: 'object', properties: {} });
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const obj = (props: Record<string, any>, required?: string[]) =>
   jsonSchema({ type: 'object', properties: props, required: required ?? Object.keys(props) });
 
@@ -77,7 +75,6 @@ export const browserTools = {
   goto: {
     description: 'Navigate to a URL.',
     inputSchema: obj({ url: str('The URL to navigate to') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ url }: any) => runPwCommand(`goto ${url}`),
   },
   click: {
@@ -86,7 +83,6 @@ export const browserTools = {
       { label: str('The accessible name of the element'), role: optStr('The ARIA role (button, link, etc.)') },
       ['label'],
     ),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label, role }: any) =>
       runPwCommand(role ? `click ${role} "${label}"` : `click "${label}"`),
   },
@@ -96,20 +92,17 @@ export const browserTools = {
       { label: str('The accessible name or label of the field'), value: str('The value to fill'), role: optStr('The ARIA role (textbox, combobox, etc.)') },
       ['label', 'value'],
     ),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label, value, role }: any) =>
       runPwCommand(role ? `fill ${role} "${label}" "${value}"` : `fill "${label}" "${value}"`),
   },
   press: {
     description: 'Press a keyboard key (Enter, Tab, Escape, etc.).',
     inputSchema: obj({ key: str('The key to press') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ key }: any) => runPwCommand(`press ${key}`),
   },
   select: {
     description: 'Select a dropdown option.',
     inputSchema: obj({ label: str('The accessible name of the dropdown'), value: str('The option to select') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label, value }: any) => runPwCommand(`select "${label}" "${value}"`),
   },
   hover: {
@@ -118,32 +111,27 @@ export const browserTools = {
       { label: str('The accessible name of the element'), role: optStr('The ARIA role') },
       ['label'],
     ),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label, role }: any) =>
       runPwCommand(role ? `hover ${role} "${label}"` : `hover "${label}"`),
   },
   check: {
     description: 'Check a checkbox.',
     inputSchema: obj({ label: str('The accessible name of the checkbox') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label }: any) => runPwCommand(`check "${label}"`),
   },
   uncheck: {
     description: 'Uncheck a checkbox.',
     inputSchema: obj({ label: str('The accessible name of the checkbox') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ label }: any) => runPwCommand(`uncheck "${label}"`),
   },
   type_text: {
     description: 'Type text key by key into the focused element.',
     inputSchema: obj({ text: str('The text to type') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ text }: any) => runPwCommand(`type "${text}"`),
   },
   verify_text: {
     description: 'Assert that text is visible on the page.',
     inputSchema: obj({ text: str('The text to verify') }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async ({ text }: any) => runPwCommand(`verify-text "${text}"`),
   },
   screenshot: {

@@ -191,7 +191,6 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
 
 // ─── Message routing from background SW ─────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
     if (msg.type === 'bridge-port-changed') {
         lastPort = msg.port as number;

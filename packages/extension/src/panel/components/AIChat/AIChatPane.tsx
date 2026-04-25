@@ -204,7 +204,6 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
             setIsStreaming(false);
             abortRef.current = null;
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeModel, messages, isStreaming]);
 
     function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
