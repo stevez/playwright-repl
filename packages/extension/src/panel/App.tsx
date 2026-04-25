@@ -50,6 +50,7 @@ function App() {
           passCount: handoff.passCount,
           failCount: handoff.failCount,
           lineResults: handoff.lineResults,
+          aiChatMessages: handoff.aiChatMessages ?? [],
         }});
         if (handoff.editorPaneHeight && editorPaneRef.current) {
           editorPaneRef.current.style.flex = `0 0 ${handoff.editorPaneHeight}px`;
@@ -125,6 +126,7 @@ function App() {
       failCount: state.failCount,
       lineResults: state.lineResults,
       attachedTabId: state.attachedTabId,
+      aiChatMessages: state.aiChatMessages,
     };
     await chrome.runtime.sendMessage({ type: 'handoff-save', state: handoffState });
     const isPopup = new URLSearchParams(window.location.search).has('tabId');
@@ -249,13 +251,14 @@ function App() {
       {/* Splitter */}
       <Splitter editorPaneRef={editorPaneRef} />
 
-      <BottomPane 
-          outputLines={state.outputLines} 
+      <BottomPane
+          outputLines={state.outputLines}
           dispatch={dispatch}
           bottomTab={state.bottomTab}
           isStepDebugging={state.isStepDebugging}
-          scopeData={state.scopeData} 
+          scopeData={state.scopeData}
           onLocalProps={setLocalProps}
+          aiChatMessages={state.aiChatMessages}
       />
     </>
   )

@@ -4,16 +4,8 @@ import { createModel, browserTools, lastScreenshot } from '@/lib/ai-agent';
 import { loadAISettings, type AIModelConfig } from '@/lib/settings';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface ToolCallInfo { name: string; input: Record<string, unknown>; result?: string; image?: string }
-
-interface ChatMessage {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    toolCalls?: ToolCallInfo[];
-}
+import type { ChatMessage, ToolCallInfo } from '@/types';
+import type { Action } from '@/reducer';
 
 // ─── Tool badge ─────────────────────────────────────────────────────────────
 
@@ -83,14 +75,29 @@ const markdownComponents = {
 
 // ─── Main AI Chat Pane ──────────────────────────────────────────────────────
 
-export function AIChatPane() {
+interface AIChatPaneProps {
+    messages: ChatMessage[];
+    dispatch: React.Dispatch<Action>;
+}
+
+export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
     const [input, setInput] = useState('');
     const [activeModel, setActiveModel] = useState<AIModelConfig | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    // Local state for fast streaming renders; synced to reducer when stream ends
+    const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const localMessagesRef = useRef<ChatMessage[]>([]);
+
+    // Sync from reducer → local when not streaming (e.g. after handoff restore)
+    useEffect(() => {
+        if (!isStreaming) setLocalMessages(messages);
+    }, [messages, isStreaming]);
+
+    // The display messages: local during streaming, reducer otherwise
+    const displayMessages = isStreaming ? localMessages : messages;
 
     // Load active model config
     useEffect(() => {
@@ -103,7 +110,7 @@ export function AIChatPane() {
     // Auto-scroll
     useEffect(() => {
         scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
-    }, [messages, isStreaming]);
+    }, [displayMessages, isStreaming]);
 
     const sendMessage = useCallback(async (text: string) => {
         if (!activeModel || isStreaming) return;
@@ -111,7 +118,8 @@ export function AIChatPane() {
         const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text };
         const assistantMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', toolCalls: [] };
 
-        setMessages(prev => [...prev, userMsg, assistantMsg]);
+        const initial = [...messages, userMsg, assistantMsg];
+        setLocalMessages(initial);
         setIsStreaming(true);
         setError(null);
 
@@ -171,13 +179,12 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
             });
 
             let fullText = '';
-            const toolCalls: ChatMessage['toolCalls'] = [];
+            const toolCalls: ToolCallInfo[] = [];
 
             for await (const part of result.fullStream) {
                 if (part.type === 'tool-call') {
                     const input = (part as unknown as Record<string, unknown>).input as Record<string, unknown> ?? {};
                     toolCalls.push({ name: part.toolName, input });
-                    setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, toolCalls: [...toolCalls] } : m));
                 } else if (part.type === 'tool-result') {
                     const output = (part as unknown as Record<string, unknown>).output;
                     const last = toolCalls.find(t => t.name === part.toolName && !t.result);
@@ -187,11 +194,14 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                             last.image = lastScreenshot;
                         }
                     }
-                    setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, toolCalls: [...toolCalls] } : m));
                 } else if (part.type === 'text-delta') {
                     fullText += part.text;
-                    setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, content: fullText } : m));
                 }
+                // Update local state for fast rendering (only AIChatPane re-renders)
+                const updated = initial.map(m => m.id === assistantMsg.id
+                    ? { ...m, content: fullText, toolCalls: [...toolCalls] } : m);
+                localMessagesRef.current = updated;
+                setLocalMessages(updated);
             }
 
         } catch (e: unknown) {
@@ -201,6 +211,8 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                 setError(msg);
             }
         } finally {
+            // Sync final messages to reducer (persists for handoff)
+            dispatch({ type: 'SET_AI_CHAT_MESSAGES', messages: localMessagesRef.current });
             setIsStreaming(false);
             abortRef.current = null;
         }
@@ -239,12 +251,12 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
         <div className="flex flex-col flex-1 overflow-hidden">
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 text-[13px]">
-                {messages.length === 0 && (
+                {displayMessages.length === 0 && (
                     <div className="opacity-40 text-[13px] text-center mt-6">
                         Ask anything about the page, or describe what you want to do.
                     </div>
                 )}
-                {messages.map(msg => (
+                {displayMessages.map(msg => (
                     <div key={msg.id} className={`mb-3 ${msg.role === 'user' ? 'text-right' : ''}`}>
                         {msg.role === 'user' && (
                             <div className="inline-block px-3 py-1.5 rounded bg-(--bg-toolbar) text-left max-w-[90%] text-[13px]">
@@ -261,7 +273,7 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
                         )}
                     </div>
                 ))}
-                {isStreaming && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && !messages[messages.length - 1]?.toolCalls?.length && (
+                {isStreaming && displayMessages[displayMessages.length - 1]?.role === 'assistant' && !displayMessages[displayMessages.length - 1]?.content && !displayMessages[displayMessages.length - 1]?.toolCalls?.length && (
                     <div className="text-[13px] opacity-40 ml-1">thinking...</div>
                 )}
             </div>

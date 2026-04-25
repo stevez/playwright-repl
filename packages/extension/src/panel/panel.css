@@ -320,6 +320,6 @@ html, body {
 }
 
 [data-testid="bottom-pane"] > div:first-child button:not([data-active]) {
-  opacity: 0.6;
+  color: color-mix(in srgb, var(--text-default) 60%, transparent);
   border-bottom: 2px solid transparent;
 }

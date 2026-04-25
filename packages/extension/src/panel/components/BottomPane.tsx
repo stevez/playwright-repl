@@ -4,12 +4,12 @@ import { AIChatPane } from './AIChat/AIChatPane';
 import type { PanelState, Action } from "@/reducer";
 import type { SerializedValue } from '@/components/Console/types';
 
-interface BottomPaneProps extends Pick<PanelState, 'isStepDebugging' | 'bottomTab' | 'outputLines'| 'scopeData'> {
+interface BottomPaneProps extends Pick<PanelState, 'isStepDebugging' | 'bottomTab' | 'outputLines'| 'scopeData' | 'aiChatMessages'> {
     dispatch: React.Dispatch<Action>,
     onLocalProps?: (props: Record<string, SerializedValue> | null) => void;
 };
 
-export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, scopeData, onLocalProps }: BottomPaneProps) {
+export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, scopeData, onLocalProps, aiChatMessages }: BottomPaneProps) {
     return (
         <div className="flex flex-col flex-1 min-h-20 overflow-hidden" data-testid="bottom-pane">
         {/* Tab bar */}
@@ -37,7 +37,7 @@ export function BottomPane({isStepDebugging, bottomTab, outputLines, dispatch, s
             <Console outputLines={outputLines} dispatch={dispatch} />
         </div>
         <div style={{ display: bottomTab === 'ai-chat' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            <AIChatPane />
+            <AIChatPane messages={aiChatMessages} dispatch={dispatch} />
         </div>
         { bottomTab === 'variables' && isStepDebugging && <VariablePane scopeData={scopeData} onLocalProps={onLocalProps} />}
         </div>
