@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { streamText, stepCountIs } from 'ai';
 import { createModel, browserTools, lastScreenshot } from '@/lib/ai-agent';
-import { loadAISettings, type AIModelConfig } from '@/lib/settings';
+import { loadAISettings, storeAISettings, type AIModelConfig } from '@/lib/settings';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage, ToolCallInfo } from '@/types';
@@ -82,6 +82,7 @@ interface AIChatPaneProps {
 
 export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
     const [input, setInput] = useState('');
+    const [models, setModels] = useState<AIModelConfig[]>([]);
     const [activeModel, setActiveModel] = useState<AIModelConfig | null>(null);
     const [error, setError] = useState<string | null>(null);
     // Local state for fast streaming renders; synced to reducer when stream ends
@@ -99,13 +100,22 @@ export function AIChatPane({ messages, dispatch }: AIChatPaneProps) {
     // The display messages: local during streaming, reducer otherwise
     const displayMessages = isStreaming ? localMessages : messages;
 
-    // Load active model config
+    // Load model configs
     useEffect(() => {
         loadAISettings().then(settings => {
+            setModels(settings.models);
             const model = settings.models.find(m => m.id === settings.activeModelId);
             setActiveModel(model ?? null);
         });
     }, []);
+
+    async function switchModel(id: string) {
+        const model = models.find(m => m.id === id);
+        if (!model) return;
+        setActiveModel(model);
+        const settings = await loadAISettings();
+        await storeAISettings({ ...settings, activeModelId: id });
+    }
 
     // Auto-scroll
     useEffect(() => {
@@ -249,6 +259,21 @@ Only use JavaScript (Playwright API) if the user explicitly asks for JavaScript 
 
     return (
         <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Model switcher */}
+            {models.length > 0 && (
+                <div className="flex items-center gap-1 px-3 py-1 border-b border-(--border-primary) bg-(--bg-toolbar) text-[11px]">
+                    <span style={{opacity: 0.5}}>Model:</span>
+                    <select
+                        value={activeModel?.id ?? ''}
+                        onChange={e => switchModel(e.target.value)}
+                        disabled={isStreaming}
+                        className="bg-transparent border-none outline-none text-[11px] cursor-pointer"
+                        style={{color: 'var(--text-primary)'}}
+                    >
+                        {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                </div>
+            )}
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 text-[13px]">
                 {displayMessages.length === 0 && (
