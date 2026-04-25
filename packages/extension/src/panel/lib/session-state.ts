@@ -9,7 +9,7 @@ export interface SessionState {
   editorContent: string;
   editorMode: 'pw' | 'js';
   breakPoints: number[];
-  bottomTab: 'console' | 'ai-chat' | 'variables';
+  bottomTab: 'console' | 'variables';
   cursorPos: number;
   editorPaneHeight: number | null;
   commandHistory: string[];

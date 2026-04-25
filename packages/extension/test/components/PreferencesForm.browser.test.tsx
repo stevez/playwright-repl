@@ -9,8 +9,6 @@ vi.mock('../../src/panel/lib/settings', () => ({
     loadSettings: () => mockLoadSettings(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     storeSettings: (...args: any[]) => mockStoreSettings(...args),
-    loadAISettings: () => Promise.resolve({ models: [], activeModelId: '' }),
-    storeAISettings: () => Promise.resolve(),
 }));
 
 import PreferencesForm from '../../src/preferences/PreferencesForm';

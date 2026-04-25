@@ -54,15 +54,6 @@ export type CommandResult = {
     image?: string
 }
 
-export interface ToolCallInfo { name: string; input: Record<string, unknown>; result?: string; image?: string }
-
-export interface ChatMessage {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    toolCalls?: ToolCallInfo[];
-}
-
 export type RecordedMessage =
     | { type: 'pw-recorded-command'; command: string }
     | { type: 'pw-tab-activated'; url: string };
