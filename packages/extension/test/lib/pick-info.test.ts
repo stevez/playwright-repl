@@ -640,6 +640,40 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).toBe('highlight link "Stop Guessing on Contract Terms. Agiloft Astra Gives You Instant Clarity."');
     });
 
+    // ─── Interactive element with structural children (#843) ──────────
+
+    it('uses element role (not child role) when picked element has generic children', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('link', { name: 'View bill for account number' })",
+            tag: 'a',
+            text: 'View your bill',
+            attributes: {},
+        }), null, '- link "View bill for account number 877380717":\n  - generic:\n    - generic: View your bill\n    - img: ');
+        expect(result.pwCommand).toBe('highlight link "View bill for account number 877380717"');
+        expect(result.assertPw).toBe('verify-element link "View bill for account number 877380717"');
+    });
+
+    it('still uses parent/child for container with interactive child', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('checkbox', { name: 'reading' })",
+            tag: 'input',
+            text: '',
+            attributes: { type: 'checkbox' },
+            checked: true,
+        }), null, '- listitem:\n  - checkbox "reading"');
+        expect(result.pwCommand).toBe('highlight checkbox "reading" --in listitem');
+    });
+
+    it('treats button with generic children as the element itself', () => {
+        const result = buildPickResult(makeInfo({
+            locator: "getByRole('button', { name: 'Save PDF' })",
+            tag: 'button',
+            text: 'Save PDF',
+        }), null, '- button "Save PDF":\n  - generic: Save PDF\n  - img: ');
+        expect(result.pwCommand).toBe('highlight button "Save PDF"');
+        expect(result.assertPw).toBe('verify-element button "Save PDF"');
+    });
+
     it('does not use URL when link has an accessible name', () => {
         const result = buildPickResult(makeInfo({
             locator: "getByRole('link', { name: 'Home' })",

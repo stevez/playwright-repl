@@ -40,6 +40,12 @@ function parseAriaLine(line: string): AriaNode | null {
  * Single line:  `- button "Submit"` → element only
  * Nested:       `- listitem:\n  - checkbox "reading"` → element=checkbox, parent=listitem
  */
+const INTERACTIVE_ROLES = new Set([
+    'button', 'link', 'checkbox', 'radio', 'textbox', 'combobox', 'switch',
+    'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'option',
+    'slider', 'spinbutton', 'searchbox', 'treeitem',
+]);
+
 function parseAriaSnapshot(snapshot: string): { element: AriaNode; parent?: AriaNode } | null {
     const lines = snapshot.split('\n').filter(l => l.trim() && l.trim() !== '-');
     if (!lines.length) return null;
@@ -50,22 +56,30 @@ function parseAriaSnapshot(snapshot: string): { element: AriaNode; parent?: Aria
         return element ? { element } : null;
     }
 
-    // Multi-line: first line is parent, first child is the element
-    const parent = parseAriaLine(lines[0]);
-    if (!parent) return null;
+    const firstNode = parseAriaLine(lines[0]);
+    if (!firstNode) return null;
 
     // Find first child line (deeper indentation)
     const parentIndent = lines[0].search(/\S/);
     for (let i = 1; i < lines.length; i++) {
         const indent = lines[i].search(/\S/);
         if (indent > parentIndent) {
-            const element = parseAriaLine(lines[i]);
-            if (element) return { element, parent };
+            const child = parseAriaLine(lines[i]);
+            if (child) {
+                // If child is interactive (button, link, checkbox, etc.),
+                // first line is a container/parent and child is the element.
+                // If child is structural (generic, img, text, etc.),
+                // first line IS the picked element — children are just DOM contents.
+                if (INTERACTIVE_ROLES.has(child.role)) {
+                    return { element: child, parent: firstNode };
+                }
+                return { element: firstNode };
+            }
         }
     }
 
     // No children parsed — treat first line as the element
-    return { element: parent };
+    return { element: firstNode };
 }
 
 /**
