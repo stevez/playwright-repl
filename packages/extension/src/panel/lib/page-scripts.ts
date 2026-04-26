@@ -145,6 +145,13 @@ export async function actionByText(page, text, action, nth?, exact?) {
     if (await loc.count() === 0) loc = page.getByText(text);
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  // Strict mode: filter hidden elements (e.g. cdk-visually-hidden checkboxes)
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc[action]();
 }
 
@@ -228,6 +235,12 @@ export async function checkByText(page, text, nth?, exact?) {
     if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc.check();
 }
 
@@ -245,6 +258,12 @@ export async function uncheckByText(page, text, nth?, exact?) {
     if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc.uncheck();
 }
 
@@ -503,6 +522,12 @@ export async function pressKey(page, target, key) {
   if (await loc.count() === 0) loc = page.getByRole('combobox', { name: target });
   if (await loc.count() === 0) loc = page.getByPlaceholder(target);
   if (await loc.count() === 0) loc = page.getByText(target);
+  if (await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc.press(key);
   return 'Pressed ' + key;
 }
@@ -520,6 +545,7 @@ export async function pressKeyByRole(page, role, name, key, nth, inRole, inText)
     }
   }
   if (nth !== undefined) loc = loc.nth(nth);
+  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
   await loc.press(key);
   return 'Pressed ' + key;
 }
@@ -625,8 +651,10 @@ export async function cookieClear(page) {
 // ─── Drag ─────────────────────────────────────────────────────────────────────
 
 export async function dragDrop(page, source, target) {
-  const srcLoc = /^e\d+$/.test(source) ? page.locator('aria-ref=' + source) : page.getByText(source);
-  const tgtLoc = /^e\d+$/.test(target) ? page.locator('aria-ref=' + target) : page.getByText(target);
+  let srcLoc = /^e\d+$/.test(source) ? page.locator('aria-ref=' + source) : page.getByText(source);
+  let tgtLoc = /^e\d+$/.test(target) ? page.locator('aria-ref=' + target) : page.getByText(target);
+  if (await srcLoc.count() > 1) srcLoc = srcLoc.filter({ visible: true }).first();
+  if (await tgtLoc.count() > 1) tgtLoc = tgtLoc.filter({ visible: true }).first();
   await srcLoc.dragTo(tgtLoc);
   return 'Dragged';
 }
