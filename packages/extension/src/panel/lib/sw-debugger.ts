@@ -4,6 +4,7 @@
 import { SerializedValue } from '@/components/Console/types';
 import { CdpRemoteObject, fromCdpRemoteObject, CdpPropertyDescriptor } from '@/components/Console/cdpToSerialized';
 import { cdpSendCommand, cdpGetProperties, cdpCallFunctionOn, cdpEval, getTargetId } from '../../lib/sw-debugger-core';
+import type { CdpEvalResult } from '../../lib/sw-debugger-core';
 export { swDebugTargets } from '../../lib/sw-debugger-core';
 
 export type ScopeInfo = {
@@ -27,7 +28,7 @@ export async function swDebugEval(expression: string): Promise<unknown> {
         const result = await cdpSendCommand('Debugger.evaluateOnCallFrame', {
             callFrameId: pausedCallFrameId,
             expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup: 'console',
-        });
+        }) as CdpEvalResult | undefined;
         if (result?.exceptionDetails) {
             const msg = result.exceptionDetails.exception?.description
                 ?? result.exceptionDetails.text ?? 'Unknown error';
@@ -68,15 +69,15 @@ export async function swDebuggerDisable(): Promise<void> {
 }
 
 export async function swSetBreakpointByUrl(url: string, lineNumber: number): Promise<string> {
-    const result = await cdpSendCommand('Debugger.setBreakpointByUrl', { url, lineNumber });
+    const result = await cdpSendCommand('Debugger.setBreakpointByUrl', { url, lineNumber }) as { breakpointId?: string } | undefined;
     return result?.breakpointId ?? '';
 }
 
 /** Like swDebugEval but returns raw result (doesn't reject on exceptions). */
-export async function swDebugEvalRaw(expression: string): Promise<{ result?: any; exceptionDetails?: any }> {
+export async function swDebugEvalRaw(expression: string): Promise<{ result?: CdpRemoteObject; exceptionDetails?: { exception?: { description?: string }; text?: string } }> {
     return cdpSendCommand('Runtime.evaluate', {
         expression, awaitPromise: true, returnByValue: false, generatePreview: true, replMode: true,
-    });
+    }) as Promise<{ result?: CdpRemoteObject; exceptionDetails?: { exception?: { description?: string }; text?: string } }>;
 }
 
 const activeBreakpointIds: string[] = [];
@@ -127,7 +128,7 @@ async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set
 
     // Fetch own properties eagerly
     const raw = await swGetProperties(obj.objectId);
-    const descriptors = (raw as any)?.result as CdpPropertyDescriptor[];
+    const descriptors = (raw as { result?: CdpPropertyDescriptor[] })?.result;
     if (!descriptors) return fromCdpRemoteObject(obj);
 
     const props: Record<string, SerializedValue> = {};
@@ -144,16 +145,19 @@ async function eagerSerialize(obj: CdpRemoteObject, depth = 0, visited = new Set
     return { __type: 'object', cls, props };
 }
 
-chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
+// chrome.debugger types aren't visible in panel context — cast to access the API
+type DebuggerEvent = { addListener: (cb: (source: { targetId?: string }, method: string, params: Record<string, unknown>) => void) => void };
+((chrome as unknown as { debugger: { onEvent: DebuggerEvent } }).debugger.onEvent).addListener(async (source, method, params) => {
     if (source.targetId !== getTargetId()) return;
 
     if (method === 'Debugger.paused') {
-        if (params.callFrames?.length > 0) {
-            pausedCallFrameId = params.callFrames[0].callFrameId;
-            const scopes: ScopeInfo[] = (params.callFrames[0].scopeChain ?? [])
-            .filter((s:any) => s.type !== 'global')
-            .map((s:any) => ({ type: s.type, name: s.name, objectId: s.object.objectId }));
-            pauseCallback?.(params.callFrames[0].location.lineNumber, scopes);
+        const callFrames = params?.callFrames as Array<{ callFrameId: string; location: { lineNumber: number }; scopeChain?: Array<{ type: string; name?: string; object: { objectId: string } }> }> | undefined;
+        if (callFrames && callFrames.length > 0) {
+            pausedCallFrameId = callFrames[0].callFrameId;
+            const scopes: ScopeInfo[] = (callFrames[0].scopeChain ?? [])
+            .filter(s => s.type !== 'global')
+            .map(s => ({ type: s.type, name: s.name, objectId: s.object.objectId }));
+            pauseCallback?.(callFrames[0].location.lineNumber, scopes);
         }
         return;
     }
@@ -165,10 +169,10 @@ chrome.debugger.onEvent.addListener(async (source, method, params: any) => {
     if (method !== 'Runtime.consoleAPICalled') return;
     if (!consoleCallback) return;
 
-    const level = params.type; // 'log', 'error', 'warn', 'info', etc.
+    const level = params.type as string; // 'log', 'error', 'warn', 'info', etc.
     try {
         const serialized: SerializedValue[] = [];
-        for (const arg of params.args) {
+        for (const arg of params.args as CdpRemoteObject[]) {
             try {
                 serialized.push(await eagerSerialize(arg));
             } catch {

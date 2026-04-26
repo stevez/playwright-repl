@@ -20,8 +20,31 @@ import {
 
 // ─── Locator mock factory ─────────────────────────────────────────────────
 
-function createLocator(overrides: Record<string, any> = {}) {
-    const loc: any = {
+interface MockLocator {
+    count: ReturnType<typeof vi.fn>;
+    click: ReturnType<typeof vi.fn>;
+    fill: ReturnType<typeof vi.fn>;
+    check: ReturnType<typeof vi.fn>;
+    uncheck: ReturnType<typeof vi.fn>;
+    press: ReturnType<typeof vi.fn>;
+    selectOption: ReturnType<typeof vi.fn>;
+    highlight: ReturnType<typeof vi.fn>;
+    inputValue: ReturnType<typeof vi.fn>;
+    isVisible: ReturnType<typeof vi.fn>;
+    isChecked: ReturnType<typeof vi.fn>;
+    evaluate: ReturnType<typeof vi.fn>;
+    textContent: ReturnType<typeof vi.fn>;
+    filter: ReturnType<typeof vi.fn>;
+    first: ReturnType<typeof vi.fn>;
+    nth: ReturnType<typeof vi.fn>;
+    locator: ReturnType<typeof vi.fn>;
+    getByText: ReturnType<typeof vi.fn>;
+    getByRole: ReturnType<typeof vi.fn>;
+    [key: string]: ReturnType<typeof vi.fn>;
+}
+
+function createLocator(overrides: Record<string, unknown> = {}): MockLocator {
+    const loc: MockLocator = {
         count: vi.fn().mockResolvedValue(1),
         click: vi.fn().mockResolvedValue(undefined),
         fill: vi.fn().mockResolvedValue(undefined),
@@ -55,9 +78,31 @@ function createLocator(overrides: Record<string, any> = {}) {
 
 // ─── Page mock factory ────────────────────────────────────────────────────
 
-function createPage(overrides: Record<string, any> = {}) {
+interface MockPage {
+    getByText: ReturnType<typeof vi.fn>;
+    getByRole: ReturnType<typeof vi.fn>;
+    getByLabel: ReturnType<typeof vi.fn>;
+    getByPlaceholder: ReturnType<typeof vi.fn>;
+    locator: ReturnType<typeof vi.fn>;
+    title: ReturnType<typeof vi.fn>;
+    url: ReturnType<typeof vi.fn>;
+    goBack: ReturnType<typeof vi.fn>;
+    goForward: ReturnType<typeof vi.fn>;
+    goto: ReturnType<typeof vi.fn>;
+    reload: ReturnType<typeof vi.fn>;
+    waitForTimeout: ReturnType<typeof vi.fn>;
+    evaluate: ReturnType<typeof vi.fn>;
+    screenshot: ReturnType<typeof vi.fn>;
+    ariaSnapshot?: ReturnType<typeof vi.fn>;
+    _snapshotForAI?: ReturnType<typeof vi.fn>;
+    keyboard: { press: ReturnType<typeof vi.fn>; type: ReturnType<typeof vi.fn> };
+    context: ReturnType<typeof vi.fn>;
+    [key: string]: unknown;
+}
+
+function createPage(overrides: Record<string, unknown> = {}): MockPage {
     const defaultLocator = createLocator();
-    const page: any = {
+    const page: MockPage = {
         getByText: vi.fn().mockReturnValue(defaultLocator),
         getByRole: vi.fn().mockReturnValue(defaultLocator),
         getByLabel: vi.fn().mockReturnValue(defaultLocator),
@@ -300,7 +345,7 @@ describe('verifyInputValue', () => {
     it('checks radio group when no direct input found', async () => {
         // Mock document.querySelector so the evaluate closure actually runs
         const origDoc = globalThis.document;
-        globalThis.document = { querySelector: vi.fn().mockReturnValue({ textContent: '  Option A  ' }) } as any;
+        globalThis.document = { querySelector: vi.fn().mockReturnValue({ textContent: '  Option A  ' }) } as unknown as Document;
 
         const noLoc = createLocator({ count: vi.fn().mockResolvedValue(0) });
         const checkedRadio = createLocator({
@@ -323,7 +368,7 @@ describe('verifyInputValue', () => {
 
     it('throws when radio group value does not match', async () => {
         const origDoc = globalThis.document;
-        globalThis.document = { querySelector: vi.fn().mockReturnValue(null) } as any;
+        globalThis.document = { querySelector: vi.fn().mockReturnValue(null) } as unknown as Document;
 
         const noLoc = createLocator({ count: vi.fn().mockResolvedValue(0) });
         const checkedRadio = createLocator({
@@ -895,13 +940,13 @@ describe('localStorage', () => {
         removeItem: vi.fn((k: string) => { delete mockStore[k]; }),
         clear: vi.fn(() => { for (const k in mockStore) delete mockStore[k]; }),
         key: vi.fn((i: number) => Object.keys(mockStore)[i]),
-    } as any;
+    } as unknown as Storage;
 
     beforeEach(() => {
         origLS = globalThis.localStorage;
         globalThis.localStorage = mockLS;
         for (const k in mockStore) delete mockStore[k];
-        mockLS.length = 0;
+        (mockLS as Record<string, unknown>).length = 0;
     });
 
     afterEach(() => {
@@ -936,7 +981,7 @@ describe('localStorage', () => {
     it('list calls evaluate closure to iterate storage', async () => {
         mockStore['a'] = '1';
         mockStore['b'] = '2';
-        mockLS.length = 2;
+        (mockLS as Record<string, unknown>).length = 2;
         const page = createPage({ evaluate: vi.fn().mockImplementation(fn => Promise.resolve(fn())) });
         const result = await localStorageList(page);
         expect(JSON.parse(result)).toEqual({ a: '1', b: '2' });
@@ -953,13 +998,13 @@ describe('sessionStorage', () => {
         removeItem: vi.fn((k: string) => { delete mockStore[k]; }),
         clear: vi.fn(() => { for (const k in mockStore) delete mockStore[k]; }),
         key: vi.fn((i: number) => Object.keys(mockStore)[i]),
-    } as any;
+    } as unknown as Storage;
 
     beforeEach(() => {
         origSS = globalThis.sessionStorage;
         globalThis.sessionStorage = mockSS;
         for (const k in mockStore) delete mockStore[k];
-        mockSS.length = 0;
+        (mockSS as Record<string, unknown>).length = 0;
     });
 
     afterEach(() => {
@@ -993,7 +1038,7 @@ describe('sessionStorage', () => {
 
     it('list calls evaluate closure to iterate storage', async () => {
         mockStore['x'] = 'y';
-        mockSS.length = 1;
+        (mockSS as Record<string, unknown>).length = 1;
         const page = createPage({ evaluate: vi.fn().mockImplementation(fn => Promise.resolve(fn())) });
         const result = await sessionStorageList(page);
         expect(JSON.parse(result)).toEqual({ x: 'y' });
@@ -1041,9 +1086,15 @@ describe('cookies', () => {
 // ─── Tab operations ───────────────────────────────────────────────────────
 
 describe('tab operations', () => {
+    // Access the mock chrome object that we override per-test
+    const mockChromeObj = globalThis as unknown as Record<string, unknown>;
+    function mockChrome() {
+        return (mockChromeObj.chrome as Record<string, Record<string, ReturnType<typeof vi.fn>>>);
+    }
+
     beforeEach(() => {
-        (globalThis as any).activeTabId = 1;
-        (globalThis as any).chrome = {
+        mockChromeObj.activeTabId = 1;
+        mockChromeObj.chrome = {
             runtime: {
                 getURL: vi.fn((path: string) => `chrome-extension://test-id/${path}`),
             },
@@ -1057,7 +1108,7 @@ describe('tab operations', () => {
                 remove: vi.fn().mockResolvedValue(undefined),
             },
         };
-        (globalThis as any).attachToTab = vi.fn().mockResolvedValue({ ok: true, url: 'https://b.com' });
+        mockChromeObj.attachToTab = vi.fn().mockResolvedValue({ ok: true, url: 'https://b.com' });
     });
 
     it('tabList returns tab info with current marker', async () => {
@@ -1070,13 +1121,13 @@ describe('tab operations', () => {
 
     it('tabNew creates tab in same window', async () => {
         const result = await tabNew({}, 'https://new.com');
-        expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({ url: 'https://new.com', windowId: 10 });
+        expect(mockChrome().tabs.create).toHaveBeenCalledWith({ url: 'https://new.com', windowId: 10 });
         expect(result).toContain('https://new.com');
     });
 
     it('tabNew without URL', async () => {
         const result = await tabNew({}, undefined);
-        expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({
+        expect(mockChrome().tabs.create).toHaveBeenCalledWith({
             url: 'about:blank',
             windowId: 10,
         });
@@ -1085,13 +1136,13 @@ describe('tab operations', () => {
 
     it('tabClose closes tab by index', async () => {
         const result = await tabClose({}, 1);
-        expect((globalThis as any).chrome.tabs.remove).toHaveBeenCalledWith(2);
+        expect(mockChrome().tabs.remove).toHaveBeenCalledWith(2);
         expect(result).toContain('https://b.com');
     });
 
     it('tabClose closes current tab when no index', async () => {
         const result = await tabClose({}, undefined);
-        expect((globalThis as any).chrome.tabs.remove).toHaveBeenCalledWith(1);
+        expect(mockChrome().tabs.remove).toHaveBeenCalledWith(1);
         expect(result).toContain('https://a.com');
     });
 
@@ -1101,7 +1152,7 @@ describe('tab operations', () => {
 
     it('tabSelect attaches to tab by index', async () => {
         const result = await tabSelect({}, 1);
-        expect((globalThis as any).attachToTab).toHaveBeenCalledWith(2);
+        expect(mockChromeObj.attachToTab).toHaveBeenCalledWith(2);
         expect(result).toContain('Selected tab 1');
     });
 
@@ -1110,38 +1161,38 @@ describe('tab operations', () => {
     });
 
     it('tabSelect throws when attach fails', async () => {
-        (globalThis as any).attachToTab = vi.fn().mockResolvedValue({ ok: false, error: 'denied' });
+        mockChromeObj.attachToTab = vi.fn().mockResolvedValue({ ok: false, error: 'denied' });
         await expect(tabSelect({}, 0)).rejects.toThrow('denied');
     });
 
     it('tabList works without activeTabId', async () => {
-        (globalThis as any).activeTabId = undefined;
+        mockChromeObj.activeTabId = undefined;
         const result = await tabList({});
         const tabs = JSON.parse(result);
-        expect(tabs.every((t: any) => t.current === false)).toBe(true);
+        expect(tabs.every((t: Record<string, unknown>) => t.current === false)).toBe(true);
     });
 
     it('tabClose without activeTabId closes by index', async () => {
-        (globalThis as any).activeTabId = undefined;
+        mockChromeObj.activeTabId = undefined;
         const result = await tabClose({}, 0);
-        expect((globalThis as any).chrome.tabs.query).toHaveBeenCalledWith({});
+        expect(mockChrome().tabs.query).toHaveBeenCalledWith({});
         expect(result).toContain('https://a.com');
     });
 
     it('tabClose throws for current tab when no activeTabId', async () => {
-        (globalThis as any).activeTabId = undefined;
+        mockChromeObj.activeTabId = undefined;
         await expect(tabClose({}, undefined)).rejects.toThrow('Tab current not found');
     });
 
     it('tabSelect without activeTabId selects by index', async () => {
-        (globalThis as any).activeTabId = undefined;
+        mockChromeObj.activeTabId = undefined;
         const result = await tabSelect({}, 0);
-        expect((globalThis as any).chrome.tabs.query).toHaveBeenCalledWith({});
+        expect(mockChrome().tabs.query).toHaveBeenCalledWith({});
         expect(result).toContain('Selected tab 0');
     });
 
     it('tabClose handles tab with no url', async () => {
-        (globalThis as any).chrome.tabs.query = vi.fn().mockResolvedValue([
+        mockChrome().tabs.query = vi.fn().mockResolvedValue([
             { id: 10, title: 'No URL' },
         ]);
         const result = await tabClose({}, 0);
@@ -1149,18 +1200,18 @@ describe('tab operations', () => {
     });
 
     it('tabSelect handles attach with no url in response', async () => {
-        (globalThis as any).attachToTab = vi.fn().mockResolvedValue({ ok: true });
+        mockChromeObj.attachToTab = vi.fn().mockResolvedValue({ ok: true });
         const result = await tabSelect({}, 0);
         expect(result).toBe('Selected tab 0: ');
     });
 
     it('tabSelect throws with default error when no error message', async () => {
-        (globalThis as any).attachToTab = vi.fn().mockResolvedValue({ ok: false });
+        mockChromeObj.attachToTab = vi.fn().mockResolvedValue({ ok: false });
         await expect(tabSelect({}, 0)).rejects.toThrow('Attach failed');
     });
 
     it('tabList handles tabs with no title or url', async () => {
-        (globalThis as any).chrome.tabs.query = vi.fn().mockResolvedValue([
+        mockChrome().tabs.query = vi.fn().mockResolvedValue([
             { id: 1 },
         ]);
         const result = await tabList({});
@@ -1170,9 +1221,9 @@ describe('tab operations', () => {
     });
 
     it('tabNew without activeTabId', async () => {
-        (globalThis as any).activeTabId = undefined;
+        mockChromeObj.activeTabId = undefined;
         const result = await tabNew({}, 'https://new.com');
-        expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({ url: 'https://new.com' });
+        expect(mockChrome().tabs.create).toHaveBeenCalledWith({ url: 'https://new.com' });
         expect(result).toContain('https://new.com');
     });
 });

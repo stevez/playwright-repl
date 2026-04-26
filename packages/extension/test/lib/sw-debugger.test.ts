@@ -12,14 +12,14 @@ import {
 /** Make chrome.debugger.getTargets call back with given targets */
 function mockGetTargets(targets: Array<{ id: string; type: string; url: string }>) {
     (chrome.debugger.getTargets as ReturnType<typeof vi.fn>).mockImplementation(
-        (cb: (t: any[]) => void) => cb(targets)
+        (cb: (t: Array<{ id: string; type: string; url: string }>) => void) => cb(targets)
     );
 }
 
 /** Make chrome.debugger.attach succeed */
 function mockAttachSuccess() {
     (chrome.debugger.attach as ReturnType<typeof vi.fn>).mockImplementation(
-        (_target: any, _version: string, cb: () => void) => {
+        (_target: unknown, _version: string, cb: () => void) => {
             Object.defineProperty(chrome.runtime, 'lastError', { get: () => undefined, configurable: true });
             cb();
         }
@@ -27,9 +27,9 @@ function mockAttachSuccess() {
 }
 
 /** Make chrome.debugger.sendCommand call back with given result */
-function mockSendCommand(result: any) {
+function mockSendCommand(result: unknown) {
     (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-        (_target: any, _method: string, _params: any, cb: (r: any) => void) => {
+        (_target: unknown, _method: string, _params: unknown, cb: (r: unknown) => void) => {
             Object.defineProperty(chrome.runtime, 'lastError', { get: () => undefined, configurable: true });
             cb(result);
         }
@@ -40,7 +40,7 @@ const SW_TARGET = { id: 'target-1', type: 'worker', url: `chrome-extension://${c
 
 /** Reset module-level swTargetId by firing the onDetach event (vitest-chrome's callListeners) */
 function resetSwTargetId() {
-    (chrome.debugger.onDetach as any).callListeners({ targetId: 'target-1' });
+    (chrome.debugger.onDetach as unknown as { callListeners: (...args: unknown[]) => void }).callListeners({ targetId: 'target-1' });
 }
 
 // ─── swDebugTargets ──────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ describe('swDebugEval', () => {
 
         await swDebugEval('const x = 42');
         const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
-            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+            .find((c: unknown[]) => c[1] === 'Runtime.evaluate')![2].expression;
         expect(expr).toBe('const x = 42');
     });
 
@@ -100,7 +100,7 @@ describe('swDebugEval', () => {
 
         await swDebugEval('{a:1, b:2}');
         const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
-            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+            .find((c: unknown[]) => c[1] === 'Runtime.evaluate')![2].expression;
         expect(expr).toBe('({a:1, b:2})');
     });
 
@@ -111,7 +111,7 @@ describe('swDebugEval', () => {
 
         await swDebugEval('const x = {a:1}');
         const expr = (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mock.calls
-            .find((c: any) => c[1] === 'Runtime.evaluate')![2].expression;
+            .find((c: unknown[]) => c[1] === 'Runtime.evaluate')![2].expression;
         expect(expr).toBe('const x = {a:1}');
     });
 
@@ -143,7 +143,7 @@ describe('swDebugEval', () => {
         mockGetTargets([SW_TARGET]);
         mockAttachSuccess();
         (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-            (_target: any, _method: string, _params: any, cb: (r: any) => void) => {
+            (_target: unknown, _method: string, _params: unknown, cb: (r: unknown) => void) => {
                 Object.defineProperty(chrome.runtime, 'lastError', {
                     get: () => ({ message: 'Debugger is not attached' }),
                     configurable: true,
@@ -177,7 +177,7 @@ describe('swDebugEval', () => {
     it('handles "already attached" error by reusing target', async () => {
         mockGetTargets([SW_TARGET]);
         (chrome.debugger.attach as ReturnType<typeof vi.fn>).mockImplementation(
-            (_target: any, _version: string, cb: () => void) => {
+            (_target: unknown, _version: string, cb: () => void) => {
                 Object.defineProperty(chrome.runtime, 'lastError', {
                     get: () => ({ message: 'Another debugger is already attached' }),
                     configurable: true,
@@ -194,7 +194,7 @@ describe('swDebugEval', () => {
     it('rejects with attach error when not "already attached"', async () => {
         mockGetTargets([SW_TARGET]);
         (chrome.debugger.attach as ReturnType<typeof vi.fn>).mockImplementation(
-            (_target: any, _version: string, cb: () => void) => {
+            (_target: unknown, _version: string, cb: () => void) => {
                 Object.defineProperty(chrome.runtime, 'lastError', {
                     get: () => ({ message: 'Cannot attach to this target' }),
                     configurable: true,
@@ -237,7 +237,7 @@ describe('swGetProperties', () => {
         mockAttachSuccess();
         // First call to sendCommand succeeds (Runtime.enable), second fails
         (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-            (_target: any, method: string, _params: any, cb: (r: any) => void) => {
+            (_target: unknown, method: string, _params: unknown, cb: (r: unknown) => void) => {
                 if (method === 'Runtime.getProperties') {
                     Object.defineProperty(chrome.runtime, 'lastError', {
                         get: () => ({ message: 'Object has been collected' }),
@@ -279,7 +279,7 @@ describe('swCallFunctionOn', () => {
         mockGetTargets([SW_TARGET]);
         mockAttachSuccess();
         (chrome.debugger.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-            (_target: any, method: string, _params: any, cb: (r: any) => void) => {
+            (_target: unknown, method: string, _params: unknown, cb: (r: unknown) => void) => {
                 if (method === 'Runtime.callFunctionOn') {
                     Object.defineProperty(chrome.runtime, 'lastError', {
                         get: () => ({ message: 'Function call failed' }),

@@ -7,8 +7,7 @@ const mockStoreSettings = vi.fn();
 
 vi.mock('../../src/panel/lib/settings', () => ({
     loadSettings: () => mockLoadSettings(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    storeSettings: (...args: any[]) => mockStoreSettings(...args),
+    storeSettings: (...args: unknown[]) => mockStoreSettings(...args),
 }));
 
 import PreferencesForm from '../../src/preferences/PreferencesForm';

@@ -32,20 +32,12 @@ async function startVideoCapture(streamId: string) {
     }
     revokeLastBlob();
 
-    const media = await navigator.mediaDevices.getUserMedia({
-        audio: {
-            mandatory: {
-                chromeMediaSource: 'tab',
-                chromeMediaSourceId: streamId,
-            },
-        } as any,
-        video: {
-            mandatory: {
-                chromeMediaSource: 'tab',
-                chromeMediaSourceId: streamId,
-            },
-        } as any,
-    });
+    // Chrome extension tab capture uses non-standard `mandatory` constraint
+    const constraints = {
+        audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
+        video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
+    } as unknown as MediaStreamConstraints;
+    const media = await navigator.mediaDevices.getUserMedia(constraints);
 
     // Continue playing captured audio to the user
     const output = new AudioContext();
@@ -137,7 +129,7 @@ function connect(port: number) {
             console.debug(`[pw-repl] bridge connected to port ${port}`);
             retryCount = 0;
             // Trigger auto-attach so the CLI knows which tab is connected
-            chrome.runtime.sendMessage({ type: 'bridge-attach' }).then((result: any) => {
+            chrome.runtime.sendMessage({ type: 'bridge-attach' }).then((result: { url?: string }) => {
                 if (ws?.readyState === WebSocket.OPEN && result?.url)
                     ws.send(JSON.stringify({ _event: true, type: 'tab-attached', url: result.url }));
             }).catch(() => {});
@@ -191,7 +183,7 @@ chrome.runtime.sendMessage({ type: 'get-bridge-port' }).then((port: number) => {
 
 // ─── Message routing from background SW ─────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
+chrome.runtime.onMessage.addListener((msg: { type: string; port?: number; streamId?: string }, _sender, sendResponse) => {
     if (msg.type === 'bridge-port-changed') {
         lastPort = msg.port as number;
         if (reconnectTimer) clearTimeout(reconnectTimer);

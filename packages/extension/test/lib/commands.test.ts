@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import type { ParseResult } from '../../src/panel/lib/commands';
 
-let parseReplCommand: (input: string) => any;
+let parseReplCommand: (input: string) => ParseResult;
 
 beforeAll(async () => {
   const mod = await import("../../src/panel/lib/commands");

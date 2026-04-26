@@ -296,9 +296,9 @@ describe('locator', () => {
             document.body.innerHTML = '<button>Delete</button><button>Delete</button><button>Delete</button>';
             const buttons = document.querySelectorAll('button');
             // Stub checkVisibility: only first button visible (like TodoMVC hover-revealed delete)
-            (buttons[0] as any).checkVisibility = () => true;
-            (buttons[1] as any).checkVisibility = () => false;
-            (buttons[2] as any).checkVisibility = () => false;
+            (buttons[0] as unknown as Record<string, unknown>).checkVisibility = () => true;
+            (buttons[1] as unknown as Record<string, unknown>).checkVisibility = () => false;
+            (buttons[2] as unknown as Record<string, unknown>).checkVisibility = () => false;
             const matches = findByRoleAndName('button', 'Delete');
             expect(matches).toHaveLength(1);
             expect(matches[0]).toBe(buttons[0]);
@@ -313,9 +313,9 @@ describe('locator', () => {
         it('includes hidden elements (ignores checkVisibility)', () => {
             document.body.innerHTML = '<button>Delete</button><button>Delete</button><button>Delete</button>';
             const buttons = document.querySelectorAll('button');
-            (buttons[0] as any).checkVisibility = () => true;
-            (buttons[1] as any).checkVisibility = () => false;
-            (buttons[2] as any).checkVisibility = () => false;
+            (buttons[0] as unknown as Record<string, unknown>).checkVisibility = () => true;
+            (buttons[1] as unknown as Record<string, unknown>).checkVisibility = () => false;
+            (buttons[2] as unknown as Record<string, unknown>).checkVisibility = () => false;
             // findByRoleAndName returns only visible
             expect(findByRoleAndName('button', 'Delete')).toHaveLength(1);
             // findAllByRoleAndName returns all regardless of visibility

@@ -105,8 +105,8 @@ export async function runJsScript(code: string, dispatch: React.Dispatch<Action>
             const value = fromCdpRemoteObject(r);
             dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', time, value, getProperties: swGetProperties } });
         }
-    } catch (e: any) {
-        const text = trimStack(e?.message ?? String(e));
+    } catch (e: unknown) {
+        const text = trimStack(e instanceof Error ? e.message : String(e));
         dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
     }
 }
@@ -174,8 +174,8 @@ export async function runJsScriptStep(code: string, dispatch: React.Dispatch<Act
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: '', type: 'success', value, getProperties: swGetProperties } });
             }
         }
-    } catch (e: any) {
-        dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(e?.message ?? String(e)), type: 'error' } });
+    } catch (e: unknown) {
+        dispatch({ type: 'COMMAND_ERROR', line: { text: trimStack(e instanceof Error ? e.message : String(e)), type: 'error' } });
     } finally {
         onDebugPaused(null);
         await swDebuggerDisable().catch(e => console.debug('[debug] disable:', e));
@@ -205,8 +205,8 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
             const isError = !r?.ok;
             dispatch({ type: isError ? 'COMMAND_ERROR' : 'COMMAND_SUCCESS', line: { text, type: isError ? 'error' : 'success', time } });
             return { text, isError };
-        } catch (e: any) {
-            const text = e?.message ?? String(e);
+        } catch (e: unknown) {
+            const text = e instanceof Error ? e.message : String(e);
             dispatch({ type: 'COMMAND_ERROR', line: { text, type: 'error' } });
             return { text, isError: true };
         }
@@ -227,8 +227,8 @@ export async function runAndDispatch(command: string, dispatch: React.Dispatch<A
             else text = 'Done';
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'success', time } });
             return { text, isError: false };
-        } catch (e: any) {
-            const text = trimStack(e?.message ?? String(e));
+        } catch (e: unknown) {
+            const text = trimStack(e instanceof Error ? e.message : String(e));
             dispatch({ type: 'COMMAND_SUCCESS', line: { text, type: 'error' } });
             return { text, isError: true };
         }

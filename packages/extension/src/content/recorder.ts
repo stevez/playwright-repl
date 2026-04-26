@@ -101,7 +101,7 @@ function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; j
  * has been invalidated (e.g. extension reloaded), clean up event listeners
  * instead of throwing an uncaught error (#823).
  */
-function safeSendMessage(msg: any) {
+function safeSendMessage(msg: { type: string; action?: { pw: string; js: string } }) {
     try {
         chrome.runtime.sendMessage(msg);
     } catch {
@@ -236,7 +236,7 @@ export function onFocusOutCapture(e: FocusEvent) {
 
 export function cleanup() {
     flushPendingFill();
-    (window as any).__pw_recorder_active = false;
+    window.__pw_recorder_active = false;
     document.removeEventListener('click', onClickCapture, true);
     document.removeEventListener('input', onInputCapture, true);
     document.removeEventListener('change', onChangeCapture, true);
@@ -245,7 +245,7 @@ export function cleanup() {
     chrome.runtime.onMessage.removeListener(onMessage);
 }
 
-function onMessage(msg: any) {
+function onMessage(msg: { type: string }) {
     if (msg.type === 'record-stop') cleanup();
 }
 
@@ -253,8 +253,8 @@ function onMessage(msg: any) {
 
 export function init() {
     // Guard against double-injection
-    if ((window as any).__pw_recorder_active) return;
-    (window as any).__pw_recorder_active = true;
+    if (window.__pw_recorder_active) return;
+    window.__pw_recorder_active = true;
 
     // Detect iframe context once on init
     framePath = detectFrameChain();

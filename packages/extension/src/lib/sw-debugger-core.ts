@@ -6,6 +6,14 @@
  * Vite bundles a copy into each entry point.
  */
 
+export type CdpEvalResult = {
+    result?: unknown;
+    exceptionDetails?: {
+        exception?: { description?: string };
+        text?: string;
+    };
+};
+
 let swTargetId: string | null = null;
 
 if (typeof chrome !== 'undefined' && chrome.debugger) {
@@ -66,10 +74,10 @@ export function getTargetId() { return swTargetId; }
 
 // ─── Generic CDP Command ─────────────────────────────────────────────────────
 
-export async function cdpSendCommand(method: string, params: Record<string, unknown> = {}): Promise<any> {
+export async function cdpSendCommand(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
     const targetId = await ensureAttached();
     return new Promise((resolve, reject) => {
-        chrome.debugger.sendCommand({ targetId }, method, params, (result: any) => {
+        chrome.debugger.sendCommand({ targetId }, method, params, (result: unknown) => {
             if (chrome.runtime.lastError) {
                 reject(new Error(chrome.runtime.lastError.message));
             } else {
@@ -86,20 +94,20 @@ export async function cdpSendCommand(method: string, params: Record<string, unkn
  * Wraps `{…}` in parens so V8 parses object literals correctly.
  * Returns the raw CDP result object (not exceptionDetails — those throw).
  */
-export async function cdpEval(expression: string, objectGroup = 'console'): Promise<any> {
+export async function cdpEval(expression: string, objectGroup = 'console'): Promise<unknown> {
     const expr = expression.trimStart().startsWith('{') ? `(${expression})` : expression;
     const targetId = await ensureAttached();
-    const result = await new Promise<any>((resolve, reject) => {
+    const result = await new Promise<CdpEvalResult | undefined>((resolve, reject) => {
         chrome.debugger.sendCommand(
             { targetId },
             'Runtime.evaluate',
             { expression: expr, awaitPromise: true, returnByValue: false, generatePreview: true, objectGroup, replMode: true },
-            (res: any) => {
+            (res: unknown) => {
                 if (chrome.runtime.lastError) {
                     swTargetId = null;
                     reject(new Error(chrome.runtime.lastError.message));
                 } else {
-                    resolve(res);
+                    resolve(res as CdpEvalResult | undefined);
                 }
             }
         );
@@ -118,7 +126,7 @@ export async function cdpCallFunctionOn(
     objectId: string,
     functionDeclaration: string,
     returnByValue = true,
-): Promise<any> {
+): Promise<unknown> {
     return cdpSendCommand('Runtime.callFunctionOn', {
         objectId, functionDeclaration, returnByValue,
     });
@@ -126,7 +134,7 @@ export async function cdpCallFunctionOn(
 
 // ─── Runtime.getProperties ───────────────────────────────────────────────────
 
-export async function cdpGetProperties(objectId: string): Promise<any> {
+export async function cdpGetProperties(objectId: string): Promise<unknown> {
     return cdpSendCommand('Runtime.getProperties', {
         objectId, ownProperties: true, generatePreview: true,
     });

@@ -15,21 +15,23 @@ test.describe("Panel page test", () => {
     // Intercept onMessage.addListener before React mounts so recording tests
     // can dispatch recorded-action messages to the Toolbar listener
     await panelPage.addInitScript(() => {
-      const listeners: any[] = [];
+      type Listener = (msg: unknown, sender: unknown, sendResponse: () => void) => void;
+      const listeners: Listener[] = [];
       const origAdd = chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);
       const origRemove = chrome.runtime.onMessage.removeListener.bind(chrome.runtime.onMessage);
-      chrome.runtime.onMessage.addListener = ((fn: any) => { listeners.push(fn); return origAdd(fn); }) as any;
-      chrome.runtime.onMessage.removeListener = ((fn: any) => {
+      chrome.runtime.onMessage.addListener = ((fn: Listener) => { listeners.push(fn); return origAdd(fn); }) as typeof chrome.runtime.onMessage.addListener;
+      chrome.runtime.onMessage.removeListener = ((fn: Listener) => {
         const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); return origRemove(fn);
-      }) as any;
-      (window as any).__fireRecorderMsg = (msg: any) => { for (const fn of listeners) fn(msg, {}, () => {}); };
+      }) as typeof chrome.runtime.onMessage.removeListener;
+      (window as unknown as Record<string, unknown>).__fireRecorderMsg = (msg: unknown) => { for (const fn of listeners) fn(msg, {}, () => {}); };
     });
     await sidePanel.goto(extensionId);
 
     // Stub health + attach — App.tsx sends these on mount
     await panelPage.evaluate(() => {
-      const orig = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
-      (chrome.runtime as any).sendMessage = async (msg: any) => {
+      const cr = chrome.runtime as unknown as Record<string, unknown>;
+      const orig = (cr.sendMessage as (...a: unknown[]) => unknown).bind(chrome.runtime);
+      cr.sendMessage = async (msg: Record<string, unknown>) => {
         if (msg.type === 'health') return { ok: true };
         if (msg.type === 'attach') return { ok: true, url: 'https://example.com' };
         return orig(msg);
@@ -167,8 +169,9 @@ test.describe("Panel page test", () => {
 
   test('record button shows error when record-start fails', async ({ sidePanel }) => {
     await sidePanel.raw.evaluate(() => {
-      const origSend = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
-      (chrome.runtime as any).sendMessage = async (msg: any) => {
+      const cr = chrome.runtime as unknown as Record<string, unknown>;
+      const origSend = (cr.sendMessage as (...a: unknown[]) => unknown).bind(chrome.runtime);
+      cr.sendMessage = async (msg: Record<string, unknown>) => {
         if (msg.type === 'record-start') return { ok: false, error: 'Cannot access chrome:// URLs' };
         return origSend(msg);
       };

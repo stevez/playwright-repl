@@ -94,7 +94,7 @@ export class SidePanelPage {
     await this.page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
     // Clear session state after load so restored content doesn't leak between tests.
     // The panel may have already restored — clearEditor below resets it.
-    await this.page.evaluate(() => (globalThis as any).chrome?.storage?.session?.remove('panelSessionState'));
+    await this.page.evaluate(() => (globalThis as unknown as Record<string, { storage?: { session?: { remove: (key: string) => void } } }>).chrome?.storage?.session?.remove('panelSessionState'));
   }
 
   /** Select all editor content and delete it. */
@@ -118,12 +118,15 @@ export class SidePanelPage {
   /** Stub record-start, record-stop, health, and attach messages. */
   async mockRecordingApis() {
     await this.page.evaluate(() => {
-      const orig = (chrome.runtime.sendMessage as any).bind(chrome.runtime);
-      (chrome.runtime as any).sendMessage = async (msg: any) => {
-        if (msg.type === 'health') return { ok: true };
-        if (msg.type === 'attach') return { ok: true, url: 'https://example.com' };
-        if (msg.type === 'record-start') return { ok: true, url: 'https://example.com' };
-        if (msg.type === 'record-stop') return { ok: true };
+      const chromeObj = chrome as unknown as { runtime: Record<string, unknown> };
+      const cr = chromeObj.runtime;
+      const orig = (cr.sendMessage as (...args: unknown[]) => unknown).bind(chromeObj.runtime);
+      cr.sendMessage = async (msg: unknown) => {
+        const m = msg as { type: string };
+        if (m.type === 'health') return { ok: true };
+        if (m.type === 'attach') return { ok: true, url: 'https://example.com' };
+        if (m.type === 'record-start') return { ok: true, url: 'https://example.com' };
+        if (m.type === 'record-stop') return { ok: true };
         return orig(msg);
       };
     });
@@ -132,7 +135,7 @@ export class SidePanelPage {
   /** Fire a recorded-action message to the Toolbar's onMessage listener. */
   async fireRecordedAction(action: { pw: string; js: string }) {
     await this.page.evaluate(
-      (a) => (window as any).__fireRecorderMsg({ type: 'recorded-action', action: a }),
+      (a) => (window as unknown as Record<string, (msg: unknown) => void>).__fireRecorderMsg({ type: 'recorded-action', action: a }),
       action,
     );
   }

@@ -393,7 +393,7 @@ describe('fromCdpRemoteObject', () => {
             type: 'object',
             preview: { type: 'object', properties: [{ name: 'x', type: 'undefined' }] },
         };
-        const result = fromCdpRemoteObject(obj) as any;
+        const result = fromCdpRemoteObject(obj) as unknown as Record<string, Record<string, unknown>>;
         expect(result.props.x).toEqual({ __type: 'undefined' });
     });
 
@@ -402,7 +402,7 @@ describe('fromCdpRemoteObject', () => {
             type: 'object',
             preview: { type: 'object', properties: [{ name: 'x', type: 'object', subtype: 'null', value: 'null' }] },
         };
-        const result = fromCdpRemoteObject(obj) as any;
+        const result = fromCdpRemoteObject(obj) as unknown as Record<string, Record<string, unknown>>;
         expect(result.props.x).toEqual({ __type: 'null' });
     });
 
@@ -411,7 +411,7 @@ describe('fromCdpRemoteObject', () => {
             type: 'object',
             preview: { type: 'object', properties: [{ name: 'x', type: 'boolean', value: 'true' }] },
         };
-        const result = fromCdpRemoteObject(obj) as any;
+        const result = fromCdpRemoteObject(obj) as unknown as Record<string, Record<string, unknown>>;
         expect(result.props.x).toEqual({ __type: 'boolean', v: true });
     });
 
@@ -420,7 +420,7 @@ describe('fromCdpRemoteObject', () => {
             type: 'object',
             preview: { type: 'object', properties: [{ name: 'fn', type: 'function' }] },
         };
-        const result = fromCdpRemoteObject(obj) as any;
+        const result = fromCdpRemoteObject(obj) as unknown as Record<string, Record<string, unknown>>;
         expect(result.props.fn).toEqual({ __type: 'function', name: 'fn' });
     });
 
@@ -429,7 +429,7 @@ describe('fromCdpRemoteObject', () => {
             type: 'object',
             preview: { type: 'object', properties: [{ name: 'child', type: 'object', value: 'MyClass' }] },
         };
-        const result = fromCdpRemoteObject(obj) as any;
+        const result = fromCdpRemoteObject(obj) as unknown as Record<string, Record<string, unknown>>;
         expect(result.props.child).toEqual({ __type: 'ref', cls: 'MyClass' });
     });
 });

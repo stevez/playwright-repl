@@ -18,7 +18,7 @@ import type {
 //
 // Inserts "()" after method completions and places cursor between the parens.
 
-function applyMethod(view: any, completion: Completion, from: number, to: number) {
+function applyMethod(view: { dispatch: (spec: { changes: { from: number; to: number; insert: string }; selection: { anchor: number } }) => void }, completion: Completion, from: number, to: number) {
   const insert = completion.label + "()";
   view.dispatch({
     changes: { from, to, insert },
@@ -215,7 +215,7 @@ function toCompletions(interfaceName: InterfaceName): Completion[] {
     return completionCache.get(interfaceName)!;
   }
 
-  const raw: RawCompletion[] = (PW_COMPLETIONS as any)[interfaceName] ?? [];
+  const raw: RawCompletion[] = (PW_COMPLETIONS as Record<string, RawCompletion[]>)[interfaceName] ?? [];
 
   const completions: Completion[] = raw.map((item) => ({
     label: item.label,

@@ -45,7 +45,7 @@ export const test = base.extend<
       res.end(html);
     });
     await new Promise<void>(resolve => httpServer.listen(0, resolve));
-    const httpPort = (httpServer.address() as any).port;
+    const httpPort = (httpServer.address() as { port: number }).port;
     const testUrl = `http://localhost:${httpPort}`;
 
     // 2. Start BridgeServer BEFORE the browser so the offscreen doc connects on init
@@ -100,7 +100,8 @@ export const test = base.extend<
     ]);
     if (!closed) {
       // Force-kill: terminate lingering connections so the port is freed
-      (bridge as any).wss?.clients?.forEach((ws: any) => ws.terminate());
+      const wss = (bridge as unknown as { wss?: { clients?: Set<{ terminate: () => void }> } }).wss;
+      wss?.clients?.forEach(ws => ws.terminate());
       await bridge.close().catch(() => {});
     }
     httpServer.close();

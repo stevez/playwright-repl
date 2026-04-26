@@ -1,11 +1,25 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock @codemirror/language to capture the token function passed to StreamLanguage.define
-let capturedParser: { startState: () => any; token: (stream: any, state: any) => string | null };
+interface StreamState { commandSeen: boolean }
+interface MockStream {
+    pos: number;
+    string: string;
+    start: number;
+    sol: () => boolean;
+    eol: () => boolean;
+    peek: () => string | undefined;
+    next: () => string | undefined;
+    eatSpace: () => boolean;
+    match: (pattern: RegExp | string, consume?: boolean) => boolean | RegExpMatchArray | null;
+    skipToEnd: () => void;
+}
+
+let capturedParser: { startState: () => StreamState; token: (stream: MockStream, state: StreamState) => string | null };
 
 vi.mock('@codemirror/language', () => ({
   StreamLanguage: {
-    define: (parser: any) => { capturedParser = parser; return { language: {} }; },
+    define: (parser: typeof capturedParser) => { capturedParser = parser; return { language: {} }; },
   },
   HighlightStyle: { define: () => ({}) },
   syntaxHighlighting: () => ({}),

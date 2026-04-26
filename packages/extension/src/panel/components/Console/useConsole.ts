@@ -128,8 +128,8 @@ export function useConsole(dispatch: React.Dispatch<Action>) {
             } else {
                 dispatch({ type: 'COMMAND_SUCCESS', line: { text: result.text ?? 'Done', type: 'success', time } });
             }
-        } catch (e: any) {
-            const raw = e?.message ?? String(e);
+        } catch (e: unknown) {
+            const raw = e instanceof Error ? e.message : String(e);
             const errorText = raw.split('\n    at ')[0].split('\nCall log:')[0].trim();
             dispatch({ type: 'COMMAND_ERROR', line: { text: errorText, type: 'error' } });
         }

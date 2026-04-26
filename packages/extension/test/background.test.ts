@@ -1,9 +1,39 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
+// ─── Mock types ──────────────────────────────────────────────────────────────
+
+interface MockPage {
+  url: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+}
+
+interface MockCrxApp {
+  attach: ReturnType<typeof vi.fn>;
+  detach: ReturnType<typeof vi.fn>;
+  detachAll: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  context: ReturnType<typeof vi.fn>;
+  recorder: {
+    show: ReturnType<typeof vi.fn>;
+    hide: ReturnType<typeof vi.fn>;
+  };
+}
+
+/** Cast a chrome namespace to allow assigning mock properties */
+function asMock<T>(obj: T): Record<string, unknown> {
+  return obj as unknown as Record<string, unknown>;
+}
+
+type DebuggerTarget = { targetId: string };
+type DebuggerCallback = (...args: unknown[]) => void;
+type MessageSender = Record<string, unknown>;
+type SendResponseFn = (response: unknown) => void;
+type MessageListener = (msg: Record<string, unknown>, sender: MessageSender, sendResponse: SendResponseFn) => boolean | void;
+
 // ─── Shared mock state ────────────────────────────────────────────────────────
 
-let mockPage: any;
-let mockCrxApp: any;
+let mockPage: MockPage;
+let mockCrxApp: MockCrxApp;
 let mockParseReplCommand: Mock;
 let mockDetectMode: Mock;
 
@@ -12,14 +42,14 @@ vi.mock('@playwright-repl/playwright-crx/test', () => ({
 }));
 
 vi.mock('@playwright-repl/playwright-crx', () => {
-  mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
+  mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() } as MockPage;
   const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
   mockCrxApp = {
     attach: vi.fn().mockResolvedValue(mockPage),
     detach: vi.fn().mockResolvedValue(undefined),
     on: vi.fn(),
     context: vi.fn().mockReturnValue(mockContext),
-  };
+  } as unknown as MockCrxApp;
   return { crx: { start: vi.fn().mockResolvedValue(mockCrxApp) } };
 });
 
@@ -28,20 +58,20 @@ vi.mock('../src/panel/lib/settings', () => ({
 }));
 
 vi.mock('../src/panel/lib/commands', () => ({
-  parseReplCommand: (...args: any[]) => mockParseReplCommand(...args),
+  parseReplCommand: (input: string) => mockParseReplCommand(input),
 }));
 
 vi.mock('../src/panel/lib/execute', () => ({
-  detectMode: (...args: any[]) => mockDetectMode(...args),
+  detectMode: (input: string) => mockDetectMode(input),
 }));
 
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
 describe("background.ts message handlers", () => {
-  let onMessageListener: (msg: any, sender: any, sendResponse: (r: any) => void) => boolean | void;
-  let onStorageChanged: (...args: any[]) => void;
-  let onActionClicked: (...args: any[]) => void;
-  let onDebuggerDetach: (...args: any[]) => void;
+  let onMessageListener: MessageListener;
+  let onStorageChanged: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void;
+  let onActionClicked: (tab: { id?: number; windowId?: number }) => void;
+  let onDebuggerDetach: (source: DebuggerTarget) => void;
   let onTabRemoved: (tabId: number) => void;
 
   beforeEach(async () => {
@@ -65,48 +95,50 @@ describe("background.ts message handlers", () => {
         show: vi.fn().mockResolvedValue(undefined),
         hide: vi.fn().mockResolvedValue(undefined),
       },
-    };
+    } as MockCrxApp;
 
     // Override factory for this test
     const { crx } = await import('@playwright-repl/playwright-crx');
     (crx.start as ReturnType<typeof vi.fn>).mockResolvedValue(mockCrxApp);
 
     // Set up chrome stubs
-    (chrome.management as any).getSelf = vi.fn().mockResolvedValue({ installType: 'development' });
-    (chrome.storage.local.get as any).mockResolvedValue({});
-    (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 42, url: 'https://example.com' });
-    (chrome.tabs as any).query = vi.fn().mockResolvedValue([{ id: 42, url: 'https://example.com' }]);
-    (chrome.tabs as any).onActivated = { addListener: vi.fn() };
-    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
-    const tabRemovedListeners: any[] = [];
-    (chrome.tabs as any).onRemoved = { addListener: vi.fn((fn: any) => tabRemovedListeners.push(fn)) };
-    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
-    (chrome.scripting as any).executeScript = vi.fn().mockResolvedValue([]);
+    asMock(chrome.management).getSelf = vi.fn().mockResolvedValue({ installType: 'development' });
+    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const tabs = asMock(chrome.tabs);
+    tabs.get = vi.fn().mockResolvedValue({ id: 42, url: 'https://example.com' });
+    tabs.query = vi.fn().mockResolvedValue([{ id: 42, url: 'https://example.com' }]);
+    tabs.onActivated = { addListener: vi.fn() };
+    tabs.onUpdated = { addListener: vi.fn() };
+    const tabRemovedListeners: ((tabId: number) => void)[] = [];
+    tabs.onRemoved = { addListener: vi.fn((fn: (tabId: number) => void) => tabRemovedListeners.push(fn)) };
+    tabs.sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.scripting).executeScript = vi.fn().mockResolvedValue([]);
 
     // Capture chrome event listeners
-    const messageListeners: typeof onMessageListener[] = [];
-    (chrome.runtime as any).onMessage = { addListener: vi.fn((fn: any) => messageListeners.push(fn)) };
-    (chrome.runtime as any).sendMessage = vi.fn().mockResolvedValue(undefined);
+    const messageListeners: MessageListener[] = [];
+    const runtime = asMock(chrome.runtime);
+    runtime.onMessage = { addListener: vi.fn((fn: MessageListener) => messageListeners.push(fn)) };
+    runtime.sendMessage = vi.fn().mockResolvedValue(undefined);
 
-    const storageListeners: any[] = [];
-    (chrome.storage as any).onChanged = { addListener: vi.fn((fn: any) => storageListeners.push(fn)) };
+    const storageListeners: typeof onStorageChanged[] = [];
+    asMock(chrome.storage).onChanged = { addListener: vi.fn((fn: typeof onStorageChanged) => storageListeners.push(fn)) };
 
-    const actionListeners: any[] = [];
-    (chrome.action as any).onClicked = { addListener: vi.fn((fn: any) => actionListeners.push(fn)) };
+    const actionListeners: typeof onActionClicked[] = [];
+    asMock(chrome.action).onClicked = { addListener: vi.fn((fn: typeof onActionClicked) => actionListeners.push(fn)) };
 
-    const detachListeners: any[] = [];
-    (chrome.debugger as any).onDetach = { addListener: vi.fn((fn: any) => detachListeners.push(fn)) };
+    const detachListeners: ((source: DebuggerTarget) => void)[] = [];
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn((fn: (source: DebuggerTarget) => void) => detachListeners.push(fn)) };
 
     // Offscreen mock
-    (chrome.offscreen as any).hasDocument = vi.fn().mockResolvedValue(false);
-    (chrome.offscreen as any).createDocument = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(false);
+    asMock(chrome.offscreen).createDocument = vi.fn().mockResolvedValue(undefined);
 
     // sidePanel mock
-    (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
-    (chrome.sidePanel as any).open = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.sidePanel).open = vi.fn().mockResolvedValue(undefined);
 
     // windows mock
-    (chrome.windows as any).create = vi.fn().mockResolvedValue({});
+    asMock(chrome.windows).create = vi.fn().mockResolvedValue({});
 
     vi.resetModules();
 
@@ -118,9 +150,9 @@ describe("background.ts message handlers", () => {
     onTabRemoved = tabRemovedListeners[0];
   });
 
-  function sendMessage(msg: any): Promise<any> {
+  function sendMessage(msg: Record<string, unknown>): Promise<Record<string, unknown>> {
     return new Promise((resolve) => {
-      const ret = onMessageListener(msg, {}, resolve);
+      const ret = onMessageListener(msg, {}, resolve as SendResponseFn);
       if (ret === false) {
         // synchronous — resolve has already been called
       }
@@ -128,16 +160,17 @@ describe("background.ts message handlers", () => {
   }
 
   /** Set up chrome.debugger mocks for bridge-command / ensureSelfAttached */
-  function setupDebuggerMocks(swId = 'sw-1', evalResult: any = { result: { type: 'undefined' } }) {
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+  function setupDebuggerMocks(swId = 'sw-1', evalResult: Record<string, unknown> = { result: { type: 'undefined' } }) {
+    const dbg = asMock(chrome.debugger);
+    dbg.getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: swId },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    dbg.attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => cb());
+    dbg.sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb(evalResult);
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    dbg.onDetach = { addListener: vi.fn() };
   }
 
   // ─── health ───────────────────────────────────────────────────────────────
@@ -164,7 +197,7 @@ describe("background.ts message handlers", () => {
   });
 
   it("attach rejects chrome:// URLs", async () => {
-    (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome://settings' });
+    asMock(chrome.tabs).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome://settings' });
     const result = await sendMessage({ type: 'attach', tabId: 1 });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Cannot attach to this page');
@@ -189,7 +222,7 @@ describe("background.ts message handlers", () => {
   it("attach switches to new tab without detaching previous tab", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     mockCrxApp.attach.mockResolvedValue({ url: vi.fn().mockReturnValue('https://new.com'), on: vi.fn() });
-    (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 99, url: 'https://new.com' });
+    asMock(chrome.tabs).get = vi.fn().mockResolvedValue({ id: 99, url: 'https://new.com' });
     await sendMessage({ type: 'attach', tabId: 99 });
     // playwright-crx supports multiple attached pages, so we don't detach when switching tabs
     expect(mockCrxApp.detach).not.toHaveBeenCalled();
@@ -221,7 +254,7 @@ describe("background.ts message handlers", () => {
   it("record-stop sends record-stop message to tab and returns ok:true", async () => {
     await sendMessage({ type: 'record-start' });
     const result = await sendMessage({ type: 'record-stop' });
-    expect((chrome.tabs as any).sendMessage).toHaveBeenCalledWith(42, { type: 'record-stop' });
+    expect(asMock(chrome.tabs).sendMessage).toHaveBeenCalledWith(42, { type: 'record-stop' });
     expect(result).toEqual({ ok: true });
   });
 
@@ -235,13 +268,13 @@ describe("background.ts message handlers", () => {
   // ─── get-bridge-port ──────────────────────────────────────────────────────
 
   it("get-bridge-port returns stored port", async () => {
-    (chrome.storage.local.get as any).mockResolvedValue({ bridgePort: 1234 });
+    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({ bridgePort: 1234 });
     const result = await sendMessage({ type: 'get-bridge-port' });
     expect(result).toBe(1234);
   });
 
   it("get-bridge-port returns default 9876 when not set", async () => {
-    (chrome.storage.local.get as any).mockResolvedValue({});
+    (chrome.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
     const result = await sendMessage({ type: 'get-bridge-port' });
     expect(result).toBe(9876);
   });
@@ -266,7 +299,7 @@ describe("background.ts message handlers", () => {
   // ─── bridge-command ───────────────────────────────────────────────────────
 
   it("bridge-command returns error when no page attached and no active tab", async () => {
-    (chrome.tabs as any).query = vi.fn().mockResolvedValue([]);
+    asMock(chrome.tabs).query = vi.fn().mockResolvedValue([]);
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
     expect(result.text).toContain('No active tab');
@@ -274,18 +307,18 @@ describe("background.ts message handlers", () => {
 
   it("bridge-command auto-attaches to active tab", async () => {
     // Set up debugger mock for executeBridgeExpr (ensureSelfAttached + eval)
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       // Return undefined result for the eval
       cb({ result: { type: 'undefined' } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     // Should have auto-attached to tab 42
@@ -298,17 +331,17 @@ describe("background.ts message handlers", () => {
   it("bridge-command script executes lines sequentially", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'string', value: 'ok' } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({
       type: 'bridge-command',
@@ -326,17 +359,17 @@ describe("background.ts message handlers", () => {
   it("bridge-command returns Done for undefined result", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'undefined' } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result).toEqual({ text: 'Done', isError: false });
@@ -345,17 +378,17 @@ describe("background.ts message handlers", () => {
   it("bridge-command returns string result", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'string', value: 'hello world' } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result).toEqual({ text: 'hello world', isError: false });
@@ -365,17 +398,17 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
     const imgJson = JSON.stringify({ __image: 'abc123', mimeType: 'image/png' });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'string', value: imgJson } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'screenshot' });
     expect(result.isError).toBe(false);
@@ -385,17 +418,17 @@ describe("background.ts message handlers", () => {
   it("bridge-command returns error on eval exception", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_target: any, _ver: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_target: unknown, _ver: string, cb: DebuggerCallback) => {
       cb();
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_target: any, method: string, _params: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_target: unknown, method: string, _params: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ exceptionDetails: { exception: { description: 'ReferenceError: x is not defined' } } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -405,7 +438,7 @@ describe("background.ts message handlers", () => {
   // ─── attach: chrome-extension:// URL rejection ────────────────────────────
 
   it("attach rejects chrome-extension:// URLs", async () => {
-    (chrome.tabs as any).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome-extension://abc/panel.html' });
+    asMock(chrome.tabs).get = vi.fn().mockResolvedValue({ id: 1, url: 'chrome-extension://abc/panel.html' });
     const result = await sendMessage({ type: 'attach', tabId: 1 });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Cannot attach to this page');
@@ -482,11 +515,11 @@ describe("background.ts message handlers", () => {
     onDebuggerDetach({ targetId: 'sw-1' });
 
     // Next bridge-command should re-attach (getTargets called again)
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-2' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => cb());
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'undefined' } });
     });
@@ -504,18 +537,18 @@ describe("background.ts message handlers", () => {
   it("ensureOffscreen skips creation when document already exists", async () => {
     // Reset and re-import with hasDocument returning true
     vi.resetModules();
-    (chrome.offscreen as any).hasDocument = vi.fn().mockResolvedValue(true);
-    (chrome.offscreen as any).createDocument = vi.fn();
-    const listeners: any[] = [];
-    (chrome.runtime as any).onMessage = { addListener: vi.fn((fn: any) => listeners.push(fn)) };
-    (chrome.storage as any).onChanged = { addListener: vi.fn() };
-    (chrome.action as any).onClicked = { addListener: vi.fn() };
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
-    (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
-    (chrome.tabs as any).onActivated = { addListener: vi.fn() };
-    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
-    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
-    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(true);
+    asMock(chrome.offscreen).createDocument = vi.fn();
+    const listeners: MessageListener[] = [];
+    asMock(chrome.runtime).onMessage = { addListener: vi.fn((fn: MessageListener) => listeners.push(fn)) };
+    asMock(chrome.storage).onChanged = { addListener: vi.fn() };
+    asMock(chrome.action).onClicked = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
+    asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.tabs).onActivated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onUpdated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onRemoved = { addListener: vi.fn() };
+    asMock(chrome.tabs).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     // Wait for the async ensureOffscreen call
@@ -534,7 +567,7 @@ describe("background.ts message handlers", () => {
   // ─── startRecording without active tab ─────────────────────────────────────
 
   it("record-start returns ok:false when no active tab", async () => {
-    (chrome.tabs as any).query = vi.fn().mockResolvedValue([]);
+    asMock(chrome.tabs).query = vi.fn().mockResolvedValue([]);
     const result = await sendMessage({ type: 'record-start' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('No active tab');
@@ -544,8 +577,8 @@ describe("background.ts message handlers", () => {
 
   it("bridge-command throws when background worker target not found", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([]));
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([]));
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -559,26 +592,26 @@ describe("background.ts message handlers", () => {
     // First call sets selfTargetId
     await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     // Second call should reuse cached selfTargetId (no new attach)
-    (chrome.debugger as any).attach = vi.fn();
+    asMock(chrome.debugger).attach = vi.fn();
     await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(chrome.debugger.attach).not.toHaveBeenCalled();
   });
 
   it("bridge-command handles 'already attached' debugger error gracefully", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Already attached' };
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => {
+      asMock(chrome.runtime).lastError = { message: 'Already attached' };
       cb();
-      delete (chrome.runtime as any).lastError;
+      delete asMock(chrome.runtime).lastError;
     });
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       cb({ result: { type: 'undefined' } });
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(false);
@@ -586,15 +619,15 @@ describe("background.ts message handlers", () => {
 
   it("bridge-command rejects on non-'already attached' debugger error", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Permission denied' };
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => {
+      asMock(chrome.runtime).lastError = { message: 'Permission denied' };
       cb();
-      delete (chrome.runtime as any).lastError;
+      delete asMock(chrome.runtime).lastError;
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -610,10 +643,10 @@ describe("background.ts message handlers", () => {
     mockParseReplCommand.mockReturnValue({ jsExpr: 'const x = 1\nx' });
     const result = await sendMessage({ type: 'bridge-command', command: 'const x = 1\nx' });
     expect(result.isError).toBe(false);
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    expect(evalCall[2].expression).toBe('const x = 1\nx');
-    expect(evalCall[2].replMode).toBe(true);
+    const sendCmdCalls = vi.mocked(chrome.debugger.sendCommand).mock.calls;
+    const evalCall = sendCmdCalls.find((c: unknown[]) => c[1] === 'Runtime.evaluate');
+    expect((evalCall![2] as Record<string, unknown>).expression).toBe('const x = 1\nx');
+    expect((evalCall![2] as Record<string, unknown>).replMode).toBe(true);
   });
 
   it("bridge-command handles lastError in sendCommand (clears selfTargetId)", async () => {
@@ -624,10 +657,10 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'bridge-command', command: 'snapshot' });
 
     // Now make sendCommand fail with lastError
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: 'Target closed' };
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, _method: string, _p: unknown, cb: DebuggerCallback) => {
+      asMock(chrome.runtime).lastError = { message: 'Target closed' };
       cb(undefined);
-      delete (chrome.runtime as any).lastError;
+      delete asMock(chrome.runtime).lastError;
     });
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
@@ -727,7 +760,7 @@ describe("background.ts message handlers", () => {
   it("bridge-command returns parsed error for unrecognized mode", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     mockParseReplCommand.mockReturnValue({ error: 'Unknown command: foo' });
-    mockDetectMode.mockReturnValue('other' as any);
+    mockDetectMode.mockReturnValue('other');
 
     const result = await sendMessage({ type: 'bridge-command', command: 'foo' });
     expect(result.isError).toBe(true);
@@ -747,7 +780,7 @@ describe("background.ts message handlers", () => {
       if (callCount === 1) return { jsExpr: 'page.title()' };
       return { error: 'Unknown command: badcmd' };
     });
-    mockDetectMode.mockReturnValue('other' as any);
+    mockDetectMode.mockReturnValue('other');
 
     const result = await sendMessage({
       type: 'bridge-command',
@@ -780,9 +813,9 @@ describe("background.ts message handlers", () => {
     mockDetectMode.mockReturnValue('js');
     await sendMessage({ type: 'bridge-command', command: '{a: 1}' });
 
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    expect(evalCall[2].expression).toBe('({a: 1})');
+    const sendCmdCalls = vi.mocked(chrome.debugger.sendCommand).mock.calls;
+    const evalCall = sendCmdCalls.find((c: unknown[]) => c[1] === 'Runtime.evaluate');
+    expect((evalCall![2] as Record<string, unknown>).expression).toBe('({a: 1})');
   });
 
   it("bridge-command passes non-brace expression directly", async () => {
@@ -793,29 +826,29 @@ describe("background.ts message handlers", () => {
     mockDetectMode.mockReturnValue('js');
     await sendMessage({ type: 'bridge-command', command: 'page.title();' });
 
-    const sendCmdCalls = (chrome.debugger.sendCommand as any).mock.calls;
-    const evalCall = sendCmdCalls.find((c: any) => c[1] === 'Runtime.evaluate');
-    expect(evalCall[2].expression).toBe('page.title();');
-    expect(evalCall[2].replMode).toBe(true);
+    const sendCmdCalls = vi.mocked(chrome.debugger.sendCommand).mock.calls;
+    const evalCall = sendCmdCalls.find((c: unknown[]) => c[1] === 'Runtime.evaluate');
+    expect((evalCall![2] as Record<string, unknown>).expression).toBe('page.title();');
+    expect((evalCall![2] as Record<string, unknown>).replMode).toBe(true);
   });
 
   // ─── Fire-and-forget .catch() callbacks ────────────────────────────────────
 
   it("ensureOffscreen catch is exercised when createDocument rejects", async () => {
     vi.resetModules();
-    (chrome.offscreen as any).hasDocument = vi.fn().mockResolvedValue(false);
-    (chrome.offscreen as any).createDocument = vi.fn().mockRejectedValue(new Error('fail'));
-    const listeners: any[] = [];
-    (chrome.runtime as any).onMessage = { addListener: vi.fn((fn: any) => listeners.push(fn)) };
-    (chrome.runtime as any).sendMessage = vi.fn().mockResolvedValue(undefined);
-    (chrome.storage as any).onChanged = { addListener: vi.fn() };
-    (chrome.action as any).onClicked = { addListener: vi.fn() };
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
-    (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
-    (chrome.tabs as any).onActivated = { addListener: vi.fn() };
-    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
-    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
-    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(false);
+    asMock(chrome.offscreen).createDocument = vi.fn().mockRejectedValue(new Error('fail'));
+    const listeners: MessageListener[] = [];
+    asMock(chrome.runtime).onMessage = { addListener: vi.fn((fn: MessageListener) => listeners.push(fn)) };
+    asMock(chrome.runtime).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.storage).onChanged = { addListener: vi.fn() };
+    asMock(chrome.action).onClicked = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
+    asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.tabs).onActivated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onUpdated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onRemoved = { addListener: vi.fn() };
+    asMock(chrome.tabs).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     await new Promise(r => setTimeout(r, 20));
@@ -824,18 +857,18 @@ describe("background.ts message handlers", () => {
 
   it("setPanelBehavior catch is exercised when it rejects", async () => {
     vi.resetModules();
-    (chrome.offscreen as any).hasDocument = vi.fn().mockResolvedValue(true);
-    (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockRejectedValue(new Error('fail'));
-    const listeners: any[] = [];
-    (chrome.runtime as any).onMessage = { addListener: vi.fn((fn: any) => listeners.push(fn)) };
-    (chrome.runtime as any).sendMessage = vi.fn().mockResolvedValue(undefined);
-    (chrome.storage as any).onChanged = { addListener: vi.fn() };
-    (chrome.action as any).onClicked = { addListener: vi.fn() };
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
-    (chrome.tabs as any).onActivated = { addListener: vi.fn() };
-    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
-    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
-    (chrome.tabs as any).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(true);
+    asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockRejectedValue(new Error('fail'));
+    const listeners: MessageListener[] = [];
+    asMock(chrome.runtime).onMessage = { addListener: vi.fn((fn: MessageListener) => listeners.push(fn)) };
+    asMock(chrome.runtime).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.storage).onChanged = { addListener: vi.fn() };
+    asMock(chrome.action).onClicked = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
+    asMock(chrome.tabs).onActivated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onUpdated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onRemoved = { addListener: vi.fn() };
+    asMock(chrome.tabs).sendMessage = vi.fn().mockResolvedValue(undefined);
 
     await import('../src/background.js');
     await new Promise(r => setTimeout(r, 20));
@@ -844,19 +877,19 @@ describe("background.ts message handlers", () => {
   it("loadSettings catch is exercised when it rejects", async () => {
     vi.resetModules();
     const { loadSettings } = await import('../src/panel/lib/settings');
-    (loadSettings as any).mockImplementation(() => Promise.reject(new Error('fail')));
+    (loadSettings as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.reject(new Error('fail')));
 
-    (chrome.offscreen as any).hasDocument = vi.fn().mockResolvedValue(true);
-    (chrome.sidePanel as any).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
-    const listeners: any[] = [];
-    (chrome.runtime as any).onMessage = { addListener: vi.fn((fn: any) => listeners.push(fn)) };
-    (chrome.runtime as any).sendMessage = vi.fn().mockResolvedValue(undefined);
-    (chrome.storage as any).onChanged = { addListener: vi.fn() };
-    (chrome.action as any).onClicked = { addListener: vi.fn() };
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
-    (chrome.tabs as any).onActivated = { addListener: vi.fn() };
-    (chrome.tabs as any).onUpdated = { addListener: vi.fn() };
-    (chrome.tabs as any).onRemoved = { addListener: vi.fn() };
+    asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(true);
+    asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
+    const listeners: MessageListener[] = [];
+    asMock(chrome.runtime).onMessage = { addListener: vi.fn((fn: MessageListener) => listeners.push(fn)) };
+    asMock(chrome.runtime).sendMessage = vi.fn().mockResolvedValue(undefined);
+    asMock(chrome.storage).onChanged = { addListener: vi.fn() };
+    asMock(chrome.action).onClicked = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
+    asMock(chrome.tabs).onActivated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onUpdated = { addListener: vi.fn() };
+    asMock(chrome.tabs).onRemoved = { addListener: vi.fn() };
 
     vi.resetModules();
     await import('../src/background.js');
@@ -864,7 +897,7 @@ describe("background.ts message handlers", () => {
   });
 
   it("storage onChanged bridgePort catch is exercised when sendMessage rejects", async () => {
-    (chrome.runtime as any).sendMessage = vi.fn().mockRejectedValue(new Error('no receiver'));
+    asMock(chrome.runtime).sendMessage = vi.fn().mockRejectedValue(new Error('no receiver'));
     onStorageChanged({ bridgePort: { newValue: 9999 } }, 'local');
     await new Promise(r => setTimeout(r, 10));
     // The .catch(() => {}) should swallow the rejection
@@ -882,13 +915,13 @@ describe("background.ts message handlers", () => {
 
   it("record-stop is safe when no recording is active", async () => {
     const result = await sendMessage({ type: 'record-stop' });
-    expect((chrome.tabs as any).sendMessage).not.toHaveBeenCalled();
+    expect(asMock(chrome.tabs).sendMessage).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true });
   });
 
   it("record-stop swallows sendMessage errors", async () => {
     await sendMessage({ type: 'record-start' });
-    (chrome.tabs as any).sendMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
+    asMock(chrome.tabs).sendMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
     const result = await sendMessage({ type: 'record-stop' });
     expect(result).toEqual({ ok: true });
   });
@@ -929,24 +962,24 @@ describe("background.ts message handlers", () => {
     setupDebuggerMocks('sw-1');
 
     // Make sendCommand throw with a non-Error object
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, _method: string, _p: any, cb: any) => {
-      (chrome.runtime as any).lastError = { message: '' };
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, _method: string, _p: unknown, cb: DebuggerCallback) => {
+      asMock(chrome.runtime).lastError = { message: '' };
       cb(undefined);
-      delete (chrome.runtime as any).lastError;
+      delete asMock(chrome.runtime).lastError;
     });
     // Need to clear selfTargetId first so ensureSelfAttached runs
     onDebuggerDetach({ targetId: 'sw-1' });
     setupDebuggerMocks('sw-2');
     // After re-attach, make the EVAL sendCommand fail with empty message
     let callIdx = 0;
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       callIdx++;
       if (callIdx === 1) {
         // This is the eval sendCommand — trigger lastError with empty message
-        (chrome.runtime as any).lastError = { message: '' };
+        asMock(chrome.runtime).lastError = { message: '' };
         cb(undefined);
-        delete (chrome.runtime as any).lastError;
+        delete asMock(chrome.runtime).lastError;
       }
     });
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
@@ -966,16 +999,16 @@ describe("background.ts message handlers", () => {
 
   it("bridge-command handles already-attached error with undefined message", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => {
       // lastError without message property → ?? '' → doesn't match /already attached/
-      (chrome.runtime as any).lastError = {};
+      asMock(chrome.runtime).lastError = {};
       cb();
-      delete (chrome.runtime as any).lastError;
+      delete asMock(chrome.runtime).lastError;
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -1000,7 +1033,7 @@ describe("background.ts message handlers", () => {
     setupDebuggerMocks('sw-1');
 
     // Make ensureSelfAttached throw a non-Error value
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([]));
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([]));
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -1037,14 +1070,14 @@ describe("background.ts message handlers", () => {
 
   it("bridge-command catch falls back to String(e) when error has no message prop", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
     // attach callback throws a non-Error (string)
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, _cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, _cb: DebuggerCallback) => {
       throw 'raw string error';
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -1067,7 +1100,7 @@ describe("background.ts message handlers", () => {
   it("bridge-command formats object falling back to String when JSON.stringify fails", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     // Create a circular object that JSON.stringify can't handle
-    const circular: any = {};
+    const circular: Record<string, unknown> = {};
     circular.self = circular;
     setupDebuggerMocks('sw-1', { result: { type: 'function', description: circular } });
 
@@ -1081,8 +1114,8 @@ describe("background.ts message handlers", () => {
   it("bridge-command executeBridgeExpr catch uses String(e) for non-Error throw", async () => {
     await sendMessage({ type: 'attach', tabId: 42 });
     // Make ensureSelfAttached throw a non-Error (string)
-    (chrome.debugger as any).getTargets = vi.fn(() => { throw 'getTargets failed'; });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).getTargets = vi.fn(() => { throw 'getTargets failed'; });
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     const result = await sendMessage({ type: 'bridge-command', command: 'snapshot' });
     expect(result.isError).toBe(true);
@@ -1111,7 +1144,7 @@ describe("background.ts message handlers", () => {
     onTabRemoved(42);
     // record-stop should not try to sendMessage (recordingTabId was cleared)
     const result = await sendMessage({ type: 'record-stop' });
-    expect((chrome.tabs as any).sendMessage).not.toHaveBeenCalledWith(42, { type: 'record-stop' });
+    expect(asMock(chrome.tabs).sendMessage).not.toHaveBeenCalledWith(42, { type: 'record-stop' });
     expect(result).toEqual({ ok: true });
   });
 
@@ -1137,7 +1170,7 @@ describe("background.ts message handlers", () => {
 
     // First call returns TargetClosedError, second succeeds
     let callCount = 0;
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       callCount++;
       if (callCount === 1) {
@@ -1164,7 +1197,7 @@ describe("background.ts message handlers", () => {
 
     // First command takes 50ms, second is instant
     let callCount = 0;
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       callCount++;
       const idx = callCount;
@@ -1195,11 +1228,11 @@ describe("background.ts message handlers", () => {
 
     // Track eval calls: first returns command result, second returns snapshot
     let evalCount = 0;
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => cb());
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       evalCount++;
       if (evalCount === 1) {
@@ -1210,7 +1243,7 @@ describe("background.ts message handlers", () => {
         cb({ result: { type: 'string', value: '- heading "Hello" [ref=e1]' } });
       }
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
 
     // parseReplCommand returns jsExpr for both calls
     mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
@@ -1281,11 +1314,11 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
     let evalCount = 0;
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => cb());
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       evalCount++;
       if (evalCount === 1) {
@@ -1296,7 +1329,7 @@ describe("background.ts message handlers", () => {
         cb({ result: { type: 'string', value: '- button "OK" [ref=e2]' } });
       }
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
     mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
 
     const result = await sendMessage({
@@ -1316,11 +1349,11 @@ describe("background.ts message handlers", () => {
     await sendMessage({ type: 'attach', tabId: 42 });
 
     let evalCount = 0;
-    (chrome.debugger as any).getTargets = vi.fn((cb: any) => cb([
+    asMock(chrome.debugger).getTargets = vi.fn((cb: DebuggerCallback) => cb([
       { type: 'worker', url: `chrome-extension://${chrome.runtime.id}/background.js`, id: 'sw-1' },
     ]));
-    (chrome.debugger as any).attach = vi.fn((_t: any, _v: string, cb: any) => cb());
-    (chrome.debugger as any).sendCommand = vi.fn((_t: any, method: string, _p: any, cb: any) => {
+    asMock(chrome.debugger).attach = vi.fn((_t: unknown, _v: string, cb: DebuggerCallback) => cb());
+    asMock(chrome.debugger).sendCommand = vi.fn((_t: unknown, method: string, _p: unknown, cb: DebuggerCallback) => {
       if (method === 'Runtime.enable') { cb(); return; }
       evalCount++;
       if (evalCount === 1) {
@@ -1330,7 +1363,7 @@ describe("background.ts message handlers", () => {
         cb({ exceptionDetails: { exception: { description: 'Snapshot error' } } });
       }
     });
-    (chrome.debugger as any).onDetach = { addListener: vi.fn() };
+    asMock(chrome.debugger).onDetach = { addListener: vi.fn() };
     mockParseReplCommand.mockReturnValue({ jsExpr: 'page.title()' });
 
     const result = await sendMessage({

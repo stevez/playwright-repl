@@ -175,11 +175,11 @@ test.describe('actionByText', () => {
     test('clicks a button by text', async ({ page }) => {
         await page.evaluate(() => {
             document.querySelector('button')!.addEventListener('click', () => {
-                (window as any).__clicked = true;
+                (window as unknown as Record<string, unknown>).__clicked = true;
             });
         });
         await actionByText(page, 'Submit', 'click', undefined);
-        const clicked = await page.evaluate(() => (window as any).__clicked);
+        const clicked = await page.evaluate(() => (window as unknown as Record<string, unknown>).__clicked);
         expect(clicked).toBe(true);
     });
 });

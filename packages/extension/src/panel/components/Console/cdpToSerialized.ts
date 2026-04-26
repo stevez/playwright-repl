@@ -120,7 +120,7 @@ export function fromCdpRemoteObject(obj: CdpRemoteObject): SerializedValue {
 
 /** Convert Runtime.getProperties response into SerializedValue props map. */
 export function fromCdpGetProperties(raw: unknown): Record<string, SerializedValue> {
-    const data = raw as any;
+    const data = raw as { result?: CdpPropertyDescriptor[]; internalProperties?: CdpPropertyDescriptor[] };
     const result = data?.result as CdpPropertyDescriptor[] | undefined;
     const props: Record<string, SerializedValue> = {};
     if (result) {

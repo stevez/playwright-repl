@@ -204,7 +204,7 @@ const resultGutter = gutter({
     class: 'cm-result-gutter',
     markers(view) {
         const results = view.state.field(lineResultsField);
-        const markers: any[] = [];
+        const markers: Range<GutterMarker>[] = [];
         for (let i = 0; i < results.length && i < view.state.doc.lines; i++) {
             if (results[i]) {
                 const line = view.state.doc.line(i + 1);
@@ -219,7 +219,7 @@ const breakpointGutter = gutter({
     class: 'cm-breakpoint-gutter',
     markers(view) {
         const bps = view.state.field(breakpointField);
-        const markers: any[] = [];
+        const markers: Range<GutterMarker>[] = [];
         for (const lineNum of bps) {
             if (lineNum < view.state.doc.lines) {
                 const line = view.state.doc.line(lineNum + 1);

@@ -130,22 +130,21 @@ function App() {
     const isPopup = new URLSearchParams(window.location.search).has('tabId');
     if (isPopup) {
       // Open side panel directly from the popup (preserves user gesture).
-      // Chrome API types are incomplete for sidePanel/tabs in panel context.
-      /* eslint-disable @typescript-eslint/no-explicit-any */
+      // Chrome API types are incomplete for tabs/windows in panel context.
+      const chromeExt = chrome as unknown as { tabs: { get: (id: number) => Promise<{ windowId?: number }> }; windows: { getAll: (opts: { windowTypes: string[] }) => Promise<Array<{ id?: number; focused?: boolean }>> } };
       let windowId: number | undefined;
       if (state.attachedTabId) {
-        const tab = await (chrome as any).tabs.get(state.attachedTabId).catch(() => null);
+        const tab = await chromeExt.tabs.get(state.attachedTabId).catch(() => null);
         windowId = tab?.windowId;
       }
       if (!windowId) {
-        const windows = await (chrome as any).windows.getAll({ windowTypes: ['normal'] });
-        windowId = (windows.find((w: any) => w.focused) ?? windows[0])?.id;
+        const windows = await chromeExt.windows.getAll({ windowTypes: ['normal'] });
+        windowId = (windows.find(w => w.focused) ?? windows[0])?.id;
       }
       if (windowId) {
-        await (chrome as any).sidePanel.open({ windowId });
+        await chrome.sidePanel.open({ windowId });
         window.close();
       }
-      /* eslint-enable @typescript-eslint/no-explicit-any */
     } else {
       const res = await chrome.runtime.sendMessage({
         type: 'handoff-to-popup',

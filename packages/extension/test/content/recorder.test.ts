@@ -71,7 +71,7 @@ describe('recorder', () => {
         it('sends recorded-action for button click', () => {
             document.body.innerHTML = '<button>Submit</button>';
             const btn = document.querySelector('button')!;
-            onClickCapture(new MouseEvent('click', { bubbles: true }) as any);
+            onClickCapture(new MouseEvent('click', { bubbles: true }));
             // No target set via constructor — need to dispatch on element
             btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             // The handler reads e.target, so dispatch on the element

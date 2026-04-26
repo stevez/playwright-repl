@@ -46,11 +46,12 @@ function dedentSnapshot(snapshot: string) {
   return lines.map(line => line.substring(prefix)).join('\n');
 }
 
-function makeAriaSnapshotMatcher(locator: any, isNot: boolean) {
+function makeAriaSnapshotMatcher(locator: unknown, isNot: boolean) {
+  const loc = locator as { _expect: (type: string, opts: { expectedValue: string; isNot: boolean; timeout: number }) => Promise<{ matches: boolean; received?: { raw?: string } }> };
   return async (expected: string, options?: { timeout?: number }) => {
     const timeout = options?.timeout ?? 5000;
     const normalized = dedentSnapshot(expected);
-    const { matches: pass, received } = await locator._expect(
+    const { matches: pass, received } = await loc._expect(
       'to.match.aria',
       { expectedValue: normalized, isNot, timeout },
     );
@@ -67,7 +68,7 @@ function makeAriaSnapshotMatcher(locator: any, isNot: boolean) {
   };
 }
 
-function wrapExpectResult(e: any, locator: any, isNot = false) {
+function wrapExpectResult(e: object, locator: unknown, isNot = false) {
   return new Proxy(e, {
     get(obj, prop) {
       if (prop === 'toMatchAriaSnapshot')
@@ -81,7 +82,7 @@ function wrapExpectResult(e: any, locator: any, isNot = false) {
 
 const _origExpect = expect;
 const patchedExpect: typeof expect = Object.assign(
-  (target: any) => wrapExpectResult(_origExpect(target), target),
+  (target: unknown) => wrapExpectResult(_origExpect(target) as object, target),
   _origExpect,
 );
 
@@ -172,7 +173,7 @@ function resetCrxState() {
 async function ensureCrxApp(): Promise<CrxApplication> {
   if (crxApp) return crxApp;
   crxApp = await crx.start();
-  (crxApp as any).on('close', () => resetCrxState());
+  (crxApp as unknown as { on: (event: string, cb: () => void) => void }).on('close', () => resetCrxState());
   return crxApp;
 }
 
@@ -236,20 +237,20 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
     Object.assign(globalThis, { page: currentPage, context: app.context(), crxApp: app, activeTabId, expect: patchedExpect });
 
     // Set up event listeners on globalThis so page-scripts can read them
-    (globalThis as any).__consoleMessages = [];
-    (globalThis as any).__networkRequests = [];
-    (globalThis as any).__activeRoutes = [];
-    currentPage.on('console', (msg: any) => {
-      (globalThis as any).__consoleMessages.push('[' + msg.type() + '] ' + msg.text());
+    globalThis.__consoleMessages = [];
+    globalThis.__networkRequests = [];
+    globalThis.__activeRoutes = [];
+    currentPage.on('console', (msg) => {
+      globalThis.__consoleMessages.push('[' + msg.type() + '] ' + msg.text());
     });
-    currentPage.on('response', (resp: any) => {
+    currentPage.on('response', (resp) => {
       const url = resp.url();
       if (url.startsWith('chrome-extension://')) return;
       const req = resp.request();
-      (globalThis as any).__networkRequests.push({ status: resp.status(), method: req.method(), url, type: req.resourceType() });
+      globalThis.__networkRequests.push({ status: resp.status(), method: req.method(), url, type: req.resourceType() });
     });
-    currentPage.on('dialog', async (dialog: any) => {
-      const mode = (globalThis as any).__dialogMode;
+    currentPage.on('dialog', async (dialog) => {
+      const mode = globalThis.__dialogMode;
       if (mode === 'accept') await dialog.accept();
       else if (mode === 'dismiss') await dialog.dismiss();
     });
@@ -357,7 +358,7 @@ let lastTraceData: Uint8Array | null = null;
 
 // ─── Pick Element ────────────────────────────────────────────────────────────
 
-async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string }> {
+async function pickElement(): Promise<{ ok: boolean; info?: Record<string, unknown>; error?: string }> {
   if (!currentPage) {
     const tabId = await getActiveTabId();
     if (tabId) await attachToTab(tabId);
@@ -440,9 +441,10 @@ async function pickElement(): Promise<{ ok: boolean; info?: any; error?: string 
         ...(elementInfo || {}),
       },
     };
-  } catch (e: any) {
-    if (e?.message?.includes('cancelled')) return { ok: false, error: 'cancelled' };
-    return { ok: false, error: e?.message ?? String(e) };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('cancelled')) return { ok: false, error: 'cancelled' };
+    return { ok: false, error: msg };
   }
 }
 
@@ -458,27 +460,31 @@ async function cancelPick(): Promise<{ ok: boolean }> {
 import { cdpEval, cdpCallFunctionOn } from './lib/sw-debugger-core';
 
 /** Format a CDP ObjectPreview into a readable string (similar to Node.js REPL output). */
-function formatCdpPreview(preview: any, depth = 0): string {
+interface CdpPreviewProp { name: string; type: string; value?: string; subtype?: string; valuePreview?: CdpPreviewObj }
+interface CdpPreviewEntry { key?: { description?: string; value?: string; type?: string }; value: { description?: string; value?: string; type?: string } }
+interface CdpPreviewObj { description?: string; subtype?: string; overflow?: boolean; properties?: CdpPreviewProp[]; entries?: CdpPreviewEntry[] }
+
+function formatCdpPreview(preview: CdpPreviewObj, depth = 0): string {
   if (!preview || !preview.properties) return preview?.description ?? '';
   const isArray = preview.subtype === 'array';
-  const props: any[] = preview.properties;
+  const props = preview.properties;
 
   // Promise: show "Promise" for pending, "Promise {<fulfilled>: value}" for resolved
   if (preview.description === 'Promise') {
-    const stateP = props.find((p: any) => p.name === '[[PromiseState]]');
+    const stateP = props.find(p => p.name === '[[PromiseState]]');
     const state = stateP?.value ?? 'pending';
     if (state === 'pending') return 'Promise';
-    const resultP = props.find((p: any) => p.name === '[[PromiseResult]]');
+    const resultP = props.find(p => p.name === '[[PromiseResult]]');
     const val = resultP?.type === 'string' ? `'${resultP.value}'`
       : resultP?.value !== undefined ? resultP.value : resultP?.type ?? '';
     return val ? `Promise {<${state}>: ${val}}` : `Promise {<${state}>}`;
   }
 
   // Map/Set: use entries field (key=>value for Map, value for Set)
-  const cdpEntries: any[] = preview.entries;
+  const cdpEntries = preview.entries;
   if (cdpEntries && cdpEntries.length > 0) {
     const isMap = preview.subtype === 'map';
-    const items = cdpEntries.map((e: any) => {
+    const items = cdpEntries.map(e => {
       const val = e.value?.description ?? e.value?.value ?? e.value?.type ?? '';
       if (isMap) {
         const key = e.key?.description ?? e.key?.value ?? e.key?.type ?? '';
@@ -495,7 +501,7 @@ function formatCdpPreview(preview: any, depth = 0): string {
     return preview.description ?? '';
   }
 
-  const entries = props.map((p: any) => {
+  const entries = props.map(p => {
     let val: string;
     if (p.type === 'string') val = `'${p.value}'`;
     else if (p.valuePreview && depth < 2) val = formatCdpPreview(p.valuePreview, depth + 1);
@@ -513,7 +519,7 @@ function formatCdpPreview(preview: any, depth = 0): string {
 
 async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isError: boolean; image?: string }> {
   try {
-    const r = await cdpEval(jsExpr, 'bridge');
+    const r = await cdpEval(jsExpr, 'bridge') as { type?: string; value?: unknown; description?: string; objectId?: string; preview?: CdpPreviewObj } | undefined;
     if (!r || r.type === 'undefined') return formatBridgeResult(undefined);
     if (r.type === 'string' || r.type === 'number' || r.type === 'boolean') return formatBridgeResult(r.value);
 
@@ -523,7 +529,7 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
       const fn = isMap
         ? 'function(){return [...this].map(([k,v])=>JSON.stringify(k)+" => "+JSON.stringify(v)).join(", ")}'
         : 'function(){return [...this].map(v=>JSON.stringify(v)).join(", ")}';
-      const res = await cdpCallFunctionOn(r.objectId, fn);
+      const res = await cdpCallFunctionOn(r.objectId, fn) as { result?: { value?: string } } | undefined;
       const inner = res?.result?.value ?? null;
       if (inner !== null) return formatBridgeResult(`${r.description} {${inner}}`);
     }
@@ -531,7 +537,7 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
     // Playwright Response: extract status + url via method calls
     if (r.objectId && /^Response\d*$/.test(r.description ?? '')) {
       const res = await cdpCallFunctionOn(r.objectId,
-        'function(){try{return this.status()+" "+this.url()}catch{return null}}');
+        'function(){try{return this.status()+" "+this.url()}catch{return null}}') as { result?: { value?: string } } | undefined;
       const summary = res?.result?.value;
       if (summary) return formatBridgeResult(`Response: ${summary}`);
     }
@@ -539,7 +545,7 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
     // Plain objects/arrays: use JSON.stringify for full nested representation
     if (r.objectId && (r.description === 'Object' || /^Array\(\d+\)$/.test(r.description ?? ''))) {
       const res = await cdpCallFunctionOn(r.objectId,
-        'function(){try{return JSON.stringify(this)}catch{return null}}');
+        'function(){try{return JSON.stringify(this)}catch{return null}}') as { result?: { value?: string } } | undefined;
       const json = res?.result?.value ?? null;
       if (json) return formatBridgeResult(json);
     }
@@ -547,8 +553,8 @@ async function executeBridgeExpr(jsExpr: string): Promise<{ text: string; isErro
     // Other objects (Date, RegExp, Promise, etc.): use description directly
     if (r.preview) return formatBridgeResult(formatCdpPreview(r.preview));
     return formatBridgeResult(r.description ?? 'Done');
-  } catch (e: any) {
-    return { text: e?.message ?? String(e), isError: true };
+  } catch (e: unknown) {
+    return { text: e instanceof Error ? e.message : String(e), isError: true };
   }
 }
 
@@ -676,8 +682,8 @@ async function handleBridgeCommand(msg: {
       const app = await ensureCrxApp();
       await app.context().tracing.start({ screenshots: true, snapshots: true });
       return { text: 'Tracing started', isError: false };
-    } catch (e: any) {
-      return { text: e?.message ?? String(e), isError: true };
+    } catch (e: unknown) {
+      return { text: e instanceof Error ? e.message : String(e), isError: true };
     }
   }
   if (cmd === 'tracing-stop') {
@@ -687,7 +693,7 @@ async function handleBridgeCommand(msg: {
       await app.context().tracing.stop({ path: tracePath });
       // Read trace from memfs and download via chrome.downloads
       const data = crx.fs.readFileSync(tracePath);
-      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as unknown as ArrayBufferLike);
       // Keep a copy for "View Trace" in browser
       lastTraceData = bytes;
       let binary = '';
@@ -702,8 +708,8 @@ async function handleBridgeCommand(msg: {
       const size = bytes.length;
       const sizeStr = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
       return { text: `Trace saved to Downloads/${filename} (${sizeStr})`, isError: false };
-    } catch (e: any) {
-      return { text: e?.message ?? String(e), isError: true };
+    } catch (e: unknown) {
+      return { text: e instanceof Error ? e.message : String(e), isError: true };
     }
   }
 
@@ -742,7 +748,7 @@ async function handleBridgeCommand(msg: {
 }
 
 // Expose for serviceWorker.evaluate() and VS Code CDP injection
-(self as any).handleBridgeCommand = handleBridgeCommand;
+globalThis.handleBridgeCommand = handleBridgeCommand;
 
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
@@ -750,7 +756,7 @@ async function handleBridgeCommand(msg: {
 let commandQueue: Promise<void> = Promise.resolve();
 
 // ── Handoff state for side panel ↔ popup transfer (#820) ──
-let handoffState: any = null;
+let handoffState: unknown = null;
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'bridge-command') {
@@ -799,7 +805,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const tracePath = `/tmp/trace-${Date.now()}.zip`;
       await app.context().tracing.stop({ path: tracePath });
       const data = crx.fs.readFileSync(tracePath);
-      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as unknown as ArrayBufferLike);
       lastTraceData = bytes;
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
@@ -897,4 +903,4 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
-(globalThis as any).attachToTab = attachToTab;
+globalThis.attachToTab = attachToTab;

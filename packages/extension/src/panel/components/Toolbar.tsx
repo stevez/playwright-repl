@@ -239,12 +239,11 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
 
     useEffect(() => {
         if (!chrome.runtime?.onMessage) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const listener = (msg: any) => {
-            if (msg.type === 'recorded-action') {
+        const listener = (msg: { type: string; action?: { pw: string; js: string } }) => {
+            if (msg.type === 'recorded-action' && msg.action) {
                 editorRef.current?.insertAtCursor(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
-            if (msg.type === 'recorded-fill-update') {
+            if (msg.type === 'recorded-fill-update' && msg.action) {
                 editorRef.current?.replaceLastInsert(editorMode === 'pw' ? msg.action.pw : msg.action.js);
             }
         };

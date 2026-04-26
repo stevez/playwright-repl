@@ -10,9 +10,15 @@ export default tseslint.config(
   {
     files: ["src/**/*.ts", "test/**/*.ts", "e2e/**/*.ts"],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "no-empty-pattern": "off",
+    },
+  },
+  {
+    files: ["types.d.ts"],
+    rules: {
+      "no-var": "off",
     },
   },
   {

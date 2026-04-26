@@ -45,7 +45,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       try {
         const obj = JSON.parse(val);
         if (obj && typeof obj === 'object' && '__image' in obj) {
-          return { text: '', image: `data:${(obj as any).mimeType};base64,${(obj as any).__image}`, isError: false };
+          const img = obj as { mimeType: string; __image: string };
+          return { text: '', image: `data:${img.mimeType};base64,${img.__image}`, isError: false };
         }
       } catch { /* not JSON — treat as plain text */ }
       return { text: val, isError: false };
@@ -55,8 +56,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       try {
         const s = await swCallFunctionOn(r.objectId,
           'function() { try { return JSON.stringify(this, null, 2); } catch(e) { return String(this); } }'
-        ) as any;
-        const val: string = s?.result?.value;
+        ) as { result?: { value?: string } };
+        const val = s?.result?.value;
         if (val) return { text: val, isError: false };
       } catch { /* fall through */ }
     }
@@ -74,8 +75,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       try {
         const raw = await withTimeout(swDebugEval(expr)) as { result?: CdpResult };
         return formatResult(raw?.result);
-      } catch (e: any) {
-        return { text: e?.message ?? String(e), isError: true };
+      } catch (e: unknown) {
+        return { text: e instanceof Error ? e.message : String(e), isError: true };
       }
     }
 
@@ -87,8 +88,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
   try {
     const raw = await withTimeout(swDebugEval(parsed.jsExpr)) as { result?: CdpResult };
     return formatResult(raw?.result);
-  } catch (e: any) {
-    return { text: e?.message ?? String(e), isError: true };
+  } catch (e: unknown) {
+    return { text: e instanceof Error ? e.message : String(e), isError: true };
   }
 }
 
@@ -142,7 +143,8 @@ export async function executeCommandForConsole(command: string): Promise<Console
     try {
       const obj = JSON.parse(val);
       if (obj && typeof obj === 'object' && '__image' in obj) {
-        return { text: '', image: `data:${(obj as any).mimeType};base64,${(obj as any).__image}` };
+        const img = obj as { mimeType: string; __image: string };
+        return { text: '', image: `data:${img.mimeType};base64,${img.__image}` };
       }
     } catch { /* not JSON — treat as plain text */ }
     return { text: val };

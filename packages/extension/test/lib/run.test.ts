@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockExecuteCommand = vi.fn();
 vi.mock('@/lib/bridge', () => ({
-    executeCommand: (...args: any[]) => mockExecuteCommand(...args),
+    executeCommand: (...args: unknown[]) => mockExecuteCommand(...args),
 }));
 
 const mockFilterResponse = vi.fn((text: string) => text);
@@ -38,13 +38,13 @@ const mockSwDebuggerDisable = vi.fn().mockResolvedValue(undefined);
 const mockSwDebugPause = vi.fn().mockResolvedValue(undefined);
 const mockOnDebugPaused = vi.fn();
 vi.mock('@/lib/sw-debugger', () => ({
-    swDebugEval: (...args: any[]) => mockSwDebugEval(...args),
-    swDebugEvalRaw: (...args: any[]) => mockSwDebugEvalRaw(...args),
-    swGetProperties: (...args: any[]) => mockSwGetProperties(...args),
-    swDebuggerEnable: (...args: any[]) => mockSwDebuggerEnable(...args),
-    swDebuggerDisable: (...args: any[]) => mockSwDebuggerDisable(...args),
-    swDebugPause: (...args: any[]) => mockSwDebugPause(...args),
-    onDebugPaused: (...args: any[]) => mockOnDebugPaused(...args),
+    swDebugEval: (...args: unknown[]) => mockSwDebugEval(...args),
+    swDebugEvalRaw: (...args: unknown[]) => mockSwDebugEvalRaw(...args),
+    swGetProperties: (...args: unknown[]) => mockSwGetProperties(...args),
+    swDebuggerEnable: (...args: unknown[]) => mockSwDebuggerEnable(...args),
+    swDebuggerDisable: (...args: unknown[]) => mockSwDebuggerDisable(...args),
+    swDebugPause: (...args: unknown[]) => mockSwDebugPause(...args),
+    onDebugPaused: (...args: unknown[]) => mockOnDebugPaused(...args),
     swDebugResume: vi.fn().mockResolvedValue(undefined),
     swDebugStepOver: vi.fn().mockResolvedValue(undefined),
     swDebugStepInto: vi.fn().mockResolvedValue(undefined),
@@ -54,9 +54,9 @@ vi.mock('@/lib/sw-debugger', () => ({
     swRemoveAllBreakpoints: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as any);
+const mockFromCdpRemoteObject = vi.fn((_obj: unknown) => ({ __type: 'string', v: 'mocked' }) as Record<string, unknown>);
 vi.mock('@/components/Console/cdpToSerialized', () => ({
-    fromCdpRemoteObject: (obj: any) => mockFromCdpRemoteObject(obj),
+    fromCdpRemoteObject: (obj: unknown) => mockFromCdpRemoteObject(obj),
 }));
 
 import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
@@ -64,7 +64,7 @@ import { runAndDispatch, runJsScript, runJsScriptStep } from '@/lib/run';
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function createDispatch() {
-    return vi.fn() as unknown as React.Dispatch<any> & ReturnType<typeof vi.fn>;
+    return vi.fn() as unknown as React.Dispatch<unknown> & ReturnType<typeof vi.fn>;
 }
 
 // ─── Setup ──────────────────────────────────────────────────────────────────

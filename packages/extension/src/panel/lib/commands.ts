@@ -177,7 +177,7 @@ function ser(v: unknown): string {
 }
 
 /** Build a JS expression that calls a page-script function in the SW context (where `page` is global) */
-function call(fn: any, ...args: unknown[]): string {
+function call(fn: (...args: unknown[]) => unknown, ...args: unknown[]): string {
   return `await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
 }
 
@@ -186,7 +186,7 @@ function call(fn: any, ...args: unknown[]): string {
  * then calls fn with the scoped locator as `page`.
  * First tries role-based scoping, then falls back to DOM proximity via locator.evaluate().
  */
-function callScoped(fn: any, inText: string, _targetText: string, ...args: unknown[]): string {
+function callScoped(fn: (...args: unknown[]) => unknown, inText: string, _targetText: string, ...args: unknown[]): string {
   // Try exact match first, then fall back to substring (consistent with actionByText)
   const anchorCode = `(async () => { const __e = page.getByText(${ser(inText)}, { exact: true }); return (await __e.count()) > 0 ? __e : page.getByText(${ser(inText)}); })()`;
   const fallbackCheck = `(await ${anchorCode}).first().evaluate((el) => {
@@ -379,7 +379,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   }
 
   // ── Verify css subcommand (verify-visible css ".sel", verify-element css ".sel") ─
-  const CSS_VERIFY: Record<string, any> = {
+  const CSS_VERIFY: Record<string, (...args: unknown[]) => unknown> = {
     'verify-visible': verifyCssVisible,
     'verify-element': verifyCssElement,
     'verify-no-element': verifyCssNoElement,
@@ -397,7 +397,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   // ── Legacy verify-* commands ────────────────────────────────
   const TEXT_VERIFY_CMDS = new Set(['verify-text', 'verify-no-text', 'verify-title', 'verify-url']);
   const ELEMENT_VERIFY_CMDS = new Set(['verify-element', 'verify-no-element', 'verify-visible']);
-  const verifyFns: Record<string, any> = {
+  const verifyFns: Record<string, (...args: unknown[]) => unknown> = {
     'verify-text': verifyText,
     'verify-element': verifyElement,
     'verify-visible': verifyVisible,
@@ -579,7 +579,7 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
   }
 
   // ── Text locators ───────────────────────────────────────────
-  const textFns: Record<string, any> = {
+  const textFns: Record<string, (...args: unknown[]) => unknown> = {
     click: actionByText, dblclick: actionByText, hover: actionByText,
     fill: fillByText, select: selectByText,
     check: checkByText, uncheck: uncheckByText,

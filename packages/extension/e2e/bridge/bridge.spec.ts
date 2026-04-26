@@ -209,7 +209,7 @@ test.describe("Bridge command tests", () => {
 
     test('tab-list returns valid JSON array with tab details', async ({ bridge }) => {
       const r = await bridge.run('tab-list');
-      const tabs = expectJSON(r) as any[];
+      const tabs = expectJSON(r) as Record<string, unknown>[];
       expect(Array.isArray(tabs)).toBe(true);
       expect(tabs.length).toBeGreaterThan(0);
       expect(tabs[0]).toHaveProperty('index');
@@ -219,19 +219,19 @@ test.describe("Bridge command tests", () => {
 
     test('tab-new opens a new tab and tab-close closes it', async ({ bridge, testUrl }) => {
       const r1 = await bridge.run('tab-list');
-      const before = (expectJSON(r1) as any[]).length;
+      const before = (expectJSON(r1) as unknown[]).length;
 
       const r = await bridge.run(`tab-new ${testUrl}?tab=new`);
       expectOk(r);
       const r2 = await bridge.run('tab-list');
-      const after = (expectJSON(r2) as any[]).length;
+      const after = (expectJSON(r2) as unknown[]).length;
       expect(after).toBe(before + 1);
 
       // Clean up: close the tab we just opened
       const r3 = await bridge.run(`tab-close ${after - 1}`);
       expectOk(r3);
       const r4 = await bridge.run('tab-list');
-      const final = (expectJSON(r4) as any[]).length;
+      const final = (expectJSON(r4) as unknown[]).length;
       expect(final).toBeLessThan(after);
     });
 

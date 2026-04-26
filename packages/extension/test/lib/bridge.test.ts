@@ -17,8 +17,8 @@ vi.mock('@/lib/settings', () => ({
 import { loadSettings } from '@/lib/settings';
 
 vi.mock('@/lib/commands', async (importOriginal) => {
-    const actual = await importOriginal() as any;
-    return { ...actual, parseReplCommand: vi.fn(actual.parseReplCommand) };
+    const actual = await importOriginal() as Record<string, unknown>;
+    return { ...actual, parseReplCommand: vi.fn(actual.parseReplCommand as ((...args: unknown[]) => unknown)) };
 });
 
 import { swDebugEval, swCallFunctionOn } from '@/lib/sw-debugger';

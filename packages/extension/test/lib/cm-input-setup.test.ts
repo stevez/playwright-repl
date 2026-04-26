@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock CodeMirror modules
 vi.mock('@codemirror/view', () => ({
-    EditorView: { theme: (spec: any) => spec },
-    keymap: { of: (bindings: any[]) => ({ bindings }) },
+    EditorView: { theme: (spec: unknown) => spec },
+    keymap: { of: (bindings: unknown[]) => ({ bindings }) },
     placeholder: (text: string) => ({ placeholder: text }),
     drawSelection: () => ({}),
 }));
@@ -15,7 +15,7 @@ vi.mock('@codemirror/commands', () => ({
 
 let completionStatusValue: string | null = null;
 vi.mock('@codemirror/autocomplete', () => ({
-    autocompletion: (opts: any) => opts,
+    autocompletion: (opts: unknown) => opts,
     acceptCompletion: 'acceptCompletion',
     completionStatus: () => completionStatusValue,
 }));
@@ -39,12 +39,12 @@ import { inputExtensions } from '@/lib/cm-input-setup';
 
 /** Create a minimal mock EditorView for keymap handler testing */
 function mockView(doc = '') {
-    const dispatched: any[] = [];
+    const dispatched: Array<Record<string, unknown>> = [];
     return {
         state: {
             doc: { toString: () => doc, length: doc.length },
         },
-        dispatch: (tr: any) => dispatched.push(tr),
+        dispatch: (tr: Record<string, unknown>) => dispatched.push(tr),
         _dispatched: dispatched,
     };
 }
@@ -53,8 +53,8 @@ function mockView(doc = '') {
 function getBindings(onSubmit: (cmd: string) => void) {
     const exts = inputExtensions(onSubmit);
     // First item is the custom keymap: { bindings: [...] }
-    const km = exts[0] as any;
-    return km.bindings as Array<{ key: string; run: (view: any) => boolean }>;
+    const km = exts[0] as unknown as { bindings: Array<{ key: string; run: (view: unknown) => boolean }> };
+    return km.bindings;
 }
 
 describe('cm-input-setup', () => {
@@ -135,7 +135,7 @@ describe('cm-input-setup', () => {
 
             expect(handled).toBe(true);
             expect(view._dispatched).toHaveLength(1);
-            expect(view._dispatched[0].changes.insert).toBe('snapshot');
+            expect((view._dispatched[0].changes as Record<string, unknown>).insert).toBe('snapshot');
         });
 
         it('does nothing when goUp returns undefined', () => {
@@ -173,7 +173,7 @@ describe('cm-input-setup', () => {
 
             expect(handled).toBe(true);
             expect(view._dispatched).toHaveLength(1);
-            expect(view._dispatched[0].changes.insert).toBe('goto url');
+            expect((view._dispatched[0].changes as Record<string, unknown>).insert).toBe('goto url');
         });
 
         it('replaces editor content with empty string from goDown', () => {
@@ -186,7 +186,7 @@ describe('cm-input-setup', () => {
 
             expect(handled).toBe(true);
             expect(view._dispatched).toHaveLength(1);
-            expect(view._dispatched[0].changes.insert).toBe('');
+            expect((view._dispatched[0].changes as Record<string, unknown>).insert).toBe('');
         });
 
         it('does nothing when goDown returns null/undefined', () => {

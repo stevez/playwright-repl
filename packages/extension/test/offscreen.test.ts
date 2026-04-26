@@ -26,7 +26,7 @@ class MockWebSocket {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('offscreen bridge', () => {
-  let onMessageListener: (msg: any) => void;
+  let onMessageListener: (msg: Record<string, unknown>) => void;
   let OriginalWebSocket: typeof WebSocket;
   let sendMessage: ReturnType<typeof vi.fn>;
 
@@ -38,17 +38,18 @@ describe('offscreen bridge', () => {
     sendMessage = vi.fn().mockResolvedValue(9876);
 
     // Mock chrome.runtime
-    (globalThis as any).chrome = {
+    const g = globalThis as unknown as Record<string, unknown>;
+    g.chrome = {
       runtime: {
         sendMessage,
         onMessage: {
-          addListener: vi.fn((fn: any) => { onMessageListener = fn; }),
+          addListener: vi.fn((fn: (msg: Record<string, unknown>) => void) => { onMessageListener = fn; }),
         },
       },
     };
 
     // Replace WebSocket
-    (globalThis as any).WebSocket = MockWebSocket;
+    g.WebSocket = MockWebSocket;
 
     // Import module (triggers side effects: get-bridge-port → connect)
     vi.resetModules();
@@ -167,13 +168,13 @@ describe('offscreen bridge', () => {
     sendMessage.mockResolvedValue(9999);
 
     let callCount = 0;
-    (globalThis as any).WebSocket = class ThrowingWS {
+    (globalThis as unknown as Record<string, unknown>).WebSocket = class ThrowingWS {
       constructor() {
         callCount++;
         if (callCount === 1) throw new Error('connection refused');
         // Second call succeeds — use MockWebSocket
         const inst = new MockWebSocket('ws://127.0.0.1:9999');
-        return inst as any;
+        return inst as unknown as ThrowingWS;
       }
     };
 
@@ -227,12 +228,12 @@ describe('offscreen bridge', () => {
     sendMessage.mockResolvedValue(0);
 
     let callCount = 0;
-    (globalThis as any).WebSocket = class ThrowingWS {
+    (globalThis as unknown as Record<string, unknown>).WebSocket = class ThrowingWS {
       constructor() {
         callCount++;
         if (callCount === 1) throw new Error('connection refused');
         const inst = new MockWebSocket('ws://127.0.0.1:7777');
-        return inst as any;
+        return inst as unknown as ThrowingWS;
       }
     };
 
@@ -289,7 +290,7 @@ describe('offscreen bridge', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     const call = sendMessage.mock.calls.find(
-      (c: any[]) => c[0]?.type === 'bridge-command' && c[0]?.command === 'click e5'
+      (c: unknown[]) => (c[0] as Record<string, unknown>)?.type === 'bridge-command' && (c[0] as Record<string, unknown>)?.command === 'click e5'
     );
     expect(call).toBeDefined();
     expect(call![0]).not.toHaveProperty('includeSnapshot');

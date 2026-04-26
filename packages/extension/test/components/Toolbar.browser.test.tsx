@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
 import Toolbar from '@/components/Toolbar';
+import type { EditorHandle } from '@/components/CodeMirrorEditorPane';
 
 // ─── Bridge mock ──────────────────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ describe('Toolbar component tests', () => {
       name: 'saved.pw',
       createWritable: vi.fn().mockResolvedValue(mockWritable),
     };
-    window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as any;
+    window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as typeof window.showSaveFilePicker;
 
     const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
     saveBtn.click();
@@ -181,7 +181,7 @@ describe('Toolbar component tests', () => {
     const dispatch = vi.fn();
     const screen = await renderToolbar({ editorContent: 'some content', dispatch });
 
-    window.showSaveFilePicker = vi.fn().mockRejectedValue(new Error('Disk full')) as any;
+    window.showSaveFilePicker = vi.fn().mockRejectedValue(new Error('Disk full')) as typeof window.showSaveFilePicker;
 
     const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
     saveBtn.click();
@@ -200,7 +200,7 @@ describe('Toolbar component tests', () => {
 
     const abortError = new Error('User cancelled');
     abortError.name = 'AbortError';
-    window.showSaveFilePicker = vi.fn().mockRejectedValue(abortError) as any;
+    window.showSaveFilePicker = vi.fn().mockRejectedValue(abortError) as typeof window.showSaveFilePicker;
 
     dispatch.mockClear();
     const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
@@ -423,7 +423,7 @@ describe('Toolbar component tests', () => {
   });
 
   it('should not record when chrome.tabs.query is unavailable', async () => {
-    window.chrome.tabs.query = null as any;
+    (window.chrome.tabs as unknown as Record<string, unknown>).query = null;
 
     const screen = await renderToolbar();
     await screen.getByRole('button', { name: 'Record' }).click();
@@ -454,13 +454,14 @@ describe('Toolbar component tests', () => {
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
     // Set up chrome.runtime.onMessage to capture the listener
-    const listeners: ((msg: any) => void)[] = [];
+    type MsgListener = (msg: Record<string, unknown>) => void;
+    const listeners: MsgListener[] = [];
     window.chrome.runtime.onMessage = {
-      addListener: vi.fn((fn: any) => listeners.push(fn)),
+      addListener: vi.fn((fn: MsgListener) => listeners.push(fn)),
       removeListener: vi.fn(),
-    } as any;
+    } as unknown as typeof chrome.runtime.onMessage;
 
-    await renderToolbar({ editorRef: editorRef as any });
+    await renderToolbar({ editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
 
     // Simulate a recorded-action message from content script
     for (const listener of listeners) {
@@ -480,7 +481,7 @@ describe('Toolbar component tests', () => {
     const insertAtCursor = vi.fn();
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
-    const screen = await renderToolbar({ editorContent: '', editorRef: editorRef as any });
+    const screen = await renderToolbar({ editorContent: '', editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
     await screen.getByRole('button', { name: 'Record' }).click();
 
     await vi.waitFor(() => {
@@ -493,7 +494,7 @@ describe('Toolbar component tests', () => {
     const insertAtCursor = vi.fn();
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
-    const screen = await renderToolbar({ editorContent: '# this is a comment\n\n# another', editorMode: 'pw', editorRef: editorRef as any });
+    const screen = await renderToolbar({ editorContent: '# this is a comment\n\n# another', editorMode: 'pw', editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
     await screen.getByRole('button', { name: 'Record' }).click();
 
     await vi.waitFor(() => {
@@ -506,7 +507,7 @@ describe('Toolbar component tests', () => {
     const insertAtCursor = vi.fn();
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
-    const screen = await renderToolbar({ editorContent: '// comment\n/* block */', editorMode: 'js', editorRef: editorRef as any });
+    const screen = await renderToolbar({ editorContent: '// comment\n/* block */', editorMode: 'js', editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
     await screen.getByRole('button', { name: 'Record' }).click();
 
     await vi.waitFor(() => {
@@ -519,7 +520,7 @@ describe('Toolbar component tests', () => {
     const insertAtCursor = vi.fn();
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
-    const screen = await renderToolbar({ editorContent: 'click "Submit"', editorMode: 'pw', editorRef: editorRef as any });
+    const screen = await renderToolbar({ editorContent: 'click "Submit"', editorMode: 'pw', editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
     await screen.getByRole('button', { name: 'Record' }).click();
 
     await vi.waitFor(() => {
@@ -533,7 +534,7 @@ describe('Toolbar component tests', () => {
     const insertAtCursor = vi.fn();
     const editorRef = { current: { insertAtCursor, replaceLastInsert: vi.fn() } };
 
-    const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js', editorRef: editorRef as any });
+    const screen = await renderToolbar({ editorContent: 'document.title', editorMode: 'js', editorRef: editorRef as unknown as React.RefObject<EditorHandle | null> });
     await screen.getByRole('button', { name: 'Record' }).click();
 
     await vi.waitFor(() => {
@@ -903,7 +904,7 @@ describe('Toolbar component tests', () => {
 
       const mockWritable = { write: vi.fn(), close: vi.fn() };
       const mockFileHandle = { name: 'commands.js', createWritable: vi.fn().mockResolvedValue(mockWritable) };
-      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as any;
+      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as typeof window.showSaveFilePicker;
 
       const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
       saveBtn.click();
@@ -920,7 +921,7 @@ describe('Toolbar component tests', () => {
 
       const mockWritable = { write: vi.fn(), close: vi.fn() };
       const mockFileHandle = { name: 'script.js', createWritable: vi.fn().mockResolvedValue(mockWritable) };
-      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as any;
+      window.showSaveFilePicker = vi.fn().mockResolvedValue(mockFileHandle) as typeof window.showSaveFilePicker;
 
       const saveBtn = screen.container.querySelector('#save-btn') as HTMLButtonElement;
       saveBtn.click();

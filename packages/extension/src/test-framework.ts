@@ -59,9 +59,9 @@ test.only = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?:
 };
 
 class SkipError extends Error { constructor() { super('SKIP'); this.name = 'SkipError'; } }
-test.skip = (nameOrCond: any, fnOrOpts?: any, maybeFn?: any) => {
+test.skip = (nameOrCond: string | boolean | undefined, fnOrOpts?: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
   if (typeof nameOrCond === 'string') {
-    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn;
+    const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
     currentSuite.tests.push({ name: nameOrCond, fn, only: false, skip: true });
   } else if (nameOrCond) {
     throw new SkipError();
@@ -79,30 +79,38 @@ test.describe = (name: string, fn: () => void) => {
   fn();
   currentSuite = parent;
 };
-(test.describe as any).configure = () => {};
-(test as any).fixme = (condOrName?: any, fn?: any) => {
+interface TestDescribeFn { (name: string, fn: () => void): void; configure: () => void; }
+(test.describe as TestDescribeFn).configure = () => {};
+
+interface TestExt {
+  fixme: (condOrName?: string | boolean, fn?: TestFn) => void;
+  slow: () => void;
+  info: () => { annotations: unknown[] };
+}
+const testExt = test as typeof test & TestExt;
+testExt.fixme = (condOrName?: string | boolean, fn?: TestFn) => {
   if (typeof condOrName === 'string') return test.skip(condOrName, fn);
   if (condOrName) throw new SkipError();
 };
-(test as any).slow = () => {};
-(test as any).info = () => ({ annotations: [] });
+testExt.slow = () => {};
+testExt.info = () => ({ annotations: [] });
 
 test.beforeAll = (fn: HookFn) => { currentSuite.beforeAll.push(fn); };
 test.afterAll = (fn: HookFn) => { currentSuite.afterAll.push(fn); };
 test.beforeEach = (fn: HookFn) => { currentSuite.beforeEach.push(fn); };
 test.afterEach = (fn: HookFn) => { currentSuite.afterEach.push(fn); };
 
-test.extend = (fixtures: Record<string, any>) => {
+test.extend = (fixtures: Record<string, unknown>) => {
   const extendedTest = (name: string, fnOrOpts: TestFn | Record<string, unknown>, maybeFn?: TestFn) => {
     const fn = typeof fnOrOpts === 'function' ? fnOrOpts : maybeFn!;
     currentSuite.tests.push({
       name, only: false, skip: false,
-      fn: async (baseFixtures: any) => {
+      fn: async (baseFixtures: Record<string, unknown>) => {
         const extended = { ...baseFixtures };
         for (const [key, fixtureFn] of Object.entries(fixtures)) {
           if (typeof fixtureFn === 'function') {
             await new Promise<void>((resolve, reject) => {
-              const useCallback = async (value: any) => {
+              const useCallback = async (value: unknown) => {
                 extended[key] = value;
                 resolve();
               };
@@ -113,7 +121,7 @@ test.extend = (fixtures: Record<string, any>) => {
             });
           }
         }
-        await fn(extended);
+        await fn(extended as { page: unknown; context: unknown; expect: unknown });
       },
     });
   };
@@ -125,9 +133,9 @@ test.extend = (fixtures: Record<string, any>) => {
   extendedTest.beforeEach = test.beforeEach;
   extendedTest.afterEach = test.afterEach;
   extendedTest.extend = test.extend;
-  extendedTest.fixme = (test as any).fixme;
-  extendedTest.slow = (test as any).slow;
-  extendedTest.info = (test as any).info;
+  extendedTest.fixme = testExt.fixme;
+  extendedTest.slow = testExt.slow;
+  extendedTest.info = testExt.info;
   return extendedTest;
 };
 
@@ -137,8 +145,9 @@ async function runSuite(
   suite: Suite, parentBeforeEach: HookFn[], parentAfterEach: HookFn[], prefix: string,
 ): Promise<TestResult[]> {
   const results: TestResult[] = [];
-  const _g = globalThis as any;
-  const fixtures = { page: _g.__proxyPage ?? _g.page, context: null, expect: _g.__proxyExpect ?? _g.expect };
+  const _g = globalThis as typeof globalThis & Record<string, unknown>;
+  const page = _g.__proxyPage ?? _g.page;
+  const fixtures = { page, context: null, expect: _g.__proxyExpect ?? _g.expect };
   const allBeforeEach = [...parentBeforeEach, ...suite.beforeEach];
   const allAfterEach = [...suite.afterEach, ...parentAfterEach];
 
@@ -152,9 +161,10 @@ async function runSuite(
     }
     const start = Date.now();
     try {
-      if (fixtures.page?.unrouteAll) {
-        try { await fixtures.page.unrouteAll({ behavior: 'wait' }); }
-        catch { await fixtures.page.unrouteAll(); }
+      const p = page as Record<string, unknown> | null | undefined;
+      if (p?.unrouteAll) {
+        try { await (p.unrouteAll as (opts?: unknown) => Promise<void>)({ behavior: 'wait' }); }
+        catch { await (p.unrouteAll as () => Promise<void>)(); }
       }
       for (const fn of allBeforeEach) await fn(fixtures);
       await Promise.race([
@@ -207,16 +217,16 @@ async function __runTests(): Promise<string> {
 
 function smartExpect(target: unknown): unknown {
   // In browser context, just use the real expect
-  const _g = globalThis as any;
+  const _g = globalThis as typeof globalThis & Record<string, unknown>;
   const realExpect = _g.__proxyExpect ?? _g.expect;
-  if (realExpect) return realExpect(target);
+  if (realExpect) return (realExpect as (target: unknown) => unknown)(target);
   throw new Error('expect() not available');
 }
 
 // ─── Install ───────────────────────────────────────────────────────────────
 
 export function installFramework() {
-  const _g = globalThis as any;
+  const _g = globalThis;
   _g.__test = test;
   _g.__expect = smartExpect;
   _g.__runTests = __runTests;
