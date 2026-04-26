@@ -710,7 +710,7 @@ function displayBridgeResult(result: EngineResult, silent: boolean): void {
     const outPath = path.join(outDir, `${prefix}-${Date.now()}${ext}`);
     const b64 = result.image.replace(/^data:[^;]+;base64,/, '');
     fs.writeFileSync(outPath, Buffer.from(b64, 'base64'));
-    if (!silent) console.log(`${isPdf ? 'PDF' : 'Screenshot'} saved to ${outPath}`);
+    console.log(`${isPdf ? 'PDF' : 'Screenshot'} saved to ${outPath}`);
   } else if (result.text) {
     const t = result.text.trim();
     if (!result.isError && (t.startsWith('{') || t.startsWith('['))) {
@@ -1067,7 +1067,7 @@ function waitForShutdown(log: (...args: unknown[]) => void): Promise<void> {
 /** Try to send --command via HTTP to an already-running --http server. */
 async function tryHttpCommand(command: string, port: number): Promise<boolean> {
   try {
-    const result = await new Promise<{ text?: string; isError?: boolean }>((resolve, reject) => {
+    const result = await new Promise<{ text?: string; image?: string; isError?: boolean }>((resolve, reject) => {
       const body = JSON.stringify({ command });
       const req = http.request({ hostname: '127.0.0.1', port, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
         let data = '';
@@ -1078,8 +1078,12 @@ async function tryHttpCommand(command: string, port: number): Promise<boolean> {
       req.write(body);
       req.end();
     });
-    const text = (result.text ?? '').replace(/^\s*\n+|\n+\s*$/g, '');
-    if (text) process.stdout.write(text + '\n');
+    if (result.image) {
+      displayBridgeResult(result as EngineResult, false);
+    } else {
+      const text = (result.text ?? '').replace(/^\s*\n+|\n+\s*$/g, '');
+      if (text) process.stdout.write(text + '\n');
+    }
     process.exit(result.isError ? 1 : 0);
   } catch (e: unknown) {
     const code = (e as NodeJS.ErrnoException).code;
