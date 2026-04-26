@@ -16,6 +16,7 @@ describe('CodeMirrorEditorPane component tests', () => {
                     editorMode={state.editorMode}
                     currentRunLine={state.currentRunLine}
                     lineResults={state.lineResults}
+                    inlineValues={new Map()}
                     dispatch={dispatch}
                 />
             </div>

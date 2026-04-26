@@ -78,6 +78,10 @@ declare namespace chrome {
   namespace action {
     const onClicked: { addListener: (callback: (tab: { id?: number; url?: string; windowId?: number }) => void) => void };
   }
+
+  namespace tabCapture {
+    function getMediaStreamId(options: { targetTabId?: number }): Promise<string>;
+  }
 }
 
 // ─── nextcov (no published types) ────────────────────────────────────────────

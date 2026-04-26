@@ -55,6 +55,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     breakPoints={new Set()}
     dispatch={vi.fn()}
     editorRef={editorRef}
+    onModeSwitch={vi.fn()}
     {...overrides}
   />);
 }

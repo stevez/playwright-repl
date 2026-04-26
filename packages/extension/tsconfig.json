@@ -10,9 +10,9 @@
     "noEmit": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
+    "types": ["chrome", "react", "react-dom", "js-yaml", "node"],
     "paths": {
-      "@/*": ["src/panel/*"]
+      "@/*": ["./src/panel/*"]
     }
   },
   "include": ["src", "test", "e2e", "types.d.ts"]
