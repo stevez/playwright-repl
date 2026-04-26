@@ -73,6 +73,7 @@ describe("background.ts message handlers", () => {
   let onActionClicked: (tab: { id?: number; windowId?: number }) => void;
   let onDebuggerDetach: (source: DebuggerTarget) => void;
   let onTabRemoved: (tabId: number) => void;
+  let onWebNavCommitted: (details: { tabId: number; frameId: number; transitionType: string; url?: string; transitionQualifiers?: string[] }) => void;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -133,6 +134,10 @@ describe("background.ts message handlers", () => {
     asMock(chrome.offscreen).hasDocument = vi.fn().mockResolvedValue(false);
     asMock(chrome.offscreen).createDocument = vi.fn().mockResolvedValue(undefined);
 
+    // webNavigation mock
+    const webNavCommittedListeners: typeof onWebNavCommitted[] = [];
+    asMock(chrome.webNavigation).onCommitted = { addListener: vi.fn((fn: typeof onWebNavCommitted) => webNavCommittedListeners.push(fn)) };
+
     // sidePanel mock
     asMock(chrome.sidePanel).setPanelBehavior = vi.fn().mockResolvedValue(undefined);
     asMock(chrome.sidePanel).open = vi.fn().mockResolvedValue(undefined);
@@ -148,6 +153,7 @@ describe("background.ts message handlers", () => {
     onActionClicked = actionListeners[0];
     onDebuggerDetach = detachListeners[0];
     onTabRemoved = tabRemovedListeners[0];
+    onWebNavCommitted = webNavCommittedListeners[0];
   });
 
   function sendMessage(msg: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -1376,5 +1382,94 @@ describe("background.ts message handlers", () => {
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Clicked');
     expect(result.text).not.toContain('### Snapshot');
+  });
+
+  // ─── navigation recording (#837) ──────────────────────────────────────────
+
+  it("records goto from onCommitted as cross-origin fallback", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'back_forward', url: 'https://example.com/' });
+
+    // Delayed fallback — wait for setTimeout
+    await new Promise(r => setTimeout(r, 200));
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action', action: { pw: 'goto "https://example.com/"', js: "await page.goto('https://example.com/');" } })
+    );
+  });
+
+  it("records goto for forward_back qualifier with reload type", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'reload', transitionQualifiers: ['forward_back'], url: 'https://example.com/' });
+
+    await new Promise(r => setTimeout(r, 200));
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action', action: { pw: 'goto "https://example.com/"', js: "await page.goto('https://example.com/');" } })
+    );
+  });
+
+  it("suppresses onCommitted back_forward when nav-handled received", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    // Content script handled via Navigation API
+    onMessageListener({ type: 'nav-handled' }, {}, () => {});
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'back_forward', url: 'https://example.com/' });
+
+    await new Promise(r => setTimeout(r, 200));
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action' })
+    );
+  });
+
+  it("records reload on reload navigation during recording", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'reload' });
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action', action: { pw: 'reload', js: 'await page.reload();' } })
+    );
+  });
+
+  it("does not record navigation when not recording", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    // Not recording — no record-start
+
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'back_forward' });
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action' })
+    );
+  });
+
+  it("ignores subframe navigations during recording", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    // frameId !== 0 means subframe
+    onWebNavCommitted({ tabId: 42, frameId: 1, transitionType: 'back_forward' });
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action' })
+    );
+  });
+
+  it("ignores link navigations during recording (handled by recorder)", async () => {
+    await sendMessage({ type: 'attach', tabId: 42 });
+    await sendMessage({ type: 'record-start' });
+
+    onWebNavCommitted({ tabId: 42, frameId: 0, transitionType: 'link' });
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'recorded-action' })
+    );
   });
 });

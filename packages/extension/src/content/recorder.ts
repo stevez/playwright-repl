@@ -101,7 +101,7 @@ function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; j
  * has been invalidated (e.g. extension reloaded), clean up event listeners
  * instead of throwing an uncaught error (#823).
  */
-function safeSendMessage(msg: { type: string; action?: { pw: string; js: string } }) {
+function safeSendMessage(msg: Record<string, unknown>) {
     try {
         chrome.runtime.sendMessage(msg);
     } catch {
@@ -258,6 +258,27 @@ export function init() {
 
     // Detect iframe context once on init
     framePath = detectFrameChain();
+
+    // Back/forward detection via Navigation API traverse event
+    type NavEntry = { index: number; url?: string };
+    type NavEvent = Event & { navigationType: string; destination: NavEntry };
+    type NavAPI = EventTarget & { currentEntry?: NavEntry };
+    const nav = (window as unknown as { navigation?: NavAPI }).navigation;
+    if (nav) {
+        // Same-origin back/forward: Navigation API traverse event (reliable direction)
+        nav.addEventListener('navigate', (e) => {
+            const evt = e as NavEvent;
+            if (evt.navigationType === 'traverse') {
+                if (evt.destination.index < (nav.currentEntry?.index ?? 0)) {
+                    safeSendMessage({ type: 'recorded-action', action: { pw: 'go-back', js: 'await page.goBack();' } });
+                } else {
+                    const url = evt.destination.url ?? '';
+                    safeSendMessage({ type: 'recorded-action', action: { pw: `goto "${url}"`, js: `await page.goto('${url}');` } });
+                }
+                safeSendMessage({ type: 'nav-handled' });
+            }
+        });
+    }
 
     chrome.runtime.onMessage.addListener(onMessage);
     document.addEventListener('click', onClickCapture, true);

@@ -296,6 +296,30 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
+// Capture navigation during recording:
+// - reload → emit reload
+// - cross-origin back/forward → emit go-back (as fallback; same-origin handled by Navigation API in recorder.ts)
+// Dedup: content script sends nav-handled when Navigation API traverse fires
+let lastNavHandledAt = 0;
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.tabId !== recordingTabId || details.frameId !== 0) return;
+  const qualifiers = details.transitionQualifiers ?? [];
+  const isBackForward = details.transitionType === 'back_forward' || qualifiers.includes('forward_back');
+  if (isBackForward) {
+    // Delay to let content script's nav-handled arrive first (same-origin handled by Navigation API)
+    const url = details.url;
+    setTimeout(() => {
+      if (Date.now() - lastNavHandledAt > 300) {
+        // Not handled by content script — cross-origin fallback using goto
+        chrome.runtime.sendMessage({ type: 'recorded-action', action: { pw: `goto "${url}"`, js: `await page.goto('${url}');` } }).catch(() => {});
+      }
+    }, 150);
+  } else if (details.transitionType === 'reload' && !qualifiers.includes('forward_back')) {
+    chrome.runtime.sendMessage({ type: 'recorded-action', action: { pw: 'reload', js: 'await page.reload();' } }).catch(() => {});
+  }
+});
+
 // Invalidate stale state when a tab is closed (user clicks X, tab-close command, etc.)
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === activeTabId) {
@@ -754,6 +778,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg.type === 'health')        { sendResponse({ ok: !!crxApp }); return false; }
+  if (msg.type === 'nav-handled')   { lastNavHandledAt = Date.now(); return; }
   if (msg.type === 'record-start')  { startRecording().then(sendResponse); return true; }
   if (msg.type === 'record-stop')   { stopRecording().then(sendResponse); return true; }
   if (msg.type === 'pick')           { pickElement().then(sendResponse); return true; }
