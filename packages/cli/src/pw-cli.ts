@@ -12,10 +12,12 @@
 
 import { startRepl } from './repl.js';
 import { minimist } from '@playwright-repl/core';
+import { SessionPlayer } from './recorder.js';
+import http from 'node:http';
 
 const args = minimist(process.argv.slice(2), {
   boolean: ['headed', 'headless', 'bridge', 'http', 'interactive', 'help'],
-  string: ['http-port', 'bridge-port', 'command'],
+  string: ['http-port', 'bridge-port', 'command', 'replay', 'variable'],
   alias: { h: 'help' },
 });
 
@@ -36,6 +38,39 @@ Examples:
   pw-cli "screenshot"
 `);
   process.exit(0);
+}
+
+// --replay: load .pw file, substitute variables, send commands via HTTP
+if (args.replay) {
+  const httpPort = args['http-port'] ? parseInt(args['http-port'] as string, 10) : 9223;
+  // Parse --variable args (string or string[])
+  const variables: Record<string, string> = {};
+  const varArgs = args.variable ? (Array.isArray(args.variable) ? args.variable : [args.variable]) as string[] : [];
+  for (const v of varArgs) {
+    const [key, ...rest] = v.split('=');
+    if (key && rest.length > 0) variables[key] = rest.join('=');
+  }
+  const commands = SessionPlayer.load(args.replay as string, Object.keys(variables).length > 0 ? variables : undefined);
+
+  let failed = false;
+  for (const cmd of commands) {
+    const result = await new Promise<{ text?: string; isError?: boolean }>((resolve, reject) => {
+      const body = JSON.stringify({ command: cmd });
+      const req = http.request({ hostname: '127.0.0.1', port: httpPort, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
+        let data = '';
+        res.on('data', (chunk: string) => data += chunk);
+        res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid response')); } });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    }).catch((e: Error) => ({ text: e.message, isError: true }));
+
+    const mark = result.isError ? '✗' : '✓';
+    console.log(`${mark} ${cmd}${result.isError && result.text ? ` — ${result.text}` : ''}`);
+    if (result.isError) { failed = true; break; }
+  }
+  process.exit(failed ? 1 : 0);
 }
 
 // If positional args given, treat as --http --command

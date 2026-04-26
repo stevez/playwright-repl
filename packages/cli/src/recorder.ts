@@ -126,12 +126,27 @@ export class SessionPlayer {
   /**
    * Load commands from a .pw file.
    */
-  static load(filename: string): string[] {
+  static load(filename: string, variables?: Record<string, string>): string[] {
     if (!fs.existsSync(filename)) {
       throw new Error(`File not found: ${filename}`);
     }
 
-    const content = fs.readFileSync(filename, 'utf-8');
+    let content = fs.readFileSync(filename, 'utf-8');
+
+    // Replace {{key}} placeholders with --variable key=value args
+    if (variables) {
+      for (const [key, value] of Object.entries(variables)) {
+        content = content.replaceAll(`{{${key}}}`, value);
+      }
+    }
+
+    // Check for unresolved variables
+    const unresolved = content.match(/\{\{(\w+)\}\}/g);
+    if (unresolved) {
+      const keys = [...new Set(unresolved.map(m => m.slice(2, -2)))];
+      throw new Error(`Missing variables: ${keys.join(', ')}. Use --variable key=value`);
+    }
+
     return content
       .split('\n')
       .map(line => line.trim())
@@ -142,9 +157,9 @@ export class SessionPlayer {
    * Create a player that yields commands one at a time.
    * Supports step-through mode where it pauses between commands.
    */
-  constructor(filename: string) {
+  constructor(filename: string, variables?: Record<string, string>) {
     this.filename = filename;
-    this.commands = SessionPlayer.load(filename);
+    this.commands = SessionPlayer.load(filename, variables);
   }
 
   get done(): boolean {
@@ -221,9 +236,9 @@ export class SessionManager {
 
   // ── Playback ───────────────────────────────────────────────────
 
-  startReplay(filename: string, step = false): SessionPlayer {
+  startReplay(filename: string, step = false, variables?: Record<string, string>): SessionPlayer {
     if (this.mode !== 'idle') throw new Error(`Cannot replay while ${this.mode}`);
-    this.#player = new SessionPlayer(filename);
+    this.#player = new SessionPlayer(filename, variables);
     this.#step = step;
     return this.#player;
   }

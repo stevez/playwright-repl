@@ -1,0 +1,12 @@
+# Rogers bill download
+# Navigate to MyRogers billing page and download bill PDFs
+# Requires: logged into rogers.com (bridge mode)
+#
+# Usage:
+#   replay skills/rogers/download-bill.pw --variable billing_period="January 24, 2026"
+
+goto https://www.rogers.com/consumer/self-serve/overview
+click "View your bill" --exact
+click "Save PDF"
+check "{{billing_period}}"
+click "Download bills"

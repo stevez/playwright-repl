@@ -266,13 +266,22 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   // ── Inline replay ──────────────────────────────────────────────
 
   if (line.startsWith('.replay')) {
-    const filename = line.split(/\s+/)[1];
+    const parts = line.split(/\s+/);
+    const filename = parts[1];
     if (!filename) {
-      console.log(`${c.yellow}Usage: .replay <filename>${c.reset}`);
+      console.log(`${c.yellow}Usage: .replay <filename> [--variable key=value ...]${c.reset}`);
       return;
     }
+    // Parse --variable key=value args
+    const variables: Record<string, string> = {};
+    for (let i = 2; i < parts.length; i++) {
+      if (parts[i] === '--variable' && parts[i + 1]) {
+        const [key, ...rest] = parts[++i].split('=');
+        if (key && rest.length > 0) variables[key] = rest.join('=');
+      }
+    }
     try {
-      const player = ctx.session.startReplay(filename);
+      const player = ctx.session.startReplay(filename, false, Object.keys(variables).length > 0 ? variables : undefined);
       console.log(`${c.blue}▶${c.reset} Replaying ${c.bold}${filename}${c.reset} (${player.commands.length} commands)\n`);
       while (!player.done) {
         const cmd = player.next()!;

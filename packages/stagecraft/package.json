@@ -1,0 +1,22 @@
+{
+  "name": "@playwright-repl/stagecraft",
+  "description": "Skill library and agent runtime for playwright-repl",
+  "version": "0.26.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "skills/"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@playwright-repl/core": "workspace:*"
+  },
+  "license": "ISC"
+}

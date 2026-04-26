@@ -226,6 +226,12 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  packages/stagecraft:
+    dependencies:
+      '@playwright-repl/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/vscode:
     dependencies:
       '@playwright-repl/browser-extension':
