@@ -120,8 +120,28 @@ export function flushPendingFill() {
 // ─── Event handlers (capture phase, transparent) ──────────────────────────
 
 export function onClickCapture(e: MouseEvent) {
-    const target = e.target as Element;
+    let target = e.target as Element;
     if (!target) return;
+
+    // Media elements (video/audio) are typically covered by player overlays —
+    // walk up to the nearest <a> with href for a unique URL-based locator
+    if (target.matches('video, audio')) {
+        const link = target.closest('a[href]') as HTMLAnchorElement | null;
+        if (link) {
+            // Strip tracking params — keep path + first query param for stable matching
+            let href = link.getAttribute('href') || '';
+            const ampIdx = href.indexOf('&');
+            if (ampIdx > 0) href = href.slice(0, ampIdx);
+            if (href) {
+                const cmds = {
+                    pw: `click link "${href}"`,
+                    js: `await page.locator('a[href^="${href}"]:not([aria-hidden="true"])').click();`,
+                };
+                safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
+                return;
+            }
+        }
+    }
 
     // Skip clicks on text fields (focus-click noise before fill)
     if (isTextField(target)) return;

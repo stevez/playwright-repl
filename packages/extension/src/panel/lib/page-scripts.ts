@@ -20,7 +20,7 @@ export async function verifyText(page, text) {
 export async function verifyElement(page, role, name) {
   // Link with URL: match by href instead of accessible name
   const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
-  const loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, { name });
+  const loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, { name });
   if (await loc.count() === 0)
     throw new Error('Element not found: ' + role + ' "' + name + '"');
 }
@@ -254,7 +254,7 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
   // Link with URL: match by href instead of accessible name
   const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
   const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
-  let loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
+  let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
@@ -319,7 +319,7 @@ export async function highlightByRole(page, role, name, nth, inRole?, inText?) {
   // Link with URL: match by href instead of accessible name
   const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
   const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
-  let loc = isUrl ? page.locator('a[href="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
+  let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
     loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
@@ -363,9 +363,29 @@ export async function clearHighlight(page) {
 // ─── Chaining (>> selectors) ────────────────────────────────────────────────
 
 export async function chainAction(page, selector, action, value) {
-  const loc = page.locator(selector);
-  if (value !== undefined) await loc[action](value);
-  else await loc[action]();
+  let loc = page.locator(selector);
+  // If multiple matches, try filtering to avoid strict violation:
+  // 1. Exclude aria-hidden elements
+  // 2. Filter to visible elements only
+  // 3. Fall back to first match
+  if (await loc.count() > 1) {
+    const noHidden = page.locator(selector + ':not([aria-hidden="true"])');
+    if (await noHidden.count() === 1) { loc = noHidden; }
+    else {
+      const visible = loc.filter({ visible: true });
+      const vc = await visible.count();
+      if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+      else loc = loc.first();
+    }
+  }
+  try {
+    if (value !== undefined) await loc[action](value);
+    else await loc[action]();
+  } catch {
+    // Retry with force for covered elements (e.g. YouTube video player overlay)
+    if (value !== undefined) await loc[action](value, { force: true });
+    else await loc[action]({ force: true });
+  }
   return 'Done';
 }
 
