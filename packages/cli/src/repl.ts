@@ -5,16 +5,14 @@
  */
 
 import readline from 'node:readline';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import http from 'node:http';
-import url from 'node:url';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   BridgeServer, CDPRelayServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
-  filterResponse as filterResponseBase, resolveArgs,
+  filterResponse as filterResponseBase, resolveArgs, resolveCommand,
   isLocalCommand, handleLocalCommand,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
@@ -853,33 +851,6 @@ async function runBridgeReplayMode(opts: ReplOpts, srv: BridgeServer): Promise<v
 
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-interface RelayDeps {
-  BrowserBackend: new (config: any, browserContext: any, tools: any[]) => any;
-  browserTools: any[];
-  resolveConfig: (config: any) => Promise<any> | any;
-  commands: Record<string, any>;
-  parseCommand: (command: any, args: any) => { toolName: string; toolParams: Record<string, any> };
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
-
-let _relayDeps: RelayDeps | undefined;
-
-function loadRelayDeps(): RelayDeps {
-  if (_relayDeps) return _relayDeps;
-  const require = createRequire(import.meta.url);
-  const pwCoreDir = path.dirname(require.resolve('playwright-core/package.json'));
-  const pwCoreReq = (sub: string) => require(path.join(pwCoreDir, sub));
-  _relayDeps = {
-    BrowserBackend:  pwCoreReq('lib/tools/backend/browserBackend.js').BrowserBackend,
-    browserTools:    pwCoreReq('lib/tools/backend/tools.js').browserTools,
-    resolveConfig:   pwCoreReq('lib/tools/mcp/config.js').resolveConfig,
-    commands:        pwCoreReq('lib/tools/cli-daemon/commands.js').commands,
-    parseCommand:    pwCoreReq('lib/tools/cli-daemon/command.js').parseCommand,
-  };
-  return _relayDeps;
-}
-
 function isRelayExpression(code: string): boolean {
   const trimmed = code.trim();
   if (trimmed.includes('\n')) return false;
@@ -896,42 +867,23 @@ function formatRelayResult(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
-function formatToolResult(result: { content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; isError?: boolean }): { text: string; isError: boolean } {
-  let text = '';
-  for (const item of result.content) {
-    if (item.type === 'text' && !text) text = item.text || '';
-  }
-  return { text: text || 'Done', isError: !!result.isError };
-}
-
 async function relayExec(
   command: string,
   page: any,
   context: any,
   expect: any,
-  backend: any,
 ): Promise<{ text: string; isError: boolean }> {
   const trimmed = command.trim();
 
-  // Keyword command → resolve args + BrowserBackend
-  const parsed = parseInput(trimmed);
-  if (parsed) {
-    const deps = loadRelayDeps();
-    const cmdName = parsed._[0];
-    if (cmdName && cmdName in deps.commands) {
-      // resolveArgs transforms role-based, text-based, verify, etc. into run-code
-      const resolved = resolveArgs(parsed);
-      const resolvedCmd = deps.commands[resolved._[0]];
-      if (!resolvedCmd) return { text: `Command "${resolved._[0]}" not supported in relay mode.`, isError: true };
-      const { toolName, toolParams } = deps.parseCommand(resolvedCmd, resolved);
-      if (!toolName) return { text: `Command "${cmdName}" not supported in relay mode.`, isError: true };
-      toolParams._meta = { cwd: process.cwd() };
-      try {
-        const response = await backend.callTool(toolName, toolParams);
-        return formatToolResult(response);
-      } catch (e: unknown) {
-        return { text: e instanceof Error ? e.message : String(e), isError: true };
-      }
+  // Keyword command → resolveCommand → jsExpr → direct execution
+  const resolved = resolveCommand(trimmed);
+  if (resolved) {
+    try {
+      const fn = new AsyncFn('page', 'context', 'expect', resolved.jsExpr);
+      const result = await fn(page, context, expect);
+      return { text: formatRelayResult(result), isError: false };
+    } catch (e: unknown) {
+      return { text: e instanceof Error ? e.message : String(e), isError: true };
     }
   }
 
@@ -948,16 +900,113 @@ async function relayExec(
   }
 }
 
-// ─── Relay REPL loop ────────────────────────────────────────────────────────
+// ─── Relay replay mode ──────────────────────────────────────────────────────
 
-async function startRelayLoop(
+async function runRelayReplayMode(
   opts: ReplOpts,
-  relay: CDPRelayServer,
+  relay: CDPRelayServer | null,
   browser: any,
   page: any,
   context: any,
   expect: any,
-  backend: any,
+): Promise<void> {
+  const silent = opts.silent || false;
+  const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
+
+  const files = resolveReplayFiles(opts.replay!, ['.pw', '.js']);
+  if (files.length === 0) {
+    console.error(`${c.red}Error:${c.reset} No .pw or .js files found`);
+    await browser.close().catch(() => {});
+    if (relay) await relay.close();
+    process.exit(1);
+  }
+
+  const results: { file: string; passed: boolean; commands: number; error?: string }[] = [];
+  const totalStart = performance.now();
+
+  if (files.length > 1) log(`${c.blue}▶${c.reset} Running ${c.bold}${files.length}${c.reset} files\n`);
+
+  for (const file of files) {
+    const basename = path.basename(file);
+    const commands = loadReplayFile(file);
+    const prefixed = files.length > 1;
+
+    if (prefixed) log(`${c.blue}▶${c.reset} ${c.bold}${basename}${c.reset}`);
+    else log(`${c.blue}▶${c.reset} Replaying ${c.bold}${file}${c.reset} (${commands.length} commands)\n`);
+
+    const fileStart = performance.now();
+    let commandsRun = 0;
+    let passed = true;
+    let errorMsg: string | undefined;
+
+    for (const cmd of commands) {
+      commandsRun++;
+      const indent = prefixed ? '  ' : '';
+      log(`${indent}${c.dim}[${commandsRun}/${commands.length}]${c.reset} ${cmd}`);
+
+      const startTime = performance.now();
+      const result = await relayExec(cmd, page, context, expect);
+      const elapsed = (performance.now() - startTime).toFixed(0);
+
+      if (result.text && result.text !== 'Done') {
+        log(`${indent}${result.isError ? `${c.red}${result.text}${c.reset}` : result.text}`);
+      }
+      log(`${indent}${c.dim}(${elapsed}ms)${c.reset}`);
+
+      if (result.isError) {
+        passed = false;
+        errorMsg = `failed at [${commandsRun}/${commands.length}]: ${cmd}`;
+        break;
+      }
+
+      if (opts.step && commandsRun < commands.length) {
+        await new Promise<void>((resolve) => {
+          process.stdout.write(`${c.dim}  Press Enter to continue...${c.reset}`);
+          process.stdin.once('data', () => { process.stdout.write('\r\x1b[K'); resolve(); });
+        });
+      }
+    }
+
+    const fileElapsed = ((performance.now() - fileStart) / 1000).toFixed(1);
+    if (prefixed) {
+      const status = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
+      log(`  ${status} ${basename} ${c.dim}(${fileElapsed}s)${c.reset}\n`);
+    } else if (passed) {
+      log(`\n${c.green}✓${c.reset} Replay complete`);
+    }
+
+    results.push({ file: basename, passed, commands: commandsRun, error: errorMsg });
+  }
+
+  // Multi-file summary
+  if (files.length > 1) {
+    const totalElapsed = ((performance.now() - totalStart) / 1000).toFixed(1);
+    const passCount = results.filter(r => r.passed).length;
+    const failCount = results.filter(r => !r.passed).length;
+
+    log(`${c.bold}─── Results ───${c.reset}`);
+    for (const r of results) {
+      const icon = r.passed ? `${c.green}✓${c.reset}` : `${c.red}✗${c.reset}`;
+      log(`  ${icon} ${r.file}${r.error ? ` — ${r.error}` : ''}`);
+    }
+    log(`\n${passCount} passed, ${failCount} failed (${results.length} total, ${totalElapsed}s)`);
+  }
+
+  await browser.close().catch(() => {});
+  if (relay) await relay.close();
+  const failCount = results.filter(r => !r.passed).length;
+  process.exit(failCount > 0 ? 1 : 0);
+}
+
+// ─── Relay REPL loop ────────────────────────────────────────────────────────
+
+async function startRelayLoop(
+  opts: ReplOpts,
+  relay: CDPRelayServer | null,
+  browser: any,
+  page: any,
+  context: any,
+  expect: any,
 ): Promise<void> {
   const silent = opts.silent || false;
   const log = (...args: unknown[]) => { if (!silent) console.log(...args); };
@@ -999,7 +1048,7 @@ async function startRelayLoop(
     // Meta-commands
     if (command === '.exit' || command === '.quit') {
       await browser.close().catch(() => {});
-      await relay.close();
+      if (relay) await relay.close();
       process.exit(0);
     }
     if (command === '.clear') { console.clear(); return; }
@@ -1011,7 +1060,7 @@ async function startRelayLoop(
     } catch { /* ignore */ }
 
     const startTime = performance.now();
-    const result = await relayExec(command, page, context, expect, backend);
+    const result = await relayExec(command, page, context, expect);
     const elapsed = (performance.now() - startTime).toFixed(0);
     if (result.text) {
       // Pass command name so filterResponse keeps the right sections
@@ -1039,7 +1088,7 @@ async function startRelayLoop(
   rl.on('line', (line: string) => { commandQueue.push(line); processQueue(); });
   rl.on('close', async () => {
     await browser.close().catch(() => {});
-    await relay.close();
+    if (relay) await relay.close();
     process.exit(0);
   });
   rl.on('SIGINT', () => {
@@ -1374,56 +1423,63 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
   // ─── Relay-only mode ───────────────────────────────────────────────
 
   if (opts.relay && !opts.bridge) {
-    const relay = new CDPRelayServer();
-    await relay.start();
-    log(`CDP relay listening on ${relay.cdpEndpoint()}`);
-    log(`Extension endpoint: ${relay.relayEndpoint()}`);
-    log('Waiting for extension to connect...');
-    await relay.waitForExtension(30000);
-    log(`${c.green}✓${c.reset} Extension connected`);
-
-    // Connect Playwright via CDP
     const dynamicImport = Function('m', 'return import(m)') as (m: string) => Promise<any>;
     const { chromium } = await dynamicImport('playwright');
     const { expect: pwExpect } = await dynamicImport('@playwright/test').catch(() => ({ expect: undefined }));
-    const browser = await chromium.connectOverCDP(relay.cdpEndpoint());
-    const relayCtx = browser.contexts()[0];
-    const relayPage = relayCtx.pages()[0];
-    if (!relayPage) {
-      console.error(`${c.red}✗${c.reset} No page found — make sure a tab is open in Chrome`);
-      await relay.close();
-      process.exit(1);
+
+    let browser: any;
+    let relayCtx: any;
+    let relayPage: any;
+    let relay: CDPRelayServer | null = null;
+
+    const headless = opts.headed === false; // explicit --headless
+
+    if (!headless) {
+      // Headed (default): connect to existing Chrome via extension + CDP relay
+      relay = new CDPRelayServer();
+      await relay.start();
+      log(`CDP relay listening on ${relay.cdpEndpoint()}`);
+      log(`Extension endpoint: ${relay.relayEndpoint()}`);
+      log('Waiting for extension to connect...');
+      await relay.waitForExtension(30000);
+      log(`${c.green}✓${c.reset} Extension connected`);
+      browser = await chromium.connectOverCDP(relay.cdpEndpoint());
+      relayCtx = browser.contexts()[0];
+      relayPage = relayCtx.pages()[0];
+      if (!relayPage) {
+        console.error(`${c.red}✗${c.reset} No page found — make sure a tab is open in Chrome`);
+        await relay.close();
+        process.exit(1);
+      }
+    } else {
+      // Headless: launch browser directly — no extension needed
+      log(`${c.dim}Launching headless browser...${c.reset}`);
+      browser = await chromium.launch({ headless: true });
+      relayCtx = await browser.newContext();
+      relayPage = await relayCtx.newPage();
     }
+
     log(`${c.green}✓${c.reset} Connected to page: ${relayPage.url()}`);
 
-    // Create BrowserBackend for keyword command support
-    const deps = loadRelayDeps();
-    const relayConfig = await deps.resolveConfig({
-      browser: { browserName: 'chromium', launchOptions: {}, contextOptions: { viewport: null }, isolated: false },
-      server: {},
-      network: {},
-      timeouts: { action: 5000, navigation: 15000 },
-    });
-    const relayBackend = new deps.BrowserBackend(relayConfig, relayCtx, deps.browserTools);
-    const cwd = process.cwd();
-    await relayBackend.initialize?.({
-      name: 'playwright-repl',
-      version: replVersion,
-      cwd,
-      roots: [{ uri: url.pathToFileURL(cwd).href, name: 'cwd' }],
-      timestamp: Date.now(),
-    });
+    const cleanup = async () => {
+      await browser.close().catch(() => {});
+      if (relay) await relay.close();
+    };
 
     if (opts.command) {
-      const result = await relayExec(opts.command, relayPage, relayCtx, pwExpect, relayBackend);
+      const result = await relayExec(opts.command, relayPage, relayCtx, pwExpect);
       if (result.text) process.stdout.write(result.text + '\n');
-      await browser.close().catch(() => {});
-      await relay.close();
+      await cleanup();
       process.exit(result.isError ? 1 : 0);
     }
 
+    if (opts.replay && opts.replay.length > 0) {
+      await runRelayReplayMode(opts, relay, browser, relayPage, relayCtx, pwExpect);
+      return;
+    }
+
     log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
-    await startRelayLoop(opts, relay, browser, relayPage, relayCtx, pwExpect, relayBackend);
+    await startRelayLoop(opts, relay, browser, relayPage, relayCtx, pwExpect);
     return;
   }
 

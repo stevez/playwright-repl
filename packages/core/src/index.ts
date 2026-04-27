@@ -23,6 +23,8 @@ export type { CommandInfo } from './resolve.js';
 export { parseSnapshot, refToLocator, allRefLocators } from './snapshot-parser.js';
 export type { SnapshotNode, LocatorResult, RefLocatorEntry } from './snapshot-parser.js';
 export { isLocalCommand, handleLocalCommand, isVideoCommand, handleVideoCommand, isTracingCommand, handleTracingCommand } from './local-commands.js';
+export { resolveCommand } from './resolve-command.js';
+export type { ResolvedCommand } from './resolve-command.js';
 export type { LocalCommandResult } from './local-commands.js';
 export { buildSystemPrompt, buildUserMessage, buildGrammarReference } from './prompt-builder.js';
 export type { PromptContext, PromptOptions } from './prompt-builder.js';
