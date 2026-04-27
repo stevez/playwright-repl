@@ -107,8 +107,14 @@ async function ensureOffscreen() {
 // Web Store installs: always create offscreen doc (auto-connect to bridge).
 // Development installs (--load-extension): only create if bridgePort was previously
 // configured, to avoid connecting to a real bridge during CLI/tests/VS Code.
-// Always create offscreen document — needed for both bridge and CDP relay connections
-ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+chrome.management.getSelf().then(async (info) => {
+  if (info.installType === 'normal') {
+    ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  } else {
+    const { bridgePort } = await chrome.storage.local.get(['bridgePort']);
+    if (bridgePort) ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
+  }
+});
 
 // Re-check offscreen doc periodically — Chrome may kill it after idle.
 chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
