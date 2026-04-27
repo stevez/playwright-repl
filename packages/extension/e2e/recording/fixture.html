@@ -32,6 +32,27 @@
         <li class="todo-item"><span>only item</span><button class="destroy">Delete</button></li>
     </ul>
 
+    <!-- Same-row selects: two selects in one row, each in its own cell (#800) -->
+    <h2>Same-Cell Select</h2>
+    <table border="1" cellpadding="5">
+        <tr class="Attribut1">
+            <td>
+                <span>Select*</span>
+                <select name="select1" id="select1">
+                    <option value="value1">Value 1</option>
+                    <option value="value2">Value 2</option>
+                </select>
+            </td>
+            <td>
+                <span>Select/Type*</span>
+                <select name="select2" id="select2">
+                    <option value="type1">Type 1</option>
+                    <option value="type2">Type 2</option>
+                </select>
+            </td>
+        </tr>
+    </table>
+
     <!-- Legacy table form: labels in adjacent cells, no <label> association (#768) -->
     <h2>Legacy Form</h2>
     <table border="1" cellpadding="5">

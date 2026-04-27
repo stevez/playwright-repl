@@ -59,6 +59,26 @@
     <li>Clean house <input type="checkbox" aria-label="Clean house"></li>
   </ul>
 
+  <!-- Same-row selects: two selects in one <tr>, each in its own <td> (#800) -->
+  <table border="1" cellpadding="5">
+    <tr class="Attribut1">
+      <td>
+        <span>Select*</span>
+        <select name="select1" id="select1">
+          <option value="value1">Value 1</option>
+          <option value="value2">Value 2</option>
+        </select>
+      </td>
+      <td>
+        <span>Select/Type*</span>
+        <select name="select2" id="select2">
+          <option value="type1">Type 1</option>
+          <option value="type2">Type 2</option>
+        </select>
+      </td>
+    </tr>
+  </table>
+
   <!-- Duplicate sections for --in text-only tests -->
   <fieldset>
     <legend>Billing Address</legend>

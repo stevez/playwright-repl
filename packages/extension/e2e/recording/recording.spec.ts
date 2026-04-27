@@ -102,6 +102,20 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('click');
     });
 
+    test('selecting from second combobox in same row records correct locator (#800)', async ({ sidePanel, testPage }) => {
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.locator('#select2').selectOption('type2');
+
+      await sidePanel.waitForEditorText('select');
+      const editorText = await sidePanel.getEditorText();
+      // Should use the informal label from the same cell, not CSS or the wrong label
+      expect(editorText).toContain('"Select/Type*"');
+      expect(editorText).toContain('"Type 2"');
+      expect(editorText).not.toContain('css');
+    });
+
     test('filling input in legacy table form uses informal label (#768)', async ({ sidePanel, testPage }) => {
       await sidePanel.startRecording();
 

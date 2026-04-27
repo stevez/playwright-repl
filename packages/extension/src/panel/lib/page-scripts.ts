@@ -163,7 +163,7 @@ export async function fillByText(page, text, value, nth?, exact?) {
     // Informal label fallback: find text, walk up DOM to locate a nearby input
     if (await loc.count() === 0) {
       const sel = await page.getByText(text).first().evaluate((el: Element) => {
-        let a: Element | null = el.closest('tr') || el.parentElement;
+        let a: Element | null = el.closest('td, th') || el.closest('tr') || el.parentElement;
         while (a && a !== document.body) {
           const inp = a.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, [contenteditable="true"]');
           if (inp) {
@@ -195,7 +195,7 @@ export async function selectByText(page, text, value, nth?, exact?) {
     // Informal label fallback: find text, walk up DOM to locate a nearby select
     if (await loc.count() === 0) {
       const sel = await page.getByText(text).first().evaluate((el: Element) => {
-        let a: Element | null = el.closest('tr') || el.parentElement;
+        let a: Element | null = el.closest('td, th') || el.closest('tr') || el.parentElement;
         while (a && a !== document.body) {
           const s = a.querySelector('select');
           if (s) {

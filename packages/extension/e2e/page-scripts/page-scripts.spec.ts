@@ -201,6 +201,15 @@ test.describe('selectByText', () => {
         await selectByText(page, 'Size', 'l', undefined);
         expect(await page.inputValue('#size-select')).toBe('l');
     });
+
+    test('informal label picks same-cell select, not first in row (#800)', async ({ page }) => {
+        // Two selects in the same <tr>, each in its own <td> with a label span.
+        // selectByText("Select/Type*") must find select2 (same cell), not select1.
+        await selectByText(page, 'Select/Type*', 'type2', undefined);
+        expect(await page.inputValue('#select2')).toBe('type2');
+        // select1 must remain unchanged
+        expect(await page.inputValue('#select1')).toBe('value1');
+    });
 });
 
 test.describe('checkByText / uncheckByText', () => {
