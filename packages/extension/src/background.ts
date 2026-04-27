@@ -962,13 +962,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'cdp-command') {
     const { method, params, sessionId } = msg as { type: string; method: string; params?: unknown; sessionId?: string };
     const debuggerSession = { tabId: globalThis.__cdpRelayTabId!, sessionId } as chrome.debugger.Debuggee;
-    console.debug('[cdp-relay] →', method, JSON.stringify(params ?? {}).slice(0, 100));
     chrome.debugger.sendCommand(debuggerSession, method, params as Record<string, unknown>, (result) => {
       if (chrome.runtime.lastError) {
-        console.debug('[cdp-relay] ✗', method, chrome.runtime.lastError.message);
         sendResponse({ error: chrome.runtime.lastError.message });
       } else {
-        console.debug('[cdp-relay] ✓', method);
         sendResponse({ result });
       }
     });

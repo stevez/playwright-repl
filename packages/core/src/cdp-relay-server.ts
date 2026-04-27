@@ -181,12 +181,10 @@ export class CDPRelayServer {
 
     private async _handlePlaywrightMessage(message: CDPCommand) {
         const { id, sessionId, method, params } = message;
-        console.error(`[cdp-relay] ← PW: ${method} (id=${id})`);
         try {
             const result = await this._handleCDPCommand(method, params, sessionId);
             this._sendToPlaywright({ id, sessionId, result });
         } catch (e) {
-            console.error(`[cdp-relay] ✗ ${method}: ${(e as Error).message}`);
             this._sendToPlaywright({ id, sessionId, error: { message: (e as Error).message } });
         }
     }
@@ -250,7 +248,6 @@ export class CDPRelayServer {
         };
 
         this._extensionConnection.onmessage = (method, params) => {
-            console.error(`[cdp-relay] ← EXT: ${method}`, (params as { method?: string })?.method || '');
             if (method === 'forwardCDPEvent') {
                 const p = params as { method: string; sessionId?: string; params?: unknown };
                 this._sendToPlaywright({

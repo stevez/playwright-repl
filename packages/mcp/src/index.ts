@@ -8,6 +8,7 @@ import pkg from '../package.json' with { type: 'json' };
 import { createBridgeRunner } from './bridge.js';
 import { createEvaluateRunner } from './evaluate.js';
 import { createStandaloneRunner } from './standalone.js';
+import { createRelayRunner } from './relay.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, logHttp, LOG_FILE } from './logger.js';
 import type { Runner } from './types.js';
 // ─── Process exit handlers — log why the process dies ───────────────────────
@@ -37,12 +38,15 @@ process.on('exit', (code) => {
 
 const argv = process.argv.slice(2);
 const standalone = argv.includes('--standalone');
+const relay = argv.includes('--relay');
 const headed = argv.includes('--headed');
 
 // ─── Create runner ───────────────────────────────────────────────────────────
 
 let runnerModule;
-if (standalone) {
+if (relay) {
+    runnerModule = await createRelayRunner(argv);
+} else if (standalone) {
     // Try evaluate mode (extension + JS support), fall back to Engine (keyword only)
     try {
         runnerModule = await createEvaluateRunner(argv);
@@ -55,7 +59,8 @@ if (standalone) {
 
 const { runner, descriptions } = runnerModule;
 
-logStartup(standalone ? 'standalone' : 'bridge', `log → ${LOG_FILE}`);
+const mode = relay ? 'relay' : standalone ? 'standalone' : 'bridge';
+logStartup(mode, `log → ${LOG_FILE}`);
 
 // ─── HTTP server for --command --http piggybacking ──────────────────────────
 
