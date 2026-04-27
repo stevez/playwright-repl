@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 interface MockPage {
   url: ReturnType<typeof vi.fn>;
+  title: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
 }
 
@@ -42,7 +43,7 @@ vi.mock('@playwright-repl/playwright-crx/test', () => ({
 }));
 
 vi.mock('@playwright-repl/playwright-crx', () => {
-  mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() } as MockPage;
+  mockPage = { url: vi.fn().mockReturnValue('https://example.com'), title: vi.fn().mockResolvedValue('Example'), on: vi.fn() } as MockPage;
   const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
   mockCrxApp = {
     attach: vi.fn().mockResolvedValue(mockPage),
@@ -84,7 +85,7 @@ describe("background.ts message handlers", () => {
     mockDetectMode = vi.fn().mockReturnValue('js');
 
     // Reset playwright-crx mocks
-    mockPage = { url: vi.fn().mockReturnValue('https://example.com'), on: vi.fn() };
+    mockPage = { url: vi.fn().mockReturnValue('https://example.com'), title: vi.fn().mockResolvedValue('Example'), on: vi.fn() };
     const mockContext = { pages: vi.fn().mockReturnValue([mockPage]) };
     mockCrxApp = {
       attach: vi.fn().mockResolvedValue(mockPage),

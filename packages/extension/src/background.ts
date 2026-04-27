@@ -186,7 +186,15 @@ function isAttachableUrl(url: string | undefined): boolean {
 }
 
 async function getActiveTabId(): Promise<number | null> {
-  if (activeTabId) return activeTabId;
+  if (activeTabId) {
+    // Validate cached tab is still alive and attachable
+    try {
+      const tab = await chrome.tabs.get(activeTabId);
+      if (isAttachableUrl(tab.url)) return activeTabId;
+    } catch { /* tab no longer exists */ }
+    activeTabId = null;
+    currentPage = null;
+  }
   // Try focused window first
   const [focused] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (focused?.id && isAttachableUrl(focused.url)) return focused.id;
@@ -211,6 +219,10 @@ async function attachToTab(tabId: number): Promise<{ ok: boolean; url?: string; 
     if (url.startsWith('chrome://') ||
         (url.startsWith('chrome-extension://') && !url.startsWith(ownOrigin)) ||
         url.startsWith('https://chromewebstore.google.com')) {
+      if (activeTabId === tabId) {
+        activeTabId = null;
+        currentPage = null;
+      }
       return { ok: false, error: 'Cannot attach to this page — Chrome restricts extension access. Navigate to a regular webpage first.' };
     }
 
@@ -710,6 +722,17 @@ async function handleBridgeCommand(msg: {
     if (!path) return { text: 'Usage: download-as <filename>', isError: true };
     globalThis.__downloadFilename = path;
     return { text: `Next download will save as: ${path}`, isError: false };
+  }
+
+  // Validate existing page connection is still alive (#849)
+  if (currentPage) {
+    try {
+      await currentPage.title();
+    } catch {
+      console.debug('[pw-repl] stale page detected, clearing state');
+      currentPage = null;
+      activeTabId = null;
+    }
   }
 
   if (!currentPage) {
