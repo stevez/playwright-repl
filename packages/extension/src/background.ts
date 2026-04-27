@@ -107,14 +107,8 @@ async function ensureOffscreen() {
 // Web Store installs: always create offscreen doc (auto-connect to bridge).
 // Development installs (--load-extension): only create if bridgePort was previously
 // configured, to avoid connecting to a real bridge during CLI/tests/VS Code.
-chrome.management.getSelf().then(async (info) => {
-  if (info.installType === 'normal') {
-    ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
-  } else {
-    const { bridgePort } = await chrome.storage.local.get(['bridgePort']);
-    if (bridgePort) ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
-  }
-});
+// Always create offscreen document — needed for both bridge and CDP relay connections
+ensureOffscreen().catch(e => console.warn('[pw-repl] offscreen document creation failed:', e));
 
 // Re-check offscreen doc periodically — Chrome may kill it after idle.
 chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
@@ -882,6 +876,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ ok: true });
     return false;
   }
+  if (msg.type === 'cdp-relay-connect') {
+    // Forward relay URL to offscreen document
+    ensureOffscreen().then(() => {
+      chrome.runtime.sendMessage({ type: 'cdp-relay-connect', relayUrl: msg.relayUrl });
+    });
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg.type === 'get-bridge-port') {
     chrome.storage.local.get(['bridgePort']).then(s => sendResponse((s.bridgePort as number) || 9876));
     return true;
@@ -922,7 +924,72 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  // ── CDP Relay: attach debugger to tab ──
+  if (msg.type === 'cdp-attach-tab') {
+    (async () => {
+      const tabId = await getActiveTabId();
+      if (!tabId) { sendResponse({ error: 'No active tab' }); return; }
+      const tab = await chrome.tabs.get(tabId);
+      // Detach first if already attached (from previous session)
+      await new Promise<void>(r => chrome.debugger.detach({ tabId }, () => { void chrome.runtime.lastError; r(); }));
+      await new Promise<void>((resolve, reject) => {
+        chrome.debugger.attach({ tabId }, '1.3', () => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve();
+        });
+      });
+      globalThis.__cdpRelayTabId = tabId;
+      sendResponse({
+        result: {
+          targetInfo: {
+            targetId: String(tabId),
+            type: 'page',
+            title: tab.title || '',
+            url: tab.url || '',
+            attached: false,
+            canAccessOpener: false,
+            browserContextId: 'default',
+          },
+        },
+      });
+    })().catch(e => sendResponse({ error: String(e) }));
+    return true;
+  }
+
+  // ── CDP Relay: forward CDP command via chrome.debugger ──
+  if (msg.type === 'cdp-command') {
+    const { method, params, sessionId } = msg as { type: string; method: string; params?: unknown; sessionId?: string };
+    const target = sessionId ? { targetId: sessionId } : { tabId: globalThis.__cdpRelayTabId };
+    chrome.debugger.sendCommand(target as chrome.debugger.Debuggee, method, params as Record<string, unknown>, (result) => {
+      if (chrome.runtime.lastError) sendResponse({ error: chrome.runtime.lastError.message });
+      else sendResponse({ result });
+    });
+    return true;
+  }
+
   return false;
+});
+
+// ─── CDP Relay: forward debugger events to offscreen ────────────────────────
+
+const __cdpRelayActive = true; // TODO: toggle based on relay connection state
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (!__cdpRelayActive) return;
+  chrome.runtime.sendMessage({
+    type: 'cdp-event',
+    method,
+    params,
+    sessionId: source.targetId,
+    tabId: source.tabId,
+  }).catch(() => { /* offscreen may not be ready */ });
+});
+
+chrome.debugger.onDetach.addListener((source) => {
+  if (!__cdpRelayActive) return;
+  chrome.runtime.sendMessage({
+    type: 'cdp-detach',
+    tabId: source.tabId,
+  }).catch(() => {});
 });
 
 // ─── Download filename override ─────────────────────────────────────────────

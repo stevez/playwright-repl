@@ -8,6 +8,7 @@ declare var __activeRoutes: string[];
 declare var __dialogMode: 'accept' | 'dismiss' | undefined;
 declare var __downloadFilename: string | undefined;
 declare var downloadAs: (filename: string) => void;
+declare var __cdpRelayTabId: number | undefined;
 
 // Exposed on globalThis for serviceWorker.evaluate() / VS Code CDP injection
 declare var attachToTab: (tabId: number) => Promise<{ ok: boolean; url?: string; error?: string }>;

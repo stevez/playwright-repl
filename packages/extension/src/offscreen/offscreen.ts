@@ -214,6 +214,68 @@ chrome.runtime.onMessage.addListener((msg: { type: string; port?: number; stream
             ws.send(JSON.stringify({ _event: true, ...msg }));
         }
     }
+
+    // ── CDP Relay ───────────────────────────────────────────────────────────
+    if (msg.type === 'cdp-relay-connect') {
+        const relayUrl = (msg as { type: string; relayUrl: string }).relayUrl;
+        connectRelay(relayUrl);
+    }
+
+    // Forward chrome.debugger events from background → relay WebSocket
+    if (msg.type === 'cdp-event') {
+        const { method, params, sessionId } = msg as { type: string; method: string; params?: unknown; sessionId?: string };
+        if (relayWs?.readyState === WebSocket.OPEN) {
+            relayWs.send(JSON.stringify({ method: 'forwardCDPEvent', params: { method, params, sessionId } }));
+        }
+    }
 });
+
+// Auto-connect to relay: try bridge port + 1, retry periodically
+setInterval(() => {
+    if (!relayWs || relayWs.readyState !== WebSocket.OPEN) {
+        connectRelay(`ws://127.0.0.1:${lastPort + 1}/relay`);
+    }
+}, 5000);
+
+// ─── CDP Relay WebSocket ────────────────────────────────────────────────────
+
+let relayWs: WebSocket | null = null;
+
+function connectRelay(url: string) {
+    if (relayWs) { relayWs.onclose = null; relayWs.close(); relayWs = null; }
+
+    relayWs = new WebSocket(url);
+
+    relayWs.onopen = () => {
+        console.debug(`[pw-repl] CDP relay connected to ${url}`);
+    };
+
+    relayWs.onmessage = async (e) => {
+        const msg = JSON.parse(e.data as string) as { id: number; method: string; params: unknown };
+
+        try {
+            const result = await chrome.runtime.sendMessage({
+                type: msg.method === 'attachToTab' ? 'cdp-attach-tab' : 'cdp-command',
+                ...(msg.method === 'attachToTab' ? {} : (msg.params as Record<string, unknown>)),
+            });
+
+            if (relayWs?.readyState === WebSocket.OPEN) {
+                if (result?.error) relayWs.send(JSON.stringify({ id: msg.id, error: result.error }));
+                else relayWs.send(JSON.stringify({ id: msg.id, result: result?.result ?? {} }));
+            }
+        } catch (err) {
+            if (relayWs?.readyState === WebSocket.OPEN) {
+                relayWs.send(JSON.stringify({ id: msg.id, error: String(err) }));
+            }
+        }
+    };
+
+    relayWs.onclose = () => {
+        console.debug('[pw-repl] CDP relay disconnected');
+        relayWs = null;
+    };
+
+    relayWs.onerror = () => {};
+}
 
 export {};

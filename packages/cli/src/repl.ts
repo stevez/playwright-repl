@@ -11,7 +11,7 @@ import os from 'node:os';
 import http from 'node:http';
 import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
-  BridgeServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
+  BridgeServer, CDPRelayServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
   filterResponse as filterResponseBase, resolveArgs,
   isLocalCommand, handleLocalCommand,
 } from '@playwright-repl/core';
@@ -30,6 +30,7 @@ export interface ReplOpts extends EngineOpts {
   command?: string;
   bridge?: boolean;
   bridgePort?: number;
+  relay?: boolean;
   engine?: boolean;
   http?: boolean;
   httpPort?: number;
@@ -1123,7 +1124,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
 
-  if (!opts.bridge && !opts.connect && !opts.engine) {
+  if (!opts.bridge && !opts.relay && !opts.connect && !opts.engine) {
     const { EvaluateConnection, findExtensionPath } = await import('@playwright-repl/core');
     const extPath = process.env.VITEST ? null : findExtensionPath(import.meta.url);
     if (extPath) {
@@ -1169,6 +1170,23 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     }
   }
 
+  // ─── Relay-only mode ───────────────────────────────────────────────
+
+  if (opts.relay && !opts.bridge) {
+    const relay = new CDPRelayServer();
+    await relay.start();
+    log(`CDP relay listening on ${relay.cdpEndpoint()}`);
+    log(`Extension endpoint: ${relay.relayEndpoint()}`);
+    log('Waiting for extension to connect...');
+    await relay.waitForExtension(30000);
+    log(`${c.green}✓${c.reset} Extension connected`);
+    log(`${c.dim}Connect Playwright: chromium.connectOverCDP('${relay.cdpEndpoint()}')${c.reset}`);
+    log(`${c.dim}Ctrl+C to exit.${c.reset}\n`);
+    await waitForShutdown(log);
+    await relay.close();
+    process.exit(0);
+  }
+
   // ─── Bridge mode ─────────────────────────────────────────────────
 
   if (opts.bridge) {
@@ -1176,6 +1194,20 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     const srv = new BridgeServer();
     await srv.start(port, { silent: !!opts.command });
     log(`Bridge server listening on ws://localhost:${port}`);
+
+    // Start CDP relay alongside bridge when --relay is specified
+    let relay: CDPRelayServer | null = null;
+    if (opts.relay) {
+      relay = new CDPRelayServer();
+      await relay.start();
+      log(`CDP relay listening on ${relay.cdpEndpoint()}`);
+      // When extension connects to bridge, tell it to also connect to the relay
+      srv.onConnect(async () => {
+        const relayUrl = relay!.relayEndpoint();
+        await srv.run(`chrome.runtime.sendMessage({ type: 'cdp-relay-connect', relayUrl: '${relayUrl}' })`);
+        log(`${c.green}✓${c.reset} Extension connected to CDP relay`);
+      });
+    }
     if (opts.command) {
       await srv.waitForConnection(30000);
       const result = await srv.run(opts.command);
