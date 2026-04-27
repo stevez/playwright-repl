@@ -939,6 +939,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         });
       });
       globalThis.__cdpRelayTabId = tabId;
+      console.debug('[cdp-relay] attached to tab:', tabId);
       sendResponse({
         result: {
           targetInfo: {
@@ -960,9 +961,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'cdp-command') {
     const { method, params, sessionId } = msg as { type: string; method: string; params?: unknown; sessionId?: string };
     const target = sessionId ? { targetId: sessionId } : { tabId: globalThis.__cdpRelayTabId };
+    console.debug('[cdp-relay] →', method, JSON.stringify(params ?? {}).slice(0, 100));
     chrome.debugger.sendCommand(target as chrome.debugger.Debuggee, method, params as Record<string, unknown>, (result) => {
-      if (chrome.runtime.lastError) sendResponse({ error: chrome.runtime.lastError.message });
-      else sendResponse({ result });
+      if (chrome.runtime.lastError) {
+        console.debug('[cdp-relay] ✗', method, chrome.runtime.lastError.message);
+        sendResponse({ error: chrome.runtime.lastError.message });
+      } else {
+        console.debug('[cdp-relay] ✓', method);
+        sendResponse({ result });
+      }
     });
     return true;
   }
@@ -975,6 +982,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 const __cdpRelayActive = true; // TODO: toggle based on relay connection state
 chrome.debugger.onEvent.addListener((source, method, params) => {
   if (!__cdpRelayActive) return;
+  // Only forward events from the relay tab
+  if (source.tabId !== globalThis.__cdpRelayTabId) {
+    console.debug('[cdp-relay] skip event from tab', source.tabId, '(relay tab:', globalThis.__cdpRelayTabId, '):', method);
+    return;
+  }
+  console.debug('[cdp-relay] ← event:', method);
   chrome.runtime.sendMessage({
     type: 'cdp-event',
     method,
