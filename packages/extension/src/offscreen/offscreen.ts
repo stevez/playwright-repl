@@ -234,6 +234,13 @@ chrome.runtime.onMessage.addListener((msg: { type: string; port?: number; stream
 
 let relayWs: WebSocket | null = null;
 
+// Periodic health check — same pattern as bridge (10s interval)
+setInterval(() => {
+    if (lastPort && (!relayWs || relayWs.readyState !== WebSocket.OPEN)) {
+        connectRelay(`ws://127.0.0.1:${lastPort + 1}/relay`);
+    }
+}, 10000);
+
 function connectRelay(url: string) {
     if (relayWs) { relayWs.onclose = null; relayWs.close(); relayWs = null; }
 
