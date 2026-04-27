@@ -461,6 +461,11 @@ function resolveArgs(args: ParsedArgs): ParsedArgs | DirectExecution {
     return { jsExpr: call(waitMs, ms) };
   }
 
+  // ── Download as ─────────────────────────────────────────────
+  // Handled directly by handleBridgeCommand
+  if (cmdName === 'download-as')
+    return args;
+
   // ── Eval ────────────────────────────────────────────────────
   if (cmdName === 'eval') {
     const code = args._[1] || '';

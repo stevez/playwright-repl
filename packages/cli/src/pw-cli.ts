@@ -13,11 +13,12 @@
 import { startRepl } from './repl.js';
 import { minimist } from '@playwright-repl/core';
 import { SessionPlayer } from './recorder.js';
+import fs from 'node:fs';
 import http from 'node:http';
 
 const args = minimist(process.argv.slice(2), {
   boolean: ['headed', 'headless', 'bridge', 'http', 'interactive', 'help'],
-  string: ['http-port', 'bridge-port', 'command', 'replay', 'variable'],
+  string: ['http-port', 'bridge-port', 'command', 'replay', 'variable', 'load'],
   alias: { h: 'help' },
 });
 
@@ -37,6 +38,28 @@ Examples:
   pw-cli "await page.title()"
   pw-cli "screenshot"
 `);
+  process.exit(0);
+}
+
+// --load: load .js file as a global function definition in the service worker
+if (args.load) {
+  const httpPort = args['http-port'] ? parseInt(args['http-port'] as string, 10) : 9223;
+  const filename = args.load as string;
+  if (!fs.existsSync(filename)) { console.error(`File not found: ${filename}`); process.exit(1); }
+  const script = fs.readFileSync(filename, 'utf-8');
+  const result = await new Promise<{ text?: string; isError?: boolean }>((resolve, reject) => {
+    const body = JSON.stringify({ command: script });
+    const req = http.request({ hostname: '127.0.0.1', port: httpPort, path: '/run', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
+      let data = '';
+      res.on('data', (chunk: string) => data += chunk);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid response')); } });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  }).catch((e: Error) => ({ text: e.message, isError: true }));
+  if (result.isError) { console.error(result.text); process.exit(1); }
+  console.log(`✓ Loaded ${filename}`);
   process.exit(0);
 }
 

@@ -169,6 +169,9 @@ export const COMMANDS: Record<string, CommandInfo> = {
                          examples: ['video-chapter "Login flow"', 'video-chapter "Setup" --duration 3000'] },
   'tracing-start':     { desc: 'Start trace recording', options: [] },
   'tracing-stop':      { desc: 'Stop tracing and save trace file', options: [] },
+  'download-as':       { desc: 'Set filename for next download', options: [],
+                         usage: 'download-as <filename>',
+                         examples: ['download-as bills/rogers-2026-03.pdf'] },
   'install-browser':   { desc: 'Install browser', options: [] },
   'list':              { desc: 'List sessions', options: [] },
   'close-all':         { desc: 'Close all sessions', options: [] },
@@ -187,7 +190,7 @@ export const CATEGORIES: Record<string, string[]> = {
   'State':          ['state-save', 'state-load'],
   'Video':          ['video-start', 'video-stop', 'video-chapter'],
   'Tracing':        ['tracing-start', 'tracing-stop'],
-  'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'config-print'],
+  'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'download-as', 'config-print'],
 };
 
 /** Commands that mutate the page — snapshot should be attached when includeSnapshot is on. */

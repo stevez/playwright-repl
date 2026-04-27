@@ -9,4 +9,5 @@ goto https://www.rogers.com/consumer/self-serve/overview
 click "View your bill" --exact
 click "Save PDF"
 check "{{billing_period}}"
+download-as {{filename}}
 click "Download bills"

@@ -6,6 +6,8 @@ declare var __consoleMessages: string[];
 declare var __networkRequests: Array<{ status: number; method: string; url: string; type: string }>;
 declare var __activeRoutes: string[];
 declare var __dialogMode: 'accept' | 'dismiss' | undefined;
+declare var __downloadFilename: string | undefined;
+declare var downloadAs: (filename: string) => void;
 
 // Exposed on globalThis for serviceWorker.evaluate() / VS Code CDP injection
 declare var attachToTab: (tabId: number) => Promise<{ ok: boolean; url?: string; error?: string }>;

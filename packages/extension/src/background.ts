@@ -704,6 +704,14 @@ async function handleBridgeCommand(msg: {
     }
   }
 
+  // ── Download as ────────────────────────────────────────────────────────────
+  if (cmd.startsWith('download-as')) {
+    const path = cmd.slice('download-as'.length).trim().replace(/^["']|["']$/g, '');
+    if (!path) return { text: 'Usage: download-as <filename>', isError: true };
+    globalThis.__downloadFilename = path;
+    return { text: `Next download will save as: ${path}`, isError: false };
+  }
+
   if (!currentPage) {
     const tabId = await getActiveTabId();
     if (tabId) await attachToTab(tabId);
@@ -894,5 +902,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
+// ─── Download filename override ─────────────────────────────────────────────
+// When __downloadFilename is set (via `download-as` command), rename the next
+// Chrome download to that path (relative to Downloads folder).
+chrome.downloads.onDeterminingFilename.addListener((_item, suggest) => {
+  if (globalThis.__downloadFilename) {
+    const filename = globalThis.__downloadFilename;
+    globalThis.__downloadFilename = undefined;
+    suggest({ filename });
+  }
+});
+
 // Expose stable globals for swDebugEval — functions that never change go here, not inside attachToTab
+globalThis.downloadAs = (filename: string) => { globalThis.__downloadFilename = filename; };
 globalThis.attachToTab = attachToTab;
