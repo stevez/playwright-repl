@@ -929,30 +929,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     (async () => {
       const tabId = await getActiveTabId();
       if (!tabId) { sendResponse({ error: 'No active tab' }); return; }
-      const tab = await chrome.tabs.get(tabId);
+      const debuggee: chrome.debugger.Debuggee = { tabId };
       // Detach first if already attached (from previous session)
-      await new Promise<void>(r => chrome.debugger.detach({ tabId }, () => { void chrome.runtime.lastError; r(); }));
+      await new Promise<void>(r => chrome.debugger.detach(debuggee, () => { void chrome.runtime.lastError; r(); }));
       await new Promise<void>((resolve, reject) => {
-        chrome.debugger.attach({ tabId }, '1.3', () => {
+        chrome.debugger.attach(debuggee, '1.3', () => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else resolve();
         });
       });
       globalThis.__cdpRelayTabId = tabId;
       console.debug('[cdp-relay] attached to tab:', tabId);
-      sendResponse({
-        result: {
-          targetInfo: {
-            targetId: String(tabId),
-            type: 'page',
-            title: tab.title || '',
-            url: tab.url || '',
-            attached: false,
-            canAccessOpener: false,
-            browserContextId: 'default',
-          },
-        },
-      });
+      // Get REAL CDP target info (not chrome.tabs — Playwright needs correct frame IDs)
+      const result = await new Promise<unknown>((resolve, reject) => {
+        chrome.debugger.sendCommand(debuggee, 'Target.getTargetInfo', {}, (r) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
+      }) as { targetInfo?: unknown };
+      sendResponse({ result: { targetInfo: result?.targetInfo } });
     })().catch(e => sendResponse({ error: String(e) }));
     return true;
   }
@@ -960,9 +955,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // ── CDP Relay: forward CDP command via chrome.debugger ──
   if (msg.type === 'cdp-command') {
     const { method, params, sessionId } = msg as { type: string; method: string; params?: unknown; sessionId?: string };
-    const target = sessionId ? { targetId: sessionId } : { tabId: globalThis.__cdpRelayTabId };
+    const debuggerSession = { tabId: globalThis.__cdpRelayTabId!, sessionId } as chrome.debugger.Debuggee;
     console.debug('[cdp-relay] →', method, JSON.stringify(params ?? {}).slice(0, 100));
-    chrome.debugger.sendCommand(target as chrome.debugger.Debuggee, method, params as Record<string, unknown>, (result) => {
+    chrome.debugger.sendCommand(debuggerSession, method, params as Record<string, unknown>, (result) => {
       if (chrome.runtime.lastError) {
         console.debug('[cdp-relay] ✗', method, chrome.runtime.lastError.message);
         sendResponse({ error: chrome.runtime.lastError.message });
@@ -992,7 +987,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
     type: 'cdp-event',
     method,
     params,
-    sessionId: source.targetId,
+    sessionId: (source as { sessionId?: string }).sessionId,
     tabId: source.tabId,
   }).catch(() => { /* offscreen may not be ready */ });
 });

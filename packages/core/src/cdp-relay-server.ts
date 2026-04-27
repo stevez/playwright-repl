@@ -196,6 +196,8 @@ export class CDPRelayServer {
             case 'Browser.getVersion':
                 return { protocolVersion: '1.3', product: 'Chrome/Dramaturg-Bridge', userAgent: 'CDP-Bridge-Server/1.0.0' };
             case 'Browser.setDownloadBehavior':
+                // chrome.debugger is tab-level — can't handle browser-level commands.
+                // Downloads use `download-as` / chrome.downloads API instead.
                 return {};
             case 'Target.setAutoAttach': {
                 // Forward child session handling
