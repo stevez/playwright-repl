@@ -355,6 +355,36 @@ describe('selectByText', () => {
     await selectByText(page, 'Country', 'US');
     expect(page._loc.selectOption).toHaveBeenCalledWith('US');
   });
+
+  it('selects via informal label fallback for same-cell select (#800)', async () => {
+    // Simulate: two selects in the same row, each in its own cell with a label:
+    //   <tr class="Attribut1">
+    //     <td><span>Select*</span><select name="select1">…</select></td>
+    //     <td><span>Select/Type*</span><select name="select2">…</select></td>
+    //   </tr>
+    // The runtime must find select2 (same cell as "Select/Type*"), not select1.
+    const selectedWith = [];
+    const selectLoc = {
+      selectOption: vi.fn().mockImplementation((v) => { selectedWith.push(v); }),
+    };
+    const noMatch = { count: vi.fn().mockResolvedValue(0) };
+    const page = {
+      getByLabel: vi.fn().mockReturnValue(noMatch),
+      getByRole: vi.fn().mockReturnValue(noMatch),
+      getByText: vi.fn().mockReturnValue({
+        first: vi.fn().mockReturnValue({
+          evaluate: vi.fn().mockResolvedValue('[data-pw-fill="sel2"]'),
+        }),
+      }),
+      locator: vi.fn().mockReturnValue(selectLoc),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await selectByText(page, 'Select/Type*', 'Type 2');
+    expect(page.getByText).toHaveBeenCalledWith('Select/Type*');
+    expect(page.locator).toHaveBeenCalledWith('[data-pw-fill="sel2"]');
+    expect(selectedWith).toEqual(['Type 2']);
+  });
 });
 
 describe('checkByText', () => {
