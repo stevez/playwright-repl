@@ -1201,12 +1201,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
       relay = new CDPRelayServer();
       await relay.start();
       log(`CDP relay listening on ${relay.cdpEndpoint()}`);
-      // When extension connects to bridge, tell it to also connect to the relay
-      srv.onConnect(async () => {
-        const relayUrl = relay!.relayEndpoint();
-        await srv.run(`chrome.runtime.sendMessage({ type: 'cdp-relay-connect', relayUrl: '${relayUrl}' })`);
-        log(`${c.green}✓${c.reset} Extension connected to CDP relay`);
-      });
+      // Extension auto-connects to relay (bridge port + 1)
     }
     if (opts.command) {
       await srv.waitForConnection(30000);
