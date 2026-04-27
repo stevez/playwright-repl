@@ -979,16 +979,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 // ─── CDP Relay: forward debugger events to offscreen ────────────────────────
+// Only forward events when relay is active (i.e. a tab has been attached via cdp-attach-tab).
+// Without this guard, every chrome.debugger event from playwright-crx would be intercepted.
 
-const __cdpRelayActive = true; // TODO: toggle based on relay connection state
 chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (!__cdpRelayActive) return;
-  // Only forward events from the relay tab
-  if (source.tabId !== globalThis.__cdpRelayTabId) {
-    console.debug('[cdp-relay] skip event from tab', source.tabId, '(relay tab:', globalThis.__cdpRelayTabId, '):', method);
-    return;
-  }
-  console.debug('[cdp-relay] ← event:', method);
+  if (!globalThis.__cdpRelayTabId) return;
+  if (source.tabId !== globalThis.__cdpRelayTabId) return;
   chrome.runtime.sendMessage({
     type: 'cdp-event',
     method,
@@ -999,7 +995,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 });
 
 chrome.debugger.onDetach.addListener((source) => {
-  if (!__cdpRelayActive) return;
+  if (!globalThis.__cdpRelayTabId) return;
   chrome.runtime.sendMessage({
     type: 'cdp-detach',
     tabId: source.tabId,

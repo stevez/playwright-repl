@@ -230,13 +230,6 @@ chrome.runtime.onMessage.addListener((msg: { type: string; port?: number; stream
     }
 });
 
-// Auto-connect to relay: try bridge port + 1, retry periodically
-setInterval(() => {
-    if (!relayWs || relayWs.readyState !== WebSocket.OPEN) {
-        connectRelay(`ws://127.0.0.1:${lastPort + 1}/relay`);
-    }
-}, 5000);
-
 // ─── CDP Relay WebSocket ────────────────────────────────────────────────────
 
 let relayWs: WebSocket | null = null;
