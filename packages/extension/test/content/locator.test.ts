@@ -14,6 +14,7 @@ import {
     isTextField,
     isCheckable,
     buildCommands,
+    getInformalLabel,
 } from '../../src/content/locator';
 
 describe('locator', () => {
@@ -1110,6 +1111,109 @@ describe('locator', () => {
             expect(neinCmd!.pw).not.toContain('--nth');
         });
 
+        it('uses informal label for input in nested table (#860)', () => {
+            document.body.innerHTML = `<table><tr><td>
+                <span>Date</span><br>
+                <table><tbody><tr><td>
+                    <input type="text" size="6" name="Date" value="">
+                </td></tr></tbody></table>
+            </td></tr></table>`;
+            const input = document.querySelector('input')!;
+            const cmds = buildCommands('fill', input, { value: '28.04.26' });
+            expect(cmds!.pw).toBe('fill "Date" "28.04.26"');
+            expect(cmds!.pw).not.toContain('css');
+        });
+
+        it('uses informal label for combobox past div wrapper (#861)', () => {
+            document.body.innerHTML = `<table><tbody><tr>
+                <td><span>Month</span><br>
+                    <div><select id="month">
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                    </select></div>
+                </td>
+                <td><span>Year</span><br>
+                    <div><select id="year">
+                        <option value="2020">2020</option>
+                        <option value="2021">2021</option>
+                    </select></div>
+                </td>
+            </tr></tbody></table>`;
+            const selects = document.querySelectorAll('select');
+            const cmds1 = buildCommands('click', selects[0]);
+            expect(cmds1!.pw).toBe('click "Month"');
+            const cmds2 = buildCommands('select', selects[0], { option: '11' });
+            expect(cmds2!.pw).toBe('select "Month" "11"');
+            const cmds3 = buildCommands('click', selects[1]);
+            expect(cmds3!.pw).toBe('click "Year"');
+            const cmds4 = buildCommands('select', selects[1], { option: '2021' });
+            expect(cmds4!.pw).toBe('select "Year" "2021"');
+        });
+
+        it('normalizes multiline whitespace in fill locator (#862)', () => {
+            document.body.innerHTML = `<table><tbody><tr><td>
+                <span>First
+                    field</span><br>
+                <input type="text">
+            </td></tr></table>`;
+            const input = document.querySelector('input')!;
+            const cmds = buildCommands('fill', input, { value: '123' });
+            expect(cmds!.pw).toBe('fill "First field" "123"');
+        });
+
+        it('finds correct label for each input in span wrappers (#862)', () => {
+            document.body.innerHTML = `<table><tbody><tr>
+                <td>
+                    <span>First field</span><br>
+                    <input type="text">
+                </td>
+                <td>
+                    <span>Second field</span><br>
+                    <span><input type="text"></span>
+                </td>
+                <td>
+                    <span>Third field</span><br>
+                    <span><input type="text"></span>
+                </td>
+            </tr></tbody></table>`;
+            const inputs = document.querySelectorAll('input');
+            expect(buildCommands('fill', inputs[0], { value: '1' })!.pw).toBe('fill "First field" "1"');
+            expect(buildCommands('fill', inputs[1], { value: '2' })!.pw).toBe('fill "Second field" "2"');
+            expect(buildCommands('fill', inputs[2], { value: '3' })!.pw).toBe('fill "Third field" "3"');
+        });
+
+        it('disambiguates radio buttons with --in when multiline label (#863)', () => {
+            document.body.innerHTML = `<table><tbody>
+                <tr><td>
+                    <span>Very
+                        long
+                        text
+                    </span><br>
+                    <input type="radio" name="radio1" value="true" title="ja">ja&nbsp;
+                    <input type="radio" name="radio1" value="false" title="nein">nein
+                </td></tr>
+                <tr><td>
+                    <span>Another
+                        very
+                        long
+                        text
+                    </span><br>
+                    <input type="radio" name="radio2" value="true" title="ja">ja&nbsp;
+                    <input type="radio" name="radio2" value="false" title="nein">nein
+                </td></tr>
+            </tbody></table>`;
+            const radios = document.querySelectorAll('input[type="radio"]');
+            const ja1 = buildCommands('check', radios[0]);
+            expect(ja1!.pw).toContain('--in');
+            expect(ja1!.pw).toContain('Very long text');
+            const nein1 = buildCommands('check', radios[1]);
+            expect(nein1!.pw).toContain('--in');
+            expect(nein1!.pw).toContain('Very long text');
+            const ja2 = buildCommands('check', radios[2]);
+            expect(ja2!.pw).toContain('--in');
+            expect(ja2!.pw).toContain('Another very long text');
+        });
+
         it('uses text-only --in from heading context instead of --nth', () => {
             document.body.innerHTML = `
                 <div>
@@ -1128,6 +1232,61 @@ describe('locator', () => {
 
             const cmds1 = buildCommands('click', links[1]);
             expect(cmds1!.pw).toBe('click link "RFCP® Certified" --in "Testspezialist"');
+        });
+    });
+
+    // ─── getInformalLabel ─────────────────────────────────────────────────
+
+    describe('getInformalLabel', () => {
+        it('finds label in outer cell when input is in nested table (#860)', () => {
+            document.body.innerHTML = `<table><tr><td>
+                <span>Date</span><br>
+                <table><tbody><tr><td>
+                    <input type="text" size="6" name="Date" value="">
+                </td></tr></tbody></table>
+            </td></tr></table>`;
+            const input = document.querySelector('input')!;
+            expect(getInformalLabel(input)).toBe('Date');
+        });
+
+        it('finds label past div wrapper for select (#861)', () => {
+            document.body.innerHTML = `<table><tbody><tr>
+                <td>
+                    <span>Month</span><br>
+                    <div><select id="month">
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                    </select></div>
+                </td>
+            </tr></tbody></table>`;
+            const select = document.querySelector('select')!;
+            expect(getInformalLabel(select)).toBe('Month');
+        });
+
+        it('normalizes multiline whitespace in label text (#862)', () => {
+            document.body.innerHTML = `<table><tbody><tr><td>
+                <span>First
+                    field</span><br>
+                <input type="text">
+            </td></tr></table>`;
+            const input = document.querySelector('input')!;
+            expect(getInformalLabel(input)).toBe('First field');
+        });
+
+        it('finds correct label for inputs in span wrappers (#862)', () => {
+            document.body.innerHTML = `<table><tbody><tr>
+                <td>
+                    <span>Second field</span><br>
+                    <span><input type="text"></span>
+                </td>
+                <td>
+                    <span>Third field</span><br>
+                    <span><input type="text"></span>
+                </td>
+            </tr></tbody></table>`;
+            const inputs = document.querySelectorAll('input');
+            expect(getInformalLabel(inputs[0])).toBe('Second field');
+            expect(getInformalLabel(inputs[1])).toBe('Third field');
         });
     });
 

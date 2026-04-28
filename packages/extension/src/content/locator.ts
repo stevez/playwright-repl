@@ -112,6 +112,10 @@ export function getAccessibleName(el: Element): string {
         if (alt) return alt.trim();
     }
 
+    // title attribute (fallback per ARIA name computation spec)
+    const title = el.getAttribute('title');
+    if (title) return title.trim();
+
     return '';
 }
 
@@ -131,40 +135,39 @@ export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelect
     return '';
 }
 
+/** Collapse whitespace sequences (incl. newlines) into a single space, then trim. */
+function normalizeText(s: string): string {
+    return (s || '').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Find informal label text for a form element (e.g. text in an adjacent table
  * cell). Used by the recorder to generate `fill "Label" "value"` instead of
  * `fill css "input#id" "value"`. Mirrors the fillByText runtime fallback in
  * page-scripts.ts which walks up from a getByText match to find a nearby input.
+ *
+ * Walks up from el through parent elements, checking preceding siblings at each
+ * level. This handles nested tables, div/span wrappers, and other structures
+ * where the label text is not a direct sibling of the form element.
  */
 export function getInformalLabel(el: Element): string {
-    // Table layout: check within the same cell first, then preceding cells
-    const row = el.closest('tr');
-    if (row) {
-        const cell = el.closest('td, th');
-        if (cell) {
-            // First: preceding siblings within the same cell (e.g. <td><span>Label</span><select>)
-            let prev: Element | null = el.previousElementSibling;
-            while (prev) {
-                const text = (prev.textContent || '').trim();
-                if (text && text.length <= 80) return text;
-                prev = prev.previousElementSibling;
-            }
-            // Then: preceding cell's text in the same row
-            prev = cell.previousElementSibling;
-            while (prev) {
-                const text = (prev.textContent || '').trim();
-                if (text && text.length <= 80) return text;
-                prev = prev.previousElementSibling;
-            }
+    // Walk up through parent elements, checking preceding siblings at each level.
+    // This naturally handles:
+    //   - nested tables: input→td→tr→tbody→table→(preceding span "Date")
+    //   - div wrappers: select→div→(preceding span "Month")
+    //   - span wrappers: input→span→(preceding span "Label")
+    //   - preceding cells: input→td→(preceding td "Label")
+    let current: Element | null = el;
+    let depth = 0;
+    while (current && current !== document.body && current !== document.documentElement && depth < 8) {
+        let prev: Element | null = current.previousElementSibling;
+        while (prev) {
+            const text = normalizeText(prev.textContent);
+            if (text && text.length <= 80) return text;
+            prev = prev.previousElementSibling;
         }
-    }
-    // Non-table: preceding sibling's text content
-    let prev = el.previousElementSibling;
-    while (prev) {
-        const text = (prev.textContent || '').trim();
-        if (text && text.length <= 80) return text;
-        prev = prev.previousElementSibling;
+        current = current.parentElement;
+        depth++;
     }
     return '';
 }
@@ -190,7 +193,7 @@ function getContextText(ancestor: Element, exclude: Element): string {
                 if (inner) return inner;
                 continue;
             }
-            const text = (child.textContent || '').trim();
+            const text = normalizeText(child.textContent || '');
             if (text && text.length <= 50) return text;
         }
         return '';
@@ -218,7 +221,7 @@ function findContainerAncestor(el: Element): { ancestor: Element; role: string }
 function findLeafText(node: Node): string {
     for (const child of node.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-            const text = (child.textContent || '').trim();
+            const text = normalizeText(child.textContent || '');
             if (text && text.length >= 2 && text.length <= 50) return text;
         }
         if (child.nodeType === Node.ELEMENT_NODE) {
