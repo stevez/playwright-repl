@@ -196,10 +196,10 @@ describe('locator', () => {
             expect(getAccessibleName(btn)).toBe('Submit');
         });
 
-        it('returns empty for long text content (>80 chars)', () => {
+        it('returns long text content without truncation', () => {
             const btn = document.createElement('button');
             btn.textContent = 'x'.repeat(81);
-            expect(getAccessibleName(btn)).toBe('');
+            expect(getAccessibleName(btn)).toBe('x'.repeat(81));
         });
 
         it('returns alt for IMG', () => {
@@ -487,7 +487,7 @@ describe('locator', () => {
             expect(generateLocator(buttons[1])).toContain('.nth(1)');
         });
 
-        it('falls back to .nth() when context text is too long', () => {
+        it('uses ancestor context even with long text', () => {
             const longText = 'x'.repeat(51);
             document.body.innerHTML = `
                 <ul>
@@ -495,7 +495,8 @@ describe('locator', () => {
                     <li><span>short</span><button>Delete</button></li>
                 </ul>`;
             const buttons = document.querySelectorAll('button');
-            expect(generateLocator(buttons[0])).toContain('.first()');
+            expect(generateLocator(buttons[0])).toContain('.filter(');
+            expect(generateLocator(buttons[0])).toContain(longText);
         });
 
         it('works with article container role', () => {
@@ -1212,6 +1213,47 @@ describe('locator', () => {
             const ja2 = buildCommands('check', radios[2]);
             expect(ja2!.pw).toContain('--in');
             expect(ja2!.pw).toContain('Another very long text');
+        });
+
+        it('uses informal label for combobox with long label text (#861)', () => {
+            document.body.innerHTML = `<table><tbody>
+                <tr><td>
+                    <span>Some text</span><br>
+                    <select><option>---</option><option>Option 1</option></select>
+                </td></tr>
+                <tr><td>More text</td></tr>
+                <tr><td>
+                    <span>At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren,</span><br>
+                    <select><option>keine Angabe</option><option>ja</option><option>nein</option></select>
+                </td></tr>
+            </tbody></table>`;
+            const selects = document.querySelectorAll('select');
+            const cmds0 = buildCommands('click', selects[0]);
+            expect(cmds0!.pw).toBe('click "Some text"');
+            const cmds1 = buildCommands('select', selects[1], { option: 'nein' });
+            expect(cmds1!.pw).toBe('select "At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren," "nein"');
+        });
+
+        it('disambiguates radio buttons with long label text (#863)', () => {
+            document.body.innerHTML = `<table><tbody>
+                <tr><td>
+                    <span>At vero eos et accusam et justo duo dolores et ea rebum.</span><br>
+                    <input type="radio" name="radio1" value="true" title="ja">ja&nbsp;
+                    <input type="radio" name="radio1" value="false" title="nein">nein
+                </td></tr>
+                <tr><td>
+                    <span>At vero eos et accusam et justo</span><br>
+                    <input type="radio" name="radio2" value="true" title="ja">ja&nbsp;
+                    <input type="radio" name="radio2" value="false" title="nein">nein
+                </td></tr>
+            </tbody></table>`;
+            const radios = document.querySelectorAll('input[type="radio"]');
+            const ja1 = buildCommands('check', radios[0]);
+            expect(ja1!.pw).toContain('--in');
+            expect(ja1!.pw).toContain('At vero eos et accusam et justo duo dolores et ea rebum.');
+            const ja2 = buildCommands('check', radios[2]);
+            expect(ja2!.pw).toContain('--in');
+            expect(ja2!.pw).toContain('At vero eos et accusam et justo');
         });
 
         it('uses text-only --in from heading context instead of --nth', () => {

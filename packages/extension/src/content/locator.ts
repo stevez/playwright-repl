@@ -103,7 +103,7 @@ export function getAccessibleName(el: Element): string {
     ]);
     if (role && NAME_FROM_CONTENT.has(role)) {
         const text = accumulatedText(el);
-        if (text && text.length <= 80) return text;
+        if (text) return text;
     }
 
     // alt for images
@@ -163,7 +163,7 @@ export function getInformalLabel(el: Element): string {
         let prev: Element | null = current.previousElementSibling;
         while (prev) {
             const text = normalizeText(prev.textContent);
-            if (text && text.length <= 80) return text;
+            if (text) return text;
             prev = prev.previousElementSibling;
         }
         current = current.parentElement;
@@ -194,7 +194,7 @@ function getContextText(ancestor: Element, exclude: Element): string {
                 continue;
             }
             const text = normalizeText(child.textContent || '');
-            if (text && text.length <= 50) return text;
+            if (text) return text;
         }
         return '';
     }
@@ -215,14 +215,14 @@ function findContainerAncestor(el: Element): { ancestor: Element; role: string }
 // ─── Heading-based context disambiguation ────────────────────────────────
 
 /**
- * Find the first short leaf text in an element, skipping button content.
+ * Find the first leaf text in an element, skipping button content.
  * Generic approach — works for headings, banners, labels, or any structure.
  */
 function findLeafText(node: Node): string {
     for (const child of node.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
             const text = normalizeText(child.textContent || '');
-            if (text && text.length >= 2 && text.length <= 50) return text;
+            if (text && text.length >= 2) return text;
         }
         if (child.nodeType === Node.ELEMENT_NODE) {
             const el = child as Element;
@@ -292,7 +292,7 @@ function tryAncestorContext(el: Element, role: string, name: string, matches: El
     if (!container) return null;
 
     const contextText = getContextText(container.ancestor, el);
-    if (!contextText || contextText.length > 50) return null;
+    if (!contextText) return null;
 
     // Verify uniqueness: only one match's container ancestor should contain this text
     let count = 0;
