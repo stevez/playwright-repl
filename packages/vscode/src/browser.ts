@@ -151,10 +151,6 @@ export class BrowserManager implements IBrowserManager {
     await this._startHttpProxy();
     this._log.appendLine(`HTTP proxy on port ${this._httpPort}`);
 
-    // 5. Expose require on globalThis for esbuild externals (Node built-ins)
-    if (!(globalThis as Record<string, unknown>).require)
-      (globalThis as Record<string, unknown>).require = createRequire(__filename);
-
     this._running = true;
     this._log.appendLine('Browser ready (relay mode).');
   }
