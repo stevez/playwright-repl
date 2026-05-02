@@ -7,7 +7,6 @@
  *   pw-cli "snapshot"           # → --http --command "snapshot"
  *   pw-cli "click e5"           # → --http --command "click e5"
  *   pw-cli                      # → starts interactive REPL (same as playwright-repl)
- *   pw-cli --bridge             # → passes flags through to playwright-repl
  */
 
 import { startRepl } from './repl.js';
@@ -17,8 +16,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'bridge', 'http', 'interactive', 'help'],
-  string: ['http-port', 'bridge-port', 'command', 'replay', 'variable', 'load'],
+  boolean: ['headed', 'headless', 'http', 'interactive', 'help'],
+  string: ['http-port', 'command', 'replay', 'variable', 'load'],
   alias: { h: 'help' },
 });
 
@@ -30,7 +29,6 @@ Usage:
   pw-cli "snapshot"              # send command via HTTP (fast)
   pw-cli "click e5"              # send command via HTTP
   pw-cli                         # start interactive REPL
-  pw-cli --bridge                # start bridge mode REPL
   pw-cli --http                  # start REPL with HTTP server
 
 Examples:
@@ -41,7 +39,7 @@ Examples:
   process.exit(0);
 }
 
-// --load: load .js file as a global function definition in the service worker
+// --load: load .js file as a global function definition
 if (args.load) {
   const httpPort = args['http-port'] ? parseInt(args['http-port'] as string, 10) : 9223;
   const filename = args.load as string;
@@ -112,10 +110,8 @@ if (positional.length > 0) {
 } else {
   // No args — start interactive REPL, pass through flags
   startRepl({
-    bridge: args.bridge as boolean,
     http: args.http as boolean,
     httpPort: args['http-port'] ? parseInt(args['http-port'] as string, 10) : undefined,
-    bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
     interactive: args.interactive as boolean,
     headed: args.headless ? false : args.headed ? true : undefined,
   }).catch((err: Error) => {

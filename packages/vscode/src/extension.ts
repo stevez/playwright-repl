@@ -93,7 +93,7 @@ export class Extension implements RunHooks {
   private _watchFilesBatch?: vscodeTypes.TestItem[];
   private _watchItemsBatch?: vscodeTypes.TestItem[];
 
-  // Playwright REPL: bridge-based features
+  // Playwright REPL: relay mode features
   private _browserController!: BrowserController;
   private _replView!: ReplView;
   private _assertView!: AssertView;
@@ -330,7 +330,7 @@ export class Extension implements RunHooks {
       this._treeItemObserver,
       registerTerminalLinkProvider(this._vscode),
 
-      // ─── Playwright REPL: bridge-based commands ────────────────────────────
+      // ─── Playwright REPL: relay mode commands ────────────────────────────
       vscode.commands.registerCommand('playwright-repl.launchBrowser', async () => {
         try {
           await this._browserController.ensureLaunched();
@@ -853,7 +853,7 @@ export class Extension implements RunHooks {
   }
 
   /**
-   * Best-effort: capture a page snapshot from the bridge for use in error-context.
+   * Best-effort: capture a page snapshot for use in error-context.
    * Returns undefined if the snapshot fails (e.g. page is closed).
    */
   private _extractAIContext(result: reporterTypes.TestResult): string | undefined {

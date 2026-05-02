@@ -369,10 +369,8 @@ export class ReplView extends WebviewBase {
     // .status — connection status
     if (trimmed === '.status') {
       const running = this._browserManager?.isRunning() ?? false;
-      const bridge = this._browserManager?.bridge?.connected ?? false;
       this._appendOutput(
         `Browser: ${running ? 'running' : 'stopped'}\n` +
-        `Bridge: ${bridge ? 'connected' : 'disconnected'}\n` +
         `Commands: ${this._commandCount}`,
         'info',
       );

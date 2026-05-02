@@ -4,8 +4,8 @@
  * Manages the recording flow in VS Code:
  * 1. Detects cursor context (inside/outside test function)
  * 2. Generates test template if needed
- * 3. Starts recording via bridge
- * 4. Receives streamed actions via bridge events
+ * 3. Starts recording via BrowserManager
+ * 4. Receives streamed actions via page events
  * 5. Inserts each action at cursor in the active editor
  */
 
@@ -134,7 +134,7 @@ export class Recorder {
       }
     });
 
-    // Start recording via bridge — returns URL of current page
+    // Start recording — returns URL of current page
     const result = await this._browserManager.runCommand('record-start');
     if (result.isError) {
       this._recording = false;

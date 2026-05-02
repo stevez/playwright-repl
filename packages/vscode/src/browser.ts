@@ -21,7 +21,6 @@ export interface LaunchOptions {
 export interface IBrowserManager {
   isRunning(): boolean;
   get page(): any;
-  get bridge(): { connected: boolean; run(cmd: string, opts?: any): Promise<CommandResult>; runScript(s: string, l: string): Promise<CommandResult> } | undefined;
   get httpPort(): number | null;
   get cdpUrl(): string | undefined;
   launch(opts: LaunchOptions): Promise<void>;
@@ -93,7 +92,6 @@ export class BrowserManager implements IBrowserManager {
   }
 
   isRunning() { return this._running; }
-  get bridge() { return this._page ? { connected: true, run: (cmd: string, opts?: any) => this.runCommand(cmd, opts), runScript: (s: string, l: string) => this.runScript(s, l as any) } : undefined; }
   get page() { return this._page; }
   get httpPort() { return this._httpPort; }
   get cdpUrl() { return this._cdpUrl; }
@@ -341,7 +339,7 @@ export class BrowserManager implements IBrowserManager {
 
     if (req.method === 'GET' && req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', bridge: !!this._page }));
+      res.end(JSON.stringify({ status: 'ok', connected: !!this._page }));
       return;
     }
 

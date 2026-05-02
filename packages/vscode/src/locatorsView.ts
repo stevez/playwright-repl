@@ -38,7 +38,7 @@ export class LocatorsView extends DisposableBase implements vscodeTypes.WebviewV
     this._updateActions();
   }
 
-  /** Allow external callers (e.g. our bridge picker) to show a locator. */
+  /** Allow external callers (e.g. the picker) to show a locator. */
   public async showLocator(locator: string, ariaSnapshot?: string, ref?: string) {
     this._locator = { locator };
     this._ariaSnapshot = { yaml: ariaSnapshot || '' };
