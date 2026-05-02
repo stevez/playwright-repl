@@ -6,11 +6,6 @@ import { describe, it, expect } from 'vitest';
 import * as api from '../src/index.js';
 
 describe('index.ts exports', () => {
-  it('exports Engine', () => {
-    expect(api.Engine).toBeDefined();
-    expect(typeof api.Engine).toBe('function');
-  });
-
   it('exports parseInput', () => {
     expect(typeof api.parseInput).toBe('function');
   });

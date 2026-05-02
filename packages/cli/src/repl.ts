@@ -16,7 +16,6 @@ import {
   isLocalCommand, handleLocalCommand,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
-import { Engine } from './engine.js';
 import { SessionManager } from './recorder.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -31,7 +30,6 @@ export interface ReplOpts extends EngineOpts {
   bridge?: boolean;
   bridgePort?: number;
   relay?: boolean;
-  engine?: boolean;
   http?: boolean;
   httpPort?: number;
   interactive?: boolean;
@@ -40,7 +38,7 @@ export interface ReplOpts extends EngineOpts {
 }
 
 export interface ReplContext {
-  conn: Engine;
+  conn: { run(args: ParsedArgs): Promise<EngineResult>; close(): Promise<void>; start(opts: ReplOpts): Promise<void>; connected: boolean };
   session: SessionManager;
   rl: readline.Interface | null;
   opts: ReplOpts;
@@ -1372,53 +1370,11 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
 
-  // ─── Standalone mode (new: serviceWorker.evaluate) ─────────────
-
-  if (!opts.bridge && !opts.relay && !opts.connect && !opts.engine) {
-    const { EvaluateConnection, findExtensionPath } = await import('@playwright-repl/core');
-    const extPath = process.env.VITEST ? null : findExtensionPath(import.meta.url);
-    if (extPath) {
-      const conn = new EvaluateConnection();
-      log(`${c.dim}Launching Chromium with extension...${c.reset}`);
-      try {
-        const { chromium } = await import('playwright');
-        // Default to headed for evaluate mode (interactive REPL with extension)
-        await conn.start(extPath, { headed: opts.headed ?? true, chromium });
-        log(`${c.green}✓${c.reset} Browser ready (with extension)`);
-        if (opts.command) {
-          const result = await conn.run(opts.command);
-          process.stdout.write((result.text ?? '') + '\n');
-          await conn.close();
-          process.exit(result.isError ? 1 : 0);
-        }
-        // Start HTTP server if --http
-        if (opts.http) {
-          try {
-            await startHttpServer(opts.httpPort ?? DEFAULT_HTTP_PORT, conn as CommandRunner, log);
-          } catch (e: unknown) {
-            log(`${c.yellow}⚠${c.reset} HTTP server failed: ${(e as Error).message}`);
-          }
-        }
-        // --http runs as a console (no readline) unless --interactive is also set
-        if (opts.http && !opts.interactive && !(opts.replay && opts.replay.length > 0)) {
-          log(`${c.dim}Console mode — send commands via HTTP. Ctrl+C to exit.${c.reset}\n`);
-          await waitForShutdown(log);
-          await conn.close();
-          process.exit(0);
-        }
-        log(`${c.dim}Type .help for commands, JavaScript supported${c.reset}\n`);
-        if (opts.replay && opts.replay.length > 0) {
-          await runBridgeReplayMode(opts, conn as any);
-        } else {
-          await startBridgeLoop(opts, conn as any);
-        }
-        return;
-      } catch (err: unknown) {
-        log(`${c.yellow}⚠${c.reset} ${c.dim}Could not launch with extension: ${(err as Error).message}${c.reset}`);
-        log(`${c.dim}Falling back to standard engine...${c.reset}\n`);
-      }
-    }
+  // Default to relay mode when no mode is explicitly specified
+  if (!opts.bridge && !opts.relay && !opts.connect) {
+    opts.relay = true;
   }
+
 
   // ─── Relay-only mode ───────────────────────────────────────────────
 
@@ -1528,66 +1484,7 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
     return;
   }
 
-  // ─── Start engine (fallback) ────────────────────────────────────
-
-  log(`${c.dim}Type .help for commands${c.reset}\n`);
-
-  const conn = new Engine();
-  try {
-    await conn.start(opts);
-    log(`${c.green}✓${c.reset} Browser ready\n`);
-  } catch (err: unknown) {
-    console.error(`${c.red}✗${c.reset} Failed to start: ${(err as Error).message}`);
-    process.exit(1);
-  }
-
-  if (opts.command) {
-    const parsed = parseInput(opts.command);
-    if (!parsed) {
-      process.stderr.write('Invalid command\n');
-      conn.close();
-      process.exit(1);
-      return; // unreachable, but satisfies TS control-flow
-    }
-    const result = await conn.run(parsed);
-    process.stdout.write((result.text ?? '') + '\n');
-    conn.close();
-    process.exit(result.isError ? 1 : 0);
-  }
-
-  // ─── Session + readline ──────────────────────────────────────────
-
-  const session = new SessionManager();
-  const historyDir = path.join(os.homedir(), '.playwright-repl');
-  const historyFile = path.join(historyDir, '.repl-history');
-  const ctx: ReplContext = { conn, session, rl: null, opts, log, historyFile, sessionHistory: [], commandCount: 0, errors: 0 };
-
-  // Auto-start recording if --record was passed
-  if (opts.record) {
-    const file = session.startRecording(opts.record);
-    log(`${c.red}⏺${c.reset} Recording to ${c.bold}${file}${c.reset}`);
-  }
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: promptStr(ctx),
-    historySize: 500,
-  });
-  ctx.rl = rl;
-
-  try {
-    const hist = fs.readFileSync(historyFile, 'utf-8').split('\n').filter(Boolean).reverse();
-    for (const line of hist) (rl as readline.Interface & { history: string[] }).history.push(line);
-  } catch { /* ignore */ }
-
-  attachGhostCompletion(rl, buildCompletionItems());
-
-  // ─── Start ───────────────────────────────────────────────────────
-
-  if (opts.replay && opts.replay.length > 0) {
-    await runMultiReplayMode(ctx, opts.replay, opts.step || false);
-  } else {
-    startCommandLoop(ctx);
-  }
+  // No mode matched — this shouldn't happen since relay is now the default
+  console.error(`${c.red}✗${c.reset} No execution mode selected. Use --relay or --connect.`);
+  process.exit(1);
 }
