@@ -59,7 +59,6 @@ export default defineConfig({
         background: resolve(__dirname, "src/background.ts"),
         "panel/panel": resolve(__dirname, "src/panel/panel.html"),
         "preferences/preferences": resolve(__dirname, "src/preferences/preferences.html"),
-        "offscreen/offscreen": resolve(__dirname, "src/offscreen/offscreen.html"),
         "devtools/devtools": resolve(__dirname, "src/devtools/devtools.html"),
         "devtools/console": resolve(__dirname, "src/devtools/console.html"),
       },
