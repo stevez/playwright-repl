@@ -26,7 +26,7 @@ Instead of writing `page.locator('[placeholder="What needs to be done?"]').fill(
 | [Dramaturg](packages/extension/README.md) | Chrome extension — console, script editor, recorder, JS debugger |
 | [`@playwright-repl/runner`](packages/runner/README.md) | Test runner — drop-in replacement for `npx playwright test` with context reuse |
 | [`@playwright-repl/mcp`](packages/mcp/README.md) | MCP server — AI agents control your real Chrome browser |
-| [`@playwright-repl/core`](packages/core/README.md) | Shared parser, servers, and utilities |
+| [`@playwright-repl/core`](packages/core/README.md) | Shared parser, relay server, and utilities |
 
 ---
 
@@ -66,21 +66,14 @@ pw> verify text 1 item left
 pw> screenshot
 ```
 
-**Two modes:**
-
-| Mode | Flag | How it works |
-|------|------|--------------|
-| **Standalone** | *(default)* | Launches Chromium with Dramaturg extension |
-| **Bridge** | `--bridge` | Connects to your real Chrome via Dramaturg extension |
-
-Standalone launches a fresh Chromium with the extension pre-installed — keyword commands and JavaScript both work. Use `--headless` for CI/scripting.
+Launches Chromium directly with full Playwright API — keyword commands and JavaScript both work. Use `--headless` for CI/scripting, `--connect` to attach to existing Chrome.
 
 **Single-command mode** — run one command and exit, useful for automation tools like Claude Code:
 
 ```bash
-playwright-repl --bridge --command "snapshot"
-playwright-repl --bridge --command "goto https://example.com"
-playwright-repl --bridge --command "click \"Interested\""
+playwright-repl --command "snapshot"
+playwright-repl --command "goto https://example.com"
+playwright-repl --command "click \"Interested\""
 ```
 
 > **[Full CLI docs](packages/cli/README.md)**
@@ -96,7 +89,7 @@ npm install -D @playwright-repl/runner
 ```
 
 ```bash
-pw test                              # run Playwright tests (2.8x faster via extension)
+pw test                              # run Playwright tests with context reuse
 pw repl                              # interactive REPL with keyword + JS support
 pw repl --headless                   # headless mode for scripting
 ```
@@ -125,12 +118,12 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dra
 
 ## MCP Server — AI Browser Agent
 
-AI agents control the browser — standalone or connected to your real Chrome.
+AI agents control the browser — standalone or connected to your real Chrome via CDP relay.
 
 ```bash
 npm install -g @playwright-repl/mcp
 playwright-repl-mcp --standalone     # launch fresh browser (keyword + JS)
-playwright-repl-mcp                  # connect to existing Chrome via bridge
+playwright-repl-mcp --relay          # connect to existing Chrome via CDP relay
 ```
 
 | | `@playwright-repl/mcp` | Playwright MCP | Playwriter |
@@ -153,7 +146,7 @@ packages/
 ├── runner/         # @playwright-repl/runner — test runner (pw CLI)
 ├── extension/      # Dramaturg — Chrome side panel extension
 ├── mcp/            # @playwright-repl/mcp — MCP server for AI agents
-└── core/           # @playwright-repl/core — shared parser, servers, utilities
+└── core/           # @playwright-repl/core — shared parser, relay server, utilities
 ```
 
 ## Requirements

@@ -1,6 +1,6 @@
 # @playwright-repl/core
 
-Shared parser, connections, and utilities for the playwright-repl ecosystem.
+Shared parser, relay server, and utilities for the playwright-repl ecosystem.
 
 Used by [`playwright-repl`](../cli/README.md) (CLI), [`@playwright-repl/runner`](../runner/README.md) (runner), [`@playwright-repl/mcp`](../mcp/README.md) (MCP server), and the [VS Code extension](../vscode/README.md).
 
@@ -12,68 +12,29 @@ npm install @playwright-repl/core
 
 ## Key Exports
 
-### `EvaluateConnection`
+### `CDPRelayServer`
 
-Launch Chromium with the Dramaturg extension and execute commands via `serviceWorker.evaluate()`. No WebSocket bridge needed.
-
-```typescript
-import { EvaluateConnection, findExtensionPath } from '@playwright-repl/core';
-
-const conn = new EvaluateConnection();
-const { chromium } = await import('@playwright/test');
-const extPath = findExtensionPath(import.meta.url);
-
-await conn.start(extPath, { headed: true, chromium });
-
-const result = await conn.run('snapshot');
-console.log(result.text);
-
-await conn.runScript('await page.title()', 'javascript');
-
-await conn.close();
-```
-
-**Methods:**
-
-| Method | Description |
-|--------|-------------|
-| `start(extensionPath, opts)` | Launch Chromium with extension |
-| `run(command, opts?)` | Execute a keyword command or JS expression |
-| `runScript(script, language)` | Execute a multi-line script (`'pw'` or `'javascript'`) |
-| `evaluate(fn, arg?)` | Run arbitrary code in the service worker |
-| `connected` | `boolean` — whether the connection is active |
-| `context` | Playwright browser context |
-| `serviceWorker` | Extension service worker handle |
-| `close()` | Close the browser |
-
-### `BridgeServer`
-
-WebSocket server for connecting to an existing Chrome with the Dramaturg extension installed. Used by CLI `--bridge` mode and MCP bridge mode.
+CDP relay server for connecting Node.js (Playwright) to an existing Chrome with the Dramaturg extension. Used by CLI `--connect` mode and MCP relay mode.
 
 ```typescript
-import { BridgeServer } from '@playwright-repl/core';
+import { CDPRelayServer } from '@playwright-repl/core';
 
-const bridge = new BridgeServer();
-await bridge.start(9876);
-
-await bridge.waitForConnection();
-const result = await bridge.run('snapshot');
-
-await bridge.close();
+const relay = new CDPRelayServer();
+await relay.start(9877);
+console.log(relay.cdpEndpoint());     // ws://localhost:...
+console.log(relay.relayEndpoint());   // ws://localhost:...
 ```
 
-### `findExtensionPath`
+### `resolveCommand`
 
-Find the Dramaturg Chrome extension dist path. Checks monorepo first, then bundled npm location.
+Resolve a keyword command to a Playwright JS expression.
 
 ```typescript
-import { findExtensionPath } from '@playwright-repl/core';
+import { resolveCommand } from '@playwright-repl/core';
 
-const extPath = findExtensionPath(import.meta.url);
-// → '/path/to/packages/extension/dist' or null
+const resolved = resolveCommand('click "Submit"');
+// → { jsExpr: 'await page.getByText("Submit").click()' }
 ```
-
----
 
 ### `parseInput`
 
@@ -107,9 +68,9 @@ interface ParsedArgs {
 
 ```
 src/
-├── evaluate-connection.ts # serviceWorker.evaluate() connection + findExtensionPath
-├── bridge-server.ts       # WebSocket bridge server (BridgeServer)
+├── cdp-relay-server.ts    # CDP relay server (CDPRelayServer)
 ├── parser.ts              # Command parsing, alias resolution, resolveArgs
+├── resolve-command.ts     # Keyword → JS expression resolution
 ├── page-scripts.ts        # Text locators + assertion helpers
 ├── completion-data.ts     # Autocomplete items for all commands
 ├── snapshot-parser.ts     # Snapshot tree parsing + ref-to-locator

@@ -21,7 +21,7 @@ pw> screenshot
 ```bash
 npm install -g playwright-repl
 
-# Install Chromium (needed for standalone mode)
+# Install Chromium
 npx playwright install chromium
 ```
 
@@ -56,33 +56,31 @@ The skill defines `allowed-tools: Bash(pw-cli:*)` so the agent can run browser c
 
 | Mode | Flag | How it works |
 |------|------|--------------|
-| **Standalone** | *(default)* | Launches Chromium with Dramaturg extension — keyword + JS |
-| **Bridge** | `--bridge` | Connects to your real Chrome via Dramaturg extension — cookies and logins intact |
+| **Launch** | *(default)* | Launches Chromium directly — keyword + JS, full Playwright API |
+| **Connect** | `--connect [port]` | Connects to existing Chrome via CDP — cookies and logins intact |
 
-### Standalone
+### Launch (default)
 
-Launches Chromium with the Dramaturg extension pre-installed. Headed by default — use `--headless` for CI/scripting. Supports both keyword commands and JavaScript.
-
-```bash
-playwright-repl                # headed (default)
-playwright-repl --headless     # headless for CI/scripting
-```
-
-### Bridge
-
-The bridge mode turns your terminal into a remote console for the Chrome extension. Commands run inside your real Chrome with your existing cookies and logins.
+Launches Chromium with full Playwright API. Headed by default — use `--headless` for CI/scripting. Supports both keyword commands and JavaScript.
 
 ```bash
-playwright-repl --bridge                      # start bridge server, wait for extension
-playwright-repl --bridge --replay script.pw   # replay a script via bridge
-playwright-repl --bridge --replay examples/   # replay all .pw files
-playwright-repl --bridge --bridge-port 9877   # custom port (default 9876)
-playwright-repl --bridge --command "snapshot"  # run one command and exit
+playwright-repl                          # headed (default)
+playwright-repl --headless               # headless for CI/scripting
+playwright-repl --command "snapshot"     # run one command and exit
 ```
 
-The extension connects automatically — no need to open the side panel.
+### Connect
 
-> Requires the [Dramaturg Chrome extension](../extension/README.md).
+Connect to an existing Chrome instance via CDP. Your cookies, logins, and extensions are available.
+
+```bash
+# Start Chrome with debugging enabled:
+# chrome --remote-debugging-port=9222
+
+playwright-repl --connect                # connect to Chrome on port 9222
+playwright-repl --connect 9333           # custom port
+playwright-repl --connect --replay examples/  # replay scripts against existing Chrome
+```
 
 ### HTTP Mode
 
@@ -90,8 +88,7 @@ Add `--http` to any mode to start an HTTP server alongside the REPL. This lets o
 
 ```bash
 # Terminal 1: Start REPL with HTTP server
-playwright-repl --http                        # standalone + HTTP (port 9223)
-playwright-repl --bridge --http               # bridge + HTTP
+playwright-repl --http                        # launch + HTTP (port 9223)
 playwright-repl --http --http-port 9224       # custom port
 
 # Terminal 2: Send commands via HTTP (fast — reuses existing session)
@@ -152,7 +149,7 @@ playwright-repl --replay session.pw --step
 playwright-repl --record my-test.pw
 
 # Run a single command and exit
-playwright-repl --bridge --command "snapshot"
+playwright-repl --command "snapshot"
 
 # Pipe commands
 echo -e "goto https://example.com\nsnapshot" | playwright-repl
@@ -160,20 +157,19 @@ echo -e "goto https://example.com\nsnapshot" | playwright-repl
 
 ## Input Modes
 
-| Mode | Standalone | Bridge |
-|------|:---:|:---:|
-| **Keyword** — `click "Sign in"`, `goto https://...` | Yes | Yes |
-| **Playwright API / JS** — `await page.title()`, `1 + 1` | Yes | Yes |
+| Mode | Description |
+|------|-------------|
+| **Keyword** — `click "Sign in"`, `goto https://...` | Playwright commands in natural syntax |
+| **JavaScript** — `await page.title()`, `1 + 1` | Full Playwright API |
 
-Both modes auto-detect keyword commands and JavaScript expressions. For DOM access use `await page.evaluate(() => document.title)`. For keyword commands, see [Command Reference](#command-reference).
+The REPL auto-detects keyword commands and JavaScript expressions. For DOM access use `await page.evaluate(() => document.title)`. For keyword commands, see [Command Reference](#command-reference).
 
 ## CLI Options
 
 | Option | Description |
 |--------|-------------|
 | `--headless` | Run browser in headless mode (default: headed) |
-| `--bridge` | Connect to existing Chrome via WebSocket bridge |
-| `--bridge-port <port>` | Bridge server port (default: `9876`) |
+| `--connect [port]` | Connect to existing Chrome via CDP (default: `9222`) |
 | `--http` | Start HTTP server for external command access (port `9223`) |
 | `--http-port <port>` | HTTP server port (default: `9223`) |
 | `--command <cmd>` | Run a single command, print output, and exit |
@@ -417,8 +413,7 @@ pw> click "Submit" --frame "#my-iframe"      # click inside an iframe
 | `video-stop` | Stop recording and save video |
 | `video-chapter <title>` | Add chapter marker to recording |
 
-In **standalone mode**, video uses Playwright's screencast API and saves to `~/pw-videos/`.
-In **bridge mode**, video uses Chrome's tab capture and saves to `Downloads/pw-videos/`.
+Video uses Playwright's screencast API and saves to `~/pw-videos/`.
 
 ### Browser Control
 
