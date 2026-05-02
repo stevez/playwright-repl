@@ -5,7 +5,7 @@
  *
  * Usage:
  *   playwright-repl [options]
- *   playwright-repl --bridge --command "snapshot"
+ *   playwright-repl --command "snapshot"
  *   playwright-repl --replay session.pw
  *   playwright-repl --replay session.pw --step
  *   playwright-repl --replay file1.pw file2.pw
@@ -17,8 +17,8 @@ import { minimist } from '@playwright-repl/core';
 import { startRepl } from './repl.js';
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'bridge', 'relay', 'include-snapshot', 'verbose', 'http', 'interactive'],
-  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'bridge-port', 'command', 'http-port'],
+  boolean: ['headed', 'headless', 'persistent', 'help', 'step', 'silent', 'spawn', 'relay', 'include-snapshot', 'verbose', 'http', 'interactive'],
+  string: ['session', 'browser', 'profile', 'config', 'replay', 'record', 'connect', 'port', 'cdp-port', 'command', 'http-port'],
   alias: { s: 'session', h: 'help', b: 'browser', q: 'silent' },
   default: { session: 'default' },
 });
@@ -41,8 +41,6 @@ Options:
   --persistent           Use persistent browser profile
   --profile <dir>        Persistent profile directory
   --connect [port]       Connect to existing Chrome via CDP (default: 9222)
-  --bridge               Connect to extension via WebSocket bridge (no CDP required)
-  --bridge-port <port>   WebSocket bridge port (default: 9876)
   --cdp-port <number>    Chrome CDP port (default: 9222)
   --include-snapshot     Include snapshot in update command responses
   --verbose              Show raw response headers (### Result, ### Snapshot, etc.)
@@ -76,13 +74,11 @@ Examples:
   playwright-repl --headed               # start with visible browser
   playwright-repl --connect              # connect to Chrome on port 9222
   playwright-repl --connect 9333         # connect to Chrome on custom port
-  playwright-repl --bridge               # connect to extension via WebSocket bridge
-  playwright-repl --bridge --bridge-port 9877  # custom bridge port
   playwright-repl --replay login.pw      # replay a session
   playwright-repl --replay login.pw --step  # step through replay
   playwright-repl --replay tests/         # replay all .pw files in folder
   playwright-repl --replay a.pw b.pw      # replay multiple files
-  playwright-repl --bridge --command "snapshot"  # run one command and exit
+  playwright-repl --command "snapshot"   # run one command and exit
   echo "open https://example.com" | playwright-repl  # pipe commands
 `);
   process.exit(0);
@@ -113,12 +109,10 @@ startRepl({
   silent: (args.silent as boolean) || !!commandArg,
   record: args.record as string,
   step: args.step as boolean,
-  bridge: args.bridge as boolean,
   relay: args.relay as boolean,
   http: args.http as boolean,
   httpPort: args['http-port'] ? parseInt(args['http-port'] as string, 10) : undefined,
   interactive: args.interactive as boolean,
-  bridgePort: args['bridge-port'] ? parseInt(args['bridge-port'] as string, 10) : undefined,
   includeSnapshot: args['include-snapshot'] as boolean,
   verbose: args.verbose as boolean,
 }).catch((err: Error) => {

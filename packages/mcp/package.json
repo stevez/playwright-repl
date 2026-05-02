@@ -19,7 +19,6 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.10.0",
-        "@playwright-repl/browser-extension": "workspace:*",
         "@playwright-repl/core": "workspace:*",
         "@playwright/test": "^1.59.1",
         "playwright-repl": "workspace:*",

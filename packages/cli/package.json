@@ -40,7 +40,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@playwright-repl/browser-extension": "workspace:*",
     "@playwright-repl/core": "workspace:*",
     "@playwright/test": "^1.59.1",
     "playwright": "^1.59.1",

@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.26.0",
   "scripts": {
-    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json packages/mcp/tsconfig.build.json packages/runner/tsconfig.build.json && pnpm --filter @playwright-repl/browser-extension run build && pnpm --filter playwright-repl-vscode run build",
+    "build": "tsc --build packages/core/tsconfig.build.json packages/cli/tsconfig.build.json packages/mcp/tsconfig.build.json packages/runner/tsconfig.build.json && pnpm --filter playwright-repl-vscode run build",
     "build:dev": "node scripts/build-dev.mjs",
     "test": "pnpm run --recursive --if-present test",
     "test:core": "pnpm --filter @playwright-repl/core run test",

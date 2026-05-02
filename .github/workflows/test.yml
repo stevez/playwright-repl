@@ -138,16 +138,12 @@ jobs:
         run: pnpm exec playwright install chromium chrome
         working-directory: packages/cli
 
-      - name: Run CLI E2E tests (default mode)
+      - name: Run CLI E2E tests (relay mode, .pw scripts)
         run: node dist/playwright-repl.js --headless --replay examples/
         working-directory: packages/cli
 
-      - name: Run CLI E2E tests (relay mode)
-        run: node dist/playwright-repl.js --relay --headless --replay examples/
-        working-directory: packages/cli
-
       - name: Run CLI E2E tests (relay mode, JS scripts)
-        run: node dist/playwright-repl.js --relay --headless --replay examples-js/
+        run: node dist/playwright-repl.js --headless --replay examples-js/
         working-directory: packages/cli
 
   extension:

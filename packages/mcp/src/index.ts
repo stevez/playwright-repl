@@ -5,8 +5,6 @@ import { z } from 'zod';
 import http from 'node:http';
 import { COMMANDS, CATEGORIES } from '@playwright-repl/core';
 import pkg from '../package.json' with { type: 'json' };
-import { createBridgeRunner } from './bridge.js';
-import { createEvaluateRunner } from './evaluate.js';
 import { createStandaloneRunner } from './standalone.js';
 import { createRelayRunner } from './relay.js';
 import { logStartup, logEvent, logToolCall, logToolResult, logError, logHttp, LOG_FILE } from './logger.js';
@@ -46,20 +44,13 @@ const headed = argv.includes('--headed');
 let runnerModule;
 if (relay) {
     runnerModule = await createRelayRunner(argv);
-} else if (standalone) {
-    // Try evaluate mode (extension + JS support), fall back to Engine (keyword only)
-    try {
-        runnerModule = await createEvaluateRunner(argv);
-    } catch {
-        runnerModule = createStandaloneRunner(headed);
-    }
 } else {
-    runnerModule = await createBridgeRunner(argv);
+    runnerModule = createStandaloneRunner(headed);
 }
 
 const { runner, descriptions } = runnerModule;
 
-const mode = relay ? 'relay' : standalone ? 'standalone' : 'bridge';
+const mode = relay ? 'relay' : 'standalone';
 logStartup(mode, `log → ${LOG_FILE}`);
 
 // ─── HTTP server for --command --http piggybacking ──────────────────────────

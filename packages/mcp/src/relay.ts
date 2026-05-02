@@ -17,22 +17,18 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 // ─── Descriptions ───────────────────────────────────────────────────────────
 
-import { descriptions as bridgeDescriptions } from './bridge.js';
+import { descriptions as standaloneDescriptions } from './standalone.js';
 
 export const descriptions = {
-    ...bridgeDescriptions,
+    ...standaloneDescriptions,
 
-    runCommand: bridgeDescriptions.runCommand + `
+    runCommand: standaloneDescriptions.runCommand + `
 
-RELAY MODE BONUS: Since this server runs in relay mode, JavaScript commands execute in Node.js with real Playwright page objects. You get full access to:
-  - Filesystem (fs, path)
-  - npm packages (await import('exceljs'))
-  - Local modules (await import('./helpers.mjs'))
-  - No timeout limits`,
+RELAY MODE: JavaScript commands execute in Node.js with real Playwright page objects. Full access to filesystem, npm packages, and local modules.`,
 
-    runScript: bridgeDescriptions.runScript + `
+    runScript: standaloneDescriptions.runScript + `
 
-RELAY MODE BONUS: language='javascript' scripts execute in Node.js with full access to filesystem, npm packages, streams, and child processes. No timeout limits.`,
+RELAY MODE: language='javascript' scripts execute in Node.js with full access to filesystem, npm packages, streams, and child processes.`,
 };
 
 // ─── Script execution ───────────────────────────────────────────────────────

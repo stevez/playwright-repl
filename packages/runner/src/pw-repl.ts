@@ -1,8 +1,8 @@
 /**
- * pw repl — REPL using serviceWorker.evaluate().
+ * pw repl — interactive REPL with Playwright page objects.
  *
- * Launches Chromium with the Dramaturg extension and provides
- * a Node REPL with Playwright globals (page, context, expect).
+ * Launches Chromium directly (relay mode) and provides
+ * a Node REPL with page, context, expect globals.
  *
  * Usage:
  *   pw repl                        # interactive REPL (headed)
@@ -15,10 +15,12 @@ import { inspect } from 'node:util';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { EvaluateConnection, findExtensionPath, minimist } from '@playwright-repl/core';
+import { minimist, resolveCommand } from '@playwright-repl/core';
 
 const __filename = fileURLToPath(import.meta.url);
 const _require = createRequire(__filename);
+
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 export async function handleRepl(argv: string[]): Promise<void> {
   const args = minimist(argv, {
@@ -31,13 +33,20 @@ export async function handleRepl(argv: string[]): Promise<void> {
   const headed = args.headed ? true : !args.headless;
   const scriptFile = args._[0] as string | undefined;
 
-  // If --port is given, connect to existing Chrome via CDP (legacy mode)
+  // Load Playwright
+  const pw = _require('@playwright/test');
+  const { expect } = pw;
+
+  let browser: unknown;
+  let context: unknown;
+  let page: unknown;
+
   if (port) {
-    const pw = _require('@playwright/test');
-    const browser = await pw.chromium.connectOverCDP(`http://localhost:${port}`);
-    const context = browser.contexts()[0];
-    const pages = context?.pages() ?? [];
-    const page = pages.find((p: { url: () => string }) => {
+    // Connect to existing Chrome via CDP
+    browser = await pw.chromium.connectOverCDP(`http://localhost:${port}`);
+    context = (browser as { contexts(): unknown[] }).contexts()[0];
+    const pages = (context as { pages(): { url(): string }[] })?.pages() ?? [];
+    page = pages.find((p: { url: () => string }) => {
       const url = p.url();
       return !url.startsWith('devtools://') && !url.startsWith('chrome://') && !url.startsWith('about:');
     }) ?? pages[0];
@@ -45,56 +54,35 @@ export async function handleRepl(argv: string[]): Promise<void> {
       console.error('No page found. Open a page in the browser first.');
       process.exit(1);
     }
-    const { expect } = _require('@playwright/test');
     console.log(`Connected to Chrome on port ${port}`);
-
-    if (scriptFile) {
-      const script = fs.readFileSync(scriptFile, 'utf-8');
-      const fn = new Function('page', 'context', 'browser', 'expect',
-        `return (async () => {\n${script}\n})()`);
-      const start = performance.now();
-      try {
-        const result = await fn(page, context, browser, expect);
-        const elapsed = performance.now() - start;
-        if (result !== undefined) console.log(result);
-        console.log(`\n${elapsed.toFixed(1)}ms`);
-      } catch (e: unknown) {
-        const elapsed = performance.now() - start;
-        console.error((e as Error).message);
-        console.log(`\n${elapsed.toFixed(1)}ms (error)`);
-        process.exit(1);
-      }
-      process.exit(0);
-    }
-
-    const r = repl.start({ prompt: 'pw> ', useGlobal: true });
-    Object.assign(r.context, { page, context, browser, expect });
-    await new Promise<void>(resolve => r.on('exit', () => resolve()));
-    process.exit(0);
+  } else {
+    // Launch browser directly (relay mode)
+    browser = await pw.chromium.launch({
+      headless: !headed,
+      args: ['--no-first-run', '--no-default-browser-check'],
+    });
+    context = await (browser as { newContext(): Promise<unknown> }).newContext();
+    page = await (context as { newPage(): Promise<unknown> }).newPage();
+    console.log(`Browser launched (${headed ? 'headed' : 'headless'})`);
   }
 
-  // Default: evaluate mode — launch Chromium with extension
-  const conn = new EvaluateConnection();
-  const { chromium } = _require('@playwright/test');
-  const extPath = findExtensionPath(import.meta.url);
-  if (!extPath) throw new Error('Chrome extension not found. Run "pnpm run build" first.');
-  await conn.start(extPath, { headed, chromium });
-  console.log(`Connected (${headed ? 'headed' : 'headless'})`);
-
+  // Run script file if provided
   if (scriptFile) {
     const script = fs.readFileSync(scriptFile, 'utf-8');
+    const fn = new AsyncFunction('page', 'context', 'expect', script);
     const start = performance.now();
     try {
-      const result = await conn.runScript(script, 'javascript');
+      const result = await fn(page, context, expect);
       const elapsed = performance.now() - start;
-      if (result.text) console.log(result.text);
-      console.log(`${elapsed.toFixed(1)}ms${result.isError ? ' (error)' : ''}`);
+      if (result !== undefined) console.log(result);
+      console.log(`\n${elapsed.toFixed(1)}ms`);
     } catch (e: unknown) {
       const elapsed = performance.now() - start;
       console.error((e as Error).message);
-      console.log(`${elapsed.toFixed(1)}ms (error)`);
+      console.log(`\n${elapsed.toFixed(1)}ms (error)`);
+      process.exit(1);
     }
-    await conn.close();
+    await (browser as { close(): Promise<void> }).close();
     process.exit(0);
   }
 
@@ -107,14 +95,23 @@ export async function handleRepl(argv: string[]): Promise<void> {
     eval: (input: string, _context: object, _file: string, cb: EvalCb) => {
       const cmd = input.trim();
       if (!cmd) { cb(null, undefined); return; }
+
       const start = performance.now();
-      conn.run(cmd).then(
-        (result) => {
+
+      // Try keyword command first
+      const resolved = resolveCommand(cmd);
+      const jsExpr = resolved ? resolved.jsExpr : cmd;
+
+      const fn = new AsyncFunction('page', 'context', 'expect', `return ${jsExpr}`);
+      fn(page, context, expect).then(
+        (result: unknown) => {
           lastElapsed = performance.now() - start;
-          if (result.isError) cb(new Error(result.text || 'Unknown error'));
-          else cb(null, result.text || undefined);
+          cb(null, result ?? undefined);
         },
-        (err) => { lastElapsed = performance.now() - start; cb(err as Error); },
+        (err: Error) => {
+          lastElapsed = performance.now() - start;
+          cb(err);
+        },
       );
     },
     writer(value: unknown): string {
@@ -129,7 +126,10 @@ export async function handleRepl(argv: string[]): Promise<void> {
   });
 
   await new Promise<void>(resolve => {
-    r.on('exit', async () => { await conn.close(); resolve(); });
+    r.on('exit', async () => {
+      await (browser as { close(): Promise<void> }).close();
+      resolve();
+    });
   });
   process.exit(0);
 }
