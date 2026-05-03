@@ -52,7 +52,7 @@ Module._load = function (request, parent) {
                             await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
                             if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
                             await sharedPage.evaluate(() => { try { localStorage.clear(); } catch {} try { sessionStorage.clear(); } catch {} }).catch(() => {});
-                            await sharedPage.goto('about:blank', { waitUntil: 'commit' });
+                            await sharedPage.evaluate(() => window.stop()).catch(() => {});
                         } catch {}
                     }
                     sharedContext.newPage = async () => sharedPage;
@@ -70,7 +70,7 @@ Module._load = function (request, parent) {
                             sharedPage = await sharedContext.newPage();
                         }
                         defaultViewport = sharedPage.viewportSize();
-                        await sharedPage.goto('about:blank', { waitUntil: 'commit' }).catch(() => {});
+                        await sharedPage.evaluate(() => window.stop()).catch(() => {});
                     } else {
                         try {
                             await sharedContext.clearCookies();
@@ -79,7 +79,7 @@ Module._load = function (request, parent) {
                             await sharedPage.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
                             if (defaultViewport) await sharedPage.setViewportSize(defaultViewport);
                             await sharedPage.evaluate(() => { try { localStorage.clear(); } catch {} try { sessionStorage.clear(); } catch {} }).catch(() => {});
-                            await sharedPage.goto('about:blank', { waitUntil: 'commit' });
+                            await sharedPage.evaluate(() => window.stop()).catch(() => {});
                         } catch {}
                     }
                     sharedContext.newPage = async () => sharedPage;
