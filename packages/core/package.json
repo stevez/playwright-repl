@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./dist/*": "./dist/*",
     "./static/*": "./static/*"
   },
   "types": "./dist/index.d.ts",

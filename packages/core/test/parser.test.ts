@@ -341,25 +341,20 @@ describe('--in with role-based commands (#863)', () => {
     expect(resolved._[1]).not.toContain('data-pw-in');
   });
 
-  it('uses exact text matching in --in role filter (#863)', () => {
-    // "check radio "ja" --in row "Very long text"" must use
-    // has: page.getByText("Very long text", { exact: true })
-    // not hasText: "Very long text" (which is substring matching)
+  it('uses hasText matching in --in role filter (#863)', () => {
     const args = parseInput('check radio "ja" --in row "Very long text"');
     const resolved = resolveArgs(args);
     const code = resolved._[1];
-    // actionByRole is stringified — check the filter uses exact matching
-    expect(code).toContain('getByText(inText, { exact: true })');
-    expect(code).not.toContain('hasText');
+    // actionByRole is stringified — check the filter uses hasText
+    expect(code).toContain('hasText');
   });
 
   it('uses exact text matching in --in text-only scoping (#863)', () => {
     const args = parseInput('check radio "ja" --in "Very long text"');
     const resolved = resolveArgs(args);
     const code = resolved._[1];
-    // buildRunCodeScoped filter should use exact text matching
+    // buildRunCodeScoped filter should use exact text matching (scoped path)
     expect(code).toContain('filter({ has: page.getByText("Very long text", { exact: true }) })');
-    expect(code).not.toContain('hasText');
   });
 });
 

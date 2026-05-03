@@ -26,9 +26,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@playwright-repl/browser-extension':
-        specifier: workspace:*
-        version: link:../extension
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
@@ -94,6 +91,9 @@ importers:
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
+      '@playwright-repl/core':
+        specifier: workspace:*
+        version: link:../core
       '@playwright-repl/playwright-crx':
         specifier: ^1.21.4
         version: 1.21.4
@@ -185,9 +185,6 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.10.0
         version: 1.27.1(zod@3.25.76)
-      '@playwright-repl/browser-extension':
-        specifier: workspace:*
-        version: link:../extension
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
@@ -225,9 +222,6 @@ importers:
       '@playwright-repl/core':
         specifier: workspace:*
         version: link:../core
-      '@playwright-repl/runner':
-        specifier: workspace:*
-        version: link:../runner
       eslint:
         specifier: ^10.0.2
         version: 10.0.2(jiti@2.6.1)

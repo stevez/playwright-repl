@@ -65,6 +65,7 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.16",
     "@lezer/highlight": "^1.2.3",
+    "@playwright-repl/core": "workspace:*",
     "@playwright-repl/playwright-crx": "^1.21.4",
     "codemirror": "^6.0.2",
     "js-yaml": "^4.1.1",

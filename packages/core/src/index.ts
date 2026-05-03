@@ -9,10 +9,26 @@ export { c, prettyJson } from './colors.js';
 export {
   buildRunCode, buildRunCodeScoped, verifyText, verifyElement, verifyValue, verifyList,
   verifyTitle, verifyUrl, verifyNoText, verifyNoElement,
-  verifyVisible, verifyInputValue, waitForText,
+  verifyVisible, verifyCssVisible, verifyCssElement, verifyCssNoElement, verifyCssValue,
+  verifyInputValue, waitForText,
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
 } from './page-scripts.js';
+export {
+  gotoUrl, reloadPage, goBack, goForward, waitMs, getTitle, getUrl,
+  evalCode, runCode, takeScreenshot, takeSnapshot, takePdf,
+  refAction, pressKey, typeText,
+  highlightByText, highlightByRole, highlightBySelector, highlightByRef, clearHighlight,
+  chainAction,
+  localStorageGet, localStorageSet, localStorageDelete, localStorageClear, localStorageList,
+  sessionStorageGet, sessionStorageSet, sessionStorageDelete, sessionStorageClear, sessionStorageList,
+  cookieList, cookieGet, cookieSet, cookieDelete, cookieClear,
+  getConsoleMessages, getNetworkRequests, setDialogAccept, setDialogDismiss,
+  addRoute, listRoutes, removeRoute,
+  tracingStart, tracingStop, videoStart, videoStop,
+  tabList, tabNew, tabClose, tabSelect,
+  dragDrop, resizeViewport,
+} from './command-scripts.js';
 export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
 export { filterResponse } from './filter.js';
 export { CDPRelayServer } from './cdp-relay-server.js';

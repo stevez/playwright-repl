@@ -83,7 +83,10 @@ export async function verifyText(page, text) {
 }
 
 export async function verifyElement(page, role, name) {
-  if (await page.getByRole(role, { name }).count() === 0)
+  // Link with URL: match by href instead of accessible name
+  const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
+  const loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, { name });
+  if (await loc.count() === 0)
     throw new Error('Element not found: ' + role + ' "' + name + '"');
 }
 
@@ -159,25 +162,44 @@ export async function verifyInputValue(page, label, expected) {
   if (await loc.count() === 0) loc = page.getByRole('spinbutton', { name: label });
   if (await loc.count() === 0) loc = page.getByRole('textbox', { name: label });
   if (await loc.count() === 0) loc = page.getByRole('combobox', { name: label });
-  if (await loc.count() === 0)
-    throw new Error('Element not found for label: ' + label);
-  const el = loc.first();
-  const inputType = await el.evaluate(e => e instanceof HTMLInputElement ? e.type : '');
-  if (inputType === 'checkbox') {
-    const isChecked = await el.isChecked();
-    const expectChecked = ['checked', 'true', 'yes', '1'].includes(expected.toLowerCase());
-    if (isChecked !== expectChecked)
-      throw new Error('Expected "' + label + '" to be ' + expected + ', but was ' + (isChecked ? 'checked' : 'unchecked'));
+
+  if (await loc.count() > 0) {
+    const el = loc.first();
+    const inputType = await el.evaluate(e => e instanceof HTMLInputElement ? e.type : '');
+    if (inputType === 'checkbox') {
+      const isChecked = await el.isChecked();
+      const expectChecked = ['checked', 'true', 'yes', '1'].includes(expected.toLowerCase());
+      if (isChecked !== expectChecked)
+        throw new Error('Expected "' + label + '" to be ' + expected + ', but was ' + (isChecked ? 'checked' : 'unchecked'));
+      return;
+    }
+    const value = await el.inputValue();
+    if (String(value) !== String(expected))
+      throw new Error('Expected "' + expected + '", got "' + value + '" for "' + label + '"');
     return;
   }
-  const value = await el.inputValue();
-  if (String(value) !== String(expected))
-    throw new Error('Expected "' + expected + '", got "' + value + '" for "' + label + '"');
+
+  // Radio group: find a role=group labeled <label>, then check which radio is selected
+  const group = page.getByRole('group', { name: label });
+  if (await group.count() > 0) {
+    const checkedRadio = group.locator('input[type=radio]:checked');
+    if (await checkedRadio.count() === 0)
+      throw new Error('No radio button selected in group "' + label + '"');
+    const value = await checkedRadio.evaluate(e => {
+      const lbl = document.querySelector('label[for="' + e.id + '"]');
+      return lbl ? lbl.textContent.trim() : e.value;
+    });
+    if (value !== expected)
+      throw new Error('Expected "' + expected + '" selected, got "' + value + '" in group "' + label + '"');
+    return;
+  }
+
+  throw new Error('Element not found for label: ' + label);
 }
 
 // ─── Text locator actions ───────────────────────────────────────────────────
 
-export async function actionByText(page, text, action, nth, exact?) {
+export async function actionByText(page, text, action, nth?, exact?) {
   let loc = page.getByText(text, { exact: true });
   if (!exact) {
     if (await loc.count() === 0) loc = page.getByRole('button', { name: text });
@@ -188,6 +210,13 @@ export async function actionByText(page, text, action, nth, exact?) {
     if (await loc.count() === 0) loc = page.getByText(text);
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  // Strict mode: filter hidden elements when multiple matches found
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc[action]();
 }
 
@@ -256,7 +285,7 @@ export async function selectByText(page, text, value, nth, exact?) {
   await loc.selectOption(value);
 }
 
-export async function checkByText(page, text, nth, exact?) {
+export async function checkByText(page, text, nth?, exact?) {
   if (!exact) {
     const item = page.getByRole('listitem').filter({ hasText: text });
     if (await item.count() > 0) {
@@ -270,10 +299,16 @@ export async function checkByText(page, text, nth, exact?) {
     if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc.check();
 }
 
-export async function uncheckByText(page, text, nth, exact?) {
+export async function uncheckByText(page, text, nth?, exact?) {
   if (!exact) {
     const item = page.getByRole('listitem').filter({ hasText: text });
     if (await item.count() > 0) {
@@ -287,47 +322,83 @@ export async function uncheckByText(page, text, nth, exact?) {
     if (await loc.count() === 0) loc = page.getByRole('checkbox', { name: text });
   }
   if (nth !== undefined) loc = loc.filter({ visible: true }).nth(nth);
+  if (nth === undefined && await loc.count() > 1) {
+    const visible = loc.filter({ visible: true });
+    const vc = await visible.count();
+    if (vc >= 1) loc = vc === 1 ? visible : visible.first();
+    else loc = loc.first();
+  }
   await loc.uncheck();
 }
 
 // ─── Role-based actions ─────────────────────────────────────────────────────
 
 export async function actionByRole(page, role, name, action, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  // Link with URL: match by href instead of accessible name
+  const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
+  const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
+  let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
+  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
   await loc[action]();
 }
 
 export async function fillByRole(page, role, name, value, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
+  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
   await loc.fill(value);
 }
 
 export async function selectByRole(page, role, name, value, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
+  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
   await loc.selectOption(value);
 }
 
 export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
-  let loc = page.getByRole(role, { name, exact: true });
+  const roleOpts = name ? { name, exact: true } : {};
+  let loc = page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, { name, exact: true });
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
+  } else if (inText !== undefined) {
+    for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
+      if (await scoped.count() > 0) { loc = scoped; break; }
+    }
   }
   if (nth !== undefined) loc = loc.nth(nth);
+  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
   await loc.press(key);
 }

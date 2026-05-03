@@ -425,20 +425,17 @@ describe('actionByRole', () => {
     expect(nthLoc.click).toHaveBeenCalled();
   });
 
-  it('supports --in container context with exact text matching (#863)', async () => {
-    const textLoc = mockLocator(1);
+  it('supports --in container context with hasText matching (#863)', async () => {
     const innerLoc = mockLocator(1);
     const filterLoc = { ...mockLocator(1), getByRole: vi.fn().mockReturnValue(innerLoc) };
     const loc = mockLocator(1);
     loc.filter = vi.fn().mockReturnValue(filterLoc);
     const page = {
       getByRole: vi.fn().mockReturnValue(loc),
-      getByText: vi.fn().mockReturnValue(textLoc),
     };
     await actionByRole(page, 'button', 'Save', 'click', undefined, 'dialog', 'Settings');
     expect(page.getByRole).toHaveBeenCalledWith('dialog');
-    expect(page.getByText).toHaveBeenCalledWith('Settings', { exact: true });
-    expect(loc.filter).toHaveBeenCalledWith({ has: textLoc });
+    expect(loc.filter).toHaveBeenCalledWith({ hasText: 'Settings' });
     expect(filterLoc.getByRole).toHaveBeenCalledWith('button', { name: 'Save', exact: true });
     expect(innerLoc.click).toHaveBeenCalled();
   });

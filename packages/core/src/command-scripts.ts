@@ -150,10 +150,10 @@ export async function highlightByRole(page, role, name, nth, inRole?, inText?) {
   let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
   if (inRole !== undefined && inText !== undefined) {
     const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, roleOpts);
+    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
   } else if (inText !== undefined) {
     for (const r of ['region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ has: page.getByText(inText, { exact: true }) }).getByRole(role, roleOpts);
+      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
