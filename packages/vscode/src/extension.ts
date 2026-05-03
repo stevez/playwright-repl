@@ -177,8 +177,9 @@ export class Extension implements RunHooks {
     }
 
     // Headless / debug / fallback: original Playwright extension behavior
-    const needsReset = !!this._browserController.lastCdpUrl;
+    const needsReset = !!this._browserController.lastCdpUrl || !!process.env.PW_REUSE_CDP;
     this._browserController.clearCdpUrl();
+    delete process.env.PW_REUSE_CDP;
     await this._reusedBrowser.onWillRunTests(config, debug);
     return { connectWsEndpoint: this._reusedBrowser.browserServerWSEndpoint(), resetTestServer: needsReset };
   }

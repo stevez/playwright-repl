@@ -35,7 +35,7 @@ try {
 } catch {}
 
 function preloadEnv(): Record<string, string | undefined> {
-  if (!_cdpPreloadPath)
+  if (!_cdpPreloadPath || !process.env.PW_REUSE_CDP)
     return {};
   const existing = process.env.NODE_OPTIONS || '';
   return {
