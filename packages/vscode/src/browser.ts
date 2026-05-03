@@ -1,7 +1,7 @@
 import type * as vscode from 'vscode';
 import { createRequire } from 'node:module';
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
-import { spawn, execSync, type ChildProcess } from 'node:child_process';
+import net from 'node:net';
 import path from 'node:path';
 import { resolveCommand, UPDATE_COMMANDS } from '@playwright-repl/core';
 import { recorderInit } from './relay-recorder.js';
@@ -71,7 +71,6 @@ function formatResult(value: unknown): CommandResult {
 export class BrowserManager implements IBrowserManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _browserServer: any = undefined;
-  private _chromeProcess: ChildProcess | undefined = undefined;
   private _requireFn: NodeRequire | undefined = undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _browser: any = undefined;
@@ -108,50 +107,38 @@ export class BrowserManager implements IBrowserManager {
     const headless = opts.headless ?? false;
     this._log.appendLine(`Launching Chromium (${headless ? 'headless' : 'headed'}, relay mode)...`);
 
-    // 1. Get Chrome path without loading @playwright/test in extension host
-    //    (loading it here triggers "Requiring @playwright/test second time" errors)
-    const execPath = execSync(
-      'node -p "require(\'@playwright/test\').chromium.executablePath()"',
-      { cwd: opts.workspaceFolder, encoding: 'utf8' }
-    ).trim();
-
-    // 2. Spawn Chrome with --remote-debugging-port=0, connect via CDP.
-    //    Exposes CDP URL for test workers (via PW_REUSE_CDP env var).
-    const chromeArgs = [
-      '--remote-debugging-port=0',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-background-timer-throttling',
-      '--disable-extensions',
-      '--disable-default-apps',
-      '--disable-popup-blocking',
-      '--disable-translate',
-      '--disable-sync',
-      '--password-store=basic',
-      '--use-mock-keychain',
-      ...(headless ? ['--headless=new'] : []),
-      'about:blank',
-    ];
-    this._chromeProcess = spawn(execPath, chromeArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-    this._cdpUrl = await new Promise<string>((resolve, reject) => {
-      const onData = (data: Buffer) => {
-        const match = data.toString().match(/DevTools listening on (ws:\/\/\S+)/);
-        if (match) {
-          this._chromeProcess!.stderr!.off('data', onData);
-          resolve(match[1]);
-        }
-      };
-      this._chromeProcess!.stderr!.on('data', onData);
-      this._chromeProcess!.on('error', reject);
-      this._chromeProcess!.on('exit', () => reject(new Error('Chrome exited before ready')));
+    // 1. Reserve a port, then launch via playwright-core (all default Chrome args).
+    //    Chrome listens on both pipe (Playwright) and port (test workers via CDP).
+    const debuggingPort = await new Promise<number>((resolve, reject) => {
+      const srv = net.createServer();
+      srv.listen(0, () => {
+        const port = (srv.address() as net.AddressInfo).port;
+        srv.close(() => resolve(port));
+      });
+      srv.on('error', reject);
     });
 
-    // Connect via playwright-core (doesn't have the "second time" guard that @playwright/test has)
     const pwCore = _require('playwright-core');
-    this._browser = await pwCore.chromium.connectOverCDP(this._cdpUrl);
-    this._context = this._browser.contexts()[0] || await this._browser.newContext();
-    this._page = this._context.pages()[0] || await this._context.newPage();
-    this._log.appendLine(`Chromium launched (relay mode, CDP: ${this._cdpUrl}).`);
+    this._browser = await pwCore.chromium.launch({
+      headless,
+      args: [
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-background-timer-throttling',
+        `--remote-debugging-port=${debuggingPort}`,
+      ],
+    });
+
+    // 2. Fetch CDP URL from the known debugging port
+    try {
+      const resp = await fetch(`http://127.0.0.1:${debuggingPort}/json/version`);
+      const { webSocketDebuggerUrl } = await resp.json() as { webSocketDebuggerUrl: string };
+      this._cdpUrl = webSocketDebuggerUrl;
+    } catch {}
+
+    this._context = await this._browser.newContext();
+    this._page = await this._context.newPage();
+    this._log.appendLine(`Chromium launched (relay mode, CDP: ${this._cdpUrl || 'n/a'}).`);
     // Load expect lazily (avoid loading @playwright/test in extension host)
     this._requireFn = _require;
 
@@ -198,10 +185,6 @@ export class BrowserManager implements IBrowserManager {
     if (this._browserServer) {
       await this._browserServer.close().catch(() => {});
       this._browserServer = undefined;
-    }
-    if (this._chromeProcess) {
-      this._chromeProcess.kill();
-      this._chromeProcess = undefined;
     }
     this._cdpUrl = undefined;
     this._running = false;
