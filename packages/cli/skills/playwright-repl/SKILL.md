@@ -24,23 +24,18 @@ pw-cli screenshot
 
 The `pw-cli` shorthand sends commands via HTTP to a running playwright-repl session. Start one first:
 
+**Standalone mode** — launch own browser:
 ```bash
-# Option 1: Standalone — launches Chromium with extension
-playwright-repl --http
-
-# Option 2: Standalone headless — no visible browser
-playwright-repl --http --headless
-
-# Option 3: Bridge — uses your real Chrome with Dramaturg extension
-playwright-repl --bridge --http
-
-# Option 4: Custom port (default: 9223)
-playwright-repl --http --http-port 9224
-playwright-repl --bridge --http --http-port 9224
-
-# Option 5: MCP server — HTTP starts automatically on port 9223
-# Launched by Claude Desktop / Claude Code via MCP config
+playwright-repl --http                    # headed (default)
+playwright-repl --http --headless         # headless
 ```
+
+**Connect mode** — attach to your real Chrome (cookies, sessions intact):
+```bash
+playwright-repl --connect --http          # requires Dramaturg Chrome extension
+```
+
+Both modes support `--http-port <port>` (default: 9223).
 
 When using a custom port, pass it to pw-cli:
 ```bash

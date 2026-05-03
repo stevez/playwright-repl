@@ -1126,14 +1126,14 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
   log(`${c.bold}${c.magenta}🎭 Playwright REPL${c.reset} ${c.dim}v${replVersion}${c.reset}`);
 
-  // Default to relay mode when no mode is explicitly specified
+  // Default to standalone mode (launch own browser)
   if (!opts.relay && !opts.connect) {
     opts.relay = true;
   }
 
   // ─── Relay mode ───────────────────────────────────────────────────
 
-  if (opts.relay) {
+  if (opts.relay || opts.connect) {
     const dynamicImport = Function('m', 'return import(m)') as (m: string) => Promise<any>;
     const { chromium } = await dynamicImport('playwright');
     const { expect: pwExpect } = await dynamicImport('@playwright/test').catch(() => ({ expect: undefined }));
@@ -1145,8 +1145,8 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
 
     const headless = opts.headed === false; // explicit --headless
 
-    if (!headless) {
-      // Headed (default): connect to existing Chrome via extension + CDP relay
+    if (opts.connect) {
+      // Connect mode: attach to existing Chrome via extension + CDP relay
       relay = new CDPRelayServer();
       await relay.start();
       log(`CDP relay listening on ${relay.cdpEndpoint()}`);
@@ -1163,9 +1163,12 @@ export async function startRepl(opts: ReplOpts = {}): Promise<void> {
         process.exit(1);
       }
     } else {
-      // Headless: launch browser directly — no extension needed
-      log(`${c.dim}Launching headless browser...${c.reset}`);
-      browser = await chromium.launch({ headless: true });
+      // Standalone mode (default): launch own browser
+      log(`${c.dim}Launching ${headless ? 'headless' : 'headed'} browser...${c.reset}`);
+      browser = await chromium.launch({
+        headless,
+        args: ['--no-first-run', '--no-default-browser-check'],
+      });
       relayCtx = await browser.newContext();
       relayPage = await relayCtx.newPage();
     }
