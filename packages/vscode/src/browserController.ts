@@ -71,10 +71,15 @@ export class BrowserController {
   }
 
   /** Returns connection info for test runner, or undefined if not in headed mode. */
-  async onWillRunTests(_workspaceFolder?: string): Promise<{ connectWsEndpoint: string; resetTestServer: boolean; reusingBrowser: boolean } | undefined> {
-    // Tests use ReusedBrowser path (Playwright's backend server) for proper
-    // context reuse and headed mode support. BrowserManager handles REPL/recording/picker.
-    return undefined;
+  async onWillRunTests(workspaceFolder?: string): Promise<{ connectWsEndpoint?: string; resetTestServer: boolean; reusingBrowser: boolean } | undefined> {
+    await this.ensureLaunched(workspaceFolder);
+    const cdpUrl = this._browserManager?.cdpUrl;
+    if (!cdpUrl)
+      return undefined;
+    // Set PW_REUSE_CDP so cdpPreload patches chromium.launch() in test workers
+    const needsReset = process.env.PW_REUSE_CDP !== cdpUrl;
+    process.env.PW_REUSE_CDP = cdpUrl;
+    return { resetTestServer: needsReset, reusingBrowser: true };
   }
 
   onDidRunTests() {

@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./static/*": "./static/*"
   },
   "types": "./dist/index.d.ts",
   "files": [

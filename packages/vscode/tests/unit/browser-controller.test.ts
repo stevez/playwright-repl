@@ -148,9 +148,22 @@ describe('BrowserController', () => {
     expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Could not launch browser.');
   });
 
-  it('onWillRunTests should return undefined — tests use ReusedBrowser', async () => {
-    mockBm.cdpUrl = 'ws://localhost:1234';
-    mockBm.httpPort = 5678;
+  it('onWillRunTests should set PW_REUSE_CDP and return reusingBrowser', async () => {
+    mockBm.cdpUrl = 'ws://127.0.0.1:9222/devtools/browser/abc';
+    mockBm.isRunning.mockReturnValue(true);
+    await controller.ensureLaunched();
+
+    const result = await controller.onWillRunTests('/workspace');
+    expect(result).toEqual({
+      resetTestServer: true,
+      reusingBrowser: true,
+    });
+    expect(process.env.PW_REUSE_CDP).toBe('ws://127.0.0.1:9222/devtools/browser/abc');
+    delete process.env.PW_REUSE_CDP;
+  });
+
+  it('onWillRunTests should return undefined when no cdpUrl', async () => {
+    mockBm.cdpUrl = undefined;
     mockBm.isRunning.mockReturnValue(true);
     await controller.ensureLaunched();
 
