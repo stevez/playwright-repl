@@ -31,7 +31,7 @@ import { TestServerInterface } from './upstream/testServerInterface';
 // Resolve from runner package; use forward slashes (backslashes stripped in NODE_OPTIONS on Windows)
 let _cdpPreloadPath = '';
 try {
-  _cdpPreloadPath = require.resolve('@playwright-repl/runner/dist/cdpPreload.cjs').replace(/\\/g, '/');
+  _cdpPreloadPath = require.resolve('@playwright-repl/core/static/cdpPreload.cjs').replace(/\\/g, '/');
 } catch {}
 
 function preloadEnv(): Record<string, string | undefined> {

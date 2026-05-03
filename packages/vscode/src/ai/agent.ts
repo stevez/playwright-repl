@@ -320,7 +320,7 @@ async function runTestFromFile(
   if (cdpUrl) {
     // Inject cdpPreload so Playwright reuses the running browser
     try {
-      const preloadPath = require.resolve('@playwright-repl/runner/dist/cdpPreload.cjs').replace(/\\/g, '/');
+      const preloadPath = require.resolve('@playwright-repl/core/static/cdpPreload.cjs').replace(/\\/g, '/');
       env.NODE_OPTIONS = `${env.NODE_OPTIONS || ''} --require ${preloadPath}`.trim();
     } catch { /* cdpPreload not available — run standalone */ }
     env.PW_TEST_CONNECT_WS_ENDPOINT = cdpUrl;

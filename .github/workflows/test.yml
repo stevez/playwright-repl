@@ -56,15 +56,15 @@ jobs:
           name: dist-${{ matrix.os }}
           path: |
             packages/core/dist/
+            packages/core/static/
             packages/cli/dist/
             packages/mcp/dist/
-            packages/runner/dist/
             packages/extension/dist/
             packages/vscode/dist/
           retention-days: 1
 
-  core-cli-runner-mcp:
-    name: core+cli+runner+mcp (${{ matrix.os }})
+  core-cli-mcp:
+    name: core+cli+mcp (${{ matrix.os }})
     needs: build
     runs-on: ${{ matrix.os }}
 
@@ -111,10 +111,6 @@ jobs:
       - name: Run CLI tests
         run: pnpm run test
         working-directory: packages/cli
-
-      - name: Run runner tests
-        run: pnpm run test
-        working-directory: packages/runner
 
       - name: Run MCP tests
         run: pnpm run test

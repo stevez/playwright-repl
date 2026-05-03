@@ -320,7 +320,6 @@
   },
   "dependencies": {
     "@playwright-repl/core": "workspace:*",
-    "@playwright-repl/runner": "workspace:*",
     "eslint": "^10.0.2",
     "eslint-plugin-playwright": "^2.10.1"
   },
