@@ -24,6 +24,6 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? undefined : 4,
+  workers: undefined,  // default parallelism
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
 });
