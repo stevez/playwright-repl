@@ -23,7 +23,7 @@ export function ConsoleEntry({ entry }: { entry: Entry }) {
     const [lightbox, setLightbox] = useState(false);
 
     return (
-        <div className="flex items-start gap-1 py-0.5 pb-1 border-b border-(--border-primary) last:border-b-0" data-status={entry.status}>
+        <div className="flex items-start gap-1 py-0.5 pb-1 border-b border-(--border-primary) last:border-b-0" data-status={entry.status} data-entry-id={entry.id}>
             <span className="text-(--color-prompt) shrink-0">{'>'}</span>
             <div className="flex-1 min-w-0">
                 {entry.input.split('\n').map((line, i, arr) => (

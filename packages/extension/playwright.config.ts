@@ -22,9 +22,9 @@ export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
 
   testDir: './e2e',
-  testIgnore: ['**/commands/**'],
+  fullyParallel: true,
   timeout: 60000,
   retries: 0,
-  workers: undefined,  // default parallelism
+  workers: 4,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
 });

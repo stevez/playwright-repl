@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>React &bull; TodoMVC</title>
+  <style>
+    body { font-family: sans-serif; margin: 40px; }
+    h1 { font-size: 2em; color: #b83f45; }
+    .new-todo { width: 300px; padding: 8px; font-size: 16px; }
+    .todo-list { list-style: none; padding: 0; }
+    .todo-list li { padding: 8px 0; display: flex; align-items: center; gap: 8px; }
+    .todo-list li.completed label { text-decoration: line-through; color: #999; }
+    a { color: #2196f3; cursor: pointer; }
+    .drag-zone { display: flex; gap: 20px; margin-top: 20px; }
+    .drag-item { width: 80px; height: 80px; background: #4caf50; color: white; display: flex; align-items: center; justify-content: center; cursor: grab; }
+    .drop-target { width: 120px; height: 120px; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <h1>todos</h1>
+  <input class="new-todo" placeholder="What needs to be done?" autofocus>
+  <ul class="todo-list"></ul>
+  <p><a href="page2.html">Get started</a></p>
+
+  <!-- Select dropdown -->
+  <label for="priority">Priority</label>
+  <select id="priority">
+    <option value="low">Low</option>
+    <option value="medium">Medium</option>
+    <option value="high">High</option>
+  </select>
+
+  <!-- Text input for verify-value / verify-input-value -->
+  <label for="username">Username</label>
+  <input id="username" type="text" value="admin">
+
+  <!-- File upload -->
+  <label for="file-upload">Attachment</label>
+  <input id="file-upload" type="file">
+
+  <!-- Double-click target -->
+  <button id="dblclick-target">Double-click me</button>
+  <span id="dblclick-result"></span>
+
+  <!-- Dialog triggers -->
+  <button id="alert-btn" onclick="alert('Hello alert')">Show Alert</button>
+  <button id="confirm-btn" onclick="document.getElementById('confirm-result').textContent = confirm('Are you sure?') ? 'confirmed' : 'dismissed'">Show Confirm</button>
+  <span id="confirm-result"></span>
+
+  <!-- Drag and drop -->
+  <div class="drag-zone">
+    <div class="drag-item" draggable="true" id="drag-source">Drag</div>
+    <div class="drop-target" id="drop-target">Drop here</div>
+  </div>
+
+  <!-- List for verify-list -->
+  <ul id="fruit-list">
+    <li>Apple</li>
+    <li>Banana</li>
+    <li>Cherry</li>
+  </ul>
+
+  <!-- Hidden element for verify-visible -->
+  <div id="hidden-box" style="display: none;">Hidden content</div>
+  <div id="visible-box">Visible content</div>
+
+  <script>
+    const input = document.querySelector('.new-todo');
+    const list = document.querySelector('.todo-list');
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && input.value.trim()) {
+        addTodo(input.value.trim());
+        input.value = '';
+      }
+    });
+
+    function addTodo(text) {
+      const li = document.createElement('li');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.setAttribute('aria-label', text);
+      cb.addEventListener('change', () => {
+        li.classList.toggle('completed', cb.checked);
+      });
+      const label = document.createElement('label');
+      label.textContent = text;
+      li.appendChild(cb);
+      li.appendChild(label);
+      list.appendChild(li);
+    }
+
+    // Double-click handler
+    document.getElementById('dblclick-target').addEventListener('dblclick', () => {
+      document.getElementById('dblclick-result').textContent = 'double-clicked';
+    });
+
+    // Drag and drop
+    const dragSource = document.getElementById('drag-source');
+    const dropTarget = document.getElementById('drop-target');
+    dragSource.addEventListener('dragstart', (e) => e.dataTransfer.setData('text', 'dragged'));
+    dropTarget.addEventListener('dragover', (e) => e.preventDefault());
+    dropTarget.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropTarget.textContent = 'Dropped!';
+    });
+  </script>
+</body>
+</html>
