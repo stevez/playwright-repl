@@ -66,13 +66,13 @@ async function findTabIndexFromPanel(panelPage: Page, urlSubstring: string): Pro
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
 test.describe('Navigation', () => {
-  test('goto navigates to a URL', async ({ testPage: _, panelPage, testServer }) => {
+  test('goto navigates to a URL', async ({ panelPage, testServer }) => {
     const result = await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     expect(result.isError).toBeFalsy();
     expect(result.text).toContain('127.0.0.1');
   });
 
-  test('go-back navigates to previous page', async ({ testPage: _, panelPage, testServer }) => {
+  test('go-back navigates to previous page', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, `goto ${testServer.baseUrl}/page2.html`);
     const result = await sendCommand(panelPage, 'go-back');
@@ -80,7 +80,7 @@ test.describe('Navigation', () => {
     expect(result.text).toContain(testServer.baseUrl);
   });
 
-  test('go-forward navigates to next page', async ({ testPage: _, panelPage, testServer }) => {
+  test('go-forward navigates to next page', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, `goto ${testServer.baseUrl}/page2.html`);
     await sendCommand(panelPage, 'go-back');
@@ -93,7 +93,7 @@ test.describe('Navigation', () => {
 // ─── Snapshot ────���───────────────────────────────────────────────────────────
 
 test.describe('Snapshot', () => {
-  test('snapshot returns accessibility tree with refs', async ({ testPage: _, panelPage, testServer }) => {
+  test('snapshot returns accessibility tree with refs', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'snapshot');
     expect(result.isError).toBeFalsy();
@@ -106,7 +106,7 @@ test.describe('Snapshot', () => {
 // ─── Click ───────────────────────────────────���───────────────────────────────
 
 test.describe('Click', () => {
-  test('click an element by ref', async ({ testPage: _, panelPage, testServer }) => {
+  test('click an element by ref', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const snap = await sendCommand(panelPage, 'snapshot');
     const ref = findRef(snap.text, 'todos');
@@ -114,7 +114,7 @@ test.describe('Click', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  test('click by text', async ({ testPage: _, panelPage, testServer }) => {
+  test('click by text', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'click "Get started"');
     expect(result.isError).toBeFalsy();
@@ -124,7 +124,7 @@ test.describe('Click', () => {
 // ─── Fill ────────────────────────────────────────────────────────────────────
 
 test.describe('Fill', () => {
-  test('fill an input field by text', async ({ testPage: _, panelPage, testServer }) => {
+  test('fill an input field by text', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'fill "What needs to be done" "Buy groceries"');
     expect(result.isError).toBeFalsy();
@@ -134,13 +134,13 @@ test.describe('Fill', () => {
 // ─── Press ──────���────────────────────────────────────────────────────────────
 
 test.describe('Press', () => {
-  test('press a keyboard key', async ({ testPage: _, panelPage, testServer }) => {
+  test('press a keyboard key', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'press Tab');
     expect(result.isError).toBeFalsy();
   });
 
-  test('press Enter submits a todo', async ({ testPage: _, panelPage, testServer }) => {
+  test('press Enter submits a todo', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'fill "What needs to be done" "Buy groceries"');
     const result = await sendCommand(panelPage, 'press Enter');
@@ -151,7 +151,7 @@ test.describe('Press', () => {
 // ─── Eval ────────────────────���───────────────────────────────────────────────
 
 test.describe('Eval', () => {
-  test('eval executes JavaScript', async ({ testPage: _, panelPage, testServer }) => {
+  test('eval executes JavaScript', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'eval document.title');
     expect(result.isError).toBeFalsy();
@@ -163,7 +163,7 @@ test.describe('Eval', () => {
 // ─── Screenshot ──────────────────────────────────────────────────────────────
 
 test.describe('Screenshot', () => {
-  test('screenshot captures the page', async ({ testPage: _, panelPage, testServer }) => {
+  test('screenshot captures the page', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'screenshot');
     expect(result.isError).toBeFalsy();
@@ -174,7 +174,7 @@ test.describe('Screenshot', () => {
 // ─── Check / Uncheck ─────────────────────────────────────────────────────────
 
 test.describe('Check / Uncheck', () => {
-  test('check a todo item', async ({ testPage: _, panelPage, testServer }) => {
+  test('check a todo item', async ({ panelPage, testServer }) => {
     await gotoFresh(panelPage, testServer.baseUrl);
     await sendCommand(panelPage, 'fill "What needs to be done" "Buy groceries"');
     await sendCommand(panelPage, 'press Enter');
@@ -182,7 +182,7 @@ test.describe('Check / Uncheck', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  test('uncheck a todo item', async ({ testPage: _, panelPage, testServer }) => {
+  test('uncheck a todo item', async ({ panelPage, testServer }) => {
     await gotoFresh(panelPage, testServer.baseUrl);
     await sendCommand(panelPage, 'fill "What needs to be done" "Clean house"');
     await sendCommand(panelPage, 'press Enter');
@@ -195,7 +195,7 @@ test.describe('Check / Uncheck', () => {
 // ─── Hover ───────────────────────────────────────────────────────────────────
 
 test.describe('Hover', () => {
-  test('hover over an element', async ({ testPage: _, panelPage, testServer }) => {
+  test('hover over an element', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'hover "todos"');
     expect(result.isError).toBeFalsy();
@@ -205,77 +205,77 @@ test.describe('Hover', () => {
 // ─── Verify ──────────────────────────────────────────────────────────────────
 
 test.describe('Verify', () => {
-  test('verify-text passes when text exists', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-text passes when text exists', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-text "todos"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify-text fails when text is missing', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-text fails when text is missing', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-text "nonexistent text xyz"');
     expect(result.isError).toBe(true);
     expect(result.text).toContain('Text not found');
   });
 
-  test('verify-element passes when element exists', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-element passes when element exists', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-element heading "todos"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify title passes when title matches', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify title passes when title matches', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify title "TodoMVC"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify title fails when title does not match', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify title fails when title does not match', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify title "Nonexistent Title XYZ"');
     expect(result.isError).toBe(true);
     expect(result.text).toContain('does not contain');
   });
 
-  test('verify url passes when URL matches', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify url passes when URL matches', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify url "127.0.0.1"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify url fails when URL does not match', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify url fails when URL does not match', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify url "nonexistent-path"');
     expect(result.isError).toBe(true);
     expect(result.text).toContain('does not contain');
   });
 
-  test('verify text passes when text is visible', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify text passes when text is visible', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify text "todos"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify text fails when text is not visible', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify text fails when text is not visible', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify text "nonexistent text xyz"');
     expect(result.isError).toBe(true);
     expect(result.text).toContain('Text not found');
   });
 
-  test('verify no-text passes when text is absent', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify no-text passes when text is absent', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify no-text "nonexistent text xyz"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify element passes when element exists', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify element passes when element exists', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify element heading "todos"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify no-element passes when element is absent', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify no-element passes when element is absent', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify no-element button "Nonexistent XYZ"');
     expect(result.isError).toBeFalsy();
@@ -286,7 +286,7 @@ test.describe('Verify', () => {
 // ─── Tab commands ─────────────────────────────────────────────────────────────
 
 test.describe('Tab commands', () => {
-  test('tab-list shows open tabs', async ({ testPage: _, panelPage, testServer }) => {
+  test('tab-list shows open tabs', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'tab-list');
     expect(result.isError).toBeFalsy();
@@ -295,7 +295,7 @@ test.describe('Tab commands', () => {
     expect(tabIndex).not.toBeNull();
   });
 
-  test('tab-new opens a new tab', async ({ testPage: _, panelPage, testServer }) => {
+  test('tab-new opens a new tab', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const tabsBefore = await countTabsFromPanel(panelPage);
 
@@ -306,7 +306,7 @@ test.describe('Tab commands', () => {
     expect(tabsAfter).toBe(tabsBefore + 1);
   });
 
-  test('tab-select switches to a tab by index', async ({ testPage: _, panelPage, testServer }) => {
+  test('tab-select switches to a tab by index', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'tab-new');
 
@@ -317,7 +317,7 @@ test.describe('Tab commands', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  test('tab-close closes a tab', async ({ testPage: _, panelPage, testServer }) => {
+  test('tab-close closes a tab', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'tab-new');
     const tabsBefore = await countTabsFromPanel(panelPage);
@@ -335,7 +335,7 @@ test.describe('Tab commands', () => {
 // ─── Reload ─────────────────────────────────────────────────────────────────
 
 test.describe('Reload', () => {
-  test('reload refreshes the page', async ({ testPage: _, panelPage, testServer }) => {
+  test('reload refreshes the page', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'reload');
     expect(result.isError).toBeFalsy();
@@ -345,7 +345,7 @@ test.describe('Reload', () => {
 // ─── Dblclick ────────────────────────────────────────────────────────────────
 
 test.describe('Dblclick', () => {
-  test('dblclick by text', async ({ testPage: _, panelPage, testServer }) => {
+  test('dblclick by text', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'dblclick "Double-click me"');
     expect(result.isError).toBeFalsy();
@@ -355,7 +355,7 @@ test.describe('Dblclick', () => {
 // ─── Type ────────────────────────────────────────────────────────────────────
 
 test.describe('Type', () => {
-  test('type sends keys one by one', async ({ testPage: _, panelPage, testServer }) => {
+  test('type sends keys one by one', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'click "What needs to be done"');
     const result = await sendCommand(panelPage, 'type "hello"');
@@ -366,7 +366,7 @@ test.describe('Type', () => {
 // ─── Select ──────────────────────────────────────────────────────────────────
 
 test.describe('Select', () => {
-  test('select a dropdown option', async ({ testPage: _, panelPage, testServer }) => {
+  test('select a dropdown option', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'select "Priority" "high"');
     expect(result.isError).toBeFalsy();
@@ -376,7 +376,7 @@ test.describe('Select', () => {
 // ─── Highlight ───────────────────────────────────────────────────────────────
 
 test.describe('Highlight', () => {
-  test('highlight an element by text', async ({ testPage: _, panelPage, testServer }) => {
+  test('highlight an element by text', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'highlight "todos"');
     expect(result.isError).toBeFalsy();
@@ -386,7 +386,7 @@ test.describe('Highlight', () => {
 // ─── PDF ─────────────────────────────────────────────────────────────────────
 
 test.describe('PDF', () => {
-  test('pdf generates a PDF', async ({ testPage: _, panelPage, testServer }) => {
+  test('pdf generates a PDF', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'pdf');
     expect(result.isError).toBeFalsy();
@@ -396,7 +396,7 @@ test.describe('PDF', () => {
 // ─── Resize ──────────────────────────────────────────────────────────────────
 
 test.describe('Resize', () => {
-  test('resize sets viewport dimensions', async ({ testPage: _, panelPage, testServer }) => {
+  test('resize sets viewport dimensions', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'resize 800 600');
     expect(result.isError).toBeFalsy();
@@ -406,25 +406,25 @@ test.describe('Resize', () => {
 // ─── Verify (additional) ─────────────────────────────────────────────────────
 
 test.describe('Verify (additional)', () => {
-  test('verify-visible passes for visible element', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-visible passes for visible element', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-visible heading "todos"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify-value by label passes for matching value', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-value by label passes for matching value', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-value "Username" "admin"');
     expect(result.isError).toBeFalsy();
   });
 
-  test('verify-value by label fails for wrong value', async ({ testPage: _, panelPage, testServer }) => {
+  test('verify-value by label fails for wrong value', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'verify-value "Username" "wrong"');
     expect(result.isError).toBe(true);
   });
 
-  test('wait-for-text passes when text already visible', async ({ testPage: _, panelPage, testServer }) => {
+  test('wait-for-text passes when text already visible', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'wait-for-text "todos"');
     expect(result.isError).toBeFalsy();
@@ -434,7 +434,7 @@ test.describe('Verify (additional)', () => {
 // ─── Cookie commands ─────────────────────────────────────────────────────────
 
 test.describe('Cookies', () => {
-  test('cookie-set and cookie-get', async ({ testPage: _, panelPage, testServer }) => {
+  test('cookie-set and cookie-get', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const setResult = await sendCommand(panelPage, 'cookie-set testcookie myvalue');
     expect(setResult.isError).toBeFalsy();
@@ -444,7 +444,7 @@ test.describe('Cookies', () => {
     expect(getResult.text).toContain('myvalue');
   });
 
-  test('cookie-list shows cookies', async ({ testPage: _, panelPage, testServer }) => {
+  test('cookie-list shows cookies', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'cookie-set listcookie val1');
     const result = await sendCommand(panelPage, 'cookie-list');
@@ -455,14 +455,14 @@ test.describe('Cookies', () => {
   // cookie-delete / cookie-clear use page.context().clearCookies() which triggers
   // "Protocol error (Storage.clearCookies): Either tab id or extension id must be specified."
   // in playwright-crx. Needs fix in page-scripts to pass tab context to CDP.
-  test.fixme('cookie-delete removes a cookie', async ({ testPage: _, panelPage, testServer }) => {
+  test.fixme('cookie-delete removes a cookie', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'cookie-set delcookie val');
     const result = await sendCommand(panelPage, 'cookie-delete delcookie');
     expect(result.isError).toBeFalsy();
   });
 
-  test.fixme('cookie-clear removes all cookies', async ({ testPage: _, panelPage, testServer }) => {
+  test.fixme('cookie-clear removes all cookies', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'cookie-set c1 v1');
     const result = await sendCommand(panelPage, 'cookie-clear');
@@ -473,7 +473,7 @@ test.describe('Cookies', () => {
 // ─── LocalStorage commands ───────────────────────────────────────────────────
 
 test.describe('LocalStorage', () => {
-  test('localstorage-set and localstorage-get', async ({ testPage: _, panelPage, testServer }) => {
+  test('localstorage-set and localstorage-get', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const setResult = await sendCommand(panelPage, 'localstorage-set mykey myval');
     expect(setResult.isError).toBeFalsy();
@@ -483,7 +483,7 @@ test.describe('LocalStorage', () => {
     expect(getResult.text).toContain('myval');
   });
 
-  test('localstorage-list shows items', async ({ testPage: _, panelPage, testServer }) => {
+  test('localstorage-list shows items', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'localstorage-set lskey lsval');
     const result = await sendCommand(panelPage, 'localstorage-list');
@@ -491,14 +491,14 @@ test.describe('LocalStorage', () => {
     expect(result.text).toContain('lskey');
   });
 
-  test('localstorage-delete removes a key', async ({ testPage: _, panelPage, testServer }) => {
+  test('localstorage-delete removes a key', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'localstorage-set delkey delval');
     const result = await sendCommand(panelPage, 'localstorage-delete delkey');
     expect(result.isError).toBeFalsy();
   });
 
-  test('localstorage-clear removes all items', async ({ testPage: _, panelPage, testServer }) => {
+  test('localstorage-clear removes all items', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'localstorage-set k1 v1');
     const result = await sendCommand(panelPage, 'localstorage-clear');
@@ -509,7 +509,7 @@ test.describe('LocalStorage', () => {
 // ─── SessionStorage commands ─────────────────────────────────────────────────
 
 test.describe('SessionStorage', () => {
-  test('sessionstorage-set and sessionstorage-get', async ({ testPage: _, panelPage, testServer }) => {
+  test('sessionstorage-set and sessionstorage-get', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const setResult = await sendCommand(panelPage, 'sessionstorage-set sskey ssval');
     expect(setResult.isError).toBeFalsy();
@@ -519,7 +519,7 @@ test.describe('SessionStorage', () => {
     expect(getResult.text).toContain('ssval');
   });
 
-  test('sessionstorage-list shows items', async ({ testPage: _, panelPage, testServer }) => {
+  test('sessionstorage-list shows items', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'sessionstorage-set sslistkey sslistval');
     const result = await sendCommand(panelPage, 'sessionstorage-list');
@@ -527,14 +527,14 @@ test.describe('SessionStorage', () => {
     expect(result.text).toContain('sslistkey');
   });
 
-  test('sessionstorage-delete removes a key', async ({ testPage: _, panelPage, testServer }) => {
+  test('sessionstorage-delete removes a key', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'sessionstorage-set ssdelkey ssdelval');
     const result = await sendCommand(panelPage, 'sessionstorage-delete ssdelkey');
     expect(result.isError).toBeFalsy();
   });
 
-  test('sessionstorage-clear removes all items', async ({ testPage: _, panelPage, testServer }) => {
+  test('sessionstorage-clear removes all items', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'sessionstorage-set ssk1 ssv1');
     const result = await sendCommand(panelPage, 'sessionstorage-clear');
@@ -545,7 +545,7 @@ test.describe('SessionStorage', () => {
 // ─── Dialog commands ─────────────────────────────────────────────────────────
 
 test.describe('Dialog', () => {
-  test('dialog-accept accepts an alert', async ({ testPage: _, panelPage, testServer }) => {
+  test('dialog-accept accepts an alert', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     // Set up dialog handler then trigger the alert
     await sendCommand(panelPage, 'dialog-accept');
@@ -553,7 +553,7 @@ test.describe('Dialog', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  test('dialog-dismiss dismisses a confirm', async ({ testPage: _, panelPage, testServer }) => {
+  test('dialog-dismiss dismisses a confirm', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendCommand(panelPage, 'dialog-dismiss');
     const result = await sendCommand(panelPage, 'click "Show Confirm"');
@@ -569,7 +569,7 @@ test.describe('Errors', () => {
     expect(result.isError).toBe(true);
   });
 
-  test('invalid ref returns error', async ({ testPage: _, panelPage, testServer }) => {
+  test('invalid ref returns error', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendCommand(panelPage, 'click e9999');
     expect(result.isError).toBe(true);
@@ -581,34 +581,34 @@ test.describe('Errors', () => {
 // drive the UI directly instead of using sendCommand.
 
 test.describe('run-code', () => {
-  test('returns page title', async ({ testPage: _, panelPage, testServer }) => {
+  test('returns page title', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}/page2.html`);
     const result = await sendViaUI(panelPage, 'run-code await page.title()');
     expect(result.isError).toBe(false);
     expect(result.text).toContain('Playwright');
   });
 
-  test('executes chained locator calls', async ({ testPage: _, panelPage, testServer }) => {
+  test('executes chained locator calls', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await page.locator('text=Get started').click()");
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('returns Done for void actions', async ({ testPage: _, panelPage, testServer }) => {
+  test('returns Done for void actions', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await page.click('h1')");
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('goto does not hang', async ({ testPage: _, panelPage, testServer }) => {
+  test('goto does not hang', async ({ panelPage, testServer }) => {
     const result = await sendViaUI(panelPage, `run-code await page.goto('${testServer.baseUrl}')`);
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('reports errors from failed calls', async ({ testPage: _, panelPage, testServer }) => {
+  test('reports errors from failed calls', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await page.locator('.nonexistent-xyz').click({ timeout: 1000 })");
     expect(result.isError).toBe(true);
@@ -618,42 +618,42 @@ test.describe('run-code', () => {
 // ─── run-code: expect() ────────��──────────────────────────────────────────────
 
 test.describe('run-code: expect()', () => {
-  test('expect(page).toHaveTitle() passes', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(page).toHaveTitle() passes', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveTitle(/TodoMVC/)");
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('expect(page).toHaveTitle() fails with assertion error', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(page).toHaveTitle() fails with assertion error', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveTitle('WrongTitle')");
     expect(result.isError).toBe(true);
     expect(result.text).toContain('toHaveTitle');
   });
 
-  test('expect(page).toHaveURL() passes (regex)', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(page).toHaveURL() passes (regex)', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page).toHaveURL(/127\\.0\\.0\\.1/)");
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('expect(locator).toBeVisible() passes', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(locator).toBeVisible() passes', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page.locator('h1')).toBeVisible()");
     expect(result.isError).toBe(false);
     expect(result.text).toBe('Done');
   });
 
-  test('expect(locator).toBeVisible() fails for missing element', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(locator).toBeVisible() fails for missing element', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page.locator('.nonexistent-xyz')).toBeVisible({ timeout: 1000 })");
     expect(result.isError).toBe(true);
     expect(result.text).toContain('toBeVisible');
   });
 
-  test('expect(locator).toHaveText() passes', async ({ testPage: _, panelPage, testServer }) => {
+  test('expect(locator).toHaveText() passes', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     const result = await sendViaUI(panelPage, "run-code await expect(page.locator('h1')).toHaveText('todos')");
     expect(result.isError).toBe(false);
@@ -666,13 +666,13 @@ test.describe('run-code: expect()', () => {
 // output pane via Runtime.consoleAPICalled CDP events.
 
 test.describe('Console.log capture', () => {
-  test('console.log string appears in output', async ({ testPage: _, panelPage, testServer }) => {
+  test('console.log string appears in output', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendViaUI(panelPage, 'run-code console.log("e2e-log-marker")');
     await expect(panelPage.getByTestId('output')).toContainText('e2e-log-marker');
   });
 
-  test('console.log object shows properties', async ({ testPage: _, panelPage, testServer }) => {
+  test('console.log object shows properties', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendViaUI(panelPage, 'run-code console.log({testKey: "testVal"})');
     const output = panelPage.getByTestId('output');
@@ -680,7 +680,7 @@ test.describe('Console.log capture', () => {
     await expect(output).toContainText('testVal');
   });
 
-  test('console.warn appears in output', async ({ testPage: _, panelPage, testServer }) => {
+  test('console.warn appears in output', async ({ panelPage, testServer }) => {
     await sendCommand(panelPage, `goto ${testServer.baseUrl}`);
     await sendViaUI(panelPage, 'run-code console.warn("e2e-warn-marker")');
     await expect(panelPage.getByTestId('output')).toContainText('e2e-warn-marker');
