@@ -55,10 +55,10 @@ function createTestServer(): Promise<{ server: http.Server; baseUrl: string }> {
   });
 }
 
-// ─── Test fixtures ────��─────────────────────────────────────────────────────
+// ─── Test fixtures ──────────────────────────────────────────────────────────
 
 export const test = base.extend<
-  { panelPage: Page; testPage: Page },
+  { panelPage: Page },
   { extensionContext: ExtensionContext; testServer: { baseUrl: string } }
 >({
   // Worker-scoped: local HTTP server for fixture pages
@@ -83,7 +83,7 @@ export const test = base.extend<
 
     // Navigate the initial blank tab to a real page so auto-attach never sees about:blank
     const [initialPage] = context.pages();
-    if (initialPage) await initialPage.goto(`${testServer.baseUrl}/page2.html`);
+    if (initialPage) await initialPage.goto(testServer.baseUrl);
 
     let sw = context.serviceWorkers()[0];
     if (!sw) sw = await context.waitForEvent('serviceworker');
@@ -93,46 +93,40 @@ export const test = base.extend<
     await context.close();
   }, { scope: 'worker' }],
 
-  // Test-scoped: fresh panel page per test
-  // collectClientCoverage wraps the entire lifecycle so startJSCoverage runs before goto
-  panelPage: async ({ extensionContext }, use, testInfo) => {
+  // Test-scoped: fresh panel page + target tab per test
+  panelPage: async ({ extensionContext, testServer }, use, testInfo) => {
     const { context, extensionId } = extensionContext;
+
+    // Create target page
+    const targetPage = await context.newPage();
+    await targetPage.goto(testServer.baseUrl);
+
+    // Create panel page
     const page = await context.newPage();
 
     await collectClientCoverage(page, testInfo, async () => {
       await page.goto(`chrome-extension://${extensionId}/panel/panel.html`);
       await page.waitForSelector('[data-testid="command-input"]', { timeout: 10000 });
-      await use(page);
-    }, { transformUrl });
 
-    await page.close();
-  },
+      // Bring target to front AFTER panel is ready (so it's the active tab for query)
+      await targetPage.bringToFront();
 
-  // Test-scoped: target page navigated to fixture, attached to extension
-  testPage: async ({ extensionContext, panelPage, testServer }, use) => {
-    const { context } = extensionContext;
-    const page = await context.newPage();
-    await page.goto(testServer.baseUrl);
-
-    // Bring to front so it's the active tab for chrome.tabs.query
-    await page.bringToFront();
-
-    // Attach the extension to the active tab (with timeout to fail fast)
-    await panelPage.evaluate(() =>
-      Promise.race([
+      // Attach extension to the active target tab
+      await page.evaluate(() =>
         new Promise(resolve =>
           chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) =>
             tab?.id
               ? chrome.runtime.sendMessage({ type: 'attach', tabId: tab.id }, resolve)
               : resolve({ ok: false })
           )
-        ),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('attach timeout')), 10000)),
-      ])
-    );
+        )
+      );
 
-    await use(page);
+      await use(page);
+    }, { transformUrl });
+
     await page.close();
+    await targetPage.close();
   },
 });
 
