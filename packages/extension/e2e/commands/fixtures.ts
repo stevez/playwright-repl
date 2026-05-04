@@ -89,6 +89,9 @@ export const test = base.extend<
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extensionId = sw.url().split('/')[2];
 
+    // Warm up the service worker so it's responsive for the first test
+    await sw.evaluate(() => chrome.runtime.getURL(''));
+
     await use({ context, extensionId, sw });
     await context.close();
   }, { scope: 'worker' }],
