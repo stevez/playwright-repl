@@ -164,11 +164,6 @@ export async function sendCommand(
   await panelPage.keyboard.press('Escape'); // close autocomplete
   await panelPage.keyboard.press('Enter');
 
-  // Wait for a NEW entry (not in prevIds) to reach done/error status
-  const newEntry = output.locator('[data-entry-id]').filter({
-    has: panelPage.locator('[data-type]'),
-  });
-
   // Poll until we find a completed entry with a new ID
   await expect(async () => {
     const entries = await output.locator('[data-entry-id]').evaluateAll(
