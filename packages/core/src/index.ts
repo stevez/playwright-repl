@@ -44,5 +44,6 @@ export { buildSystemPrompt, buildUserMessage, buildGrammarReference } from './pr
 export type { PromptContext, PromptOptions } from './prompt-builder.js';
 export { pwLineToJs, pwScriptToSpec } from './pw-to-js.js';
 export type { ConvertOptions } from './pw-to-js.js';
+export { SessionRecorder, SessionPlayer, SessionManager } from './session-recorder.js';
 export { getActiveModel, resolveConfigFromEnv, DEFAULT_MODELS, PROVIDER_BASE_URLS, PROVIDER_ENV_KEYS } from './llm-config.js';
 export type { LlmProvider, LlmModelConfig, LlmSettings } from './llm-config.js';

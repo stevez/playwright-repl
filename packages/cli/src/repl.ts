@@ -160,6 +160,58 @@ export async function handleClose(ctx: ReplContext): Promise<void> {
   }
 }
 
+// ─── Recording commands (start-recording, stop-recording, etc.) ────────────
+
+function handleRecordingCommand(ctx: ReplContext, cmdName: string, args: ParsedArgs): boolean {
+  const { session } = ctx;
+
+  if (cmdName === 'start-recording') {
+    try {
+      const filename = args._[1] || undefined;
+      const file = session.startRecording(filename);
+      console.log(`${c.red}⏺${c.reset} Recording to ${c.bold}${file}${c.reset}`);
+      ctx.rl?.setPrompt(promptStr(ctx));
+    } catch (err: unknown) {
+      console.log(`${c.yellow}${(err as Error).message}${c.reset}`);
+    }
+    return true;
+  }
+
+  if (cmdName === 'stop-recording') {
+    try {
+      const { filename, count } = session.save();
+      console.log(`${c.green}✓${c.reset} Saved ${count} commands to ${c.bold}${filename}${c.reset}`);
+      ctx.rl?.setPrompt(promptStr(ctx));
+    } catch (err: unknown) {
+      console.log(`${c.yellow}${(err as Error).message}${c.reset}`);
+    }
+    return true;
+  }
+
+  if (cmdName === 'pause-recording') {
+    try {
+      const paused = session.togglePause();
+      console.log(paused ? `${c.yellow}⏸${c.reset} Recording paused` : `${c.red}⏺${c.reset} Recording resumed`);
+    } catch (err: unknown) {
+      console.log(`${c.yellow}${(err as Error).message}${c.reset}`);
+    }
+    return true;
+  }
+
+  if (cmdName === 'discard-recording') {
+    try {
+      session.discard();
+      console.log(`${c.yellow}Recording discarded${c.reset}`);
+      ctx.rl?.setPrompt(promptStr(ctx));
+    } catch (err: unknown) {
+      console.log(`${c.yellow}${(err as Error).message}${c.reset}`);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 // ─── Session meta-commands (.record, .save, .pause, .discard, .replay) ──────
 
 export function handleSessionCommand(ctx: ReplContext, line: string): boolean {
@@ -308,6 +360,9 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
   if (cmdName === 'kill-all') return handleKillAll(ctx) as unknown as void;
   if (cmdName === 'close' || cmdName === 'close-all') return handleClose(ctx) as unknown as void;
 
+  // ── Recording commands (start/stop/pause/discard-recording) ──
+  if (handleRecordingCommand(ctx, cmdName, args)) return;
+
   // ── Command transformations (verify, role-based, text, run-code) ──
   const resolved = resolveArgs(args);
   if (resolved._[0] === args._[0] && cmdName === 'verify') {
@@ -331,6 +386,10 @@ export async function processLine(ctx: ReplContext, line: string): Promise<void>
         ? { includeSnapshot: ctx.opts.includeSnapshot, verbose: ctx.opts.verbose } : undefined;
       const filtered = filterResponse(result.text, cmdName, filterOpts);
       if (filtered !== null) console.log(filtered);
+    }
+    // Feed snapshot to recorder for ref-to-locator resolution
+    if (cmdName === 'snapshot' && result?.text && !result.isError) {
+      ctx.session.setSnapshot(result.text);
     }
     if (result?.isError) ctx.errors++;
     ctx.commandCount++;

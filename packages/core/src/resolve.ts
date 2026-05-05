@@ -172,6 +172,12 @@ export const COMMANDS: Record<string, CommandInfo> = {
   'download-as':       { desc: 'Set filename for next download', options: [],
                          usage: 'download-as <filename>',
                          examples: ['download-as bills/rogers-2026-03.pdf'] },
+  'start-recording':   { desc: 'Start recording commands to .pw file', options: [],
+                         usage: 'start-recording [filename]',
+                         examples: ['start-recording', 'start-recording my-flow.pw'] },
+  'stop-recording':    { desc: 'Stop recording and save .pw file', options: [] },
+  'pause-recording':   { desc: 'Pause/resume recording', options: [] },
+  'discard-recording': { desc: 'Discard current recording', options: [] },
   'install-browser':   { desc: 'Install browser', options: [] },
   'list':              { desc: 'List sessions', options: [] },
   'close-all':         { desc: 'Close all sessions', options: [] },
@@ -190,6 +196,7 @@ export const CATEGORIES: Record<string, string[]> = {
   'State':          ['state-save', 'state-load'],
   'Video':          ['video-start', 'video-stop', 'video-chapter'],
   'Tracing':        ['tracing-start', 'tracing-stop'],
+  'Recording':      ['start-recording', 'stop-recording', 'pause-recording', 'discard-recording'],
   'Other':          ['dialog-accept', 'dialog-dismiss', 'route', 'route-list', 'unroute', 'resize', 'pdf', 'upload', 'download-as', 'config-print'],
 };
 
