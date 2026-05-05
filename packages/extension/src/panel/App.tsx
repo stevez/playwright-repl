@@ -27,6 +27,7 @@ function App() {
 
   useEffect(() => {
     onConsoleEvent((level, args) => {
+      if (level === 'debug') return; // internal diagnostics — not user-facing
       for (const arg of args) {
         const type = level === 'error' ? 'error' : level === 'warn' ? 'info' : 'success';
         dispatch({ type: 'ADD_LINE', line: { text: '', type, value: arg } });
