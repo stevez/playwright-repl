@@ -24,7 +24,6 @@ Instead of writing `page.locator('[placeholder="What needs to be done?"]').fill(
 | [Playwright REPL](packages/vscode/README.md) | VS Code extension — Test Explorer, REPL panel, assert builder, element picker |
 | [`playwright-repl`](packages/cli/README.md) | CLI — terminal REPL with keyword commands, recording, replay, and piping |
 | [Dramaturg](packages/extension/README.md) | Chrome extension — console, script editor, recorder, JS debugger |
-| [`@playwright-repl/runner`](packages/runner/README.md) | Test runner — drop-in replacement for `npx playwright test` with context reuse |
 | [`@playwright-repl/mcp`](packages/mcp/README.md) | MCP server — AI agents control your real Chrome browser |
 | [`@playwright-repl/core`](packages/core/README.md) | Shared parser, relay server, and utilities |
 
@@ -80,24 +79,6 @@ playwright-repl --command "click \"Interested\""
 
 ---
 
-## pw Commands
-
-The `@playwright-repl/runner` package provides the `pw` CLI:
-
-```bash
-npm install -D @playwright-repl/runner
-```
-
-```bash
-pw test                              # run Playwright tests with context reuse
-pw repl                              # interactive REPL with keyword + JS support
-pw repl --headless                   # headless mode for scripting
-```
-
-> **[Full runner docs](packages/runner/README.md)**
-
----
-
 ## Dramaturg — Chrome Extension
 
 Chrome side panel extension that runs Playwright directly inside your browser.
@@ -143,7 +124,6 @@ playwright-repl-mcp --relay          # connect to existing Chrome via CDP relay
 packages/
 ├── vscode/         # Playwright REPL — VS Code extension
 ├── cli/            # playwright-repl — terminal REPL
-├── runner/         # @playwright-repl/runner — test runner (pw CLI)
 ├── extension/      # Dramaturg — Chrome side panel extension
 ├── mcp/            # @playwright-repl/mcp — MCP server for AI agents
 └── core/           # @playwright-repl/core — shared parser, relay server, utilities

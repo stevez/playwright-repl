@@ -27,8 +27,6 @@ const options = {
     './*.script',
     // ESM modules that use import.meta.url — can't be bundled into CJS
     '@playwright-repl/core',
-    // Loaded at runtime via require() — nft traces their dependencies
-    '@playwright-repl/runner',
   ],
   format: 'cjs',
   platform: 'node',

@@ -1,5 +1,57 @@
 # Changelog
 
+## v0.27.0
+
+**2026-05-06**
+
+### Breaking Changes
+
+- **Relay mode is now the default.** Bridge mode, standalone Engine, and the bridge compilation shim have been removed. All packages use CDP relay for browser communication. ([#848](https://github.com/stevez/playwright-repl/pull/848), [#854](https://github.com/stevez/playwright-repl/pull/854), [#870](https://github.com/stevez/playwright-repl/pull/870), [#875](https://github.com/stevez/playwright-repl/pull/875))
+- **`@playwright-repl/runner` removed.** The `cdpPreload` utility moved to `@playwright-repl/core`; `pw-cli` moved to the CLI package. The runner package has been deleted. ([#881](https://github.com/stevez/playwright-repl/pull/881))
+
+### Features
+
+- **VS Code relay mode**: Extension uses CDP relay with real Playwright page objects. Test runner uses standard Playwright with shared browser and context reuse. Recording works in relay mode. ([#854](https://github.com/stevez/playwright-repl/pull/854), [#857](https://github.com/stevez/playwright-repl/pull/857), [#858](https://github.com/stevez/playwright-repl/pull/858))
+- **VS Code AI**: AI test agent, AI Assist (fix/polish/review), Chat Participant in Copilot Chat, `/generate-test` slash command, eslint-plugin-playwright lint tool. ([#748](https://github.com/stevez/playwright-repl/pull/748), [#753](https://github.com/stevez/playwright-repl/pull/753), [#758](https://github.com/stevez/playwright-repl/pull/758), [#777](https://github.com/stevez/playwright-repl/pull/777))
+- **MCP recording**: Record interactions as `.pw` scripts from MCP runners with ref-to-locator resolution. ([#894](https://github.com/stevez/playwright-repl/pull/894), [#895](https://github.com/stevez/playwright-repl/pull/895))
+- **Nested iframes**: Recorder and playback support nested iframes. ([#819](https://github.com/stevez/playwright-repl/pull/819))
+- **Navigation recording**: Recorder captures back, forward, and reload navigation. ([#839](https://github.com/stevez/playwright-repl/pull/839))
+- **Seamless side panel ↔ popup handoff** and persistent panel state across close/reopen. ([#821](https://github.com/stevez/playwright-repl/pull/821), [#822](https://github.com/stevez/playwright-repl/pull/822))
+- **Line wrapping** in Dramaturg editor and console input. ([#806](https://github.com/stevez/playwright-repl/pull/806), [#808](https://github.com/stevez/playwright-repl/pull/808))
+- **Snapshot ref in pick locator** results for both extension and VS Code. ([#794](https://github.com/stevez/playwright-repl/pull/794), [#796](https://github.com/stevez/playwright-repl/pull/796))
+- **Configurable command timeout** in extension preferences. ([#791](https://github.com/stevez/playwright-repl/pull/791))
+- **`css` subcommand** for explicit CSS selectors in commands and verify. ([#780](https://github.com/stevez/playwright-repl/pull/780), [#788](https://github.com/stevez/playwright-repl/pull/788))
+- **Stagecraft**: Skills package with `pw-cli --replay` and template variables. ([#842](https://github.com/stevez/playwright-repl/pull/842))
+- **`download-as`** command and `pw-cli --load` for JS skills. ([#846](https://github.com/stevez/playwright-repl/pull/846))
+
+### Fixes
+
+- **`--in` scoping**: Row container role probing for table structures, substring matching, narrowest-container selection, text-based locator support. ([#763](https://github.com/stevez/playwright-repl/pull/763), [#770](https://github.com/stevez/playwright-repl/pull/770), [#797](https://github.com/stevez/playwright-repl/pull/797), [#867](https://github.com/stevez/playwright-repl/pull/867), [#893](https://github.com/stevez/playwright-repl/pull/893), [#896](https://github.com/stevez/playwright-repl/pull/896))
+- **Recorder**: Human-readable locators for wrapped form elements, select/combobox labels, `--frame` CSS id matching, `--exact` flag, `--in` for radio groups, character limit removal. ([#803](https://github.com/stevez/playwright-repl/pull/803), [#804](https://github.com/stevez/playwright-repl/pull/804), [#828](https://github.com/stevez/playwright-repl/pull/828), [#864](https://github.com/stevez/playwright-repl/pull/864), [#866](https://github.com/stevez/playwright-repl/pull/866))
+- **Picker**: Correct role and full name for elements with children, URL for nameless links, CSS fallback locators, `--in` extraction from chained locators. ([#776](https://github.com/stevez/playwright-repl/pull/776), [#834](https://github.com/stevez/playwright-repl/pull/834), [#844](https://github.com/stevez/playwright-repl/pull/844))
+- **Informal labels**: Sync extension/core fallback, same-cell select priority, text locators for labels. ([#786](https://github.com/stevez/playwright-repl/pull/786), [#805](https://github.com/stevez/playwright-repl/pull/805), [#851](https://github.com/stevez/playwright-repl/pull/851), [#856](https://github.com/stevez/playwright-repl/pull/856))
+- **Autocomplete** works after `await` keyword and after Shift+Enter newline. ([#807](https://github.com/stevez/playwright-repl/pull/807), [#818](https://github.com/stevez/playwright-repl/pull/818))
+- **Console**: Wrap long lines, suppress Chrome-internal 'No SW' error. ([#798](https://github.com/stevez/playwright-repl/pull/798), [#817](https://github.com/stevez/playwright-repl/pull/817))
+- Filter hidden elements to prevent strict mode violations. ([#841](https://github.com/stevez/playwright-repl/pull/841))
+- Clear stale tab state so failed attachment doesn't block future connections. ([#850](https://github.com/stevez/playwright-repl/pull/850))
+- Handle extension context invalidated in recorder. ([#824](https://github.com/stevez/playwright-repl/pull/824))
+- CSS strict violations and video element recording. ([#838](https://github.com/stevez/playwright-repl/pull/838))
+
+### Refactors
+
+- Extension imports `page-scripts` from core instead of duplicating. ([#890](https://github.com/stevez/playwright-repl/pull/890))
+- Remove Chrome extension dependency from all packages. ([#876](https://github.com/stevez/playwright-repl/pull/876))
+
+### Performance
+
+- Share BrowserManager's browser with test server via CDP. ([#889](https://github.com/stevez/playwright-repl/pull/889))
+
+### Tests & CI
+
+- Enable and fix extension commands E2E tests. ([#892](https://github.com/stevez/playwright-repl/pull/892))
+- E2E test for recording inside `<frame>` elements. ([#773](https://github.com/stevez/playwright-repl/pull/773))
+- Parallelize CI test jobs. ([#759](https://github.com/stevez/playwright-repl/pull/759))
+
 ## v0.26.1
 
 **2026-04-18**

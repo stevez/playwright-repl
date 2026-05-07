@@ -2,7 +2,7 @@
 
 Shared parser, relay server, and utilities for the playwright-repl ecosystem.
 
-Used by [`playwright-repl`](../cli/README.md) (CLI), [`@playwright-repl/runner`](../runner/README.md) (runner), [`@playwright-repl/mcp`](../mcp/README.md) (MCP server), and the [VS Code extension](../vscode/README.md).
+Used by [`playwright-repl`](../cli/README.md) (CLI), [`@playwright-repl/mcp`](../mcp/README.md) (MCP server), and the [VS Code extension](../vscode/README.md).
 
 ## Install
 

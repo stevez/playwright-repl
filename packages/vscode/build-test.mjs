@@ -21,8 +21,6 @@ const extensionOptions = {
     './oopReporter',
     './playwrightFinder',
     './*.script',
-    // Loaded at runtime via require() — nft traces their dependencies
-    '@playwright-repl/runner',
   ],
   format: 'cjs',
   platform: 'node',

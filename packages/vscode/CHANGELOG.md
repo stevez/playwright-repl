@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.27.0
+
+**2026-05-06**
+
+### Breaking Changes
+
+- **Relay mode is now the default.** Bridge mode and standalone Engine removed. All communication uses CDP relay with real Playwright page objects.
+
+### Features
+
+- **Relay mode**: Full VS Code extension migrated to relay mode — test runner uses standard Playwright with shared browser and context reuse
+- **Recording**: Recording support in relay mode
+- **AI test agent**: AI-powered test generation with browser tools
+- **AI Assist**: Unified fix, polish, and review with eslint-plugin-playwright
+- **Chat Participant**: `@playwright-repl` in Copilot Chat
+- **`/generate-test`**: AI-powered test generation slash command
+- **Snapshot ref**: Pick locator results include snapshot ref
+
+### Fixes
+
+- Test runner uses ReusedBrowser for proper context reuse in headed mode
+- REPL shows disconnected when browser closes
+- Remove ensureLaunched from test run path to prevent second browser launch
+
+### Performance
+
+- Share BrowserManager's browser with test server via CDP
+
 ## 0.26.1
 
 **2026-04-18**
