@@ -19,14 +19,6 @@ export const SPECIAL_KEYS = new Set([
 // ─── Frame detection ─────────────────────────────────────────────────────
 
 /**
- * Detect if we're inside an iframe and compute a CSS selector for it.
- * Returns null if we're in the top frame.
- *
- * For same-origin iframes, `window.frameElement` gives us the <iframe> element
- * in the parent document. For cross-origin iframes, `window.frameElement` is null
- * due to security restrictions — we fall back to using the frame's src URL.
- */
-/**
  * Compute CSS selector for a frame element.
  * Uses the same selector for both --frame flag (PW) and .locator().contentFrame() (JS),
  * matching pickLocator's output format for consistency.
@@ -53,8 +45,8 @@ function selectorForFrame(frame: Element): string {
  * Returns array of CSS selectors, one per ancestor frame, outermost first.
  * Returns empty array if we're in the top frame.
  */
-function detectFrameChain(): string[] {
-    if (window === window.top) return [];
+function detectFrameChain(): { chain: string[]; complete: boolean } {
+    if (window === window.top) return { chain: [], complete: true };
 
     const chain: string[] = [];
     let win: Window = window;
@@ -64,23 +56,26 @@ function detectFrameChain(): string[] {
             if (frame) {
                 chain.push(selectorForFrame(frame));
             } else {
-                // Cross-origin: frameElement is null, use src fallback
-                try {
-                    const src = win.location.href;
-                    chain.push((src && src !== 'about:blank') ? `iframe[src="${src}"]` : 'iframe');
-                } catch { chain.push('iframe'); }
-                break; // Can't walk further up from cross-origin
+                // Cross-origin: frameElement is null — can't determine selector.
+                // Will be resolved via postMessage from parent frame's content script.
+                return { chain: chain.reverse(), complete: false };
             }
         } catch {
-            break; // cross-origin — frameElement throws
+            // cross-origin — frameElement throws
+            return { chain: chain.reverse(), complete: false };
         }
         win = win.parent;
     }
-    return chain.reverse();
+    return { chain: chain.reverse(), complete: true };
 }
 
-/** Cached frame chain — computed once on init */
+/** Cached frame chain — computed on init, may be updated via postMessage */
 let framePath: string[] = [];
+let framePathReady = false;
+const pendingChildRequests: Window[] = [];
+
+const FRAME_REQ = '__pw_repl_frame_req';
+const FRAME_PATH = '__pw_repl_frame_path';
 
 /**
  * Wrap recorded commands with frame context if we're inside an iframe.
@@ -94,6 +89,76 @@ function wrapWithFrameContext(cmds: { pw: string; js: string }): { pw: string; j
         pw: `${cmds.pw} --frame "${frameArg}"`,
         js: `await page${jsChain}.${cmds.js.replace(/^await page\./, '')}`,
     };
+}
+
+// ─── Cross-origin frame path resolution ─────────────────────────────────
+
+/**
+ * For cross-origin frames (including file:// URLs), window.frameElement is null
+ * so the child can't determine its own selector. The parent frame CAN see the
+ * <frame>/<iframe> elements in its DOM, so we use postMessage to communicate
+ * the correct selector chain from parent to child.
+ *
+ * Two redundant paths ensure resolution regardless of init ordering:
+ * 1. Parent proactively notifies children on init (handles child-inits-later)
+ * 2. Child requests from parent on init (handles parent-inits-later)
+ */
+
+let frameMessageHandler: ((e: MessageEvent) => void) | null = null;
+
+/** Send frame path to a child window by finding its frame element in our DOM */
+function sendPathToChild(childWindow: Window) {
+    const frames = document.querySelectorAll('frame, iframe');
+    for (const frame of frames) {
+        try {
+            if ((frame as HTMLIFrameElement).contentWindow === childWindow) {
+                const sel = selectorForFrame(frame);
+                childWindow.postMessage({ type: FRAME_PATH, path: [...framePath, sel] }, '*');
+                return;
+            }
+        } catch { /* contentWindow comparison might throw */ }
+    }
+}
+
+/** Proactively send frame paths to all child frames */
+function notifyChildren() {
+    const frames = document.querySelectorAll('frame, iframe');
+    for (const frame of frames) {
+        const sel = selectorForFrame(frame);
+        try {
+            (frame as HTMLIFrameElement).contentWindow?.postMessage(
+                { type: FRAME_PATH, path: [...framePath, sel] },
+                '*'
+            );
+        } catch { /* contentWindow.postMessage might throw */ }
+    }
+}
+
+function setupFrameMessaging(complete: boolean) {
+    frameMessageHandler = (e: MessageEvent) => {
+        // Parent providing our frame path (cross-origin resolution)
+        if (e.data?.type === FRAME_PATH && e.source === window.parent) {
+            framePath = e.data.path;
+            framePathReady = true;
+            for (const child of pendingChildRequests) sendPathToChild(child);
+            pendingChildRequests.length = 0;
+            notifyChildren();
+        }
+        // Child frame requesting their path from us
+        if (e.data?.type === FRAME_REQ && e.source) {
+            if (framePathReady) {
+                sendPathToChild(e.source as Window);
+            } else {
+                pendingChildRequests.push(e.source as Window);
+            }
+        }
+    };
+    window.addEventListener('message', frameMessageHandler);
+
+    if (framePathReady) notifyChildren();
+    if (window !== window.top && !complete) {
+        window.parent.postMessage({ type: FRAME_REQ }, '*');
+    }
 }
 
 /**
@@ -262,6 +327,11 @@ export function cleanup() {
     document.removeEventListener('change', onChangeCapture, true);
     document.removeEventListener('keydown', onKeyDownCapture, true);
     document.removeEventListener('focusout', onFocusOutCapture, true);
+    if (frameMessageHandler) {
+        window.removeEventListener('message', frameMessageHandler);
+        frameMessageHandler = null;
+    }
+    pendingChildRequests.length = 0;
     chrome.runtime.onMessage.removeListener(onMessage);
 }
 
@@ -276,8 +346,12 @@ export function init() {
     if (window.__pw_recorder_active) return;
     window.__pw_recorder_active = true;
 
-    // Detect iframe context once on init
-    framePath = detectFrameChain();
+    // Detect iframe context — same-origin path is synchronous and reliable;
+    // cross-origin frames (including file:// URLs) get resolved via postMessage
+    const detection = detectFrameChain();
+    framePath = detection.chain;
+    framePathReady = detection.complete;
+    setupFrameMessaging(detection.complete);
 
     // Back/forward detection via Navigation API traverse event
     type NavEntry = { index: number; url?: string };

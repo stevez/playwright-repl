@@ -185,6 +185,78 @@ test.describe('Recording flow', () => {
       expect(editorText).toContain('--frame "#oevd-iframe"');
     });
 
+    test('clicking inside a cross-origin <frame> records and replays correct --frame (#769)', async ({ sidePanel, testPage }) => {
+      const ctx = testPage.context();
+      // Parent on one origin, child on another — simulates file:// cross-origin behavior
+      await ctx.route('https://parent.local/frameset.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><frameset><frame name="main" src="https://child.local/frame-content.html" /></frameset></html>',
+      }));
+      await ctx.route('https://child.local/frame-content.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<button>Arbeitskorb</button>',
+      }));
+
+      await testPage.goto('https://parent.local/frameset.html');
+      await testPage.bringToFront();
+      await sidePanel.attachToActiveTab();
+
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.frame({ url: /child\.local/ })!.getByRole('button', { name: 'Arbeitskorb' }).click();
+
+      await sidePanel.waitForEditorText('click button "Arbeitskorb"');
+      const editorText = await sidePanel.getEditorText();
+      // Cross-origin: parent resolves selector via postMessage — uses tag + name, not hardcoded 'iframe'
+      expect(editorText).toContain('--frame "frame[name="main"]"');
+
+      // Replay: stop recording and run the recorded script
+      await sidePanel.stopRecording();
+      await sidePanel.runBtn.click();
+      await expect(sidePanel.output).toContainText('Run complete', { timeout: 15000 });
+      // No errors during playback
+      await expect(sidePanel.raw.locator('[data-type="error"]')).toHaveCount(0);
+    });
+
+    test('clicking inside cross-origin nested iframes records and replays correct --frame (#815)', async ({ sidePanel, testPage }) => {
+      const ctx = testPage.context();
+      // Three origins: top → iframe1 → iframe2 (cross-origin at each boundary)
+      await ctx.route('https://top.local/page.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><body><iframe name="iframe1" src="https://mid.local/iframe1.html"></iframe></body></html>',
+      }));
+      await ctx.route('https://mid.local/iframe1.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><body><iframe name="iframe2" src="https://inner.local/iframe2.html"></iframe></body></html>',
+      }));
+      await ctx.route('https://inner.local/iframe2.html', route => route.fulfill({
+        contentType: 'text/html',
+        body: '<html><body><button>Hello iframe 2</button></body></html>',
+      }));
+
+      await testPage.goto('https://top.local/page.html');
+      await testPage.bringToFront();
+      await sidePanel.attachToActiveTab();
+
+      await sidePanel.startRecording();
+
+      await testPage.bringToFront();
+      await testPage.frame({ url: /inner\.local/ })!.getByRole('button', { name: 'Hello iframe 2' }).click();
+
+      await sidePanel.waitForEditorText('click button "Hello iframe 2"');
+      const editorText = await sidePanel.getEditorText();
+      // Nested cross-origin: space-separated selectors for both levels
+      expect(editorText).toContain('--frame "iframe[name="iframe1"] iframe[name="iframe2"]"');
+
+      // Replay: stop recording and run the recorded script
+      await sidePanel.stopRecording();
+      await sidePanel.runBtn.click();
+      await expect(sidePanel.output).toContainText('Run complete', { timeout: 15000 });
+      // No errors during playback
+      await expect(sidePanel.raw.locator('[data-type="error"]')).toHaveCount(0);
+    });
+
     test('stop recording resets button state', async ({ sidePanel }) => {
       await sidePanel.recordBtn.click();
       await expect(sidePanel.recordBtn).toHaveClass(/recording/, { timeout: 10000 });
