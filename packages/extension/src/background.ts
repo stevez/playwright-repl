@@ -116,14 +116,6 @@ chrome.management.getSelf().then(async (info) => {
   }
 });
 
-// Re-check offscreen doc periodically — Chrome may kill it after idle.
-chrome.alarms.create('ensure-offscreen', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'ensure-offscreen') {
-    ensureOffscreenRelay().catch(() => {});
-  }
-});
-
 // ─── Settings + Action (sidepanel / popup) ───────────────────────────────────
 
 // Disable auto-open so action.onClicked fires (Chrome persists this across reloads)
