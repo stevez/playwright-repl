@@ -801,12 +801,24 @@ function formatRelayResult(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+function parseRelayResult(raw: unknown): EngineResult {
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.__image) {
+        return { image: `data:${parsed.mimeType};base64,${parsed.__image}`, isError: false };
+      }
+    } catch { /* not JSON */ }
+  }
+  return { text: formatRelayResult(raw), isError: false };
+}
+
 async function relayExec(
   command: string,
   page: any,
   context: any,
   expect: any,
-): Promise<{ text: string; isError: boolean }> {
+): Promise<EngineResult> {
   const trimmed = command.trim();
 
   // Keyword command → resolveCommand → jsExpr → direct execution
@@ -815,7 +827,7 @@ async function relayExec(
     try {
       const fn = new AsyncFn('page', 'context', 'expect', resolved.jsExpr);
       const result = await fn(page, context, expect);
-      return { text: formatRelayResult(result), isError: false };
+      return parseRelayResult(result);
     } catch (e: unknown) {
       return { text: e instanceof Error ? e.message : String(e), isError: true };
     }
@@ -828,7 +840,7 @@ async function relayExec(
   try {
     const fn = new AsyncFn('page', 'context', 'expect', script);
     const result = await fn(page, context, expect);
-    return { text: formatRelayResult(result), isError: false };
+    return parseRelayResult(result);
   } catch (e: unknown) {
     return { text: e instanceof Error ? e.message : String(e), isError: true };
   }
@@ -882,7 +894,9 @@ async function runRelayReplayMode(
       const result = await relayExec(cmd, page, context, expect);
       const elapsed = (performance.now() - startTime).toFixed(0);
 
-      if (result.text && result.text !== 'Done') {
+      if (result.image) {
+        displayResult(result, silent);
+      } else if (result.text && result.text !== 'Done') {
         log(`${indent}${result.isError ? `${c.red}${result.text}${c.reset}` : result.text}`);
       }
       log(`${indent}${c.dim}(${elapsed}ms)${c.reset}`);
@@ -1041,7 +1055,9 @@ async function startRelayLoop(
       session.record(command);
     }
 
-    if (result.text) {
+    if (result.image) {
+      displayResult(result, silent);
+    } else if (result.text) {
       // Pass command name so filterResponse keeps the right sections
       const parsed = parseInput(command);
       const filteredName = parsed?._[0];
