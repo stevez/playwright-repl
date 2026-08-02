@@ -1,0 +1,22 @@
+# Dramaturg scope: console-first, cut redundant debugging surfaces, keep dual `.pw`/JS dialects
+
+Dramaturg had accumulated ten roughly-equal-weight features (console, script editor, JS debugger, recorder, object tree, tab switcher, preferences, themes, DevTools REPL) with slow user growth (72 all-time installs) despite heavy investment. We defined the flagship job as "a live Playwright console attached to your real browser tab" and re-scoped the extension around it.
+
+**Decisions:**
+
+- **Core tier** (equal billing, default-visible): Console, Recorder, Element Picker, Tab Switcher/Attach.
+- **Demoted, not dropped**: Script Editor — moved out of default toolbar prominence but kept fully intact, since it's load-bearing for `.pw` file authoring used by the CLI, MCP, and the `playwright-repl-generator`/`healer`/`converter` skills outside this package.
+- **Dropped**: DevTools REPL tab (duplicate console surface, thin wrapper) and the JS Debugger UI — `DebugBar.tsx` + `VariablePane.tsx` (self-contained, low value relative to maintenance cost). The underlying `sw-debugger.ts` CDP plumbing stays, since Console's own command execution depends on it.
+- **Not a decision, a fact**: Object Tree isn't a standalone feature — it's how Console (and the picker/variable pane) render results — so it survives regardless of the debugger's fate.
+- **New investment — Assert becomes its own core-tier button, separate from Pick**: today `deriveAssertion()` (`pick-info.ts`) runs unconditionally on *every* pick, computing one heuristic assertion in both dialects (`assertJs`/`assertPw`) — checkbox/radio → checked, input/textarea/select → value, link → visible, text-bearing → text, fallback → visible. "Basic" means a single fixed guess with no alternate matcher, no editable value, no live verify — and it's clutter on the majority of picks, which aren't for asserting (grabbing a locator for `click`/`fill`, disambiguation, inspection). VS Code's Assert Builder avoids this by being its own entry point with its own embedded pick, not attached to a general-purpose picker. Splitting the same way here: plain **Pick** goes back to lean (locator + snapshot only, `deriveAssertion` call removed). A new **Assert** button (core tier, next to Pick) triggers picking internally, then shows a tag-filtered matcher dropdown (reusing VS Code's `filterTypes` logic, current heuristic as the pre-selected default) + editable arg + negate checkbox + **Verify** button (runs live, shows pass/fail). On confirm, inserts the resulting `.pw` `verify-*` command or `expect()` JS line at the cursor via the same `insertAtCursor` path Recorder already uses. AI Suggest is dropped (not deferred). ARIA-snapshot-based assertion mode is deferred — revisit only if the locator-based flow proves out.
+- **Two audiences, one console, not two products**: Playwright developers (real `page.*`/`expect()` JS) and no-code users (`.pw` keyword commands, primarily via Recorder) share the same Console. Both dialects stay, on the condition that "zero JS ever surfaces to the no-code path" becomes an explicit design constraint for future console features (assert included), not an emergent property of auto-detection.
+- **Secondary, not core**: the video/screencast recorder (undocumented in the README, backed by `offscreen.ts`) — a genuine capability for attaching evidence to bug reports (ties into the `/qa` → GitHub issues workflow), but not part of the flagship console job, so it doesn't get default-visible billing.
+- **`.pw` step vs JS debug are not the same feature**: `step-btn` (`.pw` mode) reuses Console's own command-execution path with no breakpoints or variable inspection — it's Script Editor's lightweight, no-code-appropriate "walk through one line at a time," not debugger scope creep. It stays, bundled with Script Editor's demotion. Only the JS-mode `debug-btn` (breakpoints + `VariablePane`) is dropped.
+
+**Consequences:** Toolbar reorganized into three tiers.
+- **Core** (default-visible): Pick element, **Assert** (new), Record/Stop, `.pw`/JS mode toggle, Tab select, Attach/Detach.
+- **Secondary** (grouped under a single demoted affordance): Run/Stop, Step, Open file, Save file, Video record.
+- **Dropped**: the JS debug button.
+- **Unaffected by tiering**: Theme toggle, Pop-out/dock.
+
+This ADR still doesn't cover the top-level "one brand across CLI/MCP/VS Code/Dramaturg" decision from earlier in this conversation — that's separate and still open.
