@@ -219,6 +219,40 @@ describe('locator', () => {
             btn.setAttribute('aria-label', 'Label');
             expect(getAccessibleName(btn)).toBe('Label');
         });
+
+        it('separates adjacent element children with whitespace (MS Forms style)', () => {
+            // MS Forms builds label from adjacent spans. Playwright's ARIA name
+            // computation wraps a child's contribution with spaces ONLY when
+            // the child has display !== 'inline' (matches innerAccumulatedElementText
+            // in playwright's roleUtils). aria-hidden and display:none refs are
+            // excluded. This is a regression test for playback failing on
+            // `fill textbox "..."` for MS Forms inputs (#YYY).
+            document.body.innerHTML = `
+            <div id="q1-label">
+                <div style="display:block"><span style="display:block">1.</span><span>Application Name</span><span role="note" aria-label="Required to answer"></span></div>
+            </div>
+            <span id="q1-desc" style="display:none" aria-hidden="true">Single line text.</span>
+            <input type="text" aria-labelledby="q1-label q1-desc" aria-label="Single line text">`;
+            const input = document.querySelector('input')!;
+            expect(getAccessibleName(input)).toBe('1. Application Name');
+        });
+
+        it('preserves nbsp inside accessible name (MS Forms style, matches Playwright asFlatString)', () => {
+            // MS Forms suffixes some titles with `&nbsp;` before the required-star.
+            // Playwright's asFlatString preserves \u00A0 verbatim, so the accessible
+            // name is `"5. Application CI:\u00A0Required to answer ..."`, not
+            // `"5. Application CI: Required to answer ..."`. Our recorder must
+            // preserve nbsp too, otherwise `getByRole('textbox', { name, exact: true })`
+            // fails at playback (question 5 on the AppSec Review form).
+            document.body.innerHTML = `
+            <div id="q5-label">
+                <div><span style="display:block">5.</span><span>Application CI:\u00A0</span><span role="note" aria-label="Required to answer"></span></div>
+                <div style="display:block">All application going to production must have a CI#</div>
+            </div>
+            <input type="text" aria-labelledby="q5-label">`;
+            const input = document.querySelector('input')!;
+            expect(getAccessibleName(input)).toBe('5. Application CI:\u00A0 All application going to production must have a CI#');
+        });
     });
 
     // ─── getLabel ─────────────────────────────────────────────────────────
