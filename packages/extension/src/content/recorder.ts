@@ -7,6 +7,29 @@
  */
 import { escapeString, isTextField, isCheckable, buildCommands, findHoverAncestor, isHoverRevealed } from './locator';
 
+// Interactive ARIA roles that should own a click event when the user clicks a
+// descendant (e.g. MS Forms places a bare <span> "Select your answer" inside
+// <div role="button">; we want to record the button, not the span).
+const INTERACTIVE_ROLES = new Set([
+    'button', 'link', 'checkbox', 'radio', 'switch', 'combobox', 'listbox',
+    'option', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'treeitem',
+]);
+
+function findInteractiveAncestor(el: Element): Element {
+    for (let cur: Element | null = el; cur && cur !== document.body; cur = cur.parentElement) {
+        const role = cur.getAttribute('role');
+        if (role && INTERACTIVE_ROLES.has(role)) return cur;
+        const tag = cur.tagName;
+        if (tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return cur;
+        if (tag === 'INPUT') {
+            const type = (cur as HTMLInputElement).type;
+            if (type !== 'text' && type !== 'search' && type !== 'email' && type !== 'password' && type !== 'tel' && type !== 'url' && type !== 'number')
+                return cur;
+        }
+    }
+    return el;
+}
+
 // ─── Special key detection ────────────────────────────────────────────────
 
 export const SPECIAL_KEYS = new Set([
@@ -229,7 +252,7 @@ export function onClickCapture(e: MouseEvent) {
         }
     }
 
-    const cmds = buildCommands('click', target);
+    const cmds = buildCommands('click', findInteractiveAncestor(target));
     if (cmds) {
         safeSendMessage({ type: 'recorded-action', action: wrapWithFrameContext(cmds) });
     }

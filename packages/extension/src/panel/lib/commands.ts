@@ -178,7 +178,10 @@ function ser(v: unknown): string {
 
 /** Build a JS expression that calls a page-script function in the SW context (where `page` is global) */
 function call(fn: (...args: unknown[]) => unknown, ...args: unknown[]): string {
-  return `await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
+  const deps = ((fn as { _deps?: Array<(...a: unknown[]) => unknown> })._deps || [])
+    .map(d => `const ${d.name} = ${d.toString()};`).join(' ');
+  if (!deps) return `await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
+  return `await (async () => { ${deps} return await (${fn.toString()})(page, ${args.map(ser).join(', ')}); })()`;
 }
 
 /**
@@ -202,7 +205,10 @@ function callScoped(fn: (...args: unknown[]) => unknown, inText: string, _target
           }
           return null;
         })`;
+  const deps = ((fn as { _deps?: Array<(...a: unknown[]) => unknown> })._deps || [])
+    .map(d => `const ${d.name} = ${d.toString()};`).join(' ');
   return `await (async () => {
+    ${deps}
     let __scope = page;
     const __roles = ['row', 'group', 'article', 'listitem', 'region', 'dialog', 'form'];
     for (const __r of __roles) {

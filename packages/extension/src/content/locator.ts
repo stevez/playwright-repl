@@ -52,6 +52,14 @@ export function getImplicitRole(el: Element): string | null {
  * for each child, use its accessible name (respecting aria-label etc.) rather
  * than raw textContent. This matches Playwright's name computation.
  */
+/**
+ * Compute accumulated text from an element's children, mirroring Playwright's
+ * innerAccumulatedElementText (packages/injected/src/roleUtils.ts). For each
+ * element child, use its accessible name (respecting aria-label etc.) rather
+ * than raw textContent. Wrap a child's contribution with spaces only when the
+ * child has `display !== 'inline'` (or is <br>) — matches Playwright's
+ * "SPEC DIFFERENCE" behavior where inline elements do not add a space.
+ */
 function accumulatedText(el: Element, exclude?: Element): string {
     const tokens: string[] = [];
     for (const child of el.childNodes) {
@@ -60,17 +68,40 @@ function accumulatedText(el: Element, exclude?: Element): string {
             tokens.push(child.textContent || '');
         } else if (child.nodeType === Node.ELEMENT_NODE) {
             const childEl = child as Element;
+            // Skip aria-hidden descendants (Playwright excludes them).
+            if (childEl.getAttribute('aria-hidden') === 'true') continue;
+            // Skip role="note" descendants: ARIA defines role=note as
+            // supplementary/parenthetical content (help hints, required
+            // indicators like MS Forms' "Required to answer" red star).
+            // Folding these into the parent's accessible name clutters
+            // recorded locators without adding uniqueness. Playback strips
+            // the same pattern from Playwright's computed name.
+            if (childEl.getAttribute('role') === 'note') continue;
+            let contribution: string;
             if (exclude && childEl.contains(exclude)) {
-                tokens.push(accumulatedText(childEl, exclude));
+                contribution = accumulatedText(childEl, exclude);
             } else {
                 const name = getAccessibleName(childEl);
-                // If no accessible name, recurse into children (handles
-                // wrapper elements like <pnw-tooltip-toggle> with no role)
-                tokens.push(name || accumulatedText(childEl));
+                contribution = name || accumulatedText(childEl);
             }
+            // Wrap with whitespace only when display is not inline (or <br>).
+            // Matches Playwright's algorithm — inline elements concatenate
+            // without added whitespace (e.g. MS Forms `<span>Application Name
+            // </span><span role="note" aria-label="Required">` → "Application
+            // NameRequired", not "Application Name Required").
+            const display = getComputedStyle(childEl).display || 'inline';
+            if (display !== 'inline' || childEl.nodeName === 'BR')
+                contribution = ' ' + contribution + ' ';
+            tokens.push(contribution);
         }
     }
-    return tokens.join('').replace(/\s+/g, ' ').trim();
+    // Match Playwright's asFlatString: collapse whitespace runs EXCEPT
+    // non-breaking spaces (\u00A0), which are preserved verbatim. Note that
+    // String.prototype.trim() ALSO strips nbsp per ECMA-262, so we implement
+    // a custom trim that leaves nbsp in place.
+    return tokens.join('')
+        .replace(/[^\S\u00A0]+/g, ' ')
+        .replace(/^[^\S\u00A0]+|[^\S\u00A0]+$/g, '');
 }
 
 export function getAccessibleName(el: Element): string {
@@ -79,7 +110,14 @@ export function getAccessibleName(el: Element): string {
     if (labelledBy) {
         const parts = labelledBy.split(/\s+/).map(id => {
             const ref = document.getElementById(id);
-            return ref ? accumulatedText(ref) : '';
+            if (!ref) return '';
+            // Skip hidden refs (aria-hidden=true or display:none) — matches
+            // Playwright's isElementHiddenForAria behavior for labelledby.
+            // Without this, MS Forms `QuestionInfo` spans (aria-hidden=true,
+            // display:none) leak "Single line text." into the input's name.
+            if (ref.getAttribute('aria-hidden') === 'true') return '';
+            if (getComputedStyle(ref).display === 'none') return '';
+            return accumulatedText(ref);
         }).filter(Boolean);
         if (parts.length) return parts.join(' ');
     }
@@ -331,6 +369,26 @@ export function findAllByRoleAndName(role: string, name: string): Element[] {
     return matches;
 }
 
+/**
+ * Find visible elements matching Playwright's `getByText(text, { exact: true })`:
+ * an element matches if some text node child's trimmed content equals `text`
+ * (not just textContent, which would also match every wrapping ancestor).
+ */
+export function findByText(text: string, _target: Element): Element[] {
+    const matches: Element[] = [];
+    for (const el of document.querySelectorAll('*')) {
+        if ((el as HTMLElement).checkVisibility?.() === false) continue;
+        for (const node of el.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE
+                && (node.textContent || '').trim() === text) {
+                matches.push(el);
+                break;
+            }
+        }
+    }
+    return matches;
+}
+
 /** Find the nearest :hover ancestor (for recording hover before click). */
 export function findHoverAncestor(el: Element): Element | null {
     let ancestor = el.parentElement;
@@ -463,7 +521,17 @@ export function generateLocator(el: Element): string {
     // Skip for <select>: textContent is concatenated option texts, not useful for locating.
     const text = (el.textContent || '').trim();
     if (text && el.tagName !== 'SELECT') {
-        if (text.length <= 80) return `getByText(${escapeString(text)}, { exact: true })`;
+        if (text.length <= 80) {
+            const base = `getByText(${escapeString(text)}, { exact: true })`;
+            // Disambiguate when the same text appears in multiple places
+            // (e.g. MS Forms uses "Select your answer" as placeholder for every dropdown).
+            const matches = findByText(text, el);
+            if (matches.length > 1) {
+                const idx = matches.indexOf(el);
+                if (idx >= 0) return idx === 0 ? `${base}.first()` : `${base}.nth(${idx})`;
+            }
+            return base;
+        }
         const snippet = text.slice(0, 50).replace(/\s+\S*$/, '');
         if (snippet) return `getByText(${escapeString(snippet)})`;
     }

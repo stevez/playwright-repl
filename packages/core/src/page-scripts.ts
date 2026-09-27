@@ -27,7 +27,10 @@
 export function buildRunCode(fn, ...args) {
   const filtered = args.filter(a => a !== undefined);
   const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
-  return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
+  const deps = (fn._deps || []).map(d => `const ${d.name} = ${d.toString()};`).join('\n  ');
+  if (!deps)
+    return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
+  return { _: ['run-code', `async (page) => { ${deps}\n  return (${fn.toString()})(page, ${serialized}); }`] };
 }
 
 /**
@@ -39,8 +42,10 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
   const inSer = JSON.stringify(inText);
   const tgtSer = JSON.stringify(targetText);
+  const deps = (fn._deps || []).map(d => `  const ${d.name} = ${d.toString()};`).join('\n');
+  const prelude = deps ? `${deps}\n` : '';
   return { _: ['run-code', `async (page) => {
-  let __scope = page;
+${prelude}  let __scope = page;
   for (const __r of ['row','group','article','listitem','region','dialog','form']) {
     const __c = page.getByRole(__r).filter({ has: page.getByText(${inSer}, { exact: true }) });
     const __n = await __c.count();
@@ -333,8 +338,12 @@ export async function uncheckByText(page, text, nth?, exact?) {
 
 // ─── Role-based actions ─────────────────────────────────────────────────────
 
-export async function actionByRole(page, role, name, action, nth, inRole, inText) {
-  // Link with URL: match by href instead of accessible name
+/**
+ * Shared resolver for *ByRole helpers. Falls back to matching accessible names
+ * with role="note" descendants excluded — recorder strips these annotations
+ * (e.g. MS Forms "Required to answer" required-star), so playback must too.
+ */
+async function _resolveByRole(page, role, name, nth, inRole, inText) {
   const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
   const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
   let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
@@ -347,58 +356,73 @@ export async function actionByRole(page, role, name, action, nth, inRole, inText
       if (await scoped.count() > 0) { loc = scoped; break; }
     }
   }
+  // role="note" fallback: strict match found nothing → retry with clean-name comparison.
+  if (name && !isUrl && nth === undefined && inRole === undefined && inText === undefined
+      && await loc.count() === 0) {
+    const idx = await page.getByRole(role).evaluateAll((els, wanted) => {
+      const collect = (node) => {
+        let out = '';
+        for (const c of node.childNodes) {
+          if (c.nodeType === 3) { out += c.textContent || ''; continue; }
+          if (c.nodeType !== 1) continue;
+          if (c.getAttribute('aria-hidden') === 'true') continue;
+          if (c.getAttribute('role') === 'note') continue;
+          const label = c.getAttribute('aria-label');
+          let contrib = label || collect(c);
+          const disp = getComputedStyle(c).display || 'inline';
+          if (disp !== 'inline' || c.nodeName === 'BR') contrib = ' ' + contrib + ' ';
+          out += contrib;
+        }
+        return out.replace(/[^\S\u00A0]+/g, ' ').replace(/^[^\S\u00A0]+|[^\S\u00A0]+$/g, '');
+      };
+      const nameOf = (el) => {
+        const lb = el.getAttribute('aria-labelledby');
+        if (lb) {
+          const parts = lb.split(/\s+/).map(id => {
+            const r = document.getElementById(id);
+            if (!r) return '';
+            if (r.getAttribute('aria-hidden') === 'true') return '';
+            if (getComputedStyle(r).display === 'none') return '';
+            return collect(r);
+          }).filter(Boolean);
+          if (parts.length) return parts.join(' ');
+        }
+        const al = el.getAttribute('aria-label');
+        if (al) return al.trim();
+        return collect(el);
+      };
+      const idxs = [];
+      for (let i = 0; i < els.length; i++)
+        if (nameOf(els[i]) === wanted) idxs.push(i);
+      return idxs.length === 1 ? idxs[0] : -1;
+    }, name);
+    if (idx >= 0) loc = page.getByRole(role).nth(idx);
+  }
   if (nth !== undefined) loc = loc.nth(nth);
   else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  return loc;
+}
+
+export async function actionByRole(page, role, name, action, nth, inRole, inText) {
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc[action]();
 }
+actionByRole._deps = [_resolveByRole];
 
 export async function fillByRole(page, role, name, value, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.fill(value);
 }
+fillByRole._deps = [_resolveByRole];
 
 export async function selectByRole(page, role, name, value, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.selectOption(value);
 }
+selectByRole._deps = [_resolveByRole];
 
 export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.press(key);
 }
+pressKeyByRole._deps = [_resolveByRole];
