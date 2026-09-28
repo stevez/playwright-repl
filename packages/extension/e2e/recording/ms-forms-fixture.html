@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MS Forms fixture</title>
+</head>
+<body>
+  <!-- Mirrors Microsoft Forms question markup: a required-star role="note",
+       a hidden aria-labelledby hint, an nbsp before the star, and repeated
+       "Select your answer" dropdown placeholders. -->
+  <div data-testid="q1">
+    <div id="q1-label">
+      <div style="display:block"><span style="display:block">1.</span><span>Application Name</span><span role="note" aria-label="Required to answer"></span></div>
+    </div>
+    <span id="q1-desc" style="display:none" aria-hidden="true">Single line text.</span>
+    <input type="text" id="q1-input" aria-labelledby="q1-label q1-desc">
+  </div>
+
+  <div data-testid="q5">
+    <div id="q5-label">
+      <div><span style="display:block">5.</span><span>Application CI:&nbsp;</span><span role="note" aria-label="Required to answer"></span></div>
+      <div style="display:block">All application going to production must have a CI#</div>
+    </div>
+    <input type="text" id="q5-input" aria-labelledby="q5-label">
+  </div>
+
+  <div data-testid="dropdowns">
+    <div role="button" tabindex="0" id="dd1" onclick="this.dataset.clicked = (+(this.dataset.clicked || 0) + 1)"><span>Select your answer</span></div>
+    <div role="button" tabindex="0" id="dd2" onclick="this.dataset.clicked = (+(this.dataset.clicked || 0) + 1)"><span>Select your answer</span></div>
+  </div>
+</body>
+</html>

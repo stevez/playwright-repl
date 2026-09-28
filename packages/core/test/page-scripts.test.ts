@@ -6,7 +6,9 @@ import {
   actionByText, fillByText, selectByText,
   checkByText, uncheckByText,
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
+  inlineDeps,
 } from '../src/page-scripts.js';
+import { resolveCommand } from '../src/resolve-command.js';
 
 // ─── buildRunCode ───────────────────────────────────────────────────────────
 
@@ -510,5 +512,94 @@ describe('pressKeyByRole', () => {
     await pressKeyByRole(page, 'textbox', 'Search', 'Enter');
     expect(page.getByRole).toHaveBeenCalledWith('textbox', { name: 'Search', exact: true });
     expect(page._loc.press).toHaveBeenCalledWith('Enter');
+  });
+});
+
+describe('role name substring fallback', () => {
+  // The recorder emits a prefix of Playwright's accessible name when the full
+  // name carries decorative text (MS Forms "Required to answer" note, hidden
+  // aria-labelledby hints). Exact matching finds nothing → substring match.
+  function pageWith(exactCount, looseCount) {
+    const exact = mockLocator(exactCount);
+    const loose = mockLocator(looseCount);
+    loose.nth = vi.fn().mockReturnValue(loose);
+    return {
+      exact, loose,
+      getByRole: vi.fn().mockImplementation((_role, opts) => (opts && opts.exact ? exact : loose)),
+    };
+  }
+
+  it('uses an exact match when there is one', async () => {
+    const page = pageWith(1, 1);
+    await fillByRole(page, 'textbox', 'Application Name', 'Acme');
+    expect(page.exact.fill).toHaveBeenCalledWith('Acme');
+    expect(page.loose.fill).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a non-exact name match when exact finds nothing', async () => {
+    const page = pageWith(0, 1);
+    await fillByRole(page, 'textbox', 'Application Name', 'Acme');
+    expect(page.getByRole).toHaveBeenCalledWith('textbox', { name: 'Application Name' });
+    expect(page.loose.fill).toHaveBeenCalledWith('Acme');
+  });
+
+  it('applies --nth to the substring matches', async () => {
+    const page = pageWith(0, 2);
+    await actionByRole(page, 'textbox', 'Name', 'click', 1);
+    expect(page.loose.nth).toHaveBeenCalledWith(1);
+  });
+
+  it('falls back inside --in scope too', async () => {
+    const exactInner = mockLocator(0);
+    const looseInner = mockLocator(1);
+    const filterLoc = {
+      ...mockLocator(1),
+      getByRole: vi.fn().mockImplementation((_r, opts) => (opts.exact ? exactInner : looseInner)),
+    };
+    const dialog = mockLocator(1);
+    dialog.filter = vi.fn().mockReturnValue(filterLoc);
+    const page = { getByRole: vi.fn().mockReturnValue(dialog) };
+    await actionByRole(page, 'button', 'Save', 'click', undefined, 'dialog', 'Settings');
+    expect(looseInner.click).toHaveBeenCalled();
+  });
+
+  it('keeps the exact locator when neither matches (clear strict-mode error)', async () => {
+    const page = pageWith(0, 0);
+    await actionByRole(page, 'button', 'Missing', 'click');
+    expect(page.exact.click).toHaveBeenCalled();
+  });
+});
+
+describe('inlineDeps', () => {
+  it('declares each _deps helper as a const', () => {
+    const src = inlineDeps(actionByRole);
+    expect(src).toContain('const _resolveByRole = async function _resolveByRole');
+  });
+
+  it('returns an empty string for functions without _deps', () => {
+    expect(inlineDeps(verifyText)).toBe('');
+  });
+
+  it('buildRunCode output runs: the helper is in scope', async () => {
+    const code = buildRunCode(fillByRole, 'textbox', 'Email', 'a@b.c')._[1];
+    const page = mockPage(1);
+    await eval(`(${code})`)(page);
+    expect(page._loc.fill).toHaveBeenCalledWith('a@b.c');
+  });
+
+  it('buildRunCodeScoped output runs: the helper is in scope', async () => {
+    const code = buildRunCodeScoped(actionByRole, 'Settings', 'Save', 'button', 'Save', 'click')._[1];
+    const page = mockPage(1);
+    page._loc.first = vi.fn().mockReturnValue(page._loc);
+    await eval(`(${code})`)(page);
+    expect(page._loc.click).toHaveBeenCalled();
+  });
+
+  it('resolveCommand output runs for role commands', async () => {
+    const { jsExpr } = resolveCommand('fill textbox "Email" "a@b.c"');
+    const page = mockPage(1);
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('page', jsExpr)(page);
+    expect(page._loc.fill).toHaveBeenCalledWith('a@b.c');
   });
 });

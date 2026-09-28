@@ -405,3 +405,21 @@ describe("press", () => {
     expect(jsExpr).toContain('"Tab"');
   });
 });
+
+// ─── role helpers: stringified code is runnable ─────────────────────────────
+
+describe("role helpers inline their _deps", () => {
+  it("fill textbox output runs with _resolveByRole in scope", async () => {
+    const { jsExpr } = direct('fill textbox "Email" "a@b.c"');
+    const calls: string[] = [];
+    const loc = {
+      count: async () => 1,
+      filter: () => loc,
+      fill: async (v: string) => { calls.push(v); },
+    };
+    const page = { getByRole: () => loc };
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction("page", `return ${jsExpr}`)(page);
+    expect(calls).toEqual(["a@b.c"]);
+  });
+});
