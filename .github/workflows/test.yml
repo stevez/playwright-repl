@@ -131,7 +131,14 @@ jobs:
         working-directory: packages/cli
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium chrome
+        # macOS runners ship Google Chrome; Playwright's mac Chrome installer
+        # breaks on dl.google.com's 302 redirect (curl without -L), so skip it there.
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ] && [ -d "/Applications/Google Chrome.app" ]; then
+            pnpm exec playwright install chromium
+          else
+            pnpm exec playwright install chromium chrome
+          fi
         working-directory: packages/cli
 
       - name: Run CLI E2E tests (relay mode, .pw scripts)
@@ -202,7 +209,14 @@ jobs:
         working-directory: packages/extension
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium chrome
+        # macOS runners ship Google Chrome; Playwright's mac Chrome installer
+        # breaks on dl.google.com's 302 redirect (curl without -L), so skip it there.
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ] && [ -d "/Applications/Google Chrome.app" ]; then
+            pnpm exec playwright install chromium
+          else
+            pnpm exec playwright install chromium chrome
+          fi
         working-directory: packages/extension
 
       - name: Run unit tests
