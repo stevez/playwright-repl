@@ -2,9 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
     getImplicitRole,
     getAccessibleName,
+    getPlaywrightName,
     getLabel,
     findByRoleAndName,
     findAllByRoleAndName,
+    findByRoleAndNameSubstring,
+    findByText,
     isHoverRevealed,
     locatorToPwArgs,
     escapeString,
@@ -218,6 +221,63 @@ describe('locator', () => {
             btn.textContent = 'Text';
             btn.setAttribute('aria-label', 'Label');
             expect(getAccessibleName(btn)).toBe('Label');
+        });
+
+        // MS Forms question markup: a required-star `role="note"` and a hidden
+        // `aria-labelledby` hint. Playwright folds both into the name; the
+        // recorder name stops at the first of them, so it is always a prefix
+        // of Playwright's name and a non-exact getByRole still matches it.
+        const MS_FORMS_Q1 = `
+            <div id="q1-label">
+                <div style="display:block"><span style="display:block">1.</span><span>Application Name</span><span role="note" aria-label="Required to answer"></span></div>
+            </div>
+            <span id="q1-desc" style="display:none" aria-hidden="true">Single line text.</span>
+            <input type="text" aria-labelledby="q1-label q1-desc">`;
+
+        it('stops the recorder name at a role="note" descendant (MS Forms required star)', () => {
+            document.body.innerHTML = MS_FORMS_Q1;
+            expect(getAccessibleName(document.querySelector('input')!)).toBe('1. Application Name');
+        });
+
+        it('includes role="note" and hidden labelledby text in the Playwright name', () => {
+            document.body.innerHTML = MS_FORMS_Q1;
+            expect(getPlaywrightName(document.querySelector('input')!))
+                .toBe('1. Application NameRequired to answer Single line text.');
+        });
+
+        it('stops the recorder name at a hidden aria-labelledby target', () => {
+            document.body.innerHTML = `
+            <span id="t">Email</span>
+            <span id="h" aria-hidden="true">Single line text.</span>
+            <span id="more">address</span>
+            <input type="text" aria-labelledby="t h more">`;
+            const input = document.querySelector('input')!;
+            expect(getAccessibleName(input)).toBe('Email');
+            expect(getPlaywrightName(input)).toBe('Email Single line text. address');
+        });
+
+        it('keeps the recorder name a prefix when the note sits mid-name (MS Forms description)', () => {
+            document.body.innerHTML = `
+            <div id="q5-label">
+                <div><span style="display:block">5.</span><span>Application CI:\u00A0</span><span role="note" aria-label="Required to answer"></span></div>
+                <div style="display:block">All application going to production must have a CI#</div>
+            </div>
+            <input type="text" aria-labelledby="q5-label">`;
+            const input = document.querySelector('input')!;
+            // Edge nbsp is trimmed, as Playwright's asFlatString does.
+            expect(getAccessibleName(input)).toBe('5. Application CI:');
+            expect(getPlaywrightName(input).startsWith('5. Application CI:\u00A0Required to answer')).toBe(true);
+        });
+
+        it('keeps interior nbsp and drops zero-width space / soft hyphen (asFlatString)', () => {
+            document.body.innerHTML = `<button>a\u00A0b\u200Bc\u00ADd</button>`;
+            expect(getAccessibleName(document.querySelector('button')!)).toBe('a\u00A0bcd');
+        });
+
+        it('recorder and Playwright names agree when there is nothing decorative', () => {
+            document.body.innerHTML = '<button>Save <span>draft</span></button>';
+            const btn = document.querySelector('button')!;
+            expect(getAccessibleName(btn)).toBe(getPlaywrightName(btn));
         });
     });
 
@@ -437,6 +497,77 @@ describe('locator', () => {
     });
 
     // ─── ancestor context disambiguation ────────────────────────────────────
+
+    // ─── Prefix names (decorative text dropped) ────────────────────────────
+
+    describe('prefix-name locators', () => {
+        const question = (n: number, title: string) => `
+            <div id="q${n}"><span>${title}</span><span role="note" aria-label="Required to answer"></span></div>
+            <input type="text" aria-labelledby="q${n}">`;
+
+        it('emits the prefix name without exact so Playwright substring-matches', () => {
+            document.body.innerHTML = question(1, 'Application Name');
+            expect(generateLocator(document.querySelector('input')!))
+                .toBe("getByRole('textbox', { name: 'Application Name' })");
+        });
+
+        it('disambiguates by substring matches, the way Playwright counts them', () => {
+            // "Name" is contained in both full names → .nth over substring matches.
+            document.body.innerHTML = question(1, 'Company Name') + question(2, 'Name');
+            const inputs = document.querySelectorAll('input');
+            expect(findByRoleAndNameSubstring('textbox', 'Name')).toHaveLength(2);
+            expect(generateLocator(inputs[1])).toBe("getByRole('textbox', { name: 'Name' }).nth(1)");
+            expect(generateLocator(inputs[0])).toBe("getByRole('textbox', { name: 'Company Name' })");
+        });
+
+        it('keeps exact matching when recorder and Playwright names agree', () => {
+            document.body.innerHTML = '<button>Save</button><button>Save</button>';
+            const btns = document.querySelectorAll('button');
+            expect(generateLocator(btns[1])).toBe("getByRole('button', { name: 'Save', exact: true }).nth(1)");
+        });
+    });
+
+    // ─── heading context ignores duplicate peers ─────────────────────────
+
+    describe('heading context', () => {
+        it('does not use an identical sibling duplicate as the heading', () => {
+            document.body.innerHTML = `
+                <div>
+                    <div role="button"><span>Select your answer</span></div>
+                    <div role="button"><span>Select your answer</span></div>
+                </div>`;
+            const second = document.querySelectorAll('[role="button"]')[1];
+            const { pw, ancestor } = generateLocatorPair(second);
+            expect(ancestor).toBeUndefined();
+            expect(pw).toBe("getByRole('button', { name: 'Select your answer', exact: true }).nth(1)");
+        });
+    });
+
+    // ─── findByText ───────────────────────────────────────────────────────
+
+    describe('findByText', () => {
+        it('matches split text across inline tags, innermost element only', () => {
+            document.body.innerHTML = `
+                <div><div id="a">Select <b>your</b> answer</div></div>
+                <div><div id="b">Select   your answer</div></div>`;
+            expect(findByText('Select your answer').map(e => e.id)).toEqual(['a', 'b']);
+        });
+
+        it('disambiguates repeated text with .first() / .nth()', () => {
+            document.body.innerHTML = '<p>Select your answer</p><p>Select your answer</p>';
+            const ps = document.querySelectorAll('p');
+            expect(generateLocator(ps[0])).toBe("getByText('Select your answer', { exact: true }).first()");
+            expect(generateLocator(ps[1])).toBe("getByText('Select your answer', { exact: true }).nth(1)");
+        });
+
+        it('does not record an ambiguous text locator when the target is not a match', () => {
+            // The outer div's text equals the target text, but its inner <p>
+            // is the innermost match — so the div is not in the match list.
+            document.body.innerHTML = '<div id="t"><p>Pick one</p></div><p>Pick one</p>';
+            expect(generateLocator(document.getElementById('t')!))
+                .not.toBe("getByText('Pick one', { exact: true })");
+        });
+    });
 
     describe('ancestor context disambiguation', () => {
         it('uses ancestor listitem context instead of .nth()', () => {

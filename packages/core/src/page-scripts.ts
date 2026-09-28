@@ -24,10 +24,23 @@
  * The daemon's browser_run_code calls: `await (code)(page)`
  * So `code` must be a function expression, not an IIFE.
  */
+/**
+ * Inline a page-script's helper functions (declared as `fn._deps`) as `const`
+ * declarations, so the stringified function can call them. Used by every
+ * stringifier: buildRunCode(Scoped), resolve-command's call(Scoped) and the
+ * extension's call(Scoped).
+ */
+export function inlineDeps(fn, sep = ' ') {
+  return (fn._deps || []).map(d => `const ${d.name} = ${d.toString()};`).join(sep);
+}
+
 export function buildRunCode(fn, ...args) {
   const filtered = args.filter(a => a !== undefined);
   const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
-  return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
+  const deps = inlineDeps(fn, '\n  ');
+  if (!deps)
+    return { _: ['run-code', `async (page) => (${fn.toString()})(page, ${serialized})`] };
+  return { _: ['run-code', `async (page) => { ${deps}\n  return (${fn.toString()})(page, ${serialized}); }`] };
 }
 
 /**
@@ -39,8 +52,10 @@ export function buildRunCodeScoped(fn, inText, targetText, ...args) {
   const serialized = filtered.map(a => JSON.stringify(a)).join(', ');
   const inSer = JSON.stringify(inText);
   const tgtSer = JSON.stringify(targetText);
+  const deps = inlineDeps(fn, '\n  ');
+  const prelude = deps ? `  ${deps}\n` : '';
   return { _: ['run-code', `async (page) => {
-  let __scope = page;
+${prelude}  let __scope = page;
   for (const __r of ['row','group','article','listitem','region','dialog','form']) {
     const __c = page.getByRole(__r).filter({ has: page.getByText(${inSer}, { exact: true }) });
     const __n = await __c.count();
@@ -333,72 +348,61 @@ export async function uncheckByText(page, text, nth?, exact?) {
 
 // ─── Role-based actions ─────────────────────────────────────────────────────
 
-export async function actionByRole(page, role, name, action, nth, inRole, inText) {
-  // Link with URL: match by href instead of accessible name
+/**
+ * Shared resolver for *ByRole helpers. Tries an exact name match first, then
+ * Playwright's own substring match (mirrors actionByText's exact → substring
+ * fallback). The recorder emits a truncated prefix of Playwright's accessible
+ * name when the full name carries decorative text (role="note" such as MS Forms'
+ * "Required to answer" star, or hidden aria-labelledby hints), so the exact
+ * match finds nothing and the substring match finds the element.
+ */
+async function _resolveByRole(page, role, name, nth, inRole, inText) {
   const isUrl = role === 'link' && name && /^\/|^https?:\/\//.test(name);
-  const roleOpts = (name && !isUrl) ? { name, exact: true } : {};
-  let loc = isUrl ? page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])') : page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
+  const find = async (exact) => {
+    const roleOpts = (name && !isUrl) ? (exact ? { name, exact: true } : { name }) : {};
+    if (isUrl) return page.locator('a[href^="' + name + '"]:not([aria-hidden="true"])');
+    if (inRole !== undefined && inText !== undefined) {
+      const cr = ({ list: 'listitem' })[inRole] || inRole;
+      return page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
     }
+    if (inText !== undefined) {
+      for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
+        const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
+        if (await scoped.count() > 0) return scoped;
+      }
+    }
+    return page.getByRole(role, roleOpts);
+  };
+  let loc = await find(true);
+  if (name && !isUrl && await loc.count() === 0) {
+    const loose = await find(false);
+    if (await loose.count() > 0) loc = loose;
   }
   if (nth !== undefined) loc = loc.nth(nth);
   else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  return loc;
+}
+
+export async function actionByRole(page, role, name, action, nth, inRole, inText) {
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc[action]();
 }
+actionByRole._deps = [_resolveByRole];
 
 export async function fillByRole(page, role, name, value, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.fill(value);
 }
+fillByRole._deps = [_resolveByRole];
 
 export async function selectByRole(page, role, name, value, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.selectOption(value);
 }
+selectByRole._deps = [_resolveByRole];
 
 export async function pressKeyByRole(page, role, name, key, nth, inRole, inText) {
-  const roleOpts = name ? { name, exact: true } : {};
-  let loc = page.getByRole(role, roleOpts);
-  if (inRole !== undefined && inText !== undefined) {
-    const cr = ({ list: 'listitem' })[inRole] || inRole;
-    loc = page.getByRole(cr).filter({ hasText: inText }).getByRole(role, roleOpts);
-  } else if (inText !== undefined) {
-    for (const r of ['row', 'region', 'group', 'article', 'listitem', 'dialog', 'form']) {
-      const scoped = page.getByRole(r).filter({ hasText: inText }).getByRole(role, roleOpts);
-      if (await scoped.count() > 0) { loc = scoped; break; }
-    }
-  }
-  if (nth !== undefined) loc = loc.nth(nth);
-  else if (await loc.count() > 1) loc = loc.filter({ visible: true });
+  const loc = await _resolveByRole(page, role, name, nth, inRole, inText);
   await loc.press(key);
 }
+pressKeyByRole._deps = [_resolveByRole];

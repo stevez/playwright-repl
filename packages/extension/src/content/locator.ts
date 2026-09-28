@@ -48,39 +48,110 @@ export function getImplicitRole(el: Element): string | null {
 // ─── Accessible name ─────────────────────────────────────────────────────
 
 /**
- * Compute accumulated text from an element's children, following the ARIA spec:
- * for each child, use its accessible name (respecting aria-label etc.) rather
- * than raw textContent. This matches Playwright's name computation.
+ * Name computation context.
+ *
+ * `full: true` computes Playwright's accessible name. `full: false` (the
+ * recorder name) computes the same name but stops at the first decorative
+ * part — a `role="note"` descendant (e.g. MS Forms' "Required to answer" red
+ * star) or a hidden `aria-labelledby` target (e.g. MS Forms' "Single line
+ * text." hint). The recorder name is therefore always a prefix of Playwright's
+ * name, so a non-exact `getByRole(role, { name })` still matches it.
  */
-function accumulatedText(el: Element, exclude?: Element): string {
+interface NameCtx {
+    full: boolean;
+    /** Set once a decorative part is reached in prefix mode — stop accumulating. */
+    truncated: boolean;
+}
+
+const newNameCtx = (full = false): NameCtx => ({ full, truncated: false });
+
+/** Playwright's asFlatString: collapse whitespace except nbsp, drop zero-width space / soft hyphen, trim. */
+function asFlatString(s: string): string {
+    return s.split('\u00A0')
+        .map(chunk => chunk.replace(/\r\n/g, '\n').replace(/[\u200b\u00ad]/g, '').replace(/\s\s*/g, ' '))
+        .join('\u00A0')
+        .trim();
+}
+
+/**
+ * Compute accumulated text from an element's children, mirroring Playwright's
+ * innerAccumulatedElementText (packages/injected/src/roleUtils.ts). For each
+ * element child, use its accessible name (respecting aria-label etc.) rather
+ * than raw textContent. Wrap a child's contribution with spaces only when the
+ * child has `display !== 'inline'` (or is <br>) — matches Playwright's
+ * "SPEC DIFFERENCE" behavior where inline elements do not add a space.
+ */
+function accumulatedText(el: Element, exclude?: Element, ctx: NameCtx = newNameCtx()): string {
+    return asFlatString(accumulatedRaw(el, exclude, ctx));
+}
+
+/**
+ * accumulatedText without normalization. Playwright flattens whitespace once,
+ * on the final name — flattening each level would trim an nbsp at the edge of
+ * a nested span (MS Forms `<span>Application CI:&nbsp;</span>`) that Playwright keeps.
+ */
+function accumulatedRaw(el: Element, exclude: Element | undefined, ctx: NameCtx): string {
     const tokens: string[] = [];
     for (const child of el.childNodes) {
+        if (ctx.truncated) break;
         if (exclude && child === exclude) continue;
         if (child.nodeType === Node.TEXT_NODE) {
             tokens.push(child.textContent || '');
         } else if (child.nodeType === Node.ELEMENT_NODE) {
             const childEl = child as Element;
-            if (exclude && childEl.contains(exclude)) {
-                tokens.push(accumulatedText(childEl, exclude));
-            } else {
-                const name = getAccessibleName(childEl);
-                // If no accessible name, recurse into children (handles
-                // wrapper elements like <pnw-tooltip-toggle> with no role)
-                tokens.push(name || accumulatedText(childEl));
+            // Skip aria-hidden descendants (Playwright excludes them).
+            if (childEl.getAttribute('aria-hidden') === 'true') continue;
+            // role="note" is supplementary content (help hints, required
+            // indicators). Playwright includes it; the recorder name stops here.
+            if (!ctx.full && childEl.getAttribute('role') === 'note') {
+                ctx.truncated = true;
+                break;
             }
+            let contribution: string;
+            if (exclude && childEl.contains(exclude)) {
+                contribution = accumulatedRaw(childEl, exclude, ctx);
+            } else {
+                const name = getAccessibleName(childEl, ctx);
+                contribution = name || accumulatedRaw(childEl, undefined, ctx);
+            }
+            // Wrap with whitespace only when display is not inline (or <br>).
+            // Matches Playwright's algorithm — inline elements concatenate
+            // without added whitespace (e.g. MS Forms `<span>Application Name
+            // </span><span role="note" aria-label="Required">` → "Application
+            // NameRequired", not "Application Name Required").
+            const display = getComputedStyle(childEl).display || 'inline';
+            if (display !== 'inline' || childEl.nodeName === 'BR')
+                contribution = ' ' + contribution + ' ';
+            tokens.push(contribution);
         }
     }
-    return tokens.join('').replace(/\s+/g, ' ').trim();
+    return tokens.join('');
 }
 
-export function getAccessibleName(el: Element): string {
+/**
+ * The name the recorder emits: Playwright's accessible name up to its first
+ * decorative part (see NameCtx). Pass a context to compute Playwright's full
+ * name instead — see getPlaywrightName().
+ */
+export function getAccessibleName(el: Element, ctx: NameCtx = newNameCtx()): string {
     // aria-labelledby (highest priority per ARIA spec)
     const labelledBy = el.getAttribute('aria-labelledby');
     if (labelledBy) {
-        const parts = labelledBy.split(/\s+/).map(id => {
+        const parts: string[] = [];
+        for (const id of labelledBy.split(/\s+/)) {
+            if (ctx.truncated) break;
             const ref = document.getElementById(id);
-            return ref ? accumulatedText(ref) : '';
-        }).filter(Boolean);
+            if (!ref) continue;
+            // Playwright includes directly-referenced hidden targets (accname
+            // spec); the recorder name stops at them.
+            const hidden = ref.getAttribute('aria-hidden') === 'true' || getComputedStyle(ref).display === 'none';
+            if (hidden && !ctx.full) {
+                ctx.truncated = true;
+                break;
+            }
+            const text = accumulatedText(ref, undefined, ctx);
+            if (text) parts.push(text);
+        }
         if (parts.length) return parts.join(' ');
     }
 
@@ -90,7 +161,7 @@ export function getAccessibleName(el: Element): string {
 
     // For inputs: associated <label>
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
-        const label = getLabel(el);
+        const label = getLabel(el, ctx);
         if (label) return label;
     }
 
@@ -102,7 +173,7 @@ export function getAccessibleName(el: Element): string {
         'columnheader', 'rowheader', 'tooltip', 'treeitem',
     ]);
     if (role && NAME_FROM_CONTENT.has(role)) {
-        const text = accumulatedText(el);
+        const text = accumulatedText(el, undefined, ctx);
         if (text) return text;
     }
 
@@ -119,16 +190,21 @@ export function getAccessibleName(el: Element): string {
     return '';
 }
 
-export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
+/** Playwright's full accessible name (includes role="note" and hidden labelledby text). */
+export function getPlaywrightName(el: Element): string {
+    return getAccessibleName(el, newNameCtx(true));
+}
+
+export function getLabel(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, ctx: NameCtx = newNameCtx()): string {
     // Explicit label via for attribute
     if (el.id) {
         const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-        if (label) return accumulatedText(label, el);
+        if (label) return accumulatedText(label, el, ctx);
     }
     // Implicit label (ancestor)
     const parentLabel = el.closest('label');
     if (parentLabel) {
-        return accumulatedText(parentLabel, el);
+        return accumulatedText(parentLabel, el, ctx);
     }
     // Informal associations (e.g. preceding table cell) are excluded here because
     // getByRole/getByLabel can't resolve them. See getInformalLabel() for fill/select.
@@ -238,12 +314,15 @@ function findLeafText(node: Node): string {
  * Walk up from el, find the nearest preceding sibling with distinctive text.
  * Skips siblings that contain links — those are peer items, not section labels.
  */
-function findNearestHeading(el: Element): { container: Element; text: string } | null {
+function findNearestHeading(el: Element, peers: Element[] = []): { container: Element; text: string } | null {
     let current = el.parentElement;
     let depth = 0;
     while (current && current !== document.body && current !== document.documentElement && depth < 5) {
         for (const child of current.children) {
             if (child.contains(el)) break; // stop at el's branch
+            // Skip the other duplicates — a sibling "Select your answer" dropdown
+            // is not a heading for this one.
+            if (peers.some(p => child === p || child.contains(p))) continue;
             // Skip peer items — section labels don't contain navigation links
             if (child.matches('a') || child.querySelector('a')) continue;
             // Skip peer radio/checkbox labels — "Ja" label is not a heading for "Nein"
@@ -266,13 +345,13 @@ function findNearestHeading(el: Element): { container: Element; text: string } |
  * nearest heading, return the heading text for the target element.
  */
 function tryHeadingContext(el: Element, matches: Element[]): string | null {
-    const result = findNearestHeading(el);
+    const result = findNearestHeading(el, matches);
     if (!result) return null;
 
     // Check uniqueness: only one match should share this heading text
     let count = 0;
     for (const match of matches) {
-        const mResult = findNearestHeading(match);
+        const mResult = findNearestHeading(match, matches);
         if (mResult && mResult.text === result.text) {
             count++;
             if (count > 1) return null;
@@ -327,6 +406,41 @@ export function findAllByRoleAndName(role: string, name: string): Element[] {
     for (const el of document.querySelectorAll('*')) {
         if (getImplicitRole(el) === role && getAccessibleName(el) === name)
             matches.push(el);
+    }
+    return matches;
+}
+
+/**
+ * Visible elements a non-exact `getByRole(role, { name })` matches: Playwright's
+ * full name contains `name` (case-insensitive, whitespace-normalized).
+ */
+export function findByRoleAndNameSubstring(role: string, name: string): Element[] {
+    const wanted = normalizeText(name).toLowerCase();
+    const matches: Element[] = [];
+    for (const el of document.querySelectorAll('*')) {
+        if (getImplicitRole(el) === role
+            && normalizeText(getPlaywrightName(el)).toLowerCase().includes(wanted)
+            && (el as HTMLElement).checkVisibility?.() !== false)
+            matches.push(el);
+    }
+    return matches;
+}
+
+/**
+ * Find visible elements matching Playwright's `getByText(text, { exact: true })`:
+ * the element's whitespace-normalized text equals `text` (so split text like
+ * `Select <b>your</b> answer` matches), and it is the innermost such element —
+ * wrapping ancestors with the same text are not matches.
+ */
+export function findByText(text: string): Element[] {
+    const wanted = normalizeText(text);
+    const matches: Element[] = [];
+    for (const el of document.body.querySelectorAll('*')) {
+        if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+        if (normalizeText(el.textContent || '') !== wanted) continue;
+        if ([...el.children].some(c => normalizeText(c.textContent || '') === wanted)) continue;
+        if ((el as HTMLElement).checkVisibility?.() === false) continue;
+        matches.push(el);
     }
     return matches;
 }
@@ -426,6 +540,17 @@ export function generateLocator(el: Element): string {
     const role = getImplicitRole(el);
     const name = getAccessibleName(el);
     if (role && name) {
+        // Recorder name is a truncated prefix of Playwright's name (decorative
+        // role="note" / hidden labelledby text dropped) — emit it without
+        // `exact` so Playwright substring-matches, and disambiguate among the
+        // same substring matches Playwright will see.
+        if (name !== getPlaywrightName(el)) {
+            const base = `getByRole(${escapeString(role)}, { name: ${escapeString(name)} })`;
+            const matches = findByRoleAndNameSubstring(role, name);
+            const idx = matches.indexOf(el);
+            if (matches.length <= 1 || idx < 0) return base;
+            return idx === 0 ? base + '.first()' : base + `.nth(${idx})`;
+        }
         // Disambiguate when multiple elements share same role + name
         const matches = findByRoleAndName(role, name);
         if (matches.length > 1) {
@@ -463,9 +588,20 @@ export function generateLocator(el: Element): string {
     // Skip for <select>: textContent is concatenated option texts, not useful for locating.
     const text = (el.textContent || '').trim();
     if (text && el.tagName !== 'SELECT') {
-        if (text.length <= 80) return `getByText(${escapeString(text)}, { exact: true })`;
-        const snippet = text.slice(0, 50).replace(/\s+\S*$/, '');
-        if (snippet) return `getByText(${escapeString(snippet)})`;
+        if (text.length <= 80) {
+            const base = `getByText(${escapeString(text)}, { exact: true })`;
+            // Disambiguate when the same text appears in multiple places
+            // (e.g. MS Forms uses "Select your answer" as placeholder for every dropdown).
+            const matches = findByText(text);
+            const idx = matches.indexOf(el);
+            if (matches.length <= 1) return base;
+            // Only emit when the index is reliable; otherwise fall through to
+            // the next strategy rather than recording an ambiguous locator.
+            if (idx >= 0) return idx === 0 ? `${base}.first()` : `${base}.nth(${idx})`;
+        } else {
+            const snippet = text.slice(0, 50).replace(/\s+\S*$/, '');
+            if (snippet) return `getByText(${escapeString(snippet)})`;
+        }
     }
 
     // 8. Role without name — only when unique on the page
