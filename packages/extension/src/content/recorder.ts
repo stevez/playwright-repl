@@ -9,23 +9,26 @@ import { escapeString, isTextField, isCheckable, buildCommands, findHoverAncesto
 
 // Interactive ARIA roles that should own a click event when the user clicks a
 // descendant (e.g. MS Forms places a bare <span> "Select your answer" inside
-// <div role="button">; we want to record the button, not the span).
+// <div role="button">; we want to record the button, not the span). Container
+// roles (listbox, combobox) are excluded: clicking an item inside a list must
+// not record a click on the whole list.
 const INTERACTIVE_ROLES = new Set([
-    'button', 'link', 'checkbox', 'radio', 'switch', 'combobox', 'listbox',
+    'button', 'link', 'checkbox', 'radio', 'switch',
     'option', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'treeitem',
 ]);
 
-function findInteractiveAncestor(el: Element): Element {
-    for (let cur: Element | null = el; cur && cur !== document.body; cur = cur.parentElement) {
+// How many ancestors to climb — keeps a link/button wrapping a large card from
+// swallowing clicks on unrelated content deep inside it.
+const MAX_INTERACTIVE_DEPTH = 5;
+
+export function findInteractiveAncestor(el: Element): Element {
+    let cur: Element | null = el;
+    for (let depth = 0; cur && cur !== document.body && depth <= MAX_INTERACTIVE_DEPTH; depth++, cur = cur.parentElement) {
         const role = cur.getAttribute('role');
         if (role && INTERACTIVE_ROLES.has(role)) return cur;
         const tag = cur.tagName;
         if (tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return cur;
-        if (tag === 'INPUT') {
-            const type = (cur as HTMLInputElement).type;
-            if (type !== 'text' && type !== 'search' && type !== 'email' && type !== 'password' && type !== 'tel' && type !== 'url' && type !== 'number')
-                return cur;
-        }
+        if (tag === 'INPUT' && !isTextField(cur)) return cur;
     }
     return el;
 }

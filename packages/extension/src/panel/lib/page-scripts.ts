@@ -23,6 +23,8 @@ export {
   actionByText, fillByText, selectByText, checkByText, uncheckByText,
   // Role-based actions
   actionByRole, fillByRole, selectByRole, pressKeyByRole,
+  // Stringifier helper
+  inlineDeps,
 } from '@playwright-repl/core/dist/page-scripts.js';
 
 export {

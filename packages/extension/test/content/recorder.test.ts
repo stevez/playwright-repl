@@ -9,6 +9,7 @@ import {
     onKeyDownCapture,
     onFocusOutCapture,
     cleanup,
+    findInteractiveAncestor,
 } from '../../src/content/recorder';
 
 describe('recorder', () => {
@@ -66,6 +67,36 @@ describe('recorder', () => {
     });
 
     // ─── onClickCapture ──────────────────────────────────────────────────
+
+    // ─── findInteractiveAncestor ──────────────────────────────────────────
+
+    describe('findInteractiveAncestor', () => {
+        it('climbs from a bare span to its role=button ancestor (MS Forms dropdown)', () => {
+            document.body.innerHTML = '<div role="button" id="dd"><span><span id="t">Select your answer</span></span></div>';
+            expect(findInteractiveAncestor(document.getElementById('t')!).id).toBe('dd');
+        });
+
+        it('does not climb to a listbox container', () => {
+            document.body.innerHTML = '<div role="listbox"><div><span id="t">Item</span></div></div>';
+            expect(findInteractiveAncestor(document.getElementById('t')!).id).toBe('t');
+        });
+
+        it('stops after a bounded number of ancestors', () => {
+            document.body.innerHTML = '<a href="/card" id="card"><div><div><div><div><div><div><span id="t">deep</span></div></div></div></div></div></div></a>';
+            expect(findInteractiveAncestor(document.getElementById('t')!).id).toBe('t');
+        });
+
+        it('does not treat a text input or textarea as an interactive owner', () => {
+            document.body.innerHTML = '<textarea id="ta"></textarea><input type="text" id="in">';
+            expect(findInteractiveAncestor(document.getElementById('ta')!).id).toBe('ta');
+            expect(findInteractiveAncestor(document.getElementById('in')!).id).toBe('in');
+        });
+
+        it('returns a non-text input itself', () => {
+            document.body.innerHTML = '<input type="submit" id="s">';
+            expect(findInteractiveAncestor(document.getElementById('s')!).id).toBe('s');
+        });
+    });
 
     describe('onClickCapture', () => {
         it('sends recorded-action for button click', () => {
