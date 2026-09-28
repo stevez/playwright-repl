@@ -47,7 +47,9 @@ function ser(v) {
 
 /** Build a JS expression that calls a page-script function (page is expected in scope) */
 function call(fn, ...args) {
-  return `return await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
+  const deps = (fn._deps || []).map(d => `const ${d.name} = ${d.toString()};`).join(' ');
+  if (!deps) return `return await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
+  return `${deps} return await (${fn.toString()})(page, ${args.map(ser).join(', ')})`;
 }
 
 /**
@@ -70,6 +72,7 @@ function callScoped(fn, inText, _targetText, ...args) {
           return null;
         })`;
   return `return await (async () => {
+    ${(fn._deps || []).map(d => `const ${d.name} = ${d.toString()};`).join(' ')}
     let __scope = page;
     const __roles = ['group', 'article', 'listitem', 'region', 'dialog', 'form'];
     for (const __r of __roles) {
