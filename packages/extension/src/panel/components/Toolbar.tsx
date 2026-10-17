@@ -38,13 +38,26 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         return url.startsWith('chrome://') || url.startsWith('edge://') || url.startsWith('chrome-extension://');
     }
 
+    const MAX_TAB_LABEL = 40;
+
+    function truncateLabel(label: string): string {
+        return label.length > MAX_TAB_LABEL ? `${label.slice(0, MAX_TAB_LABEL - 1)}…` : label;
+    }
+
+    // Page title first — several tabs of one app share a hostname — then a URL-based label.
     function getTabLabel(tab: chrome.tabs.Tab): string {
+        const title = tab.title?.trim();
+        if (title) return truncateLabel(title);
         try {
             if (tab.url?.startsWith('about:')) return tab.url;
             const url = new URL(tab.url!);
             if (url.protocol === 'chrome:') return `chrome://${url.hostname}`;
             if (url.protocol === 'edge:') return `edge://${url.hostname}`;
-            return url.hostname;
+            if (url.protocol === 'file:') {
+                const fileName = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '');
+                return truncateLabel(fileName || tab.url!);
+            }
+            return truncateLabel(tab.url!);
         } catch {
             return tab.url ?? '(unknown)';
         }
@@ -71,7 +84,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
         checkActiveTab();
         if (!chrome.tabs?.onActivated) return;
         const onActivated = (info: chrome.tabs.TabActiveInfo) => { setSelectedTabId(info.tabId); checkActiveTab(); };
-        const onUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => { if (changeInfo.url) loadTabs(); };
+        const onUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => { if (changeInfo.url || changeInfo.title) loadTabs(); };
         chrome.tabs.onActivated.addListener(onActivated);
         chrome.tabs.onUpdated.addListener(onUpdated);
         return () => { chrome.tabs.onActivated.removeListener(onActivated); chrome.tabs.onUpdated.removeListener(onUpdated); };
@@ -478,7 +491,7 @@ function Toolbar({ editorContent, editorMode, stepLine, attachedUrl, attachedTab
                 >
                     {!selectedTabId && !attachedTabId && <option value="">— select tab —</option>}
                     {availableTabs.map(tab => (
-                        <option key={tab.id} value={tab.id}>{getTabLabel(tab)}</option>
+                        <option key={tab.id} value={tab.id} title={tab.url}>{getTabLabel(tab)}</option>
                     ))}
                 </select>
                 <button

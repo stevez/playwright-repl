@@ -635,7 +635,7 @@ describe('Toolbar component tests', () => {
         expect(select.querySelectorAll('option').length).toBe(2);
       });
 
-      await userEvent.selectOptions(select, 'google.com'); // select by label text
+      await userEvent.selectOptions(select, 'Google'); // select by label text
 
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_START' });
@@ -655,7 +655,7 @@ describe('Toolbar component tests', () => {
 
       await vi.waitFor(() => expect(select.querySelectorAll('option').length).toBe(2));
 
-      await userEvent.selectOptions(select, 'google.com'); // select by label text
+      await userEvent.selectOptions(select, 'Google'); // select by label text
 
       await vi.waitFor(() => {
         expect(dispatch).toHaveBeenCalledWith({ type: 'ATTACH_FAIL' });
@@ -683,6 +683,74 @@ describe('Toolbar component tests', () => {
         expect(values).toContain('1');     // https://example.com included
         expect(values).toContain('2');     // chrome://newtab included
         expect(values).toContain('4');     // about:blank included
+      });
+    });
+
+    // ─── Tab labels ───
+
+    async function renderTabOptions(tabs: Partial<chrome.tabs.Tab>[]) {
+      (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue(tabs);
+      const screen = await renderToolbar();
+      const select = screen.container.querySelector('select[title="Switch tab"]') as HTMLSelectElement;
+      select.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+      await vi.waitFor(() => expect(select.querySelectorAll('option').length).toBe(tabs.length + 1));
+      // Skip the "— select tab —" placeholder
+      return Array.from(select.querySelectorAll('option')).slice(1) as HTMLOptionElement[];
+    }
+
+    it('labels tabs with their page title and shows the URL on hover', async () => {
+      const options = await renderTabOptions([
+        { id: 1, url: 'https://app.example.com/orders', title: 'Orders' },
+        { id: 2, url: 'https://app.example.com/invoices', title: 'Invoices' },
+      ]);
+      expect(options.map(o => o.textContent)).toEqual(['Orders', 'Invoices']);
+      expect(options.map(o => o.title)).toEqual(['https://app.example.com/orders', 'https://app.example.com/invoices']);
+    });
+
+    it('falls back to the URL when a tab has no title', async () => {
+      const options = await renderTabOptions([
+        { id: 1, url: 'https://example.com/page', title: '' },
+      ]);
+      expect(options[0].textContent).toBe('https://example.com/page');
+    });
+
+    it('labels an untitled local file tab with its file name', async () => {
+      const options = await renderTabOptions([
+        { id: 1, url: 'file:///C:/Users/me/My%20Page.html' },
+      ]);
+      expect(options[0].textContent).toBe('My Page.html');
+    });
+
+    it('keeps the chrome:// label for untitled internal pages', async () => {
+      const options = await renderTabOptions([
+        { id: 1, url: 'chrome://extensions/' },
+      ]);
+      expect(options[0].textContent).toBe('chrome://extensions');
+    });
+
+    it('truncates long titles', async () => {
+      const longTitle = 'A very long page title that keeps going and going forever';
+      const options = await renderTabOptions([
+        { id: 1, url: 'https://example.com', title: longTitle },
+      ]);
+      expect(options[0].textContent!.length).toBeLessThanOrEqual(40);
+      expect(options[0].textContent!.endsWith('…')).toBe(true);
+    });
+
+    it('reloads tabs when a tab title changes', async () => {
+      let onUpdated: ((tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => void) | undefined;
+      Object.assign(window.chrome.tabs, {
+        onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onUpdated: { addListener: vi.fn(fn => { onUpdated = fn; }), removeListener: vi.fn() },
+      });
+      await renderToolbar();
+      await vi.waitFor(() => expect(onUpdated).toBeDefined());
+      const callsBefore = (window.chrome.tabs.query as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      onUpdated!(1, { title: 'New title' });
+
+      await vi.waitFor(() => {
+        expect((window.chrome.tabs.query as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsBefore);
       });
     });
   });
