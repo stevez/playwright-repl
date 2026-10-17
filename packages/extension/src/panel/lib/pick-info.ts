@@ -83,15 +83,24 @@ function parseAriaSnapshot(snapshot: string): { element: AriaNode; parent?: Aria
 }
 
 /**
- * Extract frame selector from a JS locator that contains .contentFrame().
- * e.g. `locator('#oevd-iframe').contentFrame().getByRole('radio', { name: 'Bis 45 km/h' })`
- * → { frameSelector: '#oevd-iframe', innerLocator: "getByRole('radio', { name: 'Bis 45 km/h' })" }
+ * Extract the frame chain from a JS locator with one or more .contentFrame() hops.
+ * e.g. `locator('#outer').contentFrame().locator('#inner').contentFrame().getByRole('button', { name: 'OK' })`
+ * → { frameSelector: '#outer #inner', innerLocator: "getByRole('button', { name: 'OK' })" }
+ * frameSelector is space-separated, outermost first — the same --frame format the recorder emits.
  * Returns null if no frame context is present.
  */
 function extractFrameContext(locator: string): { frameSelector: string; innerLocator: string } | null {
-    const match = locator.match(/^locator\(['"](.+?)['"]\)\.contentFrame\(\)\.(.+)$/);
-    if (match) return { frameSelector: match[1], innerLocator: match[2] };
-    return null;
+    const frames: string[] = [];
+    let rest = locator;
+    // Back-reference the opening quote so selectors like 'iframe[name="x"]' keep their inner quotes
+    const hop = /^locator\((['"])(.+?)\1\)\.contentFrame\(\)\./;
+    let match;
+    while ((match = rest.match(hop))) {
+        frames.push(match[2]);
+        rest = rest.slice(match[0].length);
+    }
+    if (frames.length === 0) return null;
+    return { frameSelector: frames.join(' '), innerLocator: rest };
 }
 
 // ─── JS Locator Parsing ──────────────────────────────────────────────

@@ -467,6 +467,38 @@ describe('buildPickResult', () => {
         expect(result.pwCommand).toContain('Bis 45 km/h');
     });
 
+    it('includes every frame in --frame for nested iframes (#815)', () => {
+        const cdpLocator = "locator('iframe[name=\"iframe1\"]').contentFrame().locator('iframe[name=\"iframe2\"]').contentFrame().getByRole('button', { name: 'Hello iframe 2' })";
+        const result = buildPickResult(makeInfo({
+            locator: cdpLocator,
+            tag: 'button',
+            text: 'Hello iframe 2',
+        }), cdpLocator, '- button "Hello iframe 2"');
+        expect(result.pwCommand).toBe('highlight button "Hello iframe 2" --frame "iframe[name="iframe1"] iframe[name="iframe2"]"');
+        expect(result.assertPw).toContain('--frame "iframe[name="iframe1"] iframe[name="iframe2"]"');
+        expect(result.jsExpression).toBe(`await page.${cdpLocator}.highlight();`);
+    });
+
+    it('includes all frames in --frame for three levels of nesting', () => {
+        const cdpLocator = "locator('#outer').contentFrame().locator('iframe[name=\"middle\"]').contentFrame().locator('#inner').contentFrame().getByRole('link', { name: 'Docs' })";
+        const result = buildPickResult(makeInfo({
+            locator: cdpLocator,
+            tag: 'a',
+            text: 'Docs',
+        }), cdpLocator, '- link "Docs"');
+        expect(result.pwCommand).toBe('highlight link "Docs" --frame "#outer iframe[name="middle"] #inner"');
+    });
+
+    it('handles double-quoted frame selectors containing single quotes', () => {
+        const cdpLocator = "locator(\"iframe[title='Payment']\").contentFrame().getByRole('button', { name: 'Pay' })";
+        const result = buildPickResult(makeInfo({
+            locator: cdpLocator,
+            tag: 'button',
+            text: 'Pay',
+        }), cdpLocator, '- button "Pay"');
+        expect(result.pwCommand).toBe('highlight button "Pay" --frame "iframe[title=\'Payment\']"');
+    });
+
     it('does not include --frame when no .contentFrame() in locator', () => {
         const result = buildPickResult(makeInfo());
         expect(result.pwCommand).not.toContain('--frame');
