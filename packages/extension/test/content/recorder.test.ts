@@ -119,6 +119,25 @@ describe('recorder', () => {
             );
         });
 
+        it('records the button, not the icon span, for an icon-only button (#911)', () => {
+            // OpenUI5 cart button (sap.m.Button), as rendered on the demo app
+            document.body.innerHTML =
+                '<button id="__button3" aria-label="Show Shopping Cart" aria-pressed="false" title="Show Shopping Cart">' +
+                '<span id="__button3-inner"><span id="__button3-img" role="presentation" aria-hidden="true"></span></span>' +
+                '<span id="__button3-tooltip">Show Shopping Cart</span></button>';
+            const icon = document.getElementById('__button3-img')!;
+            const event = new MouseEvent('click', { bubbles: true });
+            Object.defineProperty(event, 'target', { value: icon });
+            onClickCapture(event);
+            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+                type: 'recorded-action',
+                action: {
+                    pw: 'click button "Show Shopping Cart"',
+                    js: "await page.getByRole('button', { name: 'Show Shopping Cart' }).click();",
+                },
+            });
+        });
+
         it('skips click on text input', () => {
             document.body.innerHTML = '<input type="text">';
             const input = document.querySelector('input')!;
