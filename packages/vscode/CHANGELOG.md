@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.28.0
+
+**2026-10-31**
+
+### Features
+
+- New `wait-download` command — waits for the next download and returns the saved file path.
+
+### Fixes
+
+- Recording and playback on Microsoft Forms (required-field labels and repeated placeholder text).
+- Element picker includes every nested frame in `--frame`.
+- Tab switcher shows page titles instead of hostnames.
+
 ## 0.27.5
 
 **2026-05-18**

@@ -187,7 +187,8 @@ category: a-category
     expect(rogers!.category).toBe('tax/bills/telecom');
     expect(rogers!.pwFile).toContain('download-bill.pw');
     expect(rogers!.parameters).toEqual([
-      { name: 'billing_periods', description: 'list of dates to check (e.g. "January 24, 2026", "February 24, 2026")' },
+      { name: 'billing_period', description: 'billing period label to download (e.g. "January 24, 2026")' },
+      { name: 'filename', description: 'output filename for the download (e.g. "rogers-2026-01.pdf")' },
     ]);
   });
 });

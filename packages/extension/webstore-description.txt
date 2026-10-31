@@ -1,6 +1,6 @@
-Dramaturg — Playwright Engineer's Companion
+Dramaturg — Playwright Recorder, Locator Picker & Test Runner
 
-Console, editor, runner, debugger, and recorder for Playwright — all in a Chrome side panel. No Node.js backend, no external server. Open the panel and start automating.
+Record Playwright tests, pick reliable locators, and run or debug Playwright JavaScript directly in your browser's side panel. No Node.js setup, no external server — open the panel on any page and start writing tests.
 
 Console — two modes, one input
 
