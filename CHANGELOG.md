@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.28.0
+
+**2026-10-31**
+
+### Features
+
+- **`wait-download` command** — waits for the next browser download to complete and returns the saved file path. `download-bill.pw` skill now resizes to 1280×800 first so the desktop "Save PDF" button renders. ([#909](https://github.com/stevez/playwright-repl/pull/909))
+
+### Fixes
+
+- **MS Forms recording and playback** — the recorder now computes accessible names the way Playwright does (including `role="note"` labels like "Required to answer"), and disambiguates repeated text such as identical dropdown placeholders, so recorded `.pw` and JS scripts replay correctly. ([#915](https://github.com/stevez/playwright-repl/pull/915))
+- **Picker `--frame` for nested iframes** — the element picker now includes the full frame chain (e.g. `--frame "iframe[name="iframe1"] iframe[name="iframe2"]"`) instead of only the outermost frame. ([#917](https://github.com/stevez/playwright-repl/pull/917), [#815](https://github.com/stevez/playwright-repl/issues/815))
+- **Tab switcher shows page titles** — tabs are labelled by page title (or file name for `file://` tabs) instead of hostname, truncated to 40 characters, with the full URL on hover. ([#916](https://github.com/stevez/playwright-repl/pull/916), [#910](https://github.com/stevez/playwright-repl/issues/910))
+- **Relay-mode screenshots** — `screenshot` in relay mode now saves to `~/pw-screenshots/` and prints the path instead of dumping base64 to the terminal. ([#912](https://github.com/stevez/playwright-repl/pull/912))
+
+### Chrome Web Store
+
+- Extension listing renamed to **"Dramaturg – Playwright Recorder, Locator & Test Runner"** with a new summary, to make it easier to find in store search.
+
 ## v0.27.6
 
 **2026-05-19**

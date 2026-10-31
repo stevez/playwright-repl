@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Dramaturg",
-  "version": "0.27.6",
-  "description": "Playwright engineer's companion — console, editor, runner, debugger, and recorder in a browser side panel.",
+  "name": "Dramaturg – Playwright Recorder, Locator & Test Runner",
+  "version": "0.28.0",
+  "description": "Record Playwright tests, pick locators, and run or debug Playwright JavaScript right in a side panel. No Node.js setup needed.",
   "permissions": [
     "activeTab",
     "tabs",
