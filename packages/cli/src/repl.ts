@@ -13,7 +13,7 @@ import {
   replVersion, parseInput, ALIASES, ALL_COMMANDS, buildCompletionItems, c, prettyJson,
   CDPRelayServer, COMMANDS, CATEGORIES, JS_CATEGORIES,
   filterResponse as filterResponseBase, resolveArgs, resolveCommand,
-  isLocalCommand, handleLocalCommand,
+  isLocalCommand, handleLocalCommand, resolveActivePage,
 } from '@playwright-repl/core';
 import type { EngineOpts, ParsedArgs, EngineResult, CompletionItem } from '@playwright-repl/core';
 import { SessionManager } from './recorder.js';
@@ -813,20 +813,23 @@ function parseRelayResult(raw: unknown): EngineResult {
   return { text: formatRelayResult(raw), isError: false };
 }
 
-async function relayExec(
+export async function relayExec(
   command: string,
   page: any,
   context: any,
   expect: any,
 ): Promise<EngineResult> {
   const trimmed = command.trim();
+  // tab-select/tab-new/tab-close may have switched the current page since
+  // `page` was captured by the caller — resolveActivePage picks that up.
+  const livePage = resolveActivePage(page, context);
 
   // Keyword command → resolveCommand → jsExpr → direct execution
   const resolved = resolveCommand(trimmed);
   if (resolved) {
     try {
       const fn = new AsyncFn('page', 'context', 'expect', resolved.jsExpr);
-      const result = await fn(page, context, expect);
+      const result = await fn(livePage, context, expect);
       return parseRelayResult(result);
     } catch (e: unknown) {
       return { text: e instanceof Error ? e.message : String(e), isError: true };
@@ -839,7 +842,7 @@ async function relayExec(
     : trimmed;
   try {
     const fn = new AsyncFn('page', 'context', 'expect', script);
-    const result = await fn(page, context, expect);
+    const result = await fn(livePage, context, expect);
     return parseRelayResult(result);
   } catch (e: unknown) {
     return { text: e instanceof Error ? e.message : String(e), isError: true };

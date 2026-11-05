@@ -129,7 +129,9 @@ export async function tabNew(_page, url) {
   const tabUrl = url || 'about:blank';
   const activeTabId = globalThis.activeTabId;
   const windowId = activeTabId ? (await chrome.tabs.get(activeTabId)).windowId : undefined;
-  await chrome.tabs.create(windowId !== undefined ? { url: tabUrl, windowId } : { url: tabUrl });
+  const newTab = await chrome.tabs.create(windowId !== undefined ? { url: tabUrl, windowId } : { url: tabUrl });
+  const res = await globalThis.attachToTab(newTab.id);
+  if (!res.ok) throw new Error(res.error || 'Attach failed');
   return 'Opened new tab' + (url ? ': ' + url : '');
 }
 
