@@ -434,12 +434,37 @@ export async function videoStop(page) {
 }
 
 // ─── Tabs (Playwright context.pages) ────────────────────────────────────────
+//
+// tabNew/tabSelect/tabClose can't reassign the `page` variable their caller
+// holds, so they stash the new current page as `context.__pwReplActivePage`
+// instead. Runners read it back via resolveActivePage() before building the
+// next jsExpr. (These functions are stringified via fn.toString() for inline
+// eval, so the property name is a literal here, not a shared const — a
+// module-scope reference wouldn't exist in the stringified copy's scope.)
+
+/**
+ * Current page for the next command — the last tab switch, or `page` if none
+ * happened yet. Skips over a stored page that's since been closed (e.g. the
+ * user closed the selected tab by hand) and falls back to `page` itself, or
+ * the last remaining open page in the context, whichever is still open.
+ */
+export function resolveActivePage(page, context) {
+  const stored = context && context.__pwReplActivePage;
+  if (stored && !stored.isClosed?.()) return stored;
+  if (page && !page.isClosed?.()) return page;
+  const pages = context && context.pages ? context.pages() : [];
+  for (let i = pages.length - 1; i >= 0; i--) {
+    if (!pages[i].isClosed?.()) return pages[i];
+  }
+  return page;
+}
 
 export async function tabList(page) {
   const pages = page.context().pages();
+  const titles = await Promise.all(pages.map(p => p.title().catch(() => '')));
   return JSON.stringify(pages.map((p, i) => ({
     index: i,
-    title: '',
+    title: titles[i],
     url: p.url(),
     current: p === page,
   })), null, 2);
@@ -448,6 +473,7 @@ export async function tabList(page) {
 export async function tabNew(page, url) {
   const newPage = await page.context().newPage();
   if (url) await newPage.goto(url);
+  newPage.context().__pwReplActivePage = newPage;
   return 'Opened new tab' + (url ? ': ' + url : '');
 }
 
@@ -456,7 +482,12 @@ export async function tabClose(page, index) {
   const target = index !== undefined ? pages[parseInt(index)] : page;
   if (!target) throw new Error('Tab ' + (index !== undefined ? index : 'current') + ' not found');
   const url = target.url();
+  const wasCurrent = target === page;
   await target.close();
+  if (wasCurrent) {
+    const remaining = page.context().pages();
+    page.context().__pwReplActivePage = remaining[remaining.length - 1];
+  }
   return 'Closed: ' + url;
 }
 
@@ -465,6 +496,7 @@ export async function tabSelect(page, index) {
   const target = pages[parseInt(index)];
   if (!target) throw new Error('Tab ' + index + ' not found');
   await target.bringToFront();
+  page.context().__pwReplActivePage = target;
   return 'Selected tab ' + index + ': ' + target.url();
 }
 

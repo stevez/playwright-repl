@@ -3,7 +3,7 @@
  * No Chrome extension dependency.
  */
 
-import { resolveCommand, UPDATE_COMMANDS } from '@playwright-repl/core';
+import { resolveCommand, resolveActivePage, UPDATE_COMMANDS } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule } from './types.js';
 
@@ -101,7 +101,9 @@ export function createStandaloneRunner(
         await ensureBrowser();
         try {
             const fn = new AsyncFunction('page', 'context', 'expect', jsExpr);
-            const result = await fn(page, context, expect);
+            // tab-select/tab-new/tab-close may have switched the current page
+            // since `page` was last assigned — resolveActivePage picks that up.
+            const result = await fn(resolveActivePage(page, context), context, expect);
             return formatResult(result);
         } catch (e: unknown) {
             return { text: e instanceof Error ? e.message : String(e), isError: true };

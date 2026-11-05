@@ -6,7 +6,7 @@
  * No BrowserBackend — direct execution against the real page object.
  */
 
-import { CDPRelayServer, resolveCommand, UPDATE_COMMANDS } from '@playwright-repl/core';
+import { CDPRelayServer, resolveCommand, resolveActivePage, UPDATE_COMMANDS } from '@playwright-repl/core';
 import type { EngineResult } from '@playwright-repl/core';
 import type { RunnerModule } from './types.js';
 import { logEvent } from './logger.js';
@@ -126,7 +126,9 @@ export async function createRelayRunner(
         const { page: p } = await ensureConnected();
         try {
             const fn = new AsyncFunction('page', 'context', 'expect', jsExpr);
-            const result = await fn(p, context, expect);
+            // tab-select/tab-new/tab-close may have switched the current page
+            // since `page` was last assigned — resolveActivePage picks that up.
+            const result = await fn(resolveActivePage(p, context), context, expect);
             return formatResult(result);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -135,7 +137,7 @@ export async function createRelayRunner(
                 try {
                     const { page: p2 } = await ensureConnected();
                     const fn = new AsyncFunction('page', 'context', 'expect', jsExpr);
-                    const result = await fn(p2, context, expect);
+                    const result = await fn(resolveActivePage(p2, context), context, expect);
                     return formatResult(result);
                 } catch (retryErr: unknown) {
                     return { text: retryErr instanceof Error ? retryErr.message : String(retryErr), isError: true };

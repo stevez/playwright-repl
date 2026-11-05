@@ -26,7 +26,7 @@ export {
   getConsoleMessages, getNetworkRequests, setDialogAccept, setDialogDismiss,
   addRoute, listRoutes, removeRoute,
   tracingStart, tracingStop, videoStart, videoStop,
-  tabList, tabNew, tabClose, tabSelect,
+  tabList, tabNew, tabClose, tabSelect, resolveActivePage,
   dragDrop, resizeViewport,
 } from './command-scripts.js';
 export type { EngineOpts, EngineResult, ParsedArgs } from './types.js';
