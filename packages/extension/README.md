@@ -2,6 +2,8 @@
 
 Chrome side panel extension that runs the full Playwright API directly inside your browser — no Node.js backend required. Use it as a standalone console, or connect it to the CLI / MCP server.
 
+> Looking for a JavaScript-first recorder? Try **[Sidekick for Playwright](https://chromewebstore.google.com/detail/mogfomdgpoiedianojekjgoiobfkahob)**: record, assert, step-debug and video-record Playwright tests in a side panel, and export a `.spec.ts`.
+
 | Feature | Description |
 |---------|-------------|
 | **Console** | Auto-detects input type — `.pw` keywords or Playwright API / JavaScript |

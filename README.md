@@ -85,6 +85,8 @@ Chrome side panel extension that runs Playwright directly inside your browser.
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/dramaturg/ppbkmncnmjkfppilnmplpokdfagobipa), or build from source.
 
+> Looking for a JavaScript-first recorder? Try **[Sidekick for Playwright](https://chromewebstore.google.com/detail/mogfomdgpoiedianojekjgoiobfkahob)**: record, assert, step-debug and video-record Playwright tests in a side panel, and export a `.spec.ts`.
+
 | Feature | |
 |---------|---|
 | Console | `.pw` keywords and Playwright JavaScript — auto-detected |
